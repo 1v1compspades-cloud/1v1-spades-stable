@@ -11,6 +11,7 @@ import {
   playCard,
   removePlayerFromRoom,
   getRoomBySocketId,
+  reconnectPlayer,
   type GameState,
 } from "./engine.js";
 import type { Card } from "./deck.js";
@@ -244,6 +245,39 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         logger.error({ err }, "Error advancing round");
       }
     });
+
+    socket.on(
+      "reconnect_player",
+      (
+        data: { roomCode: string; playerIndex: 0 | 1; playerName: string },
+        callback: (res: { ok: boolean; error?: string }) => void
+      ) => {
+        try {
+          const code = data.roomCode.toUpperCase().trim();
+          const state = reconnectPlayer(code, data.playerIndex, socket.id, data.playerName);
+          socket.join(code);
+          logger.info({ roomCode: code, playerIndex: data.playerIndex }, "Player reconnected");
+
+          callback({ ok: true });
+          socket.emit("game_state", sanitizeStateForPlayer(state, data.playerIndex));
+
+          // Notify the other player that their opponent is back
+          const otherIndex = data.playerIndex === 0 ? 1 : 0;
+          const other = state.players[otherIndex];
+          if (other) {
+            io.to(other.socketId).emit("opponent_reconnected", {
+              playerName: data.playerName,
+            });
+            // Also refresh their state in case phase was restored
+            io.to(other.socketId).emit("game_state", sanitizeStateForPlayer(state, otherIndex));
+          }
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          logger.warn({ err, data }, "Reconnect failed");
+          callback({ ok: false, error: msg });
+        }
+      }
+    );
 
     socket.on("disconnect", () => {
       logger.info({ socketId: socket.id }, "Socket disconnected");

@@ -384,10 +384,8 @@ export function removePlayerFromRoom(socketId: string): GameState | null {
   for (const [, state] of rooms) {
     for (let i = 0; i < state.players.length; i++) {
       if (state.players[i]?.socketId === socketId) {
-        // Mark game as ended if mid-game
-        if (state.phase !== "waiting" && state.phase !== "game_over") {
-          state.phase = "game_over";
-        }
+        // Null out the slot but preserve phase — reconnectPlayer will restore the seat.
+        // We intentionally do NOT set phase = "game_over" so the room stays recoverable.
         state.players[i] = null;
         return state;
       }
@@ -409,4 +407,32 @@ export function getRoomBySocketId(socketId: string): GameState | null {
 
 export function cleanupRoom(roomCode: string): void {
   rooms.delete(roomCode);
+}
+
+export function reconnectPlayer(
+  roomCode: string,
+  playerIndex: 0 | 1,
+  newSocketId: string,
+  playerName: string
+): GameState {
+  const state = rooms.get(roomCode);
+  if (!state) throw new Error("Room not found");
+
+  const player = state.players[playerIndex];
+  if (!player) {
+    // Slot was cleared (e.g. opponent disconnected us) — restore it
+    state.players[playerIndex] = {
+      id: newSocketId,
+      name: playerName,
+      socketId: newSocketId,
+      index: playerIndex,
+    };
+  } else {
+    // Update socketId to the new connection
+    player.socketId = newSocketId;
+    player.id = newSocketId;
+  }
+
+  rooms.set(roomCode, state);
+  return state;
 }

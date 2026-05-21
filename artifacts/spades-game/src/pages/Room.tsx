@@ -14,7 +14,7 @@ export default function Room() {
   const [, setLocation] = useLocation();
   const roomCode = params?.roomCode;
   
-  const { socket, connected, gameState, connect, joinRoom, startGame, placeBid, playCard, nextRound } = useSocket();
+  const { socket, connected, gameState, connect, joinRoom, reconnect, startGame, placeBid, playCard, nextRound } = useSocket();
   const { playerName, playerIndex, savePlayerIndex, saveRoomCode } = useGameStorage();
   const { toast } = useToast();
 
@@ -33,16 +33,25 @@ export default function Room() {
   }, [roomCode, connected, connect, setLocation]);
 
   useEffect(() => {
-    if (connected && roomCode && playerName && !gameState) {
-      // Re-join if we have the info but no state (e.g. refresh)
+    if (!connected || !roomCode || !playerName || gameState) return;
+
+    if (playerIndex !== null) {
+      // We already have a seat — reconnect to restore it
+      reconnect(roomCode, playerIndex, playerName).catch(err => {
+        // Room no longer exists (server restarted); go back to lobby
+        toast({ description: err || "Session expired. Please rejoin.", variant: "destructive" });
+        setLocation("/");
+      });
+    } else {
+      // Fresh join (navigated here directly without a stored seat)
       joinRoom(roomCode, playerName).then((res) => {
         if (res.playerIndex !== undefined) savePlayerIndex(res.playerIndex as 0 | 1);
       }).catch(err => {
-        toast({ description: err || "Failed to rejoin room", variant: "destructive" });
+        toast({ description: err || "Failed to join room", variant: "destructive" });
         setLocation("/");
       });
     }
-  }, [connected, roomCode, playerName, gameState, joinRoom, setLocation, savePlayerIndex, toast]);
+  }, [connected, roomCode, playerName, gameState, playerIndex, reconnect, joinRoom, setLocation, savePlayerIndex, toast]);
 
   if (!gameState || playerIndex === null) {
     return <div className="min-h-screen flex items-center justify-center">Connecting to table...</div>;

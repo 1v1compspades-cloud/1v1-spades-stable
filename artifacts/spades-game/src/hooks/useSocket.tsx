@@ -10,6 +10,7 @@ interface SocketContextType {
   connect: () => void;
   createRoom: (name: string) => Promise<{ roomCode?: string; playerIndex?: number }>;
   joinRoom: (code: string, name: string) => Promise<{ playerIndex?: number }>;
+  reconnect: (roomCode: string, playerIndex: 0 | 1, playerName: string) => Promise<{ ok: boolean }>;
   startGame: (code: string) => void;
   placeBid: (code: string, amount: number) => Promise<void>;
   playCard: (code: string, card: Card) => Promise<void>;
@@ -42,7 +43,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     s.on("trick_complete", () => {});
     s.on("round_over", () => {});
     s.on("opponent_disconnected", () => {
-      setError("Opponent disconnected.");
+      setError("Opponent disconnected. Waiting for them to rejoin...");
+    });
+    s.on("opponent_reconnected", () => {
+      setError(null);
     });
 
     return () => {
@@ -98,6 +102,20 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const reconnect = (roomCode: string, playerIndex: 0 | 1, playerName: string) => {
+    return new Promise<{ ok: boolean }>((resolve, reject) => {
+      if (!socket) return reject("No socket");
+      socket.emit(
+        "reconnect_player",
+        { roomCode, playerIndex, playerName },
+        (res: { ok: boolean; error?: string }) => {
+          if (res.ok) resolve({ ok: true });
+          else reject(res.error);
+        }
+      );
+    });
+  };
+
   const nextRound = (roomCode: string) => {
     socket?.emit("next_round", { roomCode });
   };
@@ -111,6 +129,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       connect,
       createRoom,
       joinRoom,
+      reconnect,
       startGame,
       placeBid,
       playCard,

@@ -72,8 +72,9 @@ export function shuffleDeck(deck: Card[]): Card[] {
 }
 
 export function dealHands(deck: Card[]): [Card[], Card[]] {
-  const hand1 = deck.slice(0, 26);
-  const hand2 = deck.slice(26, 52);
+  // Standard Spades: 13 cards each (first 26 cards of the 52-card deck are used)
+  const hand1 = deck.slice(0, 13);
+  const hand2 = deck.slice(13, 26);
   return [hand1, hand2];
 }
 
