@@ -12,6 +12,7 @@ import {
   removePlayerFromRoom,
   getRoomBySocketId,
   reconnectPlayer,
+  resetMatch,
   type GameState,
 } from "./engine.js";
 import type { Card } from "./deck.js";
@@ -39,6 +40,9 @@ function sanitizeStateForPlayer(
     roundHistory: state.roundHistory,
     roundNumber: state.roundNumber,
     trickLeader: state.trickLeader,
+    matchTarget: state.matchTarget,
+    tiebreakerActive: state.tiebreakerActive,
+    tiebreakerRound: state.tiebreakerRound,
   };
 }
 
@@ -57,11 +61,17 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
     socket.on(
       "create_room",
       (
-        data: { playerName: string },
+        data: { playerName: string; matchTarget?: number },
         callback: (res: { ok: boolean; roomCode?: string; playerIndex?: number; error?: string }) => void
       ) => {
         try {
-          const state = createRoom(data.playerName, socket.id);
+          // Accept any positive integer match target. Default to 250.
+          // UI restricts to 250/500; lower values are allowed for tests.
+          const rawTarget = Number(data.matchTarget);
+          const target = Number.isFinite(rawTarget) && rawTarget > 0 && rawTarget <= 5000
+            ? Math.floor(rawTarget)
+            : 250;
+          const state = createRoom(data.playerName, socket.id, target);
           socket.join(state.roomCode);
           logger.info({ roomCode: state.roomCode, playerName: data.playerName }, "Room created");
           callback({ ok: true, roomCode: state.roomCode, playerIndex: 0 });
@@ -314,6 +324,35 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         }
       }
     );
+
+    socket.on("new_match", (data: { roomCode: string }) => {
+      try {
+        const state = getRoom(data.roomCode);
+        if (!state) return;
+        if (state.phase !== "game_over") return;
+        // Only host can start a new match
+        if (state.players[0]?.socketId !== socket.id) return;
+        // Need both players present
+        if (!state.players[0] || !state.players[1]) return;
+
+        const reset    = resetMatch(state);
+        const newState = startRound(reset);
+        updateRoom(newState);
+
+        for (let i = 0; i < 2; i++) {
+          const p = newState.players[i];
+          if (p) {
+            io.to(p.socketId).emit("game_state", sanitizeStateForPlayer(newState, i as 0 | 1));
+            io.to(p.socketId).emit("round_started", {
+              roundNumber: newState.roundNumber,
+              yourBidTurn: i === 0,
+            });
+          }
+        }
+      } catch (err: unknown) {
+        logger.error({ err }, "Error starting new match");
+      }
+    });
 
     socket.on("disconnect", () => {
       logger.info({ socketId: socket.id }, "Socket disconnected");

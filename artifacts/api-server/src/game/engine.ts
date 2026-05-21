@@ -57,6 +57,9 @@ export interface GameState {
   roundHistory: RoundScore[];
   roundNumber: number;
   trickLeader: 0 | 1;
+  matchTarget: number;
+  tiebreakerActive: boolean;
+  tiebreakerRound: number;
 }
 
 function makeRoomCode(): string {
@@ -68,7 +71,7 @@ function makeRoomCode(): string {
   return code;
 }
 
-export function createGame(roomCode: string): GameState {
+export function createGame(roomCode: string, matchTarget = 250): GameState {
   return {
     roomCode,
     phase: "waiting",
@@ -86,6 +89,9 @@ export function createGame(roomCode: string): GameState {
     roundHistory: [],
     roundNumber: 0,
     trickLeader: 0,
+    matchTarget,
+    tiebreakerActive: false,
+    tiebreakerRound: 0,
   };
 }
 
@@ -103,8 +109,34 @@ export function startRound(state: GameState): GameState {
     spadesBroken: false,
     currentTurnIndex: null,
     roundNumber: state.roundNumber + 1,
+    tiebreakerRound: state.tiebreakerActive ? state.tiebreakerRound + 1 : 0,
   };
   return newState;
+}
+
+/**
+ * Reset match-level state (scores, bags, round history, tiebreaker) while
+ * keeping the same players in the same room. Used by the "New Match" button.
+ */
+export function resetMatch(state: GameState): GameState {
+  return {
+    ...state,
+    phase: "waiting",
+    hands: [[], []],
+    bids: [null, null],
+    currentBidder: null,
+    tricks: [0, 0],
+    currentTrick: [],
+    currentTurnIndex: null,
+    spadesBroken: false,
+    scores: [0, 0],
+    bags: [0, 0],
+    roundHistory: [],
+    roundNumber: 0,
+    trickLeader: 0,
+    tiebreakerActive: false,
+    tiebreakerRound: 0,
+  };
 }
 
 export function placeBid(
@@ -270,9 +302,40 @@ export function playCard(
       tricks: newTricks,
     };
 
-    const isGameOver =
-      (finalScores[0] >= 500 || finalScores[1] >= 500) ||
-      (finalScores[0] <= -200 || finalScores[1] <= -200);
+    const target = state.matchTarget;
+    const bothAtTarget    = finalScores[0] >= target && finalScores[1] >= target;
+    const someoneAtTarget = finalScores[0] >= target || finalScores[1] >= target;
+    const isTied          = finalScores[0] === finalScores[1];
+
+    // Determine next tiebreaker state and phase
+    let nextTiebreakerActive = state.tiebreakerActive;
+    let nextTiebreakerRound  = state.tiebreakerRound;
+    let isGameOver = false;
+
+    if (state.tiebreakerActive) {
+      // Currently inside a 3-round tiebreaker block. tiebreakerRound was
+      // incremented in startRound() at the start of this round, so
+      // tiebreakerRound === 3 means the block just finished.
+      if (state.tiebreakerRound >= 3) {
+        if (isTied) {
+          // Still tied — start another 3-round block on the next call to startRound
+          nextTiebreakerActive = true;
+          nextTiebreakerRound  = 0;
+        } else {
+          isGameOver = true;
+        }
+      }
+      // else: mid-block, just continue to round_over
+    } else if (someoneAtTarget) {
+      if (bothAtTarget && isTied) {
+        // Trigger first tiebreaker block
+        nextTiebreakerActive = true;
+        nextTiebreakerRound  = 0;
+      } else {
+        // Someone reached target and is ahead → game over
+        isGameOver = true;
+      }
+    }
 
     const finalState: GameState = {
       ...intermediateState,
@@ -282,6 +345,8 @@ export function playCard(
       phase: isGameOver ? "game_over" : "round_over",
       currentTurnIndex: null,
       roundHistory: [...state.roundHistory, roundHistory],
+      tiebreakerActive: nextTiebreakerActive,
+      tiebreakerRound:  nextTiebreakerRound,
     };
 
     return {
@@ -348,13 +413,17 @@ function calculateRoundScore(
 // Room management
 const rooms = new Map<string, GameState>();
 
-export function createRoom(hostPlayerName: string, hostSocketId: string): GameState {
+export function createRoom(
+  hostPlayerName: string,
+  hostSocketId: string,
+  matchTarget = 250
+): GameState {
   let code: string;
   do {
     code = makeRoomCode();
   } while (rooms.has(code));
 
-  const state = createGame(code);
+  const state = createGame(code, matchTarget);
   const host: Player = {
     id: hostSocketId,
     name: hostPlayerName,

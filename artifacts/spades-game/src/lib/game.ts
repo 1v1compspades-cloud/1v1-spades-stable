@@ -29,6 +29,9 @@ export interface GameState {
   }[];
   roundNumber: number;
   trickLeader: 0 | 1;
+  matchTarget: number;
+  tiebreakerActive: boolean;
+  tiebreakerRound: number;
 }
 
 export const SUIT_SYMBOLS: Record<Suit, string> = {

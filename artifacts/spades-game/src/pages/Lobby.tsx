@@ -16,6 +16,7 @@ export default function Lobby() {
   
   const [nameInput, setNameInput] = useState(playerName);
   const [joinCodeInput, setJoinCodeInput] = useState("");
+  const [matchTarget, setMatchTarget] = useState<250 | 500>(250);
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
 
@@ -28,7 +29,7 @@ export default function Lobby() {
     setIsCreating(true);
     try {
       savePlayerName(nameInput);
-      const res = await createRoom(nameInput);
+      const res = await createRoom(nameInput, matchTarget);
       if (res.roomCode && res.playerIndex !== undefined) {
         saveRoomCode(res.roomCode);
         savePlayerIndex(res.playerIndex as 0 | 1);
@@ -77,6 +78,25 @@ export default function Lobby() {
               onChange={(e) => setNameInput(e.target.value)}
               className="text-lg py-6"
             />
+          </div>
+
+          <div className="space-y-2 pt-2 border-t border-border/50">
+            <Label className="text-sm">Match target</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {([250, 500] as const).map((t) => (
+                <Button
+                  key={t}
+                  type="button"
+                  variant={matchTarget === t ? "default" : "outline"}
+                  onClick={() => setMatchTarget(t)}
+                  disabled={isCreating || isJoining}
+                  className="h-12 font-mono"
+                >
+                  {t} pts
+                </Button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">First to reach target and lead wins. Tied at target → tiebreaker.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-border/50">

@@ -8,13 +8,14 @@ interface SocketContextType {
   gameState: GameState | null;
   error: string | null;
   connect: () => void;
-  createRoom: (name: string) => Promise<{ roomCode?: string; playerIndex?: number }>;
+  createRoom: (name: string, matchTarget?: number) => Promise<{ roomCode?: string; playerIndex?: number }>;
   joinRoom: (code: string, name: string) => Promise<{ playerIndex?: number }>;
   reconnect: (roomCode: string, playerIndex: 0 | 1, playerName: string) => Promise<{ ok: boolean }>;
   startGame: (code: string) => void;
   placeBid: (code: string, amount: number) => Promise<void>;
   playCard: (code: string, card: Card) => Promise<void>;
   nextRound: (code: string) => void;
+  newMatch: (code: string) => void;
 }
 
 const SocketContext = createContext<SocketContextType | null>(null);
@@ -60,10 +61,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const createRoom = (playerName: string) => {
+  const createRoom = (playerName: string, matchTarget?: number) => {
     return new Promise<{ roomCode?: string; playerIndex?: number }>((resolve, reject) => {
       if (!socket) return reject("No socket");
-      socket.emit("create_room", { playerName }, (res: any) => {
+      socket.emit("create_room", { playerName, matchTarget }, (res: any) => {
         if (res.ok) resolve({ roomCode: res.roomCode, playerIndex: res.playerIndex });
         else reject(res.error);
       });
@@ -120,6 +121,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     socket?.emit("next_round", { roomCode });
   };
 
+  const newMatch = (roomCode: string) => {
+    socket?.emit("new_match", { roomCode });
+  };
+
   return (
     <SocketContext.Provider value={{
       socket,
@@ -133,7 +138,8 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       startGame,
       placeBid,
       playCard,
-      nextRound
+      nextRound,
+      newMatch
     }}>
       {children}
     </SocketContext.Provider>

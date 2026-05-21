@@ -15,7 +15,7 @@ export default function Room() {
   const [, setLocation] = useLocation();
   const roomCode = params?.roomCode;
 
-  const { socket, connected, gameState, connect, joinRoom, reconnect, startGame, placeBid, playCard, nextRound } = useSocket();
+  const { socket, connected, gameState, connect, joinRoom, reconnect, startGame, placeBid, playCard, nextRound, newMatch } = useSocket();
   const { playerName, playerIndex, savePlayerIndex, saveRoomCode } = useGameStorage();
   const { toast } = useToast();
 
@@ -67,6 +67,7 @@ export default function Room() {
 
   const handleStartGame = () => startGame(roomCode!);
   const handleNextRound = () => nextRound(roomCode!);
+  const handleNewMatch  = () => newMatch(roomCode!);
 
   const handleBid = async () => {
     if (!bidAmount) return;
@@ -120,9 +121,23 @@ export default function Room() {
       colorClass = "bg-white/5 text-muted-foreground";
     }
 
+    // Tiebreaker overlay sub-banner during bidding/playing/round_over of a tiebreaker round
+    const showTiebreaker =
+      gameState.tiebreakerActive &&
+      gameState.tiebreakerRound >= 1 &&
+      gameState.tiebreakerRound <= 3 &&
+      (phase === "bidding" || phase === "playing" || phase === "round_over");
+
     return (
-      <div className={`text-center py-2 px-4 text-sm tracking-wide transition-colors ${colorClass}`}>
-        {message}
+      <div>
+        {showTiebreaker && (
+          <div className="text-center py-1 px-4 text-xs tracking-wider uppercase bg-orange-500/15 text-orange-300 font-semibold">
+            Tiebreaker · Round {gameState.tiebreakerRound} of 3
+          </div>
+        )}
+        <div className={`text-center py-2 px-4 text-sm tracking-wide transition-colors ${colorClass}`}>
+          {message}
+        </div>
       </div>
     );
   };
@@ -393,6 +408,9 @@ export default function Room() {
                 ) : (
                   <p className="text-2xl font-bold text-yellow-400">It's a Draw.</p>
                 )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  First to {gameState.matchTarget} points
+                </p>
               </div>
               <div className="bg-white/5 rounded-lg p-4 space-y-2">
                 <div className="flex justify-between text-sm text-muted-foreground">
@@ -408,10 +426,22 @@ export default function Room() {
                   <span>{myBags} bags</span>
                   <span>{opponentBags} bags</span>
                 </div>
+                <div className="border-t border-white/10 pt-2 text-xs text-muted-foreground">
+                  Rounds played: <span className="font-mono text-foreground">{gameState.roundHistory.length}</span>
+                </div>
               </div>
-              <Button onClick={() => setLocation("/")} variant="outline" className="w-full h-11">
-                Return to Lobby
-              </Button>
+              <div className="space-y-2">
+                {playerIndex === 0 ? (
+                  <Button onClick={handleNewMatch} className="w-full h-11 text-base">
+                    Start New Match →
+                  </Button>
+                ) : (
+                  <p className="text-center text-muted-foreground italic text-sm">Waiting for host to start a new match…</p>
+                )}
+                <Button onClick={() => setLocation("/")} variant="outline" className="w-full h-11">
+                  Return to Lobby
+                </Button>
+              </div>
             </div>
           </div>
         )}
