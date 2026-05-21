@@ -27,6 +27,11 @@ export default function Lobby() {
   const [joinCodeInput, setJoinCodeInput] = useState(initialParams.code);
   const [matchTarget, setMatchTarget] = useState<250 | 500>(250);
   const [matchLabel, setMatchLabel] = useState<string>("");
+  const [labelMode, setLabelMode] = useState<"none" | "preset" | "custom">("none");
+  const LABEL_PRESETS = [
+    "Quarterfinal 1", "Quarterfinal 2", "Quarterfinal 3", "Quarterfinal 4",
+    "Semifinal 1", "Semifinal 2", "Finals",
+  ] as const;
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [isSpectating, setIsSpectating] = useState(false);
@@ -163,17 +168,61 @@ export default function Lobby() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="match-label" className="text-sm">Match label <span className="text-muted-foreground font-normal">(optional)</span></Label>
-            <Input
-              id="match-label"
-              placeholder="e.g. Quarterfinal 1, Semifinal 2, Finals"
-              value={matchLabel}
-              onChange={(e) => setMatchLabel(e.target.value.slice(0, 40))}
-              maxLength={40}
-              disabled={isCreating || isJoining}
-              data-testid="input-match-label"
-              className="py-5"
-            />
+            <Label className="text-sm">Match label <span className="text-muted-foreground font-normal">(optional)</span></Label>
+            <div className="grid grid-cols-2 gap-2" data-testid="match-label-presets">
+              {LABEL_PRESETS.map((p) => {
+                const active = labelMode === "preset" && matchLabel === p;
+                return (
+                  <Button
+                    key={p}
+                    type="button"
+                    size="sm"
+                    variant={active ? "default" : "outline"}
+                    onClick={() => { setLabelMode("preset"); setMatchLabel(p); }}
+                    disabled={isCreating || isJoining}
+                    data-testid={`preset-${p.toLowerCase().replace(/\s+/g, "-")}`}
+                    className="h-10 text-xs font-semibold"
+                  >
+                    {p}
+                  </Button>
+                );
+              })}
+              <Button
+                type="button"
+                size="sm"
+                variant={labelMode === "custom" ? "default" : "outline"}
+                onClick={() => { setLabelMode("custom"); setMatchLabel(""); }}
+                disabled={isCreating || isJoining}
+                data-testid="preset-custom"
+                className="h-10 text-xs font-semibold"
+              >
+                Custom label
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={labelMode === "none" ? "default" : "ghost"}
+                onClick={() => { setLabelMode("none"); setMatchLabel(""); }}
+                disabled={isCreating || isJoining}
+                data-testid="preset-none"
+                className="h-10 text-xs"
+              >
+                No label
+              </Button>
+            </div>
+            {labelMode === "custom" && (
+              <Input
+                id="match-label"
+                placeholder="Enter custom match label"
+                value={matchLabel}
+                onChange={(e) => setMatchLabel(e.target.value.slice(0, 40))}
+                maxLength={40}
+                disabled={isCreating || isJoining}
+                data-testid="input-match-label"
+                className="py-5 mt-2"
+                autoFocus
+              />
+            )}
             <p className="text-xs text-muted-foreground">Shown to both players and spectators. Only the host sets this when creating.</p>
           </div>
 

@@ -615,23 +615,25 @@ export default function Room() {
                 const winScore = [s0, s1][winIdx];
                 const loseScore = [s0, s1][loseIdx];
                 const rounds = gameState.roundHistory.length;
-                const labelLine = gameState.matchLabel ? `${gameState.matchLabel} — ` : "";
+                const ts = new Date().toLocaleString(undefined, {
+                  year: "numeric", month: "short", day: "numeric",
+                  hour: "2-digit", minute: "2-digit",
+                });
 
-                const plain = tie
-                  ? `${labelLine}${n0} ${s0}–${s1} ${n1} (draw)\nRounds: ${rounds} · Room: ${roomCode}`
-                  : `${labelLine}${winName} def. ${loseName}\nFinal: ${winScore}–${loseScore} · Rounds: ${rounds} · Room: ${roomCode}`;
-
-                const discord = [
-                  "```",
-                  "Spades Result",
-                  gameState.matchLabel ? `Match:  ${gameState.matchLabel}` : null,
-                  tie ? `Result: Draw ${s0}–${s1}` : `Winner: ${winName} (${winScore})`,
-                  tie ? `        ${n0} vs ${n1}`   : `Loser:  ${loseName} (${loseScore})`,
+                const lines = [
+                  gameState.matchLabel ? `Match: ${gameState.matchLabel}` : null,
+                  tie ? `Winner: Draw` : `Winner: ${winName}`,
+                  tie
+                    ? `Final: ${n0} ${s0} - ${n1} ${s1}`
+                    : `Final: ${winName} ${winScore} - ${loseName} ${loseScore}`,
                   `Rounds: ${rounds}`,
-                  `Target: ${gameState.matchTarget}`,
-                  `Room:   ${roomCode}`,
-                  "```",
-                ].filter(Boolean).join("\n");
+                  `Match Target: ${gameState.matchTarget}`,
+                  `Room: ${roomCode}`,
+                  `Time: ${ts}`,
+                ].filter(Boolean);
+
+                const plain = lines.join("\n");
+                const discord = "```\n" + plain + "\n```";
 
                 return (
                   <div className="space-y-2 text-left">
