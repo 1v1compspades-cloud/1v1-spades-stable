@@ -3,7 +3,7 @@ import { useRoute, useLocation } from "wouter";
 import { useSocket } from "@/hooks/useSocket";
 import { useGameStorage } from "@/hooks/useGameStorage";
 import { CardComponent } from "@/components/Card";
-import { isCardPlayable } from "@/lib/game";
+import { isCardPlayable, sortHandBySuit } from "@/lib/game";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Card as CardType } from "@/lib/game";
@@ -592,27 +592,39 @@ export default function Room() {
   };
 
   // ── My hand (players only) ─────────────────────────────────────────────────
-  const renderMyHand = () => (
-    <div className="h-48 flex items-end justify-center pb-8 pt-4 px-4 overflow-x-auto overflow-y-hidden">
-      <div className="flex -space-x-8 sm:-space-x-6">
-        {gameState.hand.map((card) => {
-          const playable = isCardPlayable(card, gameState, playerIndex as 0 | 1);
-          return (
+  // Groups cards by suit and sorts high-to-low. No overlap so every card
+  // is a full tap target on mobile. Suit groups are visually separated.
+  const renderMyHand = () => {
+    const groups = sortHandBySuit(gameState.hand);
+    return (
+      <div
+        data-testid="my-hand"
+        className="flex-shrink-0 max-h-[44vh] overflow-y-auto pb-3 pt-3 px-2 bg-black/30 border-t border-border"
+      >
+        <div className="flex flex-wrap justify-center items-end gap-x-3 gap-y-2">
+          {groups.map((group) => (
             <div
-              key={`${card.suit}-${card.rank}`}
-              className={`transition-transform z-10 ${playable ? "hover:-translate-y-8 hover:z-50 cursor-pointer" : "cursor-not-allowed"}`}
+              key={group.suit}
+              data-testid={`hand-group-${group.suit}`}
+              className="flex flex-wrap justify-center items-end gap-1"
             >
-              <CardComponent
-                card={card}
-                onClick={playable ? () => handlePlayCard(card) : undefined}
-                disabled={!playable}
-              />
+              {group.cards.map((card) => {
+                const playable = isCardPlayable(card, gameState, playerIndex as 0 | 1);
+                return (
+                  <CardComponent
+                    key={`${card.suit}-${card.rank}`}
+                    card={card}
+                    onClick={playable ? () => handlePlayCard(card) : undefined}
+                    disabled={!playable}
+                  />
+                );
+              })}
             </div>
-          );
-        })}
+          ))}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // ── Spectator footer ──────────────────────────────────────────────────────
   const renderSpectatorFooter = () => (

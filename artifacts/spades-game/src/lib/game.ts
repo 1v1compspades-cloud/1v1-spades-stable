@@ -48,11 +48,34 @@ export const SUIT_SYMBOLS: Record<Suit, string> = {
 };
 
 export const SUIT_COLORS: Record<Suit, string> = {
-  spades: "text-slate-900",
-  clubs: "text-slate-900",
-  hearts: "text-red-700",
-  diamonds: "text-red-700"
+  spades:   "text-slate-900",
+  hearts:   "text-red-600",
+  clubs:    "text-emerald-700",
+  diamonds: "text-blue-700",
 };
+
+/** Rank order from highest to lowest, for hand sorting. */
+export const RANK_ORDER: Rank[] = [
+  "A","K","Q","J","10","9","8","7","6","5","4","3","2",
+];
+
+/**
+ * Sort a hand into suit groups, high-to-low within each suit.
+ * Suit order alternates color for visual clarity: ♠ ♥ ♣ ♦.
+ * Returns an array of suit groups (each non-empty), preserving input cards.
+ */
+export function sortHandBySuit(hand: Card[]): { suit: Suit; cards: Card[] }[] {
+  const order: Suit[] = ["spades", "hearts", "clubs", "diamonds"];
+  const rankIndex = new Map(RANK_ORDER.map((r, i) => [r, i]));
+  return order
+    .map(suit => ({
+      suit,
+      cards: hand
+        .filter(c => c.suit === suit)
+        .sort((a, b) => (rankIndex.get(a.rank)! - rankIndex.get(b.rank)!)),
+    }))
+    .filter(g => g.cards.length > 0);
+}
 
 /**
  * Returns true if this card is a legal play right now.

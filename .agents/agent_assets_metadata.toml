@@ -6,3 +6,9 @@ id = "jG2rOWET4LdsTqwcd2gTz"
 uri = "file://spades-multiplayer.tar.gz"
 type = "unspecified"
 title = "Spades Multiplayer — with invite links + spectator mode"
+
+[[outputs]]
+id = "nNFtPTQTiAP9vr6aNyUSi"
+uri = "file://solo-spades-v-mobile-card-polish.zip"
+type = "unspecified"
+title = "Spades — mobile card readability polish"
