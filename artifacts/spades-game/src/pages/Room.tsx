@@ -370,7 +370,7 @@ export default function Room() {
               <div className="pt-1">
                 {playerIndex === 0 ? (
                   <Button onClick={handleNextRound} className="w-full h-11 text-base">
-                    Next Round →
+                    Start Next Round →
                   </Button>
                 ) : (
                   <p className="text-center text-muted-foreground italic text-sm">Waiting for host to start next round…</p>
