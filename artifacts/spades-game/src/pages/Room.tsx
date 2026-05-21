@@ -15,8 +15,15 @@ export default function Room() {
   const [, setLocation] = useLocation();
   const roomCode = params?.roomCode;
 
-  const { socket, connected, gameState, connect, joinRoom, reconnect, startGame, placeBid, playCard, nextRound, newMatch } = useSocket();
-  const { playerName, playerIndex, savePlayerIndex, saveRoomCode } = useGameStorage();
+  const {
+    connected, gameState, connect, joinRoom, reconnect,
+    startGame, placeBid, playCard, nextRound, newMatch,
+    reconnectAsSpectator,
+  } = useSocket();
+  const {
+    playerName, playerIndex, isSpectator,
+    savePlayerIndex, saveIsSpectator,
+  } = useGameStorage();
   const { toast } = useToast();
 
   const [bidAmount, setBidAmount] = useState<string>("");
@@ -29,7 +36,13 @@ export default function Room() {
 
   useEffect(() => {
     if (!connected || !roomCode || !playerName || gameState) return;
-    if (playerIndex !== null) {
+    if (isSpectator) {
+      reconnectAsSpectator(roomCode, playerName).catch(err => {
+        toast({ description: err || "Spectator session expired.", variant: "destructive" });
+        saveIsSpectator(false);
+        setLocation("/");
+      });
+    } else if (playerIndex !== null) {
       reconnect(roomCode, playerIndex, playerName).catch(err => {
         toast({ description: err || "Session expired. Please rejoin.", variant: "destructive" });
         setLocation("/");
@@ -42,9 +55,9 @@ export default function Room() {
         setLocation("/");
       });
     }
-  }, [connected, roomCode, playerName, gameState, playerIndex, reconnect, joinRoom, setLocation, savePlayerIndex, toast]);
+  }, [connected, roomCode, playerName, gameState, playerIndex, isSpectator, reconnect, reconnectAsSpectator, joinRoom, setLocation, savePlayerIndex, saveIsSpectator, toast]);
 
-  if (!gameState || playerIndex === null) {
+  if (!gameState || (!isSpectator && playerIndex === null)) {
     return (
       <div className="min-h-screen flex items-center justify-center text-muted-foreground">
         Connecting to table...
@@ -52,25 +65,18 @@ export default function Room() {
     );
   }
 
-  const opponentIndex = playerIndex === 0 ? 1 : 0;
-  const me = gameState.players[playerIndex];
-  const opponent = gameState.players[opponentIndex];
-
-  const myScore       = gameState.scores[playerIndex];
-  const opponentScore = gameState.scores[opponentIndex];
-  const myBags        = gameState.bags[playerIndex];
-  const opponentBags  = gameState.bags[opponentIndex];
-  const myBid         = gameState.bids[playerIndex];
-  const opponentBid   = gameState.bids[opponentIndex];
-  const myTricks      = gameState.tricks[playerIndex];
-  const opponentTricks = gameState.tricks[opponentIndex];
+  // Spectator: no "me" perspective. We use absolute seats: seat 1 (top) and seat 2 (bottom).
+  // Player: bottom = self, top = opponent.
+  const spectator = !!gameState.isSpectator || isSpectator;
+  const topIndex: 0 | 1 = spectator ? 0 : ((playerIndex === 0 ? 1 : 0) as 0 | 1);
+  const bottomIndex: 0 | 1 = spectator ? 1 : (playerIndex as 0 | 1);
 
   const handleStartGame = () => startGame(roomCode!);
   const handleNextRound = () => nextRound(roomCode!);
   const handleNewMatch  = () => newMatch(roomCode!);
 
   const handleBid = async () => {
-    if (!bidAmount) return;
+    if (!bidAmount || spectator) return;
     setIsSubmitting(true);
     try {
       await placeBid(roomCode!, parseInt(bidAmount));
@@ -82,6 +88,7 @@ export default function Room() {
   };
 
   const handlePlayCard = async (card: CardType) => {
+    if (spectator) return;
     if (gameState.phase !== "playing" || gameState.currentTurnIndex !== playerIndex) return;
     try {
       await playCard(roomCode!, card);
@@ -90,38 +97,42 @@ export default function Room() {
     }
   };
 
+  const handleLeaveSpectate = () => {
+    saveIsSpectator(false);
+    setLocation("/");
+  };
+
   // ── Status banner ──────────────────────────────────────────────────────────
   const renderStatusBanner = () => {
-    const { phase, currentBidder, currentTurnIndex } = gameState;
+    const { phase, currentBidder, currentTurnIndex, players } = gameState;
+    const nameOf = (i: 0 | 1) => players[i]?.name ?? `Seat ${i + 1}`;
     let message = "";
     let colorClass = "bg-white/5 text-muted-foreground";
 
     if (phase === "bidding") {
-      if (currentBidder === playerIndex) {
+      if (!spectator && currentBidder === playerIndex) {
         message = "Your turn to bid";
         colorClass = "bg-primary/20 text-primary font-semibold";
-      } else {
-        message = `${opponent?.name ?? "Opponent"} is bidding…`;
+      } else if (currentBidder !== null) {
+        message = `${nameOf(currentBidder)} is bidding…`;
       }
     } else if (phase === "playing") {
       if (currentTurnIndex === null) {
         message = "Trick resolving…";
         colorClass = "bg-white/5 text-muted-foreground italic";
-      } else if (currentTurnIndex === playerIndex) {
+      } else if (!spectator && currentTurnIndex === playerIndex) {
         message = "Your turn — play a card";
         colorClass = "bg-primary/20 text-primary font-semibold";
       } else {
-        message = `${opponent?.name ?? "Opponent"}'s turn`;
+        message = `${nameOf(currentTurnIndex)}'s turn`;
       }
     } else if (phase === "round_over") {
       message = "Round complete";
       colorClass = "bg-yellow-500/10 text-yellow-400 font-semibold";
     } else if (phase === "game_over") {
       message = "Game over";
-      colorClass = "bg-white/5 text-muted-foreground";
     }
 
-    // Tiebreaker overlay sub-banner during bidding/playing/round_over of a tiebreaker round
     const showTiebreaker =
       gameState.tiebreakerActive &&
       gameState.tiebreakerRound >= 1 &&
@@ -142,35 +153,42 @@ export default function Room() {
     );
   };
 
-  // ── Player info row ────────────────────────────────────────────────────────
-  const renderPlayerInfo = (isMe: boolean) => {
-    const idx     = isMe ? playerIndex : opponentIndex;
-    const name    = isMe ? me?.name : opponent?.name;
-    const score   = isMe ? myScore : opponentScore;
-    const bags    = isMe ? myBags : opponentBags;
-    const bid     = isMe ? myBid : opponentBid;
-    const tricks  = isMe ? myTricks : opponentTricks;
-    const seatLabel = `Seat ${(idx as number) + 1}`;
+  // ── Player info row (renders any seat by index) ────────────────────────────
+  const renderPlayerInfo = (idx: 0 | 1) => {
+    const isMe = !spectator && idx === playerIndex;
+    const p    = gameState.players[idx];
+    const name = p?.name;
+    const score = gameState.scores[idx];
+    const bags  = gameState.bags[idx];
+    const bid   = gameState.bids[idx];
+    const tricks = gameState.tricks[idx];
+    const seatLabel = `Seat ${idx + 1}`;
     const isTurn  = gameState.phase === "playing" && gameState.currentTurnIndex === idx;
     const isBidding = gameState.phase === "bidding" && gameState.currentBidder === idx;
     const isActive = isTurn || isBidding;
 
     return (
-      <div className={`flex items-center justify-between px-4 py-3 bg-black/40 border-y border-border backdrop-blur-sm ${isActive ? "ring-1 ring-inset ring-primary" : ""}`}>
+      <div
+        data-testid={`player-info-seat-${idx + 1}`}
+        className={`flex items-center justify-between px-4 py-3 bg-black/40 border-y border-border backdrop-blur-sm ${isActive ? "ring-1 ring-inset ring-primary" : ""}`}
+      >
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex flex-col leading-tight">
-            <span className="text-xs text-muted-foreground uppercase tracking-wider">{seatLabel}{isMe ? " · You" : ""}</span>
+            <span className="text-xs text-muted-foreground uppercase tracking-wider">
+              {seatLabel}{isMe ? " · You" : ""}
+            </span>
             <span className="font-bold font-serif truncate max-w-[120px]">
               {name ?? "Waiting…"}
               {isActive && <span className="text-primary ml-2 animate-pulse">●</span>}
             </span>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <Badge variant="outline" className="text-xs tabular-nums">
-              {score >= 0 ? score : score} pts
-            </Badge>
+            <Badge variant="outline" className="text-xs tabular-nums">{score} pts</Badge>
             <Badge variant="outline" className={`text-xs tabular-nums ${bags >= 8 ? "border-yellow-500 text-yellow-400" : "text-muted-foreground"}`}>
               {bags} bag{bags !== 1 ? "s" : ""}
+            </Badge>
+            <Badge variant="outline" className="text-xs tabular-nums text-muted-foreground">
+              {gameState.handSizes?.[idx] ?? 0} cards
             </Badge>
           </div>
         </div>
@@ -193,71 +211,117 @@ export default function Room() {
     );
   };
 
-  // ── Waiting screen ─────────────────────────────────────────────────────────
-  const renderWaiting = () => (
-    <div className="flex flex-col items-center justify-center h-full space-y-8 px-4">
-      <div className="text-center space-y-2">
-        <p className="text-xs text-muted-foreground uppercase tracking-widest">{`Seat ${(playerIndex as number) + 1} · You`}</p>
-        <h2 className="text-2xl font-serif text-primary">Room Code</h2>
-        <div className="text-5xl font-mono tracking-widest font-bold bg-background p-6 rounded-lg border-2 border-primary shadow-[0_0_15px_rgba(234,179,8,0.2)]">
-          {roomCode}
-        </div>
-        <p className="text-muted-foreground text-sm mt-4">Share this code with your opponent</p>
-      </div>
-
-      {opponent ? (
-        <div className="space-y-4 text-center w-full max-w-xs">
-          <div className="bg-white/5 rounded-lg p-4 border border-border space-y-1">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider">Opponent joined</p>
-            <p className="text-xl font-serif font-bold text-primary">{opponent.name}</p>
-          </div>
-          {playerIndex === 0 ? (
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">A coin flip will decide who bids first.</p>
-              <Button size="lg" onClick={handleStartGame} className="w-full text-lg h-14">
-                Flip Coin &amp; Start
-              </Button>
-            </div>
-          ) : (
-            <p className="text-muted-foreground italic text-sm">Waiting for host to start the game…</p>
-          )}
-        </div>
-      ) : (
+  // ── Waiting screen (players only — spectators bypass this) ─────────────────
+  const renderWaiting = () => {
+    const opponent = gameState.players[playerIndex === 0 ? 1 : 0];
+    return (
+      <div className="flex flex-col items-center justify-center h-full space-y-8 px-4">
         <div className="text-center space-y-2">
-          <div className="animate-pulse text-muted-foreground">Waiting for Player 2…</div>
-          <p className="text-xs text-muted-foreground">Give them the room code above</p>
+          <p className="text-xs text-muted-foreground uppercase tracking-widest">{`Seat ${(playerIndex as number) + 1} · You`}</p>
+          <h2 className="text-2xl font-serif text-primary">Room Code</h2>
+          <div className="text-5xl font-mono tracking-widest font-bold bg-background p-6 rounded-lg border-2 border-primary shadow-[0_0_15px_rgba(234,179,8,0.2)]">
+            {roomCode}
+          </div>
+          <p className="text-muted-foreground text-sm mt-4">Share this code with your opponent</p>
         </div>
-      )}
+
+        {opponent ? (
+          <div className="space-y-4 text-center w-full max-w-xs">
+            <div className="bg-white/5 rounded-lg p-4 border border-border space-y-1">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Opponent joined</p>
+              <p className="text-xl font-serif font-bold text-primary">{opponent.name}</p>
+            </div>
+            {playerIndex === 0 ? (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">A coin flip will decide who bids first.</p>
+                <Button size="lg" onClick={handleStartGame} className="w-full text-lg h-14">
+                  Flip Coin &amp; Start
+                </Button>
+              </div>
+            ) : (
+              <p className="text-muted-foreground italic text-sm">Waiting for host to start the game…</p>
+            )}
+          </div>
+        ) : (
+          <div className="text-center space-y-2">
+            <div className="animate-pulse text-muted-foreground">Waiting for Player 2…</div>
+            <p className="text-xs text-muted-foreground">Give them the room code above</p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ── Spectator waiting screen ──────────────────────────────────────────────
+  const renderSpectatorWaiting = () => (
+    <div className="flex flex-col items-center justify-center h-full space-y-6 px-4 text-center">
+      <Badge variant="outline" className="border-primary/40 text-primary uppercase tracking-widest text-xs">
+        Spectator
+      </Badge>
+      <div>
+        <p className="text-xs text-muted-foreground uppercase tracking-widest">Watching room</p>
+        <div className="text-4xl font-mono tracking-widest font-bold mt-2">{roomCode}</div>
+      </div>
+      <p className="text-muted-foreground text-sm max-w-xs">
+        Waiting for the players to start. You'll see all the action — hands stay hidden.
+      </p>
+      <Button variant="outline" onClick={handleLeaveSpectate}>Leave</Button>
     </div>
   );
 
   // ── Table (trick area + overlays) ─────────────────────────────────────────
   const renderTable = () => {
-    const myTrickCard  = gameState.currentTrick.find(t => t.playerIndex === playerIndex)?.card;
-    const oppTrickCard = gameState.currentTrick.find(t => t.playerIndex === opponentIndex)?.card;
+    const topCard    = gameState.currentTrick.find(t => t.playerIndex === topIndex)?.card;
+    const bottomCard = gameState.currentTrick.find(t => t.playerIndex === bottomIndex)?.card;
+    const topPlayer    = gameState.players[topIndex];
+    const bottomPlayer = gameState.players[bottomIndex];
+    const topHandSize    = gameState.handSizes?.[topIndex] ?? 0;
+    const bottomHandSize = gameState.handSizes?.[bottomIndex] ?? 0;
 
-    // Round summary data
-    const lastRound  = gameState.roundHistory[gameState.roundHistory.length - 1];
-    const prevRound  = gameState.roundHistory[gameState.roundHistory.length - 2];
+    const lastRound = gameState.roundHistory[gameState.roundHistory.length - 1];
+    const prevRound = gameState.roundHistory[gameState.roundHistory.length - 2];
     const prevBags: [number, number] = prevRound ? prevRound.bags : [0, 0];
+
+    const topLabel    = topPlayer?.name?.split(" ")[0] ?? `Seat ${topIndex + 1}`;
+    const bottomLabel = spectator
+      ? (bottomPlayer?.name?.split(" ")[0] ?? `Seat ${bottomIndex + 1}`)
+      : "You";
 
     return (
       <div className="flex-1 flex flex-col items-center justify-center relative overflow-hidden">
-        {/* Opponent hidden hand */}
+        {/* Top seat hidden hand (always hidden — even players don't see opponent's cards) */}
         <div className="absolute top-4 flex justify-center w-full pointer-events-none">
           <div className="flex items-center gap-2">
             <div className="flex -space-x-10">
-              {Array.from({ length: gameState.opponentHandSize }).map((_, i) => (
-                <CardComponent key={`opp-${i}`} hidden className="scale-75" />
+              {Array.from({ length: topHandSize }).map((_, i) => (
+                <CardComponent key={`top-${i}`} hidden className="scale-75" />
               ))}
             </div>
-            {gameState.opponentHandSize > 0 && (
+            {topHandSize > 0 && (
               <span className="text-xs text-muted-foreground ml-1 tabular-nums">
-                {gameState.opponentHandSize} card{gameState.opponentHandSize !== 1 ? "s" : ""}
+                {topHandSize} card{topHandSize !== 1 ? "s" : ""}
               </span>
             )}
           </div>
         </div>
+
+        {/* Spectator: bottom seat shown as hidden hand too */}
+        {spectator && (
+          <div className="absolute bottom-4 flex justify-center w-full pointer-events-none">
+            <div className="flex items-center gap-2">
+              <div className="flex -space-x-10">
+                {Array.from({ length: bottomHandSize }).map((_, i) => (
+                  <CardComponent key={`bot-${i}`} hidden className="scale-75" />
+                ))}
+              </div>
+              {bottomHandSize > 0 && (
+                <span className="text-xs text-muted-foreground ml-1 tabular-nums">
+                  {bottomHandSize} card{bottomHandSize !== 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Center trick area */}
         <div className="w-64 h-64 rounded-full border border-white/5 bg-white/5 flex items-center justify-center relative backdrop-blur-sm">
@@ -268,26 +332,26 @@ export default function Room() {
           )}
           <div className="flex gap-8 relative z-10">
             <div className="w-24 h-36 border-2 border-dashed border-white/10 rounded-lg flex items-center justify-center relative">
-              {oppTrickCard ? (
+              {topCard ? (
                 <div className="absolute inset-0 z-10 -translate-y-2">
-                  <CardComponent card={oppTrickCard} />
+                  <CardComponent card={topCard} />
                 </div>
               ) : null}
-              <span className="text-white/20 text-xs font-serif">{opponent?.name?.split(" ")[0] ?? "Opp"}</span>
+              <span className="text-white/20 text-xs font-serif">{topLabel}</span>
             </div>
             <div className="w-24 h-36 border-2 border-dashed border-white/10 rounded-lg flex items-center justify-center relative">
-              {myTrickCard ? (
+              {bottomCard ? (
                 <div className="absolute inset-0 z-20 translate-y-2">
-                  <CardComponent card={myTrickCard} />
+                  <CardComponent card={bottomCard} />
                 </div>
               ) : null}
-              <span className="text-white/20 text-xs font-serif">You</span>
+              <span className="text-white/20 text-xs font-serif">{bottomLabel}</span>
             </div>
           </div>
         </div>
 
-        {/* Bidding overlay */}
-        {gameState.phase === "bidding" && gameState.currentBidder === playerIndex && (
+        {/* Bidding overlay (players only) */}
+        {!spectator && gameState.phase === "bidding" && gameState.currentBidder === playerIndex && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
             <div className="bg-card border border-border p-6 rounded-xl shadow-2xl space-y-4 max-w-sm w-full mx-4 text-center">
               <h3 className="text-xl font-serif text-primary">Place your bid</h3>
@@ -313,7 +377,7 @@ export default function Room() {
           </div>
         )}
 
-        {/* Round over overlay */}
+        {/* Round over overlay (shown to everyone, including spectators) */}
         {gameState.phase === "round_over" && lastRound && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
             <div className="bg-card border border-border p-6 rounded-xl shadow-2xl max-w-sm w-full mx-4 space-y-5">
@@ -322,16 +386,16 @@ export default function Room() {
               </h3>
 
               <div className="grid grid-cols-2 gap-4 text-center">
-                {([playerIndex, opponentIndex] as (0 | 1)[]).map((idx, col) => {
-                  const isMyCol   = idx === playerIndex;
-                  const pName     = gameState.players[idx]?.name ?? (isMyCol ? "You" : "Opp");
-                  const bid       = lastRound.bids[idx];
-                  const tricks    = lastRound.tricks[idx];
-                  const delta     = lastRound.scores[idx];
-                  const total     = gameState.scores[idx];
-                  const newBags   = lastRound.bags[idx];
+                {([0, 1] as (0 | 1)[]).map((idx) => {
+                  const isMyCol  = !spectator && idx === playerIndex;
+                  const pName    = gameState.players[idx]?.name ?? `Seat ${idx + 1}`;
+                  const bid      = lastRound.bids[idx];
+                  const tricks   = lastRound.tricks[idx];
+                  const delta    = lastRound.scores[idx];
+                  const total    = gameState.scores[idx];
+                  const newBags  = lastRound.bags[idx];
                   const bagsDelta = newBags - prevBags[idx];
-                  const isNil     = bid === 0;
+                  const isNil    = bid === 0;
                   const nilMade   = isNil && tricks === 0;
                   const nilBroken = isNil && tricks > 0;
                   const made      = !isNil && tricks >= bid;
@@ -383,7 +447,9 @@ export default function Room() {
               </div>
 
               <div className="pt-1">
-                {playerIndex === 0 ? (
+                {spectator ? (
+                  <p className="text-center text-muted-foreground italic text-sm">Waiting for host to start next round…</p>
+                ) : playerIndex === 0 ? (
                   <Button onClick={handleNextRound} className="w-full h-11 text-base">
                     Start Next Round →
                   </Button>
@@ -395,51 +461,63 @@ export default function Room() {
           </div>
         )}
 
-        {/* Game over overlay */}
+        {/* Game over overlay (shown to everyone) */}
         {gameState.phase === "game_over" && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-lg">
             <div className="bg-card border border-border p-8 rounded-xl shadow-2xl max-w-sm w-full mx-4 text-center space-y-5">
               <h3 className="text-4xl font-serif text-primary">Game Over</h3>
               <div>
-                {myScore > opponentScore ? (
-                  <p className="text-2xl font-bold text-green-400">You Won! 🏆</p>
-                ) : myScore < opponentScore ? (
-                  <p className="text-2xl font-bold text-red-400">You Lost.</p>
-                ) : (
-                  <p className="text-2xl font-bold text-yellow-400">It's a Draw.</p>
-                )}
+                {(() => {
+                  const s0 = gameState.scores[0], s1 = gameState.scores[1];
+                  if (spectator) {
+                    if (s0 === s1) return <p className="text-2xl font-bold text-yellow-400">Draw.</p>;
+                    const winnerName = gameState.players[s0 > s1 ? 0 : 1]?.name ?? `Seat ${s0 > s1 ? 1 : 2}`;
+                    return <p className="text-2xl font-bold text-green-400">{winnerName} wins 🏆</p>;
+                  }
+                  const my = gameState.scores[playerIndex as 0 | 1];
+                  const opp = gameState.scores[playerIndex === 0 ? 1 : 0];
+                  if (my > opp)  return <p className="text-2xl font-bold text-green-400">You Won! 🏆</p>;
+                  if (my < opp)  return <p className="text-2xl font-bold text-red-400">You Lost.</p>;
+                  return <p className="text-2xl font-bold text-yellow-400">It's a Draw.</p>;
+                })()}
                 <p className="text-xs text-muted-foreground mt-1">
                   First to {gameState.matchTarget} points
                 </p>
               </div>
               <div className="bg-white/5 rounded-lg p-4 space-y-2">
                 <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>{me?.name ?? "You"}</span>
-                  <span>{opponent?.name ?? "Opponent"}</span>
+                  <span>{gameState.players[0]?.name ?? "Seat 1"}</span>
+                  <span>{gameState.players[1]?.name ?? "Seat 2"}</span>
                 </div>
                 <div className="flex justify-between text-3xl font-mono font-bold">
-                  <span className={myScore > opponentScore ? "text-green-400" : ""}>{myScore}</span>
+                  <span className={gameState.scores[0] > gameState.scores[1] ? "text-green-400" : ""}>{gameState.scores[0]}</span>
                   <span className="text-muted-foreground text-lg self-center">vs</span>
-                  <span className={opponentScore > myScore ? "text-green-400" : ""}>{opponentScore}</span>
+                  <span className={gameState.scores[1] > gameState.scores[0] ? "text-green-400" : ""}>{gameState.scores[1]}</span>
                 </div>
                 <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>{myBags} bags</span>
-                  <span>{opponentBags} bags</span>
+                  <span>{gameState.bags[0]} bags</span>
+                  <span>{gameState.bags[1]} bags</span>
                 </div>
                 <div className="border-t border-white/10 pt-2 text-xs text-muted-foreground">
                   Rounds played: <span className="font-mono text-foreground">{gameState.roundHistory.length}</span>
                 </div>
               </div>
               <div className="space-y-2">
-                {playerIndex === 0 ? (
+                {spectator ? (
+                  <p className="text-center text-muted-foreground italic text-sm">Waiting for host to start a new match…</p>
+                ) : playerIndex === 0 ? (
                   <Button onClick={handleNewMatch} className="w-full h-11 text-base">
                     Start New Match →
                   </Button>
                 ) : (
                   <p className="text-center text-muted-foreground italic text-sm">Waiting for host to start a new match…</p>
                 )}
-                <Button onClick={() => setLocation("/")} variant="outline" className="w-full h-11">
-                  Return to Lobby
+                <Button
+                  onClick={spectator ? handleLeaveSpectate : () => setLocation("/")}
+                  variant="outline"
+                  className="w-full h-11"
+                >
+                  {spectator ? "Leave" : "Return to Lobby"}
                 </Button>
               </div>
             </div>
@@ -449,7 +527,7 @@ export default function Room() {
     );
   };
 
-  // ── My hand ────────────────────────────────────────────────────────────────
+  // ── My hand (players only) ─────────────────────────────────────────────────
   const renderMyHand = () => (
     <div className="h-48 flex items-end justify-center pb-8 pt-4 px-4 overflow-x-auto overflow-y-hidden">
       <div className="flex -space-x-8 sm:-space-x-6">
@@ -472,18 +550,55 @@ export default function Room() {
     </div>
   );
 
+  // ── Spectator footer ──────────────────────────────────────────────────────
+  const renderSpectatorFooter = () => (
+    <div
+      data-testid="spectator-footer"
+      className="flex items-center justify-between px-4 py-3 bg-black/50 border-t border-border text-xs"
+    >
+      <div className="flex items-center gap-3">
+        <Badge variant="outline" className="border-primary/40 text-primary uppercase tracking-widest">
+          Spectator
+        </Badge>
+        <span className="text-muted-foreground">
+          Room <span className="font-mono text-foreground">{roomCode}</span>
+          {" · "}
+          Round <span className="font-mono text-foreground">{gameState.roundNumber || "—"}</span>
+          {" · "}
+          Target <span className="font-mono text-foreground">{gameState.matchTarget}</span>
+          {(gameState.spectatorCount ?? 0) > 1 && (
+            <>{" · "}<span className="font-mono text-foreground">{gameState.spectatorCount}</span> watching</>
+          )}
+        </span>
+      </div>
+      <Button size="sm" variant="ghost" onClick={handleLeaveSpectate} className="h-8 text-xs">
+        Leave
+      </Button>
+    </div>
+  );
+
   // ── Root layout ────────────────────────────────────────────────────────────
+  // Spectator: never see the waiting screen as theirs — show a neutral version
+  if (spectator && gameState.phase === "waiting") {
+    return (
+      <div className="h-[100dvh] flex flex-col bg-background overflow-hidden relative">
+        {renderSpectatorWaiting()}
+        {renderSpectatorFooter()}
+      </div>
+    );
+  }
+
   return (
     <div className="h-[100dvh] flex flex-col bg-background overflow-hidden relative">
-      {gameState.phase === "waiting" ? (
+      {!spectator && gameState.phase === "waiting" ? (
         renderWaiting()
       ) : (
         <>
-          {renderPlayerInfo(false)}
+          {renderPlayerInfo(topIndex)}
           {renderStatusBanner()}
           {renderTable()}
-          {renderPlayerInfo(true)}
-          {renderMyHand()}
+          {renderPlayerInfo(bottomIndex)}
+          {spectator ? renderSpectatorFooter() : renderMyHand()}
         </>
       )}
     </div>

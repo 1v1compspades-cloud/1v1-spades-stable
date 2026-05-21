@@ -22,6 +22,12 @@ export interface Player {
   index: 0 | 1;
 }
 
+export interface Spectator {
+  id: string;
+  name: string;
+  socketId: string;
+}
+
 export interface Bid {
   playerIndex: 0 | 1;
   amount: number;
@@ -60,6 +66,7 @@ export interface GameState {
   matchTarget: number;
   tiebreakerActive: boolean;
   tiebreakerRound: number;
+  spectators: Spectator[];
 }
 
 function makeRoomCode(): string {
@@ -92,6 +99,7 @@ export function createGame(roomCode: string, matchTarget = 250): GameState {
     matchTarget,
     tiebreakerActive: false,
     tiebreakerRound: 0,
+    spectators: [],
   };
 }
 
@@ -474,8 +482,45 @@ export function removePlayerFromRoom(socketId: string): GameState | null {
         return state;
       }
     }
+    // Also check spectators — silently remove them (no notification needed)
+    const specIdx = state.spectators.findIndex((s) => s.socketId === socketId);
+    if (specIdx >= 0) {
+      state.spectators.splice(specIdx, 1);
+      return state;
+    }
   }
   return null;
+}
+
+export function addSpectator(
+  roomCode: string,
+  name: string,
+  socketId: string
+): GameState {
+  const state = rooms.get(roomCode);
+  if (!state) throw new Error("Room not found");
+  // Prevent the same socket joining twice
+  const existing = state.spectators.findIndex((s) => s.socketId === socketId);
+  if (existing >= 0) {
+    state.spectators[existing] = { id: socketId, name, socketId };
+  } else {
+    state.spectators.push({ id: socketId, name, socketId });
+  }
+  rooms.set(roomCode, state);
+  return state;
+}
+
+export function reconnectSpectator(
+  roomCode: string,
+  name: string,
+  newSocketId: string
+): GameState {
+  const state = rooms.get(roomCode);
+  if (!state) throw new Error("Room not found");
+  // Just (re)add — same as a fresh spectator join
+  state.spectators.push({ id: newSocketId, name, socketId: newSocketId });
+  rooms.set(roomCode, state);
+  return state;
 }
 
 export function getRoomBySocketId(socketId: string): GameState | null {

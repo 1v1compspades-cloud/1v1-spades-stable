@@ -13,6 +13,8 @@ import {
   getRoomBySocketId,
   reconnectPlayer,
   resetMatch,
+  addSpectator,
+  reconnectSpectator,
   type GameState,
 } from "./engine.js";
 import type { Card } from "./deck.js";
@@ -28,6 +30,7 @@ function sanitizeStateForPlayer(
     players: state.players,
     hand: state.hands[playerIndex],
     opponentHandSize: state.hands[opponentIndex].length,
+    handSizes: [state.hands[0].length, state.hands[1].length],
     bids: state.bids,
     currentBidder: state.currentBidder,
     tricks: state.tricks,
@@ -43,7 +46,57 @@ function sanitizeStateForPlayer(
     matchTarget: state.matchTarget,
     tiebreakerActive: state.tiebreakerActive,
     tiebreakerRound: state.tiebreakerRound,
+    spectatorCount: state.spectators.length,
+    isSpectator: false,
   };
+}
+
+function sanitizeStateForSpectator(state: GameState): Record<string, unknown> {
+  return {
+    roomCode: state.roomCode,
+    phase: state.phase,
+    players: state.players,
+    hand: [],
+    opponentHandSize: 0,
+    handSizes: [state.hands[0].length, state.hands[1].length],
+    bids: state.bids,
+    currentBidder: state.currentBidder,
+    tricks: state.tricks,
+    currentTrick: state.currentTrick,
+    leadPlayerIndex: state.leadPlayerIndex,
+    currentTurnIndex: state.currentTurnIndex,
+    spadesBroken: state.spadesBroken,
+    scores: state.scores,
+    bags: state.bags,
+    roundHistory: state.roundHistory,
+    roundNumber: state.roundNumber,
+    trickLeader: state.trickLeader,
+    matchTarget: state.matchTarget,
+    tiebreakerActive: state.tiebreakerActive,
+    tiebreakerRound: state.tiebreakerRound,
+    spectatorCount: state.spectators.length,
+    isSpectator: true,
+  };
+}
+
+/**
+ * Broadcast game_state to both players AND all spectators.
+ * Each gets a view sanitized for their role.
+ */
+function broadcastState(
+  io: SocketIOServer,
+  state: GameState
+): void {
+  for (let i = 0; i < 2; i++) {
+    const p = state.players[i];
+    if (p) {
+      io.to(p.socketId).emit("game_state", sanitizeStateForPlayer(state, i as 0 | 1));
+    }
+  }
+  const specView = sanitizeStateForSpectator(state);
+  for (const spec of state.spectators) {
+    io.to(spec.socketId).emit("game_state", specView);
+  }
 }
 
 export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
@@ -75,7 +128,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           socket.join(state.roomCode);
           logger.info({ roomCode: state.roomCode, playerName: data.playerName }, "Room created");
           callback({ ok: true, roomCode: state.roomCode, playerIndex: 0 });
-          socket.emit("game_state", sanitizeStateForPlayer(state, 0));
+          broadcastState(io, state);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           callback({ ok: false, error: msg });
@@ -96,7 +149,6 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           logger.info({ roomCode: code, playerName: data.playerName }, "Player joined room");
 
           callback({ ok: true, playerIndex });
-          socket.emit("game_state", sanitizeStateForPlayer(state, playerIndex));
 
           // Notify host
           const hostSocket = state.players[0]?.socketId;
@@ -104,8 +156,8 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
             io.to(hostSocket).emit("opponent_joined", {
               playerName: data.playerName,
             });
-            io.to(hostSocket).emit("game_state", sanitizeStateForPlayer(state, 0));
           }
+          broadcastState(io, state);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           callback({ ok: false, error: msg });
@@ -123,10 +175,10 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         const newState = startRound(state);
         updateRoom(newState);
 
+        broadcastState(io, newState);
         for (let i = 0; i < 2; i++) {
           const p = newState.players[i];
           if (p) {
-            io.to(p.socketId).emit("game_state", sanitizeStateForPlayer(newState, i as 0 | 1));
             io.to(p.socketId).emit("round_started", {
               roundNumber: newState.roundNumber,
               yourBidTurn: i === 0,
@@ -158,11 +210,11 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
 
           callback({ ok: true });
 
-          // Send updated state to both players
+          // Send updated state to both players + spectators
+          broadcastState(io, newState);
           for (let i = 0; i < 2; i++) {
             const p = newState.players[i];
             if (p) {
-              io.to(p.socketId).emit("game_state", sanitizeStateForPlayer(newState, i as 0 | 1));
               io.to(p.socketId).emit("bid_placed", {
                 playerIndex,
                 amount: data.amount,
@@ -201,15 +253,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
             // Phase 1: store intermediate state (cards visible, no one can play)
             // and push it to both clients immediately.
             updateRoom(result.intermediateState);
-            for (let i = 0; i < 2; i++) {
-              const p = result.intermediateState.players[i];
-              if (p) {
-                io.to(p.socketId).emit(
-                  "game_state",
-                  sanitizeStateForPlayer(result.intermediateState, i as 0 | 1)
-                );
-              }
-            }
+            broadcastState(io, result.intermediateState);
             io.to(data.roomCode).emit("trick_complete", {
               winner: result.trickWinner,
               tricks: result.intermediateState.tricks,
@@ -223,15 +267,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
               if (!current) return;
 
               updateRoom(result.state);
-              for (let i = 0; i < 2; i++) {
-                const p = result.state.players[i];
-                if (p) {
-                  io.to(p.socketId).emit(
-                    "game_state",
-                    sanitizeStateForPlayer(result.state, i as 0 | 1)
-                  );
-                }
-              }
+              broadcastState(io, result.state);
 
               if (result.roundComplete) {
                 io.to(data.roomCode).emit("round_over", {
@@ -248,15 +284,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           } else {
             // ── Mid-trick (first card played): push state immediately ────────
             updateRoom(result.state);
-            for (let i = 0; i < 2; i++) {
-              const p = result.state.players[i];
-              if (p) {
-                io.to(p.socketId).emit(
-                  "game_state",
-                  sanitizeStateForPlayer(result.state, i as 0 | 1)
-                );
-              }
-            }
+            broadcastState(io, result.state);
           }
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
@@ -277,10 +305,10 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         const newState = startRound(state);
         updateRoom(newState);
 
+        broadcastState(io, newState);
         for (let i = 0; i < 2; i++) {
           const p = newState.players[i];
           if (p) {
-            io.to(p.socketId).emit("game_state", sanitizeStateForPlayer(newState, i as 0 | 1));
             io.to(p.socketId).emit("round_started", {
               roundNumber: newState.roundNumber,
               yourBidTurn: i === 0,
@@ -305,7 +333,6 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           logger.info({ roomCode: code, playerIndex: data.playerIndex }, "Player reconnected");
 
           callback({ ok: true });
-          socket.emit("game_state", sanitizeStateForPlayer(state, data.playerIndex));
 
           // Notify the other player that their opponent is back
           const otherIndex = data.playerIndex === 0 ? 1 : 0;
@@ -314,9 +341,8 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
             io.to(other.socketId).emit("opponent_reconnected", {
               playerName: data.playerName,
             });
-            // Also refresh their state in case phase was restored
-            io.to(other.socketId).emit("game_state", sanitizeStateForPlayer(state, otherIndex));
           }
+          broadcastState(io, state);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           logger.warn({ err, data }, "Reconnect failed");
@@ -339,10 +365,10 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         const newState = startRound(reset);
         updateRoom(newState);
 
+        broadcastState(io, newState);
         for (let i = 0; i < 2; i++) {
           const p = newState.players[i];
           if (p) {
-            io.to(p.socketId).emit("game_state", sanitizeStateForPlayer(newState, i as 0 | 1));
             io.to(p.socketId).emit("round_started", {
               roundNumber: newState.roundNumber,
               yourBidTurn: i === 0,
@@ -354,6 +380,54 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
       }
     });
 
+    socket.on(
+      "join_as_spectator",
+      (
+        data: { roomCode: string; spectatorName: string },
+        callback: (res: { ok: boolean; error?: string }) => void
+      ) => {
+        try {
+          const code = data.roomCode.toUpperCase().trim();
+          const name = (data.spectatorName || "Spectator").slice(0, 24);
+          const state = addSpectator(code, name, socket.id);
+          socket.join(code);
+          logger.info({ roomCode: code, name }, "Spectator joined");
+
+          callback({ ok: true });
+          // Send the spectator their view
+          socket.emit("game_state", sanitizeStateForSpectator(state));
+          // Refresh everyone else so they see updated spectatorCount
+          broadcastState(io, state);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback({ ok: false, error: msg });
+        }
+      }
+    );
+
+    socket.on(
+      "reconnect_spectator",
+      (
+        data: { roomCode: string; spectatorName: string },
+        callback: (res: { ok: boolean; error?: string }) => void
+      ) => {
+        try {
+          const code = data.roomCode.toUpperCase().trim();
+          const name = (data.spectatorName || "Spectator").slice(0, 24);
+          const state = reconnectSpectator(code, name, socket.id);
+          socket.join(code);
+          logger.info({ roomCode: code, name }, "Spectator reconnected");
+
+          callback({ ok: true });
+          socket.emit("game_state", sanitizeStateForSpectator(state));
+          broadcastState(io, state);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback({ ok: false, error: msg });
+        }
+      }
+    );
+
     socket.on("disconnect", () => {
       logger.info({ socketId: socket.id }, "Socket disconnected");
       const state = removePlayerFromRoom(socket.id);
@@ -362,6 +436,8 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         if (remaining) {
           io.to(remaining.socketId).emit("opponent_disconnected", {});
         }
+        // Refresh remaining viewers so spectatorCount stays accurate
+        broadcastState(io, state);
       }
     });
   });

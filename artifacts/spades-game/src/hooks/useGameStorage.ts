@@ -7,6 +7,9 @@ export function useGameStorage() {
     const saved = localStorage.getItem("spades_playerIndex");
     return saved ? (parseInt(saved) as 0 | 1) : null;
   });
+  const [isSpectator, setIsSpectator] = useState<boolean>(
+    () => localStorage.getItem("spades_isSpectator") === "1"
+  );
 
   const savePlayerName = (name: string) => {
     setPlayerName(name);
@@ -27,20 +30,30 @@ export function useGameStorage() {
     }
   };
 
+  const saveIsSpectator = (v: boolean) => {
+    setIsSpectator(v);
+    if (v) localStorage.setItem("spades_isSpectator", "1");
+    else localStorage.removeItem("spades_isSpectator");
+  };
+
   const clearStorage = () => {
     setRoomCode("");
     setPlayerIndex(null);
+    setIsSpectator(false);
     localStorage.removeItem("spades_roomCode");
     localStorage.removeItem("spades_playerIndex");
+    localStorage.removeItem("spades_isSpectator");
   };
 
   return {
     playerName,
     roomCode,
     playerIndex,
+    isSpectator,
     savePlayerName,
     saveRoomCode,
     savePlayerIndex,
+    saveIsSpectator,
     clearStorage
   };
 }

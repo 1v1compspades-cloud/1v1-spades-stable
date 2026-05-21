@@ -10,8 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function Lobby() {
   const [, setLocation] = useLocation();
-  const { connect, createRoom, joinRoom } = useSocket();
-  const { playerName, savePlayerName, saveRoomCode, savePlayerIndex } = useGameStorage();
+  const { connect, createRoom, joinRoom, joinAsSpectator } = useSocket();
+  const { playerName, savePlayerName, saveRoomCode, savePlayerIndex, saveIsSpectator } = useGameStorage();
   const { toast } = useToast();
   
   const [nameInput, setNameInput] = useState(playerName);
@@ -19,6 +19,7 @@ export default function Lobby() {
   const [matchTarget, setMatchTarget] = useState<250 | 500>(250);
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
+  const [isSpectating, setIsSpectating] = useState(false);
 
   useEffect(() => {
     connect();
@@ -29,6 +30,7 @@ export default function Lobby() {
     setIsCreating(true);
     try {
       savePlayerName(nameInput);
+      saveIsSpectator(false);
       const res = await createRoom(nameInput, matchTarget);
       if (res.roomCode && res.playerIndex !== undefined) {
         saveRoomCode(res.roomCode);
@@ -48,6 +50,7 @@ export default function Lobby() {
     setIsJoining(true);
     try {
       savePlayerName(nameInput);
+      saveIsSpectator(false);
       const res = await joinRoom(joinCodeInput.toUpperCase(), nameInput);
       if (res.playerIndex !== undefined) {
         saveRoomCode(joinCodeInput.toUpperCase());
@@ -58,6 +61,27 @@ export default function Lobby() {
       toast({ description: err || "Failed to join room", variant: "destructive" });
     } finally {
       setIsJoining(false);
+    }
+  };
+
+  const handleSpectate = async (): Promise<void> => {
+    if (!nameInput.trim()) { toast({ description: "Please enter your name", variant: "destructive" }); return; }
+    if (!joinCodeInput.trim()) { toast({ description: "Please enter a room code", variant: "destructive" }); return; }
+    const code = joinCodeInput.toUpperCase();
+    setIsSpectating(true);
+    try {
+      savePlayerName(nameInput);
+      // Spectators have no seat. Clear any stale player index.
+      savePlayerIndex(null);
+      saveIsSpectator(true);
+      saveRoomCode(code);
+      await joinAsSpectator(code, nameInput);
+      setLocation(`/room/${code}`);
+    } catch (err: any) {
+      saveIsSpectator(false);
+      toast({ description: err || "Failed to join as spectator", variant: "destructive" });
+    } finally {
+      setIsSpectating(false);
     }
   };
 
@@ -103,7 +127,7 @@ export default function Lobby() {
             <div className="space-y-4">
               <Button 
                 onClick={handleCreate} 
-                disabled={isCreating || isJoining} 
+                disabled={isCreating || isJoining || isSpectating} 
                 className="w-full py-6 text-lg font-bold"
               >
                 {isCreating ? "Creating..." : "Create Room"}
@@ -122,13 +146,28 @@ export default function Lobby() {
               </div>
               <Button 
                 onClick={handleJoin} 
-                disabled={isCreating || isJoining || !joinCodeInput} 
+                disabled={isCreating || isJoining || isSpectating || !joinCodeInput} 
                 variant="secondary"
                 className="w-full py-6 text-lg font-bold"
               >
                 {isJoining ? "Joining..." : "Join Game"}
               </Button>
             </div>
+          </div>
+
+          <div className="pt-4 border-t border-border/50 space-y-2">
+            <Button
+              onClick={handleSpectate}
+              disabled={isCreating || isJoining || isSpectating || !joinCodeInput}
+              variant="ghost"
+              className="w-full h-12 text-sm font-medium border border-dashed border-border hover:border-primary/50"
+              data-testid="button-spectate"
+            >
+              {isSpectating ? "Joining…" : "Join as Spectator"}
+            </Button>
+            <p className="text-xs text-muted-foreground text-center">
+              Watch the match without playing. Hands stay hidden.
+            </p>
           </div>
         </CardContent>
       </Card>

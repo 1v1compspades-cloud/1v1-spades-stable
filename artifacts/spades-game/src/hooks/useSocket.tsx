@@ -16,6 +16,8 @@ interface SocketContextType {
   playCard: (code: string, card: Card) => Promise<void>;
   nextRound: (code: string) => void;
   newMatch: (code: string) => void;
+  joinAsSpectator: (code: string, name: string) => Promise<void>;
+  reconnectAsSpectator: (code: string, name: string) => Promise<void>;
 }
 
 const SocketContext = createContext<SocketContextType | null>(null);
@@ -125,6 +127,34 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     socket?.emit("new_match", { roomCode });
   };
 
+  const joinAsSpectator = (roomCode: string, spectatorName: string) => {
+    return new Promise<void>((resolve, reject) => {
+      if (!socket) return reject("No socket");
+      socket.emit(
+        "join_as_spectator",
+        { roomCode, spectatorName },
+        (res: { ok: boolean; error?: string }) => {
+          if (res.ok) resolve();
+          else reject(res.error);
+        }
+      );
+    });
+  };
+
+  const reconnectAsSpectator = (roomCode: string, spectatorName: string) => {
+    return new Promise<void>((resolve, reject) => {
+      if (!socket) return reject("No socket");
+      socket.emit(
+        "reconnect_spectator",
+        { roomCode, spectatorName },
+        (res: { ok: boolean; error?: string }) => {
+          if (res.ok) resolve();
+          else reject(res.error);
+        }
+      );
+    });
+  };
+
   return (
     <SocketContext.Provider value={{
       socket,
@@ -139,7 +169,9 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       placeBid,
       playCard,
       nextRound,
-      newMatch
+      newMatch,
+      joinAsSpectator,
+      reconnectAsSpectator
     }}>
       {children}
     </SocketContext.Provider>

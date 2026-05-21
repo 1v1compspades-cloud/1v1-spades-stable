@@ -32,6 +32,12 @@ export interface GameState {
   matchTarget: number;
   tiebreakerActive: boolean;
   tiebreakerRound: number;
+  /** Card counts per seat. Always populated. Spectators rely on this. */
+  handSizes: [number, number];
+  /** Number of spectators watching the room. */
+  spectatorCount: number;
+  /** True if this client is a spectator (no hand, no input). */
+  isSpectator: boolean;
 }
 
 export const SUIT_SYMBOLS: Record<Suit, string> = {
