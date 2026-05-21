@@ -183,34 +183,70 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           if (playerIndex < 0) throw new Error("Player not found");
 
           const result = playCard(state, playerIndex, data.card);
-          updateRoom(result.state);
 
           callback({ ok: true });
 
-          // Send updated state to both players
-          for (let i = 0; i < 2; i++) {
-            const p = result.state.players[i];
-            if (p) {
-              io.to(p.socketId).emit("game_state", sanitizeStateForPlayer(result.state, i as 0 | 1));
+          if (result.trickComplete && result.intermediateState) {
+            // ── Trick just completed: two-phase update ──────────────────────
+            // Phase 1: store intermediate state (cards visible, no one can play)
+            // and push it to both clients immediately.
+            updateRoom(result.intermediateState);
+            for (let i = 0; i < 2; i++) {
+              const p = result.intermediateState.players[i];
+              if (p) {
+                io.to(p.socketId).emit(
+                  "game_state",
+                  sanitizeStateForPlayer(result.intermediateState, i as 0 | 1)
+                );
+              }
             }
-          }
-
-          if (result.trickComplete) {
             io.to(data.roomCode).emit("trick_complete", {
               winner: result.trickWinner,
-              tricks: result.state.tricks,
+              tricks: result.intermediateState.tricks,
             });
-          }
 
-          if (result.roundComplete) {
-            io.to(data.roomCode).emit("round_over", {
-              scores: result.state.scores,
-              bags: result.state.bags,
-              tricks: result.state.tricks,
-              bids: [state.bids[0], state.bids[1]],
-              roundHistory: result.state.roundHistory,
-              phase: result.state.phase,
-            });
+            // Phase 2 (after 700 ms): store final state and push cleared table.
+            setTimeout(() => {
+              // Guard: make sure the room still exists and hasn't been modified
+              // by a reconnect or other event during the delay.
+              const current = getRoom(data.roomCode);
+              if (!current) return;
+
+              updateRoom(result.state);
+              for (let i = 0; i < 2; i++) {
+                const p = result.state.players[i];
+                if (p) {
+                  io.to(p.socketId).emit(
+                    "game_state",
+                    sanitizeStateForPlayer(result.state, i as 0 | 1)
+                  );
+                }
+              }
+
+              if (result.roundComplete) {
+                io.to(data.roomCode).emit("round_over", {
+                  scores: result.state.scores,
+                  bags: result.state.bags,
+                  tricks: result.state.tricks,
+                  bids: [state.bids[0], state.bids[1]],
+                  roundHistory: result.state.roundHistory,
+                  phase: result.state.phase,
+                });
+              }
+            }, 700);
+
+          } else {
+            // ── Mid-trick (first card played): push state immediately ────────
+            updateRoom(result.state);
+            for (let i = 0; i < 2; i++) {
+              const p = result.state.players[i];
+              if (p) {
+                io.to(p.socketId).emit(
+                  "game_state",
+                  sanitizeStateForPlayer(result.state, i as 0 | 1)
+                );
+              }
+            }
           }
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";

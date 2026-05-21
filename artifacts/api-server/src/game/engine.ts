@@ -174,7 +174,15 @@ export function canPlayCard(
 }
 
 export interface PlayCardResult {
+  /** Final settled state: trick cleared, winner leads (or round/game over). */
   state: GameState;
+  /**
+   * Intermediate display state: both trick cards still visible,
+   * currentTurnIndex = null so nobody can play. Exists only when a trick
+   * just completed. The caller should store this in the room first, then
+   * after the display delay swap in `state`.
+   */
+  intermediateState?: GameState;
   trickComplete: boolean;
   trickWinner?: 0 | 1;
   roundComplete?: boolean;
@@ -226,6 +234,17 @@ export function playCard(
 
   const roundComplete = newHands[0].length === 0 && newHands[1].length === 0;
 
+  // Intermediate display state: both cards visible, nobody can play.
+  // tricks/trickLeader are already updated so score counters stay correct.
+  const intermediateState: GameState = {
+    ...newState,
+    hands: newHands,
+    currentTrick: newTrick,   // keep cards on table
+    tricks: newTricks,
+    trickLeader: winnerIndex,
+    currentTurnIndex: null,   // blocks any play_card during the display window
+  };
+
   if (roundComplete) {
     const roundResult = calculateRoundScore(state, newTricks);
     const newScores: [number, number] = [
@@ -255,12 +274,9 @@ export function playCard(
       (finalScores[0] >= 500 || finalScores[1] >= 500) ||
       (finalScores[0] <= -200 || finalScores[1] <= -200);
 
-    newState = {
-      ...newState,
-      hands: newHands,
+    const finalState: GameState = {
+      ...intermediateState,
       currentTrick: [],
-      tricks: newTricks,
-      trickLeader: winnerIndex,
       scores: finalScores,
       bags: newBags,
       phase: isGameOver ? "game_over" : "round_over",
@@ -269,7 +285,8 @@ export function playCard(
     };
 
     return {
-      state: newState,
+      state: finalState,
+      intermediateState,
       trickComplete: true,
       trickWinner: winnerIndex,
       roundComplete: true,
@@ -277,17 +294,15 @@ export function playCard(
     };
   }
 
-  newState = {
-    ...newState,
-    hands: newHands,
+  const finalState: GameState = {
+    ...intermediateState,
     currentTrick: [],
-    tricks: newTricks,
-    trickLeader: winnerIndex,
     currentTurnIndex: winnerIndex,
   };
 
   return {
-    state: newState,
+    state: finalState,
+    intermediateState,
     trickComplete: true,
     trickWinner: winnerIndex,
   };
