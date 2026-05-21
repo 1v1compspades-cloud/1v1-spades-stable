@@ -3,6 +3,7 @@ import { useRoute, useLocation } from "wouter";
 import { useSocket } from "@/hooks/useSocket";
 import { useGameStorage } from "@/hooks/useGameStorage";
 import { CardComponent } from "@/components/Card";
+import { isCardPlayable } from "@/lib/game";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Card as CardType } from "@/lib/game";
@@ -285,20 +286,24 @@ export default function Room() {
   };
 
   const renderMyHand = () => {
-    const isMyTurn = gameState.phase === "playing" && gameState.currentTurnIndex === playerIndex;
-
     return (
       <div className="h-48 flex items-end justify-center pb-8 pt-4 px-4 overflow-x-auto overflow-y-hidden">
         <div className="flex -space-x-8 sm:-space-x-6">
-          {gameState.hand.map((card, i) => (
-            <div key={`${card.suit}-${card.rank}`} className="transition-transform hover:-translate-y-8 z-10 hover:z-50 cursor-pointer">
-              <CardComponent 
-                card={card} 
-                onClick={() => handlePlayCard(card)}
-                disabled={!isMyTurn && gameState.phase === "playing"}
-              />
-            </div>
-          ))}
+          {gameState.hand.map((card) => {
+            const playable = isCardPlayable(card, gameState, playerIndex as 0 | 1);
+            return (
+              <div
+                key={`${card.suit}-${card.rank}`}
+                className={`transition-transform z-10 ${playable ? "hover:-translate-y-8 hover:z-50 cursor-pointer" : "cursor-not-allowed"}`}
+              >
+                <CardComponent
+                  card={card}
+                  onClick={playable ? () => handlePlayCard(card) : undefined}
+                  disabled={!playable}
+                />
+              </div>
+            );
+          })}
         </div>
       </div>
     );

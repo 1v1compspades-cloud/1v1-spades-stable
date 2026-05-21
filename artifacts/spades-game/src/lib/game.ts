@@ -44,3 +44,40 @@ export const SUIT_COLORS: Record<Suit, string> = {
   hearts: "text-red-700",
   diamonds: "text-red-700"
 };
+
+/**
+ * Returns true if this card is a legal play right now.
+ * Mirrors the server-side canPlayCard logic so the UI can dim illegal cards
+ * before the player even clicks. The server still enforces all rules.
+ */
+export function isCardPlayable(
+  card: Card,
+  gs: GameState,
+  playerIndex: 0 | 1
+): boolean {
+  // Not this player's turn (or in the trick-display delay window)
+  if (gs.currentTurnIndex !== playerIndex) return false;
+  if (gs.phase !== "playing") return false;
+
+  const hand = gs.hand;
+  const trick = gs.currentTrick;
+
+  if (trick.length === 0) {
+    // Leading a trick: spades are illegal unless spades are broken
+    // OR the player has nothing but spades.
+    if (!gs.spadesBroken && card.suit === "spades") {
+      return hand.every(c => c.suit === "spades");
+    }
+    return true;
+  }
+
+  // Following: must follow the lead suit if possible.
+  const ledSuit = trick[0].card.suit;
+  const hasLeadSuit = hand.some(c => c.suit === ledSuit);
+  if (hasLeadSuit) {
+    return card.suit === ledSuit;
+  }
+
+  // No cards of the lead suit — any card is playable.
+  return true;
+}
