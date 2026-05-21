@@ -38,6 +38,8 @@ export interface GameState {
   spectatorCount: number;
   /** True if this client is a spectator (no hand, no input). */
   isSpectator: boolean;
+  /** Optional free-text label for this match (e.g. "Quarterfinal 1"). */
+  matchLabel?: string;
 }
 
 export const SUIT_SYMBOLS: Record<Suit, string> = {

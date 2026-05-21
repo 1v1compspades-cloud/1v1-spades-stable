@@ -8,7 +8,7 @@ interface SocketContextType {
   gameState: GameState | null;
   error: string | null;
   connect: () => void;
-  createRoom: (name: string, matchTarget?: number) => Promise<{ roomCode?: string; playerIndex?: number }>;
+  createRoom: (name: string, matchTarget?: number, matchLabel?: string) => Promise<{ roomCode?: string; playerIndex?: number }>;
   joinRoom: (code: string, name: string) => Promise<{ playerIndex?: number }>;
   reconnect: (roomCode: string, playerIndex: 0 | 1, playerName: string) => Promise<{ ok: boolean }>;
   startGame: (code: string) => void;
@@ -63,10 +63,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const createRoom = (playerName: string, matchTarget?: number) => {
+  const createRoom = (playerName: string, matchTarget?: number, matchLabel?: string) => {
     return new Promise<{ roomCode?: string; playerIndex?: number }>((resolve, reject) => {
       if (!socket) return reject("No socket");
-      socket.emit("create_room", { playerName, matchTarget }, (res: any) => {
+      socket.emit("create_room", { playerName, matchTarget, matchLabel }, (res: any) => {
         if (res.ok) resolve({ roomCode: res.roomCode, playerIndex: res.playerIndex });
         else reject(res.error);
       });

@@ -26,6 +26,7 @@ export default function Lobby() {
   const [nameInput, setNameInput] = useState(playerName);
   const [joinCodeInput, setJoinCodeInput] = useState(initialParams.code);
   const [matchTarget, setMatchTarget] = useState<250 | 500>(250);
+  const [matchLabel, setMatchLabel] = useState<string>("");
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [isSpectating, setIsSpectating] = useState(false);
@@ -42,7 +43,7 @@ export default function Lobby() {
     try {
       savePlayerName(nameInput);
       saveIsSpectator(false);
-      const res = await createRoom(nameInput, matchTarget);
+      const res = await createRoom(nameInput, matchTarget, matchLabel.trim() || undefined);
       if (res.roomCode && res.playerIndex !== undefined) {
         saveRoomCode(res.roomCode);
         savePlayerIndex(res.playerIndex as 0 | 1);
@@ -159,6 +160,21 @@ export default function Lobby() {
               ))}
             </div>
             <p className="text-xs text-muted-foreground">First to reach target and lead wins. Tied at target → tiebreaker.</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="match-label" className="text-sm">Match label <span className="text-muted-foreground font-normal">(optional)</span></Label>
+            <Input
+              id="match-label"
+              placeholder="e.g. Quarterfinal 1, Semifinal 2, Finals"
+              value={matchLabel}
+              onChange={(e) => setMatchLabel(e.target.value.slice(0, 40))}
+              maxLength={40}
+              disabled={isCreating || isJoining}
+              data-testid="input-match-label"
+              className="py-5"
+            />
+            <p className="text-xs text-muted-foreground">Shown to both players and spectators. Only the host sets this when creating.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-border/50">

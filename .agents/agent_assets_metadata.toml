@@ -12,3 +12,9 @@ id = "nNFtPTQTiAP9vr6aNyUSi"
 uri = "file://solo-spades-v-mobile-card-polish.zip"
 type = "unspecified"
 title = "Spades — mobile card readability polish"
+
+[[outputs]]
+id = "fC9K314dXo4T5GiNkockm"
+uri = "file://solo-spades-v-mock-tourney-tools.zip"
+type = "unspecified"
+title = "Spades — mock tournament tools"

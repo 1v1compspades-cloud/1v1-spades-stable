@@ -170,6 +170,17 @@ export default function Room() {
 
     return (
       <div>
+        {gameState.matchLabel && (
+          <div
+            data-testid="match-label"
+            className="text-center py-1 px-4 text-[11px] tracking-widest uppercase bg-primary/15 text-primary font-semibold border-b border-primary/20"
+          >
+            {gameState.matchLabel}
+            <span className="text-muted-foreground/70 normal-case tracking-normal font-normal ml-2">
+              · Room <span className="font-mono">{roomCode}</span>
+            </span>
+          </div>
+        )}
         {showTiebreaker && (
           <div className="text-center py-1 px-4 text-xs tracking-wider uppercase bg-orange-500/15 text-orange-300 font-semibold">
             Tiebreaker · Round {gameState.tiebreakerRound} of 3
@@ -246,6 +257,14 @@ export default function Room() {
     return (
       <div className="flex flex-col items-center justify-center h-full space-y-8 px-4">
         <div className="text-center space-y-3 w-full max-w-xs">
+          {gameState.matchLabel && (
+            <div
+              data-testid="match-label"
+              className="inline-block px-3 py-1 rounded-full border border-primary/40 bg-primary/10 text-primary text-xs font-semibold uppercase tracking-widest"
+            >
+              {gameState.matchLabel}
+            </div>
+          )}
           <p className="text-xs text-muted-foreground uppercase tracking-widest">{`Seat ${(playerIndex as number) + 1} · You`}</p>
           <h2 className="text-2xl font-serif text-primary">Room Code</h2>
           <div className="text-5xl font-mono tracking-widest font-bold bg-background p-6 rounded-lg border-2 border-primary shadow-[0_0_15px_rgba(234,179,8,0.2)]">
@@ -313,6 +332,14 @@ export default function Room() {
         Spectator
       </Badge>
       <div>
+        {gameState.matchLabel && (
+          <div
+            data-testid="match-label"
+            className="inline-block px-3 py-1 mb-2 rounded-full border border-primary/40 bg-primary/10 text-primary text-xs font-semibold uppercase tracking-widest"
+          >
+            {gameState.matchLabel}
+          </div>
+        )}
         <p className="text-xs text-muted-foreground uppercase tracking-widest">Watching room</p>
         <div className="text-4xl font-mono tracking-widest font-bold mt-2">{roomCode}</div>
       </div>
@@ -527,8 +554,16 @@ export default function Room() {
 
         {/* Game over overlay (shown to everyone) */}
         {gameState.phase === "game_over" && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-lg">
-            <div className="bg-card border border-border p-8 rounded-xl shadow-2xl max-w-sm w-full mx-4 text-center space-y-5">
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-lg overflow-y-auto p-4">
+            <div className="bg-card border border-border p-6 rounded-xl shadow-2xl max-w-sm w-full text-center space-y-5 my-auto">
+              {gameState.matchLabel && (
+                <div
+                  data-testid="match-label"
+                  className="inline-block px-3 py-1 rounded-full border border-primary/40 bg-primary/10 text-primary text-xs font-semibold uppercase tracking-widest"
+                >
+                  {gameState.matchLabel}
+                </div>
+              )}
               <h3 className="text-4xl font-serif text-primary">Game Over</h3>
               <div>
                 {(() => {
@@ -566,6 +601,67 @@ export default function Room() {
                   Rounds played: <span className="font-mono text-foreground">{gameState.roundHistory.length}</span>
                 </div>
               </div>
+
+              {/* Tournament result copy block — plain text + Discord-formatted */}
+              {(() => {
+                const s0 = gameState.scores[0], s1 = gameState.scores[1];
+                const n0 = gameState.players[0]?.name ?? "Seat 1";
+                const n1 = gameState.players[1]?.name ?? "Seat 2";
+                const tie = s0 === s1;
+                const winIdx = s0 >= s1 ? 0 : 1;
+                const loseIdx = winIdx === 0 ? 1 : 0;
+                const winName = [n0, n1][winIdx];
+                const loseName = [n0, n1][loseIdx];
+                const winScore = [s0, s1][winIdx];
+                const loseScore = [s0, s1][loseIdx];
+                const rounds = gameState.roundHistory.length;
+                const labelLine = gameState.matchLabel ? `${gameState.matchLabel} — ` : "";
+
+                const plain = tie
+                  ? `${labelLine}${n0} ${s0}–${s1} ${n1} (draw)\nRounds: ${rounds} · Room: ${roomCode}`
+                  : `${labelLine}${winName} def. ${loseName}\nFinal: ${winScore}–${loseScore} · Rounds: ${rounds} · Room: ${roomCode}`;
+
+                const discord = [
+                  "```",
+                  "Spades Result",
+                  gameState.matchLabel ? `Match:  ${gameState.matchLabel}` : null,
+                  tie ? `Result: Draw ${s0}–${s1}` : `Winner: ${winName} (${winScore})`,
+                  tie ? `        ${n0} vs ${n1}`   : `Loser:  ${loseName} (${loseScore})`,
+                  `Rounds: ${rounds}`,
+                  `Target: ${gameState.matchTarget}`,
+                  `Room:   ${roomCode}`,
+                  "```",
+                ].filter(Boolean).join("\n");
+
+                return (
+                  <div className="space-y-2 text-left">
+                    <p className="text-xs text-muted-foreground uppercase tracking-widest text-center">Report result</p>
+                    <pre
+                      data-testid="report-text"
+                      className="text-[11px] leading-snug font-mono bg-black/40 border border-border rounded-md p-3 whitespace-pre-wrap break-words max-h-32 overflow-y-auto text-left"
+                    >{discord}</pre>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => copyToClipboard(plain, "Final result")}
+                        data-testid="button-copy-result"
+                      >
+                        📋 Copy result
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => copyToClipboard(discord, "Discord report")}
+                        data-testid="button-copy-discord"
+                      >
+                        💬 Copy for Discord
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="space-y-2">
                 {spectator ? (
                   <p className="text-center text-muted-foreground italic text-sm">Waiting for host to start a new match…</p>
@@ -638,6 +734,9 @@ export default function Room() {
         </Badge>
         <span className="text-muted-foreground">
           Room <span className="font-mono text-foreground">{roomCode}</span>
+          {gameState.matchLabel && (
+            <>{" · "}<span className="font-semibold text-primary" data-testid="match-label">{gameState.matchLabel}</span></>
+          )}
           {" · "}
           Round <span className="font-mono text-foreground">{gameState.roundNumber || "—"}</span>
           {" · "}

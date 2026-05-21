@@ -48,6 +48,7 @@ function sanitizeStateForPlayer(
     tiebreakerRound: state.tiebreakerRound,
     spectatorCount: state.spectators.length,
     isSpectator: false,
+    matchLabel: state.matchLabel,
   };
 }
 
@@ -76,6 +77,7 @@ function sanitizeStateForSpectator(state: GameState): Record<string, unknown> {
     tiebreakerRound: state.tiebreakerRound,
     spectatorCount: state.spectators.length,
     isSpectator: true,
+    matchLabel: state.matchLabel,
   };
 }
 
@@ -114,7 +116,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
     socket.on(
       "create_room",
       (
-        data: { playerName: string; matchTarget?: number },
+        data: { playerName: string; matchTarget?: number; matchLabel?: string },
         callback: (res: { ok: boolean; roomCode?: string; playerIndex?: number; error?: string }) => void
       ) => {
         try {
@@ -124,7 +126,10 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           const target = Number.isFinite(rawTarget) && rawTarget > 0 && rawTarget <= 5000
             ? Math.floor(rawTarget)
             : 250;
-          const state = createRoom(data.playerName, socket.id, target);
+          // Optional match label (e.g. "Quarterfinal 1"). Trimmed, length-capped.
+          const rawLabel = typeof data.matchLabel === "string" ? data.matchLabel.trim() : "";
+          const label = rawLabel ? rawLabel.slice(0, 40) : undefined;
+          const state = createRoom(data.playerName, socket.id, target, label);
           socket.join(state.roomCode);
           logger.info({ roomCode: state.roomCode, playerName: data.playerName }, "Room created");
           callback({ ok: true, roomCode: state.roomCode, playerIndex: 0 });

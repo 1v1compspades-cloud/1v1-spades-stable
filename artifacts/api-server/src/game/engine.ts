@@ -67,6 +67,8 @@ export interface GameState {
   tiebreakerActive: boolean;
   tiebreakerRound: number;
   spectators: Spectator[];
+  /** Optional free-text label for the match (e.g. "Quarterfinal 1", "Finals"). */
+  matchLabel?: string;
 }
 
 function makeRoomCode(): string {
@@ -78,10 +80,11 @@ function makeRoomCode(): string {
   return code;
 }
 
-export function createGame(roomCode: string, matchTarget = 250): GameState {
+export function createGame(roomCode: string, matchTarget = 250, matchLabel?: string): GameState {
   return {
     roomCode,
     phase: "waiting",
+    matchLabel,
     players: [null, null],
     hands: [[], []],
     bids: [null, null],
@@ -424,14 +427,15 @@ const rooms = new Map<string, GameState>();
 export function createRoom(
   hostPlayerName: string,
   hostSocketId: string,
-  matchTarget = 250
+  matchTarget = 250,
+  matchLabel?: string
 ): GameState {
   let code: string;
   do {
     code = makeRoomCode();
   } while (rooms.has(code));
 
-  const state = createGame(code, matchTarget);
+  const state = createGame(code, matchTarget, matchLabel);
   const host: Player = {
     id: hostSocketId,
     name: hostPlayerName,

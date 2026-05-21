@@ -52,6 +52,15 @@ Two players can play a full head-to-head Spades match in real time via their bro
 
 Spectators can join any room with the room code and watch live. They see scores, bids, tricks, card counts, played cards, round summaries, and the game-over screen — but never see either player's hand. Spectators cannot bid, play, or advance the game. Multiple spectators per room are allowed. Refresh restores spectators as spectators and players as players.
 
+## Mock tournament tools
+
+Lightweight helpers for running 8-player test brackets manually (no real bracket UI yet):
+
+- Optional **Match label** field in the Lobby (e.g. "Quarterfinal 1", "Finals"). Capped at 40 chars server-side; trimmed blanks become `undefined`.
+- Label is stored on `GameState.matchLabel`, sent in both player and spectator sanitized views.
+- Label is shown to both roles in: waiting screens, in-game status banner header (active play for players), spectator footer, and game-over overlay.
+- Game-over overlay has **Copy result** (plain text) and **Copy for Discord** (code-block) buttons. The Discord block contains: match label, winner/loser + final scores, rounds played, target, room code.
+
 ## Gotchas
 
 - Always restart the API Server workflow after backend changes; the frontend is hot-reloaded by Vite.
