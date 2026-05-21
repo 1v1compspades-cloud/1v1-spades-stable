@@ -10,16 +10,27 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function Lobby() {
   const [, setLocation] = useLocation();
-  const { connect, createRoom, joinRoom, joinAsSpectator } = useSocket();
+  const { connect, connected, createRoom, joinRoom, joinAsSpectator } = useSocket();
   const { playerName, savePlayerName, saveRoomCode, savePlayerIndex, saveIsSpectator } = useGameStorage();
   const { toast } = useToast();
   
+  // Parse ?room=XXX&mode=spectator from the URL (once on mount)
+  const initialParams = (() => {
+    if (typeof window === "undefined") return { code: "", spectate: false };
+    const sp = new URLSearchParams(window.location.search);
+    const code = (sp.get("room") || "").toUpperCase().trim();
+    const spectate = sp.get("mode") === "spectator";
+    return { code, spectate };
+  })();
+
   const [nameInput, setNameInput] = useState(playerName);
-  const [joinCodeInput, setJoinCodeInput] = useState("");
+  const [joinCodeInput, setJoinCodeInput] = useState(initialParams.code);
   const [matchTarget, setMatchTarget] = useState<250 | 500>(250);
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [isSpectating, setIsSpectating] = useState(false);
+  const [invitedAsSpectator] = useState(initialParams.spectate && !!initialParams.code);
+  const [autoSpectateTried, setAutoSpectateTried] = useState(false);
 
   useEffect(() => {
     connect();
@@ -64,6 +75,18 @@ export default function Lobby() {
     }
   };
 
+  // Auto-spectate when arriving via a ?mode=spectator link, as soon as
+  // we have a connection AND a name on file. If the user has no saved name,
+  // we wait for them to enter one and click the (highlighted) Spectate button.
+  useEffect(() => {
+    if (!invitedAsSpectator || autoSpectateTried) return;
+    if (!connected) return;
+    if (!nameInput.trim()) return;
+    setAutoSpectateTried(true);
+    void handleSpectate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invitedAsSpectator, autoSpectateTried, connected, nameInput]);
+
   const handleSpectate = async (): Promise<void> => {
     if (!nameInput.trim()) { toast({ description: "Please enter your name", variant: "destructive" }); return; }
     if (!joinCodeInput.trim()) { toast({ description: "Please enter a room code", variant: "destructive" }); return; }
@@ -93,6 +116,21 @@ export default function Lobby() {
           <CardDescription className="text-base">Midnight cards. Head to head.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-8 mt-4">
+          {initialParams.code && (
+            <div
+              className={`text-center text-sm rounded-md border px-3 py-2 ${
+                invitedAsSpectator
+                  ? "border-primary/40 bg-primary/10 text-primary"
+                  : "border-border bg-white/5 text-muted-foreground"
+              }`}
+              data-testid="banner-invite"
+            >
+              {invitedAsSpectator
+                ? <>You've been invited to <span className="font-mono">{initialParams.code}</span> as a spectator. Enter your name to start watching.</>
+                : <>You've been invited to room <span className="font-mono">{initialParams.code}</span>. Enter your name and join.</>
+              }
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="name">Your Name</Label>
             <Input 

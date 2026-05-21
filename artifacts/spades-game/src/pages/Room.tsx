@@ -71,6 +71,35 @@ export default function Room() {
   const topIndex: 0 | 1 = spectator ? 0 : ((playerIndex === 0 ? 1 : 0) as 0 | 1);
   const bottomIndex: 0 | 1 = spectator ? 1 : (playerIndex as 0 | 1);
 
+  // Build invite links from the current origin (works in dev preview & prod)
+  const buildLink = (spectator: boolean) => {
+    if (typeof window === "undefined" || !roomCode) return "";
+    const url = new URL(window.location.origin + (window.location.pathname.replace(/\/room\/.*$/, "") || "/"));
+    url.searchParams.set("room", roomCode);
+    if (spectator) url.searchParams.set("mode", "spectator");
+    return url.toString();
+  };
+
+  const copyToClipboard = async (text: string, label: string) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      toast({ description: `${label} copied to clipboard` });
+    } catch {
+      toast({ description: `Couldn't copy ${label}. Long-press to copy manually.`, variant: "destructive" });
+    }
+  };
+
   const handleStartGame = () => startGame(roomCode!);
   const handleNextRound = () => nextRound(roomCode!);
   const handleNewMatch  = () => newMatch(roomCode!);
@@ -216,13 +245,38 @@ export default function Room() {
     const opponent = gameState.players[playerIndex === 0 ? 1 : 0];
     return (
       <div className="flex flex-col items-center justify-center h-full space-y-8 px-4">
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-3 w-full max-w-xs">
           <p className="text-xs text-muted-foreground uppercase tracking-widest">{`Seat ${(playerIndex as number) + 1} · You`}</p>
           <h2 className="text-2xl font-serif text-primary">Room Code</h2>
           <div className="text-5xl font-mono tracking-widest font-bold bg-background p-6 rounded-lg border-2 border-primary shadow-[0_0_15px_rgba(234,179,8,0.2)]">
             {roomCode}
           </div>
-          <p className="text-muted-foreground text-sm mt-4">Share this code with your opponent</p>
+          <div className="grid grid-cols-1 gap-2 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => copyToClipboard(roomCode!, "Room code")}
+              data-testid="button-copy-code"
+            >
+              📋 Copy Room Code
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => copyToClipboard(buildLink(false), "Player invite link")}
+              data-testid="button-copy-player-link"
+            >
+              🔗 Copy Player Invite Link
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => copyToClipboard(buildLink(true), "Spectator link")}
+              data-testid="button-copy-spectator-link"
+            >
+              👀 Copy Spectator Link
+            </Button>
+          </div>
         </div>
 
         {opponent ? (
@@ -265,7 +319,17 @@ export default function Room() {
       <p className="text-muted-foreground text-sm max-w-xs">
         Waiting for the players to start. You'll see all the action — hands stay hidden.
       </p>
-      <Button variant="outline" onClick={handleLeaveSpectate}>Leave</Button>
+      <div className="w-full max-w-xs grid grid-cols-1 gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => copyToClipboard(buildLink(true), "Spectator link")}
+          data-testid="button-copy-spectator-link"
+        >
+          👀 Copy Spectator Link
+        </Button>
+        <Button variant="outline" onClick={handleLeaveSpectate}>Leave</Button>
+      </div>
     </div>
   );
 
