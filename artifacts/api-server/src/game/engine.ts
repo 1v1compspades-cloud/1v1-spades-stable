@@ -455,11 +455,11 @@ function calculateRoundScore(
     const tricksTaken = tricks[i];
 
     if (bid === 0) {
-      // Nil bid
+      // Nil bid — 1v1 Competitive Spades house rule: ±125
       if (tricksTaken === 0) {
-        scoreDeltas[i] = 100;
+        scoreDeltas[i] = 125;
       } else {
-        scoreDeltas[i] = -100;
+        scoreDeltas[i] = -125;
         newBags[i] += tricksTaken;
       }
     } else {
