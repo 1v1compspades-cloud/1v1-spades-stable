@@ -132,18 +132,59 @@ export default function Room() {
   };
 
   // ── Status banner ──────────────────────────────────────────────────────────
+  // Compact match-label bar used by both the status banner and the
+  // coin-toss/bidding hint blocks so the label stays visible.
+  const renderMatchLabelBar = () => (
+    <div
+      data-testid="match-label"
+      className="text-center py-1 px-4 text-[11px] tracking-widest uppercase bg-primary/15 text-primary font-semibold border-b border-primary/20"
+    >
+      {gameState.matchLabel}
+      <span className="text-muted-foreground/70 normal-case tracking-normal font-normal ml-2">
+        · Room <span className="font-mono">{roomCode}</span>
+      </span>
+    </div>
+  );
+
   const renderStatusBanner = () => {
     const { phase, currentBidder, currentTurnIndex, players } = gameState;
     const nameOf = (i: 0 | 1) => players[i]?.name ?? `Seat ${i + 1}`;
     let message = "";
     let colorClass = "bg-white/5 text-muted-foreground";
 
-    if (phase === "bidding") {
+    if (phase === "coin_toss") {
+      message = "Flipping coin…";
+      colorClass = "bg-primary/20 text-primary font-semibold";
+    } else if (phase === "bidding") {
+      const roundFirstBidder = gameState.currentBidder; // first-to-bid each round
+      const firstBidderName =
+        roundFirstBidder !== null ? nameOf(roundFirstBidder) : null;
       if (!spectator && currentBidder === playerIndex) {
         message = "Your turn to bid";
         colorClass = "bg-primary/20 text-primary font-semibold";
       } else if (currentBidder !== null) {
         message = `${nameOf(currentBidder)} is bidding…`;
+      }
+      // Round N — <Name> bids first (shown until both bids are locked)
+      const showFirstBidderHint =
+        firstBidderName !== null &&
+        gameState.bids[0] === null &&
+        gameState.bids[1] === null;
+      if (showFirstBidderHint) {
+        return (
+          <div>
+            {gameState.matchLabel && renderMatchLabelBar()}
+            <div
+              data-testid="first-bidder-hint"
+              className="text-center py-1 px-4 text-[11px] tracking-wider uppercase bg-white/5 text-muted-foreground"
+            >
+              Round {gameState.roundNumber} · <span className="text-foreground font-semibold">{firstBidderName}</span> bids first
+            </div>
+            <div className={`text-center py-2 px-4 text-sm tracking-wide transition-colors ${colorClass}`}>
+              {message}
+            </div>
+          </div>
+        );
       }
     } else if (phase === "playing") {
       if (currentTurnIndex === null) {
@@ -170,17 +211,7 @@ export default function Room() {
 
     return (
       <div>
-        {gameState.matchLabel && (
-          <div
-            data-testid="match-label"
-            className="text-center py-1 px-4 text-[11px] tracking-widest uppercase bg-primary/15 text-primary font-semibold border-b border-primary/20"
-          >
-            {gameState.matchLabel}
-            <span className="text-muted-foreground/70 normal-case tracking-normal font-normal ml-2">
-              · Room <span className="font-mono">{roomCode}</span>
-            </span>
-          </div>
-        )}
+        {gameState.matchLabel && renderMatchLabelBar()}
         {showTiebreaker && (
           <div className="text-center py-1 px-4 text-xs tracking-wider uppercase bg-orange-500/15 text-orange-300 font-semibold">
             Tiebreaker · Round {gameState.tiebreakerRound} of 3
@@ -441,11 +472,54 @@ export default function Room() {
           </div>
         </div>
 
+        {/* Coin toss overlay — shown to all roles for ~3.5s, server transitions to bidding */}
+        {gameState.phase === "coin_toss" && gameState.coinFlipWinner !== null && (() => {
+          const winnerName = gameState.players[gameState.coinFlipWinner]?.name ?? `Seat ${gameState.coinFlipWinner + 1}`;
+          const loserIdx: 0 | 1 = gameState.coinFlipWinner === 0 ? 1 : 0;
+          const loserName = gameState.players[loserIdx]?.name ?? `Seat ${loserIdx + 1}`;
+          const youWon = !spectator && playerIndex === gameState.coinFlipWinner;
+          return (
+            <div
+              className="absolute inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-lg"
+              data-testid="coin-toss-overlay"
+            >
+              <div className="bg-card border border-border p-8 rounded-xl shadow-2xl max-w-sm w-full mx-4 text-center space-y-5">
+                <div className="text-6xl animate-spin-slow inline-block" aria-hidden>🪙</div>
+                <h3 className="text-2xl font-serif text-primary">Coin Toss</h3>
+                <p className="text-sm text-muted-foreground">
+                  Happens once per match. Winner bids <span className="font-semibold text-foreground">second</span> in Round 1.
+                </p>
+                <div className="space-y-1 border-y border-border py-3">
+                  <p className="text-xs text-muted-foreground uppercase tracking-widest">Winner</p>
+                  <p data-testid="coin-toss-winner" className="text-2xl font-serif font-bold text-primary">
+                    {winnerName}{youWon ? " (you)" : ""}
+                  </p>
+                </div>
+                <p className="text-sm">
+                  <span className="font-semibold text-foreground" data-testid="coin-toss-first-bidder">{loserName}</span>{" "}
+                  bids first in Round 1. Bidding order alternates each round after.
+                </p>
+                <p className="text-xs text-muted-foreground italic">Dealing cards…</p>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Bidding overlay (players only) */}
         {!spectator && gameState.phase === "bidding" && gameState.currentBidder === playerIndex && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
             <div className="bg-card border border-border p-6 rounded-xl shadow-2xl space-y-4 max-w-sm w-full mx-4 text-center">
               <h3 className="text-xl font-serif text-primary">Place your bid</h3>
+              {gameState.bids[0] === null && gameState.bids[1] === null && (
+                <p className="text-xs uppercase tracking-widest text-primary/80">
+                  You bid first this round (Round {gameState.roundNumber})
+                </p>
+              )}
+              {(gameState.bids[0] !== null || gameState.bids[1] !== null) && (
+                <p className="text-xs uppercase tracking-widest text-muted-foreground">
+                  You bid second this round
+                </p>
+              )}
               <p className="text-sm text-muted-foreground">
                 You have {gameState.hand.length} cards. Bid 0 for Nil (+/−100).
               </p>
@@ -756,6 +830,8 @@ export default function Room() {
 
   // ── Root layout ────────────────────────────────────────────────────────────
   // Spectator: never see the waiting screen as theirs — show a neutral version
+  // Spectator that joined before host hits "Start" — show waiting screen.
+  // (Coin toss and beyond render the normal table layout with overlay.)
   if (spectator && gameState.phase === "waiting") {
     return (
       <div className="h-[100dvh] flex flex-col bg-background overflow-hidden relative">

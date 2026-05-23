@@ -10,6 +10,7 @@ import {
 
 export type GamePhase =
   | "waiting"
+  | "coin_toss"
   | "bidding"
   | "playing"
   | "round_over"
@@ -69,6 +70,18 @@ export interface GameState {
   spectators: Spectator[];
   /** Optional free-text label for the match (e.g. "Quarterfinal 1", "Finals"). */
   matchLabel?: string;
+  /**
+   * Coin toss winner (0 or 1) — set ONCE at the start of the match.
+   * The winner bids SECOND in Round 1; the loser bids FIRST.
+   * Bidding order then alternates every round.
+   */
+  coinFlipWinner: 0 | 1 | null;
+  /**
+   * The seat (0 or 1) that bids first in Round 1. Always = the coin toss loser.
+   * Stored explicitly so `getFirstBidderForRound` can derive each round's
+   * first bidder by simple parity, without re-flipping.
+   */
+  firstBidderRound1: 0 | 1 | null;
 }
 
 function makeRoomCode(): string {
@@ -103,23 +116,63 @@ export function createGame(roomCode: string, matchTarget = 250, matchLabel?: str
     tiebreakerActive: false,
     tiebreakerRound: 0,
     spectators: [],
+    coinFlipWinner: null,
+    firstBidderRound1: null,
   };
+}
+
+/**
+ * Flip the coin ONCE at the start of a match. The winner bids second in
+ * Round 1; the loser bids first. Subsequent rounds alternate via
+ * {@link getFirstBidderForRound}. Idempotent: re-calling preserves the result.
+ */
+export function performCoinToss(state: GameState): GameState {
+  if (state.coinFlipWinner !== null && state.firstBidderRound1 !== null) {
+    // Coin already tossed for this match — preserve it.
+    return { ...state, phase: "coin_toss" };
+  }
+  const winner: 0 | 1 = Math.random() < 0.5 ? 0 : 1;
+  const loser: 0 | 1 = winner === 0 ? 1 : 0;
+  return {
+    ...state,
+    phase: "coin_toss",
+    coinFlipWinner: winner,
+    firstBidderRound1: loser,
+  };
+}
+
+/**
+ * Returns the seat (0 or 1) that bids first for the round being started next.
+ * Round 1 → firstBidderRound1; then alternates. `nextRoundNumber` is the
+ * upcoming roundNumber (1-indexed).
+ */
+export function getFirstBidderForRound(
+  state: GameState,
+  nextRoundNumber: number
+): 0 | 1 {
+  // Defensive default: if coin toss wasn't run, seat 0 bids first.
+  if (state.firstBidderRound1 === null) return 0;
+  const roundIsOdd = nextRoundNumber % 2 === 1;
+  if (roundIsOdd) return state.firstBidderRound1;
+  return state.firstBidderRound1 === 0 ? 1 : 0;
 }
 
 export function startRound(state: GameState): GameState {
   const deck = shuffleDeck(createDeck());
   const [hand1, hand2] = dealHands(deck);
+  const nextRoundNumber = state.roundNumber + 1;
+  const firstBidder = getFirstBidderForRound(state, nextRoundNumber);
   const newState: GameState = {
     ...state,
     phase: "bidding",
     hands: [sortHand(hand1), sortHand(hand2)],
     bids: [null, null],
-    currentBidder: 0,
+    currentBidder: firstBidder,
     tricks: [0, 0],
     currentTrick: [],
     spadesBroken: false,
     currentTurnIndex: null,
-    roundNumber: state.roundNumber + 1,
+    roundNumber: nextRoundNumber,
     tiebreakerRound: state.tiebreakerActive ? state.tiebreakerRound + 1 : 0,
   };
   return newState;
@@ -147,6 +200,9 @@ export function resetMatch(state: GameState): GameState {
     trickLeader: 0,
     tiebreakerActive: false,
     tiebreakerRound: 0,
+    // New match → re-toss the coin
+    coinFlipWinner: null,
+    firstBidderRound1: null,
   };
 }
 

@@ -8,7 +8,7 @@ export interface Card {
 
 export interface GameState {
   roomCode: string;
-  phase: "waiting" | "bidding" | "playing" | "round_over" | "game_over";
+  phase: "waiting" | "coin_toss" | "bidding" | "playing" | "round_over" | "game_over";
   players: ({ id: string; name: string; index: 0 | 1 } | null)[];
   hand: Card[];
   opponentHandSize: number;
@@ -40,6 +40,13 @@ export interface GameState {
   isSpectator: boolean;
   /** Optional free-text label for this match (e.g. "Quarterfinal 1"). */
   matchLabel?: string;
+  /**
+   * Seat (0 or 1) that won the one-time coin toss. The winner bids SECOND in
+   * Round 1; the loser bids FIRST. Bidding order alternates every round after.
+   */
+  coinFlipWinner: 0 | 1 | null;
+  /** Seat that bids first in Round 1 — always the coin toss loser. */
+  firstBidderRound1: 0 | 1 | null;
 }
 
 export const SUIT_SYMBOLS: Record<Suit, string> = {

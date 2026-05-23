@@ -1,0 +1,84 @@
+Update my 1v1 Competitive Spades game so the bidding order alternates every round after the first coin toss.
+
+RULE CHANGE:
+- Coin toss happens only once at the start of the match.
+- The coin toss winner bids SECOND in Round 1.
+- The coin toss loser bids FIRST in Round 1.
+- After Round 1, bidding order alternates every round.
+- Example:
+  Round 1: coin toss loser bids first
+  Round 2: coin toss winner bids first
+  Round 3: coin toss loser bids first
+  Round 4: coin toss winner bids first
+- Do not re-flip the coin after Round 1.
+- Keep all other game rules the same.
+
+IMPLEMENTATION REQUIREMENTS:
+1. Add state variables to track:
+   - coinFlipWinner
+   - coinFlipLoser
+   - firstBidderRound1
+   - currentRoundFirstBidder
+   - biddingPlayer
+
+2. When the coin toss is completed:
+   - Save the winner.
+   - Save the loser.
+   - Set firstBidderRound1 to the loser.
+   - Set currentRoundFirstBidder to the loser.
+   - Set biddingPlayer to the loser.
+   - Move game phase to bidding.
+
+3. Add a helper function:
+
+function getFirstBidderForRound() {
+  if (!game.firstBidderRound1) return null;
+
+  const roundIsOdd = game.round % 2 === 1;
+
+  if (roundIsOdd) {
+    return game.firstBidderRound1;
+  }
+
+  return game.firstBidderRound1 === "p1" ? "p2" : "p1";
+}
+
+4. Whenever a new round starts:
+   - Increment the round number.
+   - Reset both bids to null.
+   - Reset tricks and played cards.
+   - Set currentRoundFirstBidder = getFirstBidderForRound()
+   - Set biddingPlayer = currentRoundFirstBidder
+   - Set phase to "bidding"
+
+5. Update the UI text so players can see:
+   - Round number
+   - Who bids first this round
+   - Whose turn it is to bid
+
+6. Make sure the bid lock logic respects the new alternating bid order.
+   - First bidder locks bid first.
+   - Second bidder locks bid second.
+   - After both bids are locked, play begins.
+
+7. Do not break:
+   - multiplayer rooms
+   - turn order
+   - scoring
+   - nil
+   - bags
+   - spades breaking
+   - renege/suit enforcement
+   - hidden hands
+   - restart/rematch logic
+
+Test these cases:
+- If Player 1 wins coin toss:
+  Round 1: Player 2 bids first
+  Round 2: Player 1 bids first
+  Round 3: Player 2 bids first
+
+- If Player 2 wins coin toss:
+  Round 1: Player 1 bids first
+  Round 2: Player 2 bids first
+  Round 3: Player 1 bids first

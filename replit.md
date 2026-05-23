@@ -61,6 +61,15 @@ Lightweight helpers for running 8-player test brackets manually (no real bracket
 - Label is shown to both roles in: waiting screens, in-game status banner header (active play for players), spectator footer, and game-over overlay.
 - Game-over overlay has **Copy result** (plain text) and **Copy for Discord** (code-block) buttons. The Discord block contains: match label, winner/loser + final scores, rounds played, target, room code.
 
+## Bidding order (coin toss + alternation)
+
+- Coin toss happens ONCE per match (server-side `performCoinToss`, fired by `start_game`).
+- The coin toss WINNER bids SECOND in Round 1. The LOSER bids FIRST.
+- After Round 1, bidding order alternates every round — implemented by `getFirstBidderForRound(state, roundNumber)` (odd round → `firstBidderRound1`; even → opposite seat). `startRound` uses this for `currentBidder`.
+- `GameState` carries `coinFlipWinner` and `firstBidderRound1` (both `0 | 1 | null`); both are sent to player and spectator sanitized views.
+- `phase: "coin_toss"` is broadcast for ~3.5s before Round 1 deal so all 3 roles see the result with an overlay (`coin-toss-overlay` testid).
+- `resetMatch` (New Match button) clears coin state so the next match re-flips.
+
 ## Gotchas
 
 - Always restart the API Server workflow after backend changes; the frontend is hot-reloaded by Vite.

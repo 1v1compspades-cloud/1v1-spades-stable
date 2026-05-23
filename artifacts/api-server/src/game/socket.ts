@@ -15,6 +15,7 @@ import {
   resetMatch,
   addSpectator,
   reconnectSpectator,
+  performCoinToss,
   type GameState,
 } from "./engine.js";
 import type { Card } from "./deck.js";
@@ -49,6 +50,8 @@ function sanitizeStateForPlayer(
     spectatorCount: state.spectators.length,
     isSpectator: false,
     matchLabel: state.matchLabel,
+    coinFlipWinner: state.coinFlipWinner,
+    firstBidderRound1: state.firstBidderRound1,
   };
 }
 
@@ -78,6 +81,8 @@ function sanitizeStateForSpectator(state: GameState): Record<string, unknown> {
     spectatorCount: state.spectators.length,
     isSpectator: true,
     matchLabel: state.matchLabel,
+    coinFlipWinner: state.coinFlipWinner,
+    firstBidderRound1: state.firstBidderRound1,
   };
 }
 
@@ -176,20 +181,34 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         if (!state) return;
         if (state.players[0]?.socketId !== socket.id) return;
         if (!state.players[1]) return;
+        // Only meaningful from "waiting" phase.
+        if (state.phase !== "waiting") return;
 
-        const newState = startRound(state);
-        updateRoom(newState);
+        // Step 1: flip the coin once and broadcast the result.
+        const tossed = performCoinToss(state);
+        updateRoom(tossed);
+        broadcastState(io, tossed);
 
-        broadcastState(io, newState);
-        for (let i = 0; i < 2; i++) {
-          const p = newState.players[i];
-          if (p) {
-            io.to(p.socketId).emit("round_started", {
-              roundNumber: newState.roundNumber,
-              yourBidTurn: i === 0,
-            });
+        // Step 2: after a brief display delay, deal Round 1 and start bidding.
+        // The loser bids first in Round 1 (handled by startRound via
+        // getFirstBidderForRound).
+        setTimeout(() => {
+          const cur = getRoom(data.roomCode);
+          if (!cur || cur.phase !== "coin_toss") return;
+          const dealt = startRound(cur);
+          updateRoom(dealt);
+          broadcastState(io, dealt);
+          const firstBidder = dealt.currentBidder;
+          for (let i = 0; i < 2; i++) {
+            const p = dealt.players[i];
+            if (p) {
+              io.to(p.socketId).emit("round_started", {
+                roundNumber: dealt.roundNumber,
+                yourBidTurn: i === firstBidder,
+              });
+            }
           }
-        }
+        }, 3500);
       } catch (err: unknown) {
         logger.error({ err }, "Error starting game");
       }
@@ -310,13 +329,14 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         const newState = startRound(state);
         updateRoom(newState);
 
+        const firstBidder = newState.currentBidder;
         broadcastState(io, newState);
         for (let i = 0; i < 2; i++) {
           const p = newState.players[i];
           if (p) {
             io.to(p.socketId).emit("round_started", {
               roundNumber: newState.roundNumber,
-              yourBidTurn: i === 0,
+              yourBidTurn: i === firstBidder,
             });
           }
         }
@@ -366,20 +386,34 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         // Need both players present
         if (!state.players[0] || !state.players[1]) return;
 
-        const reset    = resetMatch(state);
-        const newState = startRound(reset);
-        updateRoom(newState);
+        // New match → re-toss the coin and broadcast the coin_toss phase
+        // for ~3.5s before dealing Round 1 (mirrors `start_game`).
+        const reset  = resetMatch(state);
+        const tossed = performCoinToss(reset);
+        updateRoom(tossed);
+        broadcastState(io, tossed);
 
-        broadcastState(io, newState);
-        for (let i = 0; i < 2; i++) {
-          const p = newState.players[i];
-          if (p) {
-            io.to(p.socketId).emit("round_started", {
-              roundNumber: newState.roundNumber,
-              yourBidTurn: i === 0,
-            });
+        setTimeout(() => {
+          try {
+            const current = getRoom(data.roomCode);
+            if (!current || current.phase !== "coin_toss") return;
+            const dealt = startRound(current);
+            updateRoom(dealt);
+            const firstBidder = dealt.currentBidder;
+            broadcastState(io, dealt);
+            for (let i = 0; i < 2; i++) {
+              const p = dealt.players[i];
+              if (p) {
+                io.to(p.socketId).emit("round_started", {
+                  roundNumber: dealt.roundNumber,
+                  yourBidTurn: i === firstBidder,
+                });
+              }
+            }
+          } catch (err: unknown) {
+            logger.error({ err }, "Error dealing first round of new match");
           }
-        }
+        }, 3500);
       } catch (err: unknown) {
         logger.error({ err }, "Error starting new match");
       }
