@@ -13,7 +13,7 @@ export default function Lobby() {
   const { connect, connected, createRoom, joinRoom, joinAsSpectator } = useSocket();
   const { playerName, savePlayerName, saveRoomCode, savePlayerIndex, saveIsSpectator } = useGameStorage();
   const { toast } = useToast();
-  
+
   // Parse ?room=XXX&mode=spectator from the URL (once on mount)
   const initialParams = (() => {
     if (typeof window === "undefined") return { code: "", spectate: false };
@@ -81,9 +81,6 @@ export default function Lobby() {
     }
   };
 
-  // Auto-spectate when arriving via a ?mode=spectator link, as soon as
-  // we have a connection AND a name on file. If the user has no saved name,
-  // we wait for them to enter one and click the (highlighted) Spectate button.
   useEffect(() => {
     if (!invitedAsSpectator || autoSpectateTried) return;
     if (!connected) return;
@@ -100,7 +97,6 @@ export default function Lobby() {
     setIsSpectating(true);
     try {
       savePlayerName(nameInput);
-      // Spectators have no seat. Clear any stale player index.
       savePlayerIndex(null);
       saveIsSpectator(true);
       saveRoomCode(code);
@@ -115,13 +111,28 @@ export default function Lobby() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <Card className="w-full max-w-md border-primary/20 shadow-2xl">
-        <CardHeader className="text-center space-y-2">
-          <CardTitle className="text-4xl font-serif text-primary tracking-wider">SPADES</CardTitle>
-          <CardDescription className="text-base">Midnight cards. Head to head.</CardDescription>
+    <div className="min-h-[100dvh] flex items-center justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <Card className="w-full max-w-md border-primary/30 shadow-2xl shadow-primary/10 bg-card/80 backdrop-blur-sm">
+        <CardHeader className="text-center space-y-3 pb-4">
+          <div className="flex items-center justify-center gap-2 text-primary text-lg" aria-hidden>
+            <span>♠</span><span className="text-red-500">♥</span><span className="text-blue-500">♦</span><span className="text-emerald-500">♣</span>
+          </div>
+          <CardTitle className="text-3xl font-serif text-primary tracking-wider drop-shadow-[0_2px_8px_rgba(234,179,8,0.25)]">
+            1v1 COMPETITIVE SPADES
+          </CardTitle>
+          <div className="flex items-center justify-center">
+            <span className="inline-block px-2 py-0.5 rounded-full border border-primary/40 bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-widest">
+              Season 0 Beta
+            </span>
+          </div>
+          <CardDescription className="text-sm font-medium text-foreground/80">
+            No partner. No excuses. Head-to-head spades.
+          </CardDescription>
+          <p className="text-xs text-muted-foreground px-2 leading-relaxed">
+            Create a room, send the code to your opponent, and play a live 1v1 match.
+          </p>
         </CardHeader>
-        <CardContent className="space-y-8 mt-4">
+        <CardContent className="space-y-7 mt-2">
           {initialParams.code && (
             <div
               className={`text-center text-sm rounded-md border px-3 py-2 ${
@@ -139,9 +150,9 @@ export default function Lobby() {
           )}
           <div className="space-y-2">
             <Label htmlFor="name">Your Name</Label>
-            <Input 
-              id="name" 
-              placeholder="e.g. Gambler" 
+            <Input
+              id="name"
+              placeholder="Enter player name"
               value={nameInput}
               onChange={(e) => setNameInput(e.target.value)}
               className="text-lg py-6"
@@ -164,7 +175,9 @@ export default function Lobby() {
                 </Button>
               ))}
             </div>
-            <p className="text-xs text-muted-foreground">First to reach target and lead wins. Tied at target → tiebreaker.</p>
+            <p className="text-xs text-muted-foreground">
+              First player to reach the target while leading wins. Ties go to tiebreaker rounds.
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -196,7 +209,7 @@ export default function Lobby() {
                 data-testid="preset-custom"
                 className="h-10 text-xs font-semibold"
               >
-                Custom label
+                Custom Label
               </Button>
               <Button
                 type="button"
@@ -207,7 +220,7 @@ export default function Lobby() {
                 data-testid="preset-none"
                 className="h-10 text-xs"
               >
-                No label
+                No Label
               </Button>
             </div>
             {labelMode === "custom" && (
@@ -228,32 +241,32 @@ export default function Lobby() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-border/50">
             <div className="space-y-4">
-              <Button 
-                onClick={handleCreate} 
-                disabled={isCreating || isJoining || isSpectating} 
-                className="w-full py-6 text-lg font-bold"
+              <Button
+                onClick={handleCreate}
+                disabled={isCreating || isJoining || isSpectating}
+                className="w-full py-6 text-lg font-bold shadow-lg shadow-primary/20 active:scale-[0.98] transition-transform"
               >
                 {isCreating ? "Creating..." : "Create Room"}
               </Button>
             </div>
-            
+
             <div className="space-y-4">
               <div className="flex gap-2">
-                <Input 
-                  placeholder="CODE" 
+                <Input
+                  placeholder="Enter room code"
                   value={joinCodeInput}
                   onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
-                  className="text-center uppercase font-mono py-6"
+                  className="text-center uppercase font-mono py-6 placeholder:normal-case placeholder:font-sans placeholder:tracking-normal"
                   maxLength={6}
                 />
               </div>
-              <Button 
-                onClick={handleJoin} 
-                disabled={isCreating || isJoining || isSpectating || !joinCodeInput} 
+              <Button
+                onClick={handleJoin}
+                disabled={isCreating || isJoining || isSpectating || !joinCodeInput}
                 variant="secondary"
-                className="w-full py-6 text-lg font-bold"
+                className="w-full py-6 text-lg font-bold active:scale-[0.98] transition-transform"
               >
-                {isJoining ? "Joining..." : "Join Game"}
+                {isJoining ? "Joining..." : "Join Match"}
               </Button>
             </div>
           </div>
@@ -266,10 +279,10 @@ export default function Lobby() {
               className="w-full h-12 text-sm font-medium border border-dashed border-border hover:border-primary/50"
               data-testid="button-spectate"
             >
-              {isSpectating ? "Joining…" : "Join as Spectator"}
+              {isSpectating ? "Joining…" : "Watch Match"}
             </Button>
             <p className="text-xs text-muted-foreground text-center">
-              Watch the match without playing. Hands stay hidden.
+              Spectators can watch without seeing hidden hands.
             </p>
           </div>
         </CardContent>

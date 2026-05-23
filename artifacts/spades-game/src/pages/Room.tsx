@@ -147,8 +147,7 @@ export default function Room() {
   );
 
   const renderStatusBanner = () => {
-    const { phase, currentBidder, currentTurnIndex, players } = gameState;
-    const nameOf = (i: 0 | 1) => players[i]?.name ?? `Seat ${i + 1}`;
+    const { phase, currentBidder, currentTurnIndex } = gameState;
     let message = "";
     let colorClass = "bg-white/5 text-muted-foreground";
 
@@ -156,21 +155,30 @@ export default function Room() {
       message = "Flipping coin…";
       colorClass = "bg-primary/20 text-primary font-semibold";
     } else if (phase === "bidding") {
-      const roundFirstBidder = gameState.currentBidder; // first-to-bid each round
-      const firstBidderName =
-        roundFirstBidder !== null ? nameOf(roundFirstBidder) : null;
+      // Stable derivation: odd round → firstBidderRound1; even → opposite seat.
+      // Do NOT use currentBidder — it flips after the first bid is placed.
+      const fbR1 = gameState.firstBidderRound1;
+      const roundFirstBidder: 0 | 1 | null =
+        fbR1 === null
+          ? null
+          : gameState.roundNumber % 2 === 1
+            ? fbR1
+            : (fbR1 === 0 ? 1 : 0);
+      const firstBidderSeat = roundFirstBidder !== null ? roundFirstBidder + 1 : null;
       if (!spectator && currentBidder === playerIndex) {
         message = "Your turn to bid";
         colorClass = "bg-primary/20 text-primary font-semibold";
       } else if (currentBidder !== null) {
-        message = `${nameOf(currentBidder)} is bidding…`;
+        // Distinguish "opponent hasn't bid yet" from "waiting after you bid"
+        const myBid = !spectator ? gameState.bids[playerIndex as 0 | 1] : null;
+        if (!spectator && myBid === null && currentBidder !== playerIndex) {
+          message = "Opponent has not bid";
+        } else {
+          message = "Waiting for opponent to bid";
+        }
       }
-      // Round N — <Name> bids first (shown until both bids are locked)
-      const showFirstBidderHint =
-        firstBidderName !== null &&
-        gameState.bids[0] === null &&
-        gameState.bids[1] === null;
-      if (showFirstBidderHint) {
+      // Always show "Round N · Seat X bids first this round" during bidding
+      if (firstBidderSeat !== null) {
         return (
           <div>
             {gameState.matchLabel && renderMatchLabelBar()}
@@ -178,7 +186,9 @@ export default function Room() {
               data-testid="first-bidder-hint"
               className="text-center py-1 px-4 text-[11px] tracking-wider uppercase bg-white/5 text-muted-foreground"
             >
-              Round {gameState.roundNumber} · <span className="text-foreground font-semibold">{firstBidderName}</span> bids first
+              <span className="text-foreground font-semibold">Round {gameState.roundNumber}</span>
+              <span className="mx-2 opacity-50">·</span>
+              <span className="text-primary font-semibold">Seat {firstBidderSeat}</span> bids first this round
             </div>
             <div className={`text-center py-2 px-4 text-sm tracking-wide transition-colors ${colorClass}`}>
               {message}
@@ -191,10 +201,10 @@ export default function Room() {
         message = "Trick resolving…";
         colorClass = "bg-white/5 text-muted-foreground italic";
       } else if (!spectator && currentTurnIndex === playerIndex) {
-        message = "Your turn — play a card";
+        message = "Your turn to play";
         colorClass = "bg-primary/20 text-primary font-semibold";
       } else {
-        message = `${nameOf(currentTurnIndex)}'s turn`;
+        message = "Waiting for opponent to play";
       }
     } else if (phase === "round_over") {
       message = "Round complete";
@@ -241,7 +251,11 @@ export default function Room() {
     return (
       <div
         data-testid={`player-info-seat-${idx + 1}`}
-        className={`flex items-center justify-between px-4 py-3 bg-black/40 border-y border-border backdrop-blur-sm ${isActive ? "ring-1 ring-inset ring-primary" : ""}`}
+        className={`flex items-center justify-between px-4 py-3 bg-black/40 border-y backdrop-blur-sm transition-shadow ${
+          isActive
+            ? "border-primary/60 shadow-[inset_0_0_0_1px_hsla(35,90%,55%,0.5),0_0_12px_-2px_hsla(35,90%,55%,0.35)]"
+            : "border-border"
+        }`}
       >
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex flex-col leading-tight">
@@ -521,7 +535,7 @@ export default function Room() {
                 </p>
               )}
               <p className="text-sm text-muted-foreground">
-                You have {gameState.hand.length} cards. Bid 0 for Nil (+/−100).
+                You have {gameState.hand.length} cards. Bid 0 for Nil (+/−125).
               </p>
               <div className="flex gap-2">
                 <Select value={bidAmount} onValueChange={setBidAmount}>
@@ -771,7 +785,7 @@ export default function Room() {
     return (
       <div
         data-testid="my-hand"
-        className="flex-shrink-0 max-h-[44vh] overflow-y-auto pb-3 pt-3 px-2 bg-black/30 border-t border-border"
+        className="flex-shrink-0 max-h-[44vh] overflow-y-auto pt-3 px-2 pb-hand-safe bg-black/30 border-t border-primary/20 shadow-[0_-2px_12px_-6px_hsla(35,90%,55%,0.25)]"
       >
         <div className="flex flex-wrap justify-center items-end gap-x-3 gap-y-2">
           {groups.map((group) => (
@@ -802,7 +816,7 @@ export default function Room() {
   const renderSpectatorFooter = () => (
     <div
       data-testid="spectator-footer"
-      className="flex items-center justify-between px-4 py-3 bg-black/50 border-t border-border text-xs"
+      className="flex items-center justify-between px-4 py-3 pb-safe bg-black/50 border-t border-border text-xs"
     >
       <div className="flex items-center gap-3">
         <Badge variant="outline" className="border-primary/40 text-primary uppercase tracking-widest">

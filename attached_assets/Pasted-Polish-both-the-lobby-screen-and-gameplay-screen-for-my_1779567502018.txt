@@ -1,0 +1,113 @@
+Polish both the lobby screen and gameplay screen for my 1v1 Competitive Spades app without changing the core game logic.
+
+DO NOT CHANGE:
+- multiplayer logic
+- sockets/server behavior
+- room creation/joining
+- card dealing
+- scoring
+- bidding rules
+- turn enforcement
+- spades-breaking logic
+- match reset/rematch logic
+
+Only improve text, layout, clarity, and visual polish.
+
+GLOBAL STYLE:
+1. Keep the dark green and gold premium card-table theme.
+2. Add a subtle table texture or gradient background.
+3. Add clean gold borders/glows, but keep it classy and readable.
+4. Keep mobile performance fast. No heavy animations.
+5. Fix iPhone safe-area spacing so bottom buttons/cards are not hidden by the browser bar.
+
+LOBBY SCREEN UPDATES:
+1. Change title from “SPADES” to:
+“1v1 COMPETITIVE SPADES”
+
+2. Subtitle:
+“No partner. No excuses. Head-to-head spades.”
+
+3. Add small explanation:
+“Create a room, send the code to your opponent, and play a live 1v1 match.”
+
+4. Change name placeholder to:
+“Enter player name”
+
+5. Keep 250 pts and 500 pts match target buttons.
+
+6. Helper text:
+“First player to reach the target while leading wins. Ties go to tiebreaker rounds.”
+
+7. Fix match label capitalization:
+“Finals”
+“No Label”
+
+8. Change room code placeholder from “CODE” to:
+“Enter room code”
+
+9. Change “Join Game” to:
+“Join Match”
+
+10. Change “Join as Spectator” to:
+“Watch Match”
+
+11. Spectator helper text:
+“Spectators can watch without seeing hidden hands.”
+
+GAMEPLAY SCREEN UPDATES:
+1. Fix Nil text.
+Current text says:
+“Bid 0 for Nil (+/-100)”
+
+Change to:
+“Bid 0 for Nil (+/-125)”
+
+2. Fix confusing status text.
+Do not show generic “Waiting...” when the player has an action.
+
+Use clear statuses:
+- “Your turn to bid”
+- “Waiting for opponent to bid”
+- “Opponent has not bid”
+- “Your turn to play”
+- “Waiting for opponent to play”
+
+3. Add round and bid-order display:
+Show:
+“Round 1”
+“Seat 1 bids first this round”
+or
+“Seat 2 bids first this round”
+
+This must update each round based on the alternating bid order system already implemented.
+
+4. Improve active player highlight.
+Keep gold identity but make it cleaner:
+- thin gold border
+- subtle gold glow
+- not too harsh
+
+5. Make bottom player hand fully visible and clickable on iPhone.
+Add enough bottom padding to the gameplay container, around 90–110px if needed.
+
+6. Improve cards visually if easy:
+- rounded corners
+- subtle shadow
+- cleaner spacing
+- clear clickable/tappable feel
+
+7. Keep score, bags, bid, tricks, and card count readable on mobile.
+
+8. No horizontal scrolling.
+
+OPTIONAL LIGHT POLISH:
+1. Add subtle suit icons near the title:
+♠ ♥ ♦ ♣
+
+2. Add a small badge:
+“Season 0 Beta”
+
+3. Make gold buttons feel more premium with subtle shadow and tap state.
+
+GOAL:
+Make the app look official, stream-ready, and easy for first-time players before Sunday’s mock tournament without breaking gameplay.
