@@ -3,10 +3,26 @@ import { useRoute, useLocation } from "wouter";
 import { useSocket } from "@/hooks/useSocket";
 import { useGameStorage } from "@/hooks/useGameStorage";
 import { CardComponent } from "@/components/Card";
-import { isCardPlayable, sortHandBySuit } from "@/lib/game";
+import { isCardPlayable, sortHandBySuit, SUIT_SYMBOLS, SUIT_COLORS } from "@/lib/game";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Card as CardType } from "@/lib/game";
+import { Card as CardType, Suit } from "@/lib/game";
+
+/**
+ * Safely format any card-like value (object {rank,suit} or plain string)
+ * into a compact display like "A♠" or "10♥".
+ */
+function formatCard(card: unknown): string {
+  if (card == null) return "None";
+  if (typeof card === "string") return card;
+  if (typeof card === "object") {
+    const c = card as { rank?: string; value?: string; suit?: string };
+    const rank = c.rank ?? c.value ?? "";
+    const suit = c.suit ? (SUIT_SYMBOLS[c.suit as Suit] ?? c.suit) : "";
+    return `${rank}${suit}`;
+  }
+  return String(card);
+}
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 
@@ -485,6 +501,37 @@ export default function Room() {
             </div>
           </div>
         </div>
+
+        {/* Last Card Played — visible to players and spectators */}
+        {(gameState.phase === "playing" || gameState.phase === "round_over" || gameState.phase === "game_over") && (() => {
+          const last = gameState.lastCardPlayed;
+          const playerName = last ? (gameState.players[last.playerIndex]?.name?.split(" ")[0] ?? `Seat ${last.playerIndex + 1}`) : null;
+          const suitColor = last ? SUIT_COLORS[last.card.suit] : "";
+          const isRed = last && (last.card.suit === "hearts" || last.card.suit === "diamonds");
+          return (
+            <div
+              id="last-card-box"
+              data-testid="last-card-box"
+              className="absolute top-4 right-4 px-3 py-2 rounded-lg border border-primary/40 bg-card/90 backdrop-blur-sm shadow-lg shadow-black/40 text-center min-w-[120px]"
+            >
+              <h3 className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
+                Last Card Played
+              </h3>
+              <div
+                id="last-card-played"
+                data-testid="last-card-value"
+                className={`text-2xl font-bold leading-tight mt-1 tabular-nums ${last ? (isRed ? "text-rose-400" : "text-foreground") : "text-muted-foreground/60"} ${suitColor}`}
+              >
+                {last ? formatCard(last.card) : "None"}
+              </div>
+              {last && playerName && (
+                <div className="text-[10px] text-muted-foreground mt-0.5 truncate max-w-[110px]">
+                  by {playerName}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Coin toss overlay — shown to all roles for ~3.5s, server transitions to bidding */}
         {gameState.phase === "coin_toss" && gameState.coinFlipWinner !== null && (() => {

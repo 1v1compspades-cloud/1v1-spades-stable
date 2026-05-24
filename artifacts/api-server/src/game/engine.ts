@@ -68,6 +68,12 @@ export interface GameState {
   tiebreakerActive: boolean;
   tiebreakerRound: number;
   spectators: Spectator[];
+  /**
+   * The most recent card played by either player in this match.
+   * Null until the first card is played; cleared on resetMatch.
+   * Persists across tricks and rounds.
+   */
+  lastCardPlayed: TrickCard | null;
   /** Optional free-text label for the match (e.g. "Quarterfinal 1", "Finals"). */
   matchLabel?: string;
   /**
@@ -116,6 +122,7 @@ export function createGame(roomCode: string, matchTarget = 250, matchLabel?: str
     tiebreakerActive: false,
     tiebreakerRound: 0,
     spectators: [],
+    lastCardPlayed: null,
     coinFlipWinner: null,
     firstBidderRound1: null,
   };
@@ -200,6 +207,7 @@ export function resetMatch(state: GameState): GameState {
     trickLeader: 0,
     tiebreakerActive: false,
     tiebreakerRound: 0,
+    lastCardPlayed: null,
     // New match → re-toss the coin
     coinFlipWinner: null,
     firstBidderRound1: null,
@@ -314,6 +322,7 @@ export function playCard(
     hands: newHands,
     currentTrick: newTrick,
     spadesBroken: state.spadesBroken || card.suit === "spades",
+    lastCardPlayed: { card, playerIndex },
   };
 
   if (newTrick.length < 2) {

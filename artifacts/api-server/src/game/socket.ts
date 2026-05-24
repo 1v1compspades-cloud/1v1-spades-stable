@@ -50,6 +50,7 @@ function sanitizeStateForPlayer(
     spectatorCount: state.spectators.length,
     isSpectator: false,
     matchLabel: state.matchLabel,
+    lastCardPlayed: state.lastCardPlayed,
     coinFlipWinner: state.coinFlipWinner,
     firstBidderRound1: state.firstBidderRound1,
   };
@@ -81,6 +82,7 @@ function sanitizeStateForSpectator(state: GameState): Record<string, unknown> {
     spectatorCount: state.spectators.length,
     isSpectator: true,
     matchLabel: state.matchLabel,
+    lastCardPlayed: state.lastCardPlayed,
     coinFlipWinner: state.coinFlipWinner,
     firstBidderRound1: state.firstBidderRound1,
   };
