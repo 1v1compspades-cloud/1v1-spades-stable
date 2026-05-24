@@ -1,0 +1,119 @@
+Fix two gameplay/UI issues in my 1v1 Competitive Spades app.
+
+ISSUE 1: “Last Card Played” is wrong.
+Right now it only shows one most recent card. I need it to show the two cards played in the current trick/round, one for each player.
+
+Goal:
+Replace or upgrade the current “Last Card Played” box into a “Current Trick” / “Cards Played This Trick” display.
+
+Requirements:
+1. Show a visible UI box labeled “Cards Played This Trick” or “Current Trick”.
+2. It should show both seats separately:
+   - Seat 1: None
+   - Seat 2: None
+3. When Seat 1 plays a card, update only Seat 1’s displayed card.
+4. When Seat 2 plays a card, update only Seat 2’s displayed card.
+5. If a card is an object, display it as card.value + card.suit.
+6. If a card is a string, display the string directly.
+7. Do not clear the display immediately when the second card is played.
+8. Keep both cards visible long enough for players to see the completed trick.
+9. Only clear the current trick display when starting the next trick, after trick resolution finishes.
+10. Do not break bidding, turn switching, trick winner logic, score, bags, nil, feed, or suit enforcement.
+11. Add a small clean visual style that matches the current dark/gold theme.
+
+Implementation guidance:
+- Add state like:
+
+game.currentTrickDisplay = {
+  p1: null,
+  p2: null
+};
+
+- Whenever a player legally plays a card, update:
+game.currentTrickDisplay[playerKey] = card;
+
+- Create a helper:
+
+function formatCard(card) {
+  if (!card) return "None";
+  if (typeof card === "string") return card;
+  return `${card.value}${card.suit}`;
+}
+
+- Create a render function:
+
+function renderCurrentTrickDisplay() {
+  const box = document.getElementById("currentTrickDisplay");
+  if (!box) return;
+
+  box.innerHTML = `
+    <div class="trick-box-title">Cards Played This Trick</div>
+    <div class="trick-card-row">
+      <span>Seat 1:</span>
+      <strong>${formatCard(game.currentTrickDisplay?.p1)}</strong>
+    </div>
+    <div class="trick-card-row">
+      <span>Seat 2:</span>
+      <strong>${formatCard(game.currentTrickDisplay?.p2)}</strong>
+    </div>
+  `;
+}
+
+- Call renderCurrentTrickDisplay() after every card play and after clearing for a new trick.
+- Reset it only when moving into the next trick:
+game.currentTrickDisplay = { p1: null, p2: null };
+
+IMPORTANT:
+Do not use “lastCardPlayed” as a single value anymore for this display. The UI needs to show both cards from the current trick as a pair.
+
+ISSUE 2: First action after bidding is wrong.
+I added round alternation after the coin flip. The bidding order is correct right now:
+- I won the coin toss.
+- My friend bid first.
+That part is correct.
+
+But after bidding finished, I got the first card action. That is wrong.
+
+Rule:
+The player who bids first for that round must also lead/play first after both bids are locked.
+
+Requirements:
+1. Track the first bidder for the round clearly, using something like:
+game.firstBidderThisRound = "p1" or "p2";
+2. When the bidding phase starts, set biddingPlayer and firstBidderThisRound to the same player.
+3. After both bids are locked and the game enters play phase:
+   - game.currentPlayer = game.firstBidderThisRound;
+   - game.leadPlayer = game.firstBidderThisRound;
+   - game.leadSuit = null;
+4. Do not let the opposite player take the first card action after bidding.
+5. Keep alternating the first bidder by round exactly how it currently works.
+6. Do not break coin flip logic.
+7. Do not break bidding UI.
+8. Do not break normal turn switching after the first card is played.
+9. Do not break trick winner deciding who leads the next trick.
+
+Expected behavior:
+Round 1:
+- Coin toss decides the first dealer / first bid structure based on my existing rules.
+
+Round 2 and later:
+- The displayed “Seat X bids first this round” should match who actually bids first.
+- That same player should play the first card of the round after bidding is done.
+
+Please inspect the existing functions for:
+- startBidding
+- lockBid / submitBid / placeBid
+- startPlayPhase
+- playCard
+- resolveTrick
+- nextRound / startNewRound
+
+Make the smallest safe changes possible. After editing, run the app and test:
+1. Start a round.
+2. Confirm the correct player bids first.
+3. Lock both bids.
+4. Confirm the same player who bid first gets the first card action.
+5. Play one card from each seat.
+6. Confirm the “Cards Played This Trick” box shows both cards as a pair.
+7. Resolve the trick.
+8. Confirm the display clears only when the next trick begins.

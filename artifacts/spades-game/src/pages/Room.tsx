@@ -502,33 +502,38 @@ export default function Room() {
           </div>
         </div>
 
-        {/* Last Card Played — visible to players and spectators */}
+        {/* Cards Played This Trick — both seats, persists through trick-resolve window */}
         {(gameState.phase === "playing" || gameState.phase === "round_over" || gameState.phase === "game_over") && (() => {
-          const last = gameState.lastCardPlayed;
-          const playerName = last ? (gameState.players[last.playerIndex]?.name?.split(" ")[0] ?? `Seat ${last.playerIndex + 1}`) : null;
-          const suitColor = last ? SUIT_COLORS[last.card.suit] : "";
-          const isRed = last && (last.card.suit === "hearts" || last.card.suit === "diamonds");
+          const seat0Card = gameState.currentTrick.find(t => t.playerIndex === 0)?.card ?? null;
+          const seat1Card = gameState.currentTrick.find(t => t.playerIndex === 1)?.card ?? null;
+          const seat0Name = gameState.players[0]?.name?.split(" ")[0] ?? "Seat 1";
+          const seat1Name = gameState.players[1]?.name?.split(" ")[0] ?? "Seat 2";
+          const renderCard = (c: CardType | null) => {
+            if (!c) return <span className="text-muted-foreground/60 font-bold">None</span>;
+            const isRed = c.suit === "hearts" || c.suit === "diamonds";
+            return (
+              <span className={`font-bold tabular-nums ${isRed ? "text-rose-400" : "text-foreground"}`}>
+                {formatCard(c)}
+              </span>
+            );
+          };
           return (
             <div
-              id="last-card-box"
-              data-testid="last-card-box"
-              className="absolute top-4 right-4 px-3 py-2 rounded-lg border border-primary/40 bg-card/90 backdrop-blur-sm shadow-lg shadow-black/40 text-center min-w-[120px]"
+              id="currentTrickDisplay"
+              data-testid="current-trick-display"
+              className="absolute top-4 right-4 px-3 py-2 rounded-lg border border-primary/40 bg-card/90 backdrop-blur-sm shadow-lg shadow-black/40 min-w-[160px]"
             >
-              <h3 className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
-                Last Card Played
-              </h3>
-              <div
-                id="last-card-played"
-                data-testid="last-card-value"
-                className={`text-2xl font-bold leading-tight mt-1 tabular-nums ${last ? (isRed ? "text-rose-400" : "text-foreground") : "text-muted-foreground/60"} ${suitColor}`}
-              >
-                {last ? formatCard(last.card) : "None"}
+              <div className="trick-box-title text-[10px] uppercase tracking-widest text-muted-foreground font-semibold text-center mb-1.5">
+                Cards Played This Trick
               </div>
-              {last && playerName && (
-                <div className="text-[10px] text-muted-foreground mt-0.5 truncate max-w-[110px]">
-                  by {playerName}
-                </div>
-              )}
+              <div className="trick-card-row flex items-center justify-between gap-3 text-sm py-0.5" data-testid="trick-row-seat-1">
+                <span className="text-muted-foreground truncate max-w-[80px]">{seat0Name}:</span>
+                <span className="text-lg">{renderCard(seat0Card)}</span>
+              </div>
+              <div className="trick-card-row flex items-center justify-between gap-3 text-sm py-0.5" data-testid="trick-row-seat-2">
+                <span className="text-muted-foreground truncate max-w-[80px]">{seat1Name}:</span>
+                <span className="text-lg">{renderCard(seat1Card)}</span>
+              </div>
             </div>
           );
         })()}

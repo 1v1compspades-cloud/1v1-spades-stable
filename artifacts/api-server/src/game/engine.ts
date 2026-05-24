@@ -232,13 +232,20 @@ export function placeBid(
   const otherIndex = playerIndex === 0 ? 1 : 0;
   const bothBid = newBids[otherIndex] !== null;
 
+  // When both bids are locked, the FIRST BIDDER of this round also leads
+  // the first trick — house rule. trickLeader/leadPlayerIndex/currentTurnIndex
+  // all align to that seat. Subsequent tricks are led by their winner
+  // (handled at the end of playCard) — unchanged.
+  const firstBidder = getFirstBidderForRound(state, state.roundNumber);
+
   const newState: GameState = {
     ...state,
     bids: newBids,
     currentBidder: bothBid ? null : (otherIndex as 0 | 1),
     phase: bothBid ? "playing" : "bidding",
-    currentTurnIndex: bothBid ? 0 : null,
-    trickLeader: 0,
+    currentTurnIndex: bothBid ? firstBidder : null,
+    leadPlayerIndex: bothBid ? firstBidder : state.leadPlayerIndex,
+    trickLeader: bothBid ? firstBidder : state.trickLeader,
   };
 
   return { state: newState, bothBid };
