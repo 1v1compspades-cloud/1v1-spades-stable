@@ -1,0 +1,197 @@
+Clean up the mobile UI layout for my 1v1 Competitive Spades app.
+
+The gameplay logic is working. Do NOT change bidding, turns, trick resolution, scoring, bags, nil, suit enforcement, or coin flip logic.
+
+I need 2 UI fixes:
+
+FIX 1: Make the player hand/cards more horizontal and less cluttered on mobile.
+
+Problem:
+The cards are taking too much vertical space and stacking too far down the screen.
+
+Goal:
+Make the cards display in a cleaner horizontal layout.
+
+Requirements:
+1. On mobile, show the hand in a horizontal row that can scroll sideways if needed.
+2. If a full horizontal row is too cramped, use 2 horizontal rows max.
+3. Do not use the current tall centered stacking layout.
+4. Cards should stay tappable/clickable.
+5. Do not shrink the cards so much that they become unreadable.
+6. Keep the player’s hand near the bottom, but reduce wasted vertical space.
+7. Prefer CSS changes over JS changes unless the hand rendering forces layout in JS.
+
+Preferred CSS idea:
+
+.player-hand,
+.hand,
+.cards,
+#playerHand {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 6px;
+  padding: 8px 10px;
+  justify-content: flex-start;
+  align-items: center;
+  scroll-snap-type: x proximity;
+}
+
+.card {
+  flex: 0 0 auto;
+  scroll-snap-align: center;
+}
+
+For mobile only:
+
+@media (max-width: 700px) {
+  .player-hand,
+  .hand,
+  .cards,
+  #playerHand {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    justify-content: flex-start;
+  }
+
+  .card {
+    width: 70px;
+    height: 96px;
+  }
+}
+
+If 1 row feels too wide, use 2 rows instead:
+
+@media (max-width: 700px) {
+  .player-hand,
+  .hand,
+  .cards,
+  #playerHand {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(2, auto);
+    overflow-x: auto;
+    gap: 6px;
+    justify-content: start;
+  }
+}
+
+Use whichever version fits my existing code best.
+
+FIX 2: Make “Last Trick Played” smaller and move it to the right wall beside the center played cards.
+
+Problem:
+The “Last Trick Played” box is way too big and is taking up too much vertical space.
+
+Goal:
+Place a compact last trick display to the RIGHT of the center table/play area, against the right side of the screen.
+
+Requirements:
+1. Keep the label “Last Trick Played”.
+2. Make the box much smaller.
+3. It should only show the 2 cards from the last completed trick.
+4. Do not show long player names in this box.
+5. Use simple labels or no labels:
+   - S1: A♠
+   - S2: 10♥
+   OR just:
+   - A♠
+   - 10♥
+6. Before a trick completes, show:
+   - S1: —
+   - S2: —
+7. Keep the display visible but compact.
+8. It should sit to the right of the center played-card slots, against the right wall.
+9. It should NOT push the whole layout down.
+10. It should NOT cover playable cards in the player’s hand.
+11. It should NOT cover the current trick card slots.
+12. On very small screens, it can be slightly overlayed on the right side of the table area, but keep it narrow and out of the card slots.
+
+Suggested HTML structure:
+
+<div id="lastCompletedTrickDisplay" class="last-trick-mini"></div>
+
+Suggested render:
+
+function renderLastCompletedTrick() {
+  const box = document.getElementById("lastCompletedTrickDisplay");
+  if (!box) return;
+
+  box.innerHTML = `
+    <div class="last-trick-title">Last</div>
+    <div class="last-trick-card">S1: ${formatCard(game.lastCompletedTrick?.p1, true)}</div>
+    <div class="last-trick-card">S2: ${formatCard(game.lastCompletedTrick?.p2, true)}</div>
+  `;
+}
+
+If my existing formatCard only takes one argument, keep it simple:
+
+function formatCard(card) {
+  if (!card) return "—";
+  if (typeof card === "string") return card;
+  return `${card.value}${card.suit}`;
+}
+
+Suggested CSS:
+
+.table-area,
+.play-area,
+.center-table,
+#tableArea {
+  position: relative;
+}
+
+.last-trick-mini {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 82px;
+  padding: 6px 6px;
+  border: 1px solid rgba(190, 145, 50, 0.85);
+  border-radius: 8px;
+  background: rgba(4, 18, 15, 0.88);
+  color: #e8e1cf;
+  z-index: 3;
+  text-align: center;
+  pointer-events: none;
+}
+
+.last-trick-title {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #c89b3c;
+  margin-bottom: 4px;
+}
+
+.last-trick-card {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .last-trick-mini {
+    right: 4px;
+    width: 74px;
+    padding: 5px;
+  }
+
+  .last-trick-card {
+    font-size: 13px;
+  }
+}
+
+Important:
+The last trick display should still only update AFTER a trick resolves. Do not make it show the current live trick.
+
+Testing:
+1. Load app on mobile width.
+2. Confirm hand is horizontal or 2-row horizontal, not a tall stack.
+3. Confirm “Last Trick Played” is small.
+4. Confirm it sits on the right side of the center table area.
+5. Confirm it only shows two cards from the previous completed trick.
+6. Confirm it does not block current played cards or bottom hand cards.

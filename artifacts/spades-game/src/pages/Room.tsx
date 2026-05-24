@@ -7,6 +7,7 @@ import { isCardPlayable, sortHandBySuit, SUIT_SYMBOLS, SUIT_COLORS } from "@/lib
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Card as CardType, Suit } from "@/lib/game";
+import { cn } from "@/lib/utils";
 
 /**
  * Safely format any card-like value (object {rank,suit} or plain string)
@@ -441,6 +442,7 @@ export default function Room() {
 
     return (
       <div className="flex-1 flex flex-col items-center justify-center relative overflow-hidden">
+        {renderLastTrickMini()}
         {/* Top seat hidden hand (always hidden — even players don't see opponent's cards) */}
         <div className="absolute top-4 flex justify-center w-full pointer-events-none">
           <div className="flex items-center gap-2">
@@ -801,14 +803,17 @@ export default function Room() {
     return (
       <div
         data-testid="my-hand"
-        className="flex-shrink-0 max-h-[44vh] overflow-y-auto pt-3 px-2 pb-hand-safe bg-black/30 border-t border-primary/20 shadow-[0_-2px_12px_-6px_hsla(35,90%,55%,0.25)]"
+        className="flex-shrink-0 overflow-x-auto overflow-y-hidden snap-x pt-2 pb-hand-safe bg-black/30 border-t border-primary/20 shadow-[0_-2px_12px_-6px_hsla(35,90%,55%,0.25)]"
       >
-        <div className="flex flex-wrap justify-center items-end gap-x-3 gap-y-2">
-          {groups.map((group) => (
+        <div className="flex flex-nowrap items-end gap-1 px-2 sm:gap-2 sm:px-3 sm:justify-center min-w-min">
+          {groups.map((group, gi) => (
             <div
               key={group.suit}
               data-testid={`hand-group-${group.suit}`}
-              className="flex flex-wrap justify-center items-end gap-1"
+              className={cn(
+                "flex flex-nowrap items-end gap-1",
+                gi > 0 && "ml-1 sm:ml-2 border-l border-white/10 pl-1 sm:pl-2"
+              )}
             >
               {group.cards.map((card) => {
                 const playable = isCardPlayable(card, gameState, playerIndex as 0 | 1);
@@ -818,6 +823,7 @@ export default function Room() {
                     card={card}
                     onClick={playable ? () => handlePlayCard(card) : undefined}
                     disabled={!playable}
+                    className="snap-center"
                   />
                 );
               })}
@@ -858,43 +864,35 @@ export default function Room() {
     </div>
   );
 
-  // ── Last Trick Played panel (slim horizontal, between table and bottom seat)
-  const renderLastTrickPanel = () => {
+  // ── Last Trick Played mini panel (right wall of the table area) ───────────
+  const renderLastTrickMini = () => {
     if (gameState.phase === "waiting" || gameState.phase === "coin_toss") return null;
     const last = gameState.lastCompletedTrick ?? [];
     const seat0Card = last.find(t => t.playerIndex === 0)?.card ?? null;
     const seat1Card = last.find(t => t.playerIndex === 1)?.card ?? null;
-    const seat0Name = gameState.players[0]?.name?.split(" ")[0] ?? "Seat 1";
-    const seat1Name = gameState.players[1]?.name?.split(" ")[0] ?? "Seat 2";
     const renderCard = (c: CardType | null) => {
-      if (!c) return <strong className="text-muted-foreground/60">None</strong>;
+      if (!c) return <span className="text-muted-foreground/70">—</span>;
       const isRed = c.suit === "hearts" || c.suit === "diamonds";
       return (
-        <strong className={`tabular-nums text-lg ${isRed ? "text-rose-400" : "text-foreground"}`}>
+        <span className={`tabular-nums ${isRed ? "text-rose-400" : "text-foreground"}`}>
           {formatCard(c)}
-        </strong>
+        </span>
       );
     };
     return (
-      <div className="px-3 pt-1 pb-2 flex justify-center" data-testid="last-trick-panel">
-        <div
-          id="lastCompletedTrickDisplay"
-          className="last-trick-panel w-full max-w-[520px] px-3.5 py-2 rounded-lg border border-primary/60 bg-black/70 backdrop-blur-sm shadow-md"
-        >
-          <div className="trick-box-title text-[10px] uppercase tracking-[0.2em] text-primary font-semibold mb-1.5 text-center">
-            Last Trick Played
-          </div>
-          <div className="flex items-center justify-around gap-4 text-sm">
-            <div className="trick-card-row flex items-center gap-2" data-testid="last-trick-seat-1">
-              <span className="text-muted-foreground truncate max-w-[110px]">{seat0Name}:</span>
-              {renderCard(seat0Card)}
-            </div>
-            <div className="h-6 w-px bg-border" />
-            <div className="trick-card-row flex items-center gap-2" data-testid="last-trick-seat-2">
-              <span className="text-muted-foreground truncate max-w-[110px]">{seat1Name}:</span>
-              {renderCard(seat1Card)}
-            </div>
-          </div>
+      <div
+        id="lastCompletedTrickDisplay"
+        data-testid="last-trick-mini"
+        className="absolute right-0.5 top-2 z-[3] w-[60px] sm:w-[78px] sm:right-1 sm:top-1/2 sm:-translate-y-1/2 px-1.5 py-1 sm:py-1.5 rounded-lg border border-primary/70 bg-black/85 backdrop-blur-sm shadow-md text-center pointer-events-none"
+      >
+        <div className="text-[9px] sm:text-[10px] uppercase tracking-[1.5px] text-primary font-semibold mb-1 leading-none">
+          Last
+        </div>
+        <div className="text-[12px] sm:text-[13px] font-bold leading-tight whitespace-nowrap" data-testid="last-trick-seat-1">
+          <span className="text-muted-foreground mr-0.5">S1:</span>{renderCard(seat0Card)}
+        </div>
+        <div className="text-[12px] sm:text-[13px] font-bold leading-tight whitespace-nowrap mt-0.5" data-testid="last-trick-seat-2">
+          <span className="text-muted-foreground mr-0.5">S2:</span>{renderCard(seat1Card)}
         </div>
       </div>
     );
@@ -922,7 +920,6 @@ export default function Room() {
           {renderPlayerInfo(topIndex)}
           {renderStatusBanner()}
           {renderTable()}
-          {renderLastTrickPanel()}
           {renderPlayerInfo(bottomIndex)}
           {spectator ? renderSpectatorFooter() : renderMyHand()}
         </>

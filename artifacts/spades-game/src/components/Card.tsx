@@ -24,7 +24,7 @@ export function CardComponent({ card, hidden, className, onClick, disabled, sele
     return (
       <div
         className={cn(
-          "relative w-20 h-28 sm:w-24 sm:h-36 rounded-lg border-2 border-slate-700 bg-slate-800 shadow-md flex items-center justify-center overflow-hidden",
+          "relative flex-shrink-0 w-16 h-24 sm:w-24 sm:h-36 rounded-lg border-2 border-slate-700 bg-slate-800 shadow-md flex items-center justify-center overflow-hidden",
           "bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cmVjdCB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjMWUyOTNiIj48L3JlY3Q+CjxwYXRoIGQ9Ik0wIDBMOCA4Wk04IDBMMCA4WiIgc3Ryb2tlPSIjMzMzNDNiIiBzdHJva2Utd2lkdGg9IjEiPjwvcGF0aD4KPC9zdmc+')] bg-repeat",
           className
         )}
@@ -43,9 +43,9 @@ export function CardComponent({ card, hidden, className, onClick, disabled, sele
       data-testid={`card-${card.suit}-${card.rank}`}
       aria-label={`${card.rank} of ${card.suit}`}
       className={cn(
-        // Bigger on mobile than the old fan (was w-20=80px with -32px overlap, ~48px tap target).
-        // Now w-[88px] standalone (no overlap) → full 88×120 tap target on phones.
-        "relative w-[88px] h-[120px] sm:w-24 sm:h-36 rounded-lg border border-slate-300 bg-white shadow-md flex flex-col items-center justify-center p-1.5 select-none transition-transform duration-150",
+        // Compact mobile card so a horizontal hand strip fits on one row.
+        // 64×88 mobile is still a solid tap target; sm: bumps back to 96×144.
+        "relative flex-shrink-0 w-16 h-24 sm:w-24 sm:h-36 rounded-lg border border-slate-300 bg-white shadow-md flex flex-col items-center justify-center p-1.5 select-none transition-transform duration-150",
         // Suit-tinted left edge bar for fast scanning even when fanned
         "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1.5 before:rounded-l-lg",
         card.suit === "spades"   && "before:bg-slate-900",
