@@ -74,6 +74,13 @@ export interface GameState {
    * Persists across tricks and rounds.
    */
   lastCardPlayed: TrickCard | null;
+  /**
+   * The two cards from the most recently *completed* trick.
+   * Empty array until the first trick fully resolves.
+   * Persists through the next trick and only updates when the next trick completes.
+   * Cleared on resetMatch.
+   */
+  lastCompletedTrick: TrickCard[];
   /** Optional free-text label for the match (e.g. "Quarterfinal 1", "Finals"). */
   matchLabel?: string;
   /**
@@ -123,6 +130,7 @@ export function createGame(roomCode: string, matchTarget = 250, matchLabel?: str
     tiebreakerRound: 0,
     spectators: [],
     lastCardPlayed: null,
+    lastCompletedTrick: [],
     coinFlipWinner: null,
     firstBidderRound1: null,
   };
@@ -208,6 +216,7 @@ export function resetMatch(state: GameState): GameState {
     tiebreakerActive: false,
     tiebreakerRound: 0,
     lastCardPlayed: null,
+    lastCompletedTrick: [],
     // New match → re-toss the coin
     coinFlipWinner: null,
     firstBidderRound1: null,
@@ -351,6 +360,8 @@ export function playCard(
 
   // Intermediate display state: both cards visible, nobody can play.
   // tricks/trickLeader are already updated so score counters stay correct.
+  // Snapshot the completed trick into lastCompletedTrick — this persists into
+  // the next trick (and survives the currentTrick: [] clear in finalState below).
   const intermediateState: GameState = {
     ...newState,
     hands: newHands,
@@ -358,6 +369,7 @@ export function playCard(
     tricks: newTricks,
     trickLeader: winnerIndex,
     currentTurnIndex: null,   // blocks any play_card during the display window
+    lastCompletedTrick: newTrick,
   };
 
   if (roundComplete) {

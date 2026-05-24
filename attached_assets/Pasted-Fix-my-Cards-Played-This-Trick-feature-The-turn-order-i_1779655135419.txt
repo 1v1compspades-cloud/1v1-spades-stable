@@ -1,0 +1,148 @@
+Fix my “Cards Played This Trick” feature.
+
+The turn order is correct now. Do not change the bidding/turn logic unless absolutely necessary.
+
+Problem:
+The current card display is showing cards from the CURRENT trick, and it is floating over the play area/card slots. I want it to show the LAST COMPLETED TRICK instead, so players can see the previous pair of cards in case of lag or delay.
+
+Rename/rework the feature from:
+“Cards Played This Trick”
+to:
+“Last Trick Played”
+
+Goal:
+Show the previous completed trick’s two cards, not the current trick’s live cards.
+
+Requirements:
+1. The UI box should be labeled “Last Trick Played”.
+2. Before any trick has completed, show:
+   - Seat 1: None
+   - Seat 2: None
+3. While the current trick is being played, do NOT update this box.
+4. Only update the box after both players have played and the trick has fully resolved.
+5. The box should show the two cards from the completed trick:
+   - Seat 1 / player name: card they played
+   - Seat 2 / player name: card they played
+6. Keep that last completed trick visible during the next trick.
+7. Replace it only when the next trick resolves.
+8. Do not clear it at the start of each trick.
+9. Do not break bidding, turn switching, trick winner logic, scoring, bags, nil, feed, or suit enforcement.
+10. Keep the card formatter:
+   - If card is an object, display card.value + card.suit
+   - If card is a string, display the string directly
+   - If no card, display “None”
+
+Implementation guidance:
+Add state like:
+
+game.lastCompletedTrick = {
+  p1: null,
+  p2: null
+};
+
+Keep using game.played or whatever existing state tracks the CURRENT trick.
+
+Important:
+Do NOT set game.lastCompletedTrick when only one card has been played.
+Only set it inside resolveTrick or right before clearing game.played for the next trick.
+
+Example logic inside resolveTrick, before clearing current played cards:
+
+game.lastCompletedTrick = {
+  p1: game.played.p1,
+  p2: game.played.p2
+};
+
+Then call:
+
+renderLastCompletedTrick();
+
+Then continue normal trick resolution.
+
+Create/update helper:
+
+function formatCard(card) {
+  if (!card) return "None";
+  if (typeof card === "string") return card;
+  return `${card.value}${card.suit}`;
+}
+
+Create/update render function:
+
+function renderLastCompletedTrick() {
+  const box = document.getElementById("lastCompletedTrickDisplay");
+  if (!box) return;
+
+  box.innerHTML = `
+    <div class="trick-box-title">Last Trick Played</div>
+    <div class="trick-card-row">
+      <span>Seat 1:</span>
+      <strong>${formatCard(game.lastCompletedTrick?.p1)}</strong>
+    </div>
+    <div class="trick-card-row">
+      <span>Seat 2:</span>
+      <strong>${formatCard(game.lastCompletedTrick?.p2)}</strong>
+    </div>
+  `;
+}
+
+If the app already uses player names in this display, keep the player names instead of Seat 1/Seat 2.
+
+Layout fix:
+The box is currently in the way of the right-side card slot/play area. Move it so it does not cover the played-card area or cards.
+
+Preferred layout:
+- Put “Last Trick Played” below the play table area, above the player’s hand, OR
+- Put it as a full-width slim horizontal panel between the table and the bottom player area.
+- On mobile, it should not be position:absolute over the center/right card slot.
+- Avoid floating over the table.
+- Use normal document flow if possible.
+
+CSS guidance:
+Remove or avoid styles like:
+position: absolute;
+right: ...;
+top: ...;
+z-index over the play area;
+
+Use something safer like:
+
+.last-trick-panel {
+  width: calc(100% - 24px);
+  max-width: 520px;
+  margin: 10px auto;
+  padding: 10px 14px;
+  border: 1px solid rgba(190, 145, 50, 0.8);
+  border-radius: 10px;
+  background: rgba(5, 20, 16, 0.92);
+}
+
+.trick-box-title {
+  font-size: 12px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #c89b3c;
+  margin-bottom: 8px;
+}
+
+.trick-card-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 15px;
+  margin: 4px 0;
+}
+
+.trick-card-row strong {
+  font-size: 20px;
+}
+
+Testing:
+1. Start a round.
+2. Before any cards are played, Last Trick Played should show None/None.
+3. Player 1 plays one card.
+4. Last Trick Played should still show None/None.
+5. Player 2 plays one card.
+6. After trick resolves, Last Trick Played should update to show both cards.
+7. Start next trick.
+8. Last Trick Played should still show the previous trick’s two cards.
+9. Make sure the display is not blocking the right-side card slot or any playable card.

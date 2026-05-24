@@ -42,6 +42,8 @@ export interface GameState {
   matchLabel?: string;
   /** Most recent card played by either player this match. Null until first play. */
   lastCardPlayed: { card: Card; playerIndex: 0 | 1 } | null;
+  /** Two cards from the most recently completed trick; empty until first trick resolves. */
+  lastCompletedTrick: { card: Card; playerIndex: 0 | 1 }[];
   /**
    * Seat (0 or 1) that won the one-time coin toss. The winner bids SECOND in
    * Round 1; the loser bids FIRST. Bidding order alternates every round after.

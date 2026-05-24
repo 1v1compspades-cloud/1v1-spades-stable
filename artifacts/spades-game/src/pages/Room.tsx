@@ -502,42 +502,6 @@ export default function Room() {
           </div>
         </div>
 
-        {/* Cards Played This Trick — both seats, persists through trick-resolve window */}
-        {(gameState.phase === "playing" || gameState.phase === "round_over" || gameState.phase === "game_over") && (() => {
-          const seat0Card = gameState.currentTrick.find(t => t.playerIndex === 0)?.card ?? null;
-          const seat1Card = gameState.currentTrick.find(t => t.playerIndex === 1)?.card ?? null;
-          const seat0Name = gameState.players[0]?.name?.split(" ")[0] ?? "Seat 1";
-          const seat1Name = gameState.players[1]?.name?.split(" ")[0] ?? "Seat 2";
-          const renderCard = (c: CardType | null) => {
-            if (!c) return <span className="text-muted-foreground/60 font-bold">None</span>;
-            const isRed = c.suit === "hearts" || c.suit === "diamonds";
-            return (
-              <span className={`font-bold tabular-nums ${isRed ? "text-rose-400" : "text-foreground"}`}>
-                {formatCard(c)}
-              </span>
-            );
-          };
-          return (
-            <div
-              id="currentTrickDisplay"
-              data-testid="current-trick-display"
-              className="absolute top-4 right-4 px-3 py-2 rounded-lg border border-primary/40 bg-card/90 backdrop-blur-sm shadow-lg shadow-black/40 min-w-[160px]"
-            >
-              <div className="trick-box-title text-[10px] uppercase tracking-widest text-muted-foreground font-semibold text-center mb-1.5">
-                Cards Played This Trick
-              </div>
-              <div className="trick-card-row flex items-center justify-between gap-3 text-sm py-0.5" data-testid="trick-row-seat-1">
-                <span className="text-muted-foreground truncate max-w-[80px]">{seat0Name}:</span>
-                <span className="text-lg">{renderCard(seat0Card)}</span>
-              </div>
-              <div className="trick-card-row flex items-center justify-between gap-3 text-sm py-0.5" data-testid="trick-row-seat-2">
-                <span className="text-muted-foreground truncate max-w-[80px]">{seat1Name}:</span>
-                <span className="text-lg">{renderCard(seat1Card)}</span>
-              </div>
-            </div>
-          );
-        })()}
-
         {/* Coin toss overlay — shown to all roles for ~3.5s, server transitions to bidding */}
         {gameState.phase === "coin_toss" && gameState.coinFlipWinner !== null && (() => {
           const winnerName = gameState.players[gameState.coinFlipWinner]?.name ?? `Seat ${gameState.coinFlipWinner + 1}`;
@@ -894,6 +858,48 @@ export default function Room() {
     </div>
   );
 
+  // ── Last Trick Played panel (slim horizontal, between table and bottom seat)
+  const renderLastTrickPanel = () => {
+    if (gameState.phase === "waiting" || gameState.phase === "coin_toss") return null;
+    const last = gameState.lastCompletedTrick ?? [];
+    const seat0Card = last.find(t => t.playerIndex === 0)?.card ?? null;
+    const seat1Card = last.find(t => t.playerIndex === 1)?.card ?? null;
+    const seat0Name = gameState.players[0]?.name?.split(" ")[0] ?? "Seat 1";
+    const seat1Name = gameState.players[1]?.name?.split(" ")[0] ?? "Seat 2";
+    const renderCard = (c: CardType | null) => {
+      if (!c) return <strong className="text-muted-foreground/60">None</strong>;
+      const isRed = c.suit === "hearts" || c.suit === "diamonds";
+      return (
+        <strong className={`tabular-nums text-lg ${isRed ? "text-rose-400" : "text-foreground"}`}>
+          {formatCard(c)}
+        </strong>
+      );
+    };
+    return (
+      <div className="px-3 pt-1 pb-2 flex justify-center" data-testid="last-trick-panel">
+        <div
+          id="lastCompletedTrickDisplay"
+          className="last-trick-panel w-full max-w-[520px] px-3.5 py-2 rounded-lg border border-primary/60 bg-black/70 backdrop-blur-sm shadow-md"
+        >
+          <div className="trick-box-title text-[10px] uppercase tracking-[0.2em] text-primary font-semibold mb-1.5 text-center">
+            Last Trick Played
+          </div>
+          <div className="flex items-center justify-around gap-4 text-sm">
+            <div className="trick-card-row flex items-center gap-2" data-testid="last-trick-seat-1">
+              <span className="text-muted-foreground truncate max-w-[110px]">{seat0Name}:</span>
+              {renderCard(seat0Card)}
+            </div>
+            <div className="h-6 w-px bg-border" />
+            <div className="trick-card-row flex items-center gap-2" data-testid="last-trick-seat-2">
+              <span className="text-muted-foreground truncate max-w-[110px]">{seat1Name}:</span>
+              {renderCard(seat1Card)}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ── Root layout ────────────────────────────────────────────────────────────
   // Spectator: never see the waiting screen as theirs — show a neutral version
   // Spectator that joined before host hits "Start" — show waiting screen.
@@ -916,6 +922,7 @@ export default function Room() {
           {renderPlayerInfo(topIndex)}
           {renderStatusBanner()}
           {renderTable()}
+          {renderLastTrickPanel()}
           {renderPlayerInfo(bottomIndex)}
           {spectator ? renderSpectatorFooter() : renderMyHand()}
         </>
