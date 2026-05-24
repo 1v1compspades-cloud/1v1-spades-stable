@@ -555,21 +555,39 @@ export default function Room() {
               <p className="text-sm text-muted-foreground">
                 You have {gameState.hand.length} cards. Bid 0 for Nil (+/−125).
               </p>
-              <div className="flex gap-2">
-                <Select value={bidAmount} onValueChange={setBidAmount}>
-                  <SelectTrigger className="text-lg h-12">
-                    <SelectValue placeholder="Select bid" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 14 }).map((_, i) => (
-                      <SelectItem key={i} value={i.toString()}>{i === 0 ? "0 — Nil" : i}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button onClick={handleBid} disabled={!bidAmount || isSubmitting} className="h-12 px-8">
-                  Bid
-                </Button>
+              <div
+                data-testid="bid-buttons"
+                className="grid grid-cols-4 sm:grid-cols-7 gap-2 w-full"
+              >
+                {Array.from({ length: 14 }).map((_, i) => {
+                  const val = i.toString();
+                  const selected = bidAmount === val;
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      data-testid={`bid-btn-${i}`}
+                      onClick={() => setBidAmount(val)}
+                      className={cn(
+                        "min-h-[44px] rounded-lg border text-base font-bold tabular-nums transition-colors",
+                        selected
+                          ? "bg-primary text-primary-foreground border-primary shadow-md"
+                          : "bg-[#071f18] text-foreground border-white/20 hover:bg-white/5 active:bg-white/10"
+                      )}
+                    >
+                      {i === 0 ? "Nil" : i}
+                    </button>
+                  );
+                })}
               </div>
+              <Button
+                onClick={handleBid}
+                disabled={!bidAmount || isSubmitting}
+                className="h-12 w-full text-base"
+                data-testid="button-confirm-bid"
+              >
+                {bidAmount ? `Bid ${bidAmount === "0" ? "Nil" : bidAmount}` : "Select a bid first"}
+              </Button>
             </div>
           </div>
         )}

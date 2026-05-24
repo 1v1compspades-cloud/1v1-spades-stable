@@ -1,0 +1,93 @@
+Fix the bid selector on mobile. The current dropdown/select is broken on iPhone because the scroll menu blocks lower bids and players can’t pick below/above certain values reliably.
+
+Do NOT change the game logic, bidding rules, score logic, turn logic, trick logic, or card play logic.
+
+Replace the bid dropdown with visible bid buttons.
+
+Requirements:
+1. Remove or hide the current “Select bid” dropdown.
+2. Add a bid button grid with buttons 0 through 13.
+3. Include 0 because nil is allowed.
+4. Buttons should be easy to tap on mobile.
+5. Use a compact grid layout:
+   - 7 buttons per row on wider screens if possible
+   - 4 buttons per row on small mobile screens
+6. The selected bid button should visually highlight.
+7. Keep the existing yellow “Bid” confirm button.
+8. When a player taps a number button, store that number as the pending selected bid.
+9. When the player presses the Bid confirm button, submit the selected bid using the existing bid function/logic.
+10. If no bid number is selected and they press Bid, show the same error behavior as before or show “Select a bid first.”
+11. Do not submit the bid immediately when tapping a number. Tapping only selects it. The yellow Bid button confirms it.
+12. Make sure the bid panel does not overflow off screen on iPhone.
+13. Make the bid buttons wrap cleanly and stay inside the bidding box.
+14. Test that every bid from 0 to 13 can be selected and submitted.
+
+Style:
+- Match the current dark green/gold theme.
+- Default bid buttons: dark green background, thin border.
+- Selected bid button: gold background.
+- Text should be readable.
+- Buttons should be at least 44px tall for mobile tapping.
+
+Implementation guidance:
+Look for the current select element for bids, likely something like:
+<select id="bidSelect">
+
+Replace it with something like:
+<div id="bidButtons" class="bid-buttons"></div>
+
+Then generate buttons 0-13 in JavaScript, or hardcode them in HTML.
+
+Use a variable like:
+let selectedBid = null;
+
+When button is clicked:
+selectedBid = Number(button.dataset.bid);
+highlight selected button.
+
+When confirm Bid button is clicked:
+use selectedBid instead of reading from the select dropdown.
+
+Be careful to update any existing code that currently does:
+document.getElementById("bidSelect").value
+
+Change it to use selectedBid.
+
+Mobile CSS example:
+.bid-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  width: 100%;
+  margin-top: 12px;
+}
+
+.bid-btn {
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.25);
+  background: #071f18;
+  color: #f2f2f2;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.bid-btn.selected {
+  background: #b38b22;
+  color: #06140f;
+  border-color: #d6b44c;
+}
+
+@media (min-width: 700px) {
+  .bid-buttons {
+    grid-template-columns: repeat(7, 1fr);
+  }
+}
+
+Also make sure the bidding container has:
+overflow: visible;
+max-width: 100%;
+box-sizing: border-box;
+
+Final result:
+Players should see bid buttons 0,1,2,3,4,5,6,7,8,9,10,11,12,13 directly on screen, tap one, then press Bid.
