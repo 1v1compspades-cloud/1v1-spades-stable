@@ -835,12 +835,19 @@ export default function Room() {
             >
               {group.cards.map((card) => {
                 const playable = isCardPlayable(card, gameState, playerIndex as 0 | 1);
+                // Only dim during the playing phase on YOUR turn — illegal cards
+                // get a muted look so legal ones stand out. Never dim during
+                // bidding or on the opponent's turn (cards must stay readable).
+                const isMyPlayTurn =
+                  gameState.phase === "playing" &&
+                  gameState.currentTurnIndex === playerIndex;
                 return (
                   <CardComponent
                     key={`${card.suit}-${card.rank}`}
                     card={card}
                     onClick={playable ? () => handlePlayCard(card) : undefined}
                     disabled={!playable}
+                    dimmed={isMyPlayTurn && !playable}
                     className="snap-center"
                   />
                 );

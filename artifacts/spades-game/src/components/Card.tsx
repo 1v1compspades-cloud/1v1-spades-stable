@@ -8,6 +8,8 @@ interface CardProps {
   onClick?: () => void;
   disabled?: boolean;
   selected?: boolean;
+  /** Visually dim the card (e.g. illegal play during your turn). Still readable. */
+  dimmed?: boolean;
 }
 
 // Four-color suit palette for clear visual distinction at a glance.
@@ -19,7 +21,7 @@ const SUIT_FACE_COLORS: Record<CardType["suit"], string> = {
   diamonds: "text-blue-700",
 };
 
-export function CardComponent({ card, hidden, className, onClick, disabled, selected }: CardProps) {
+export function CardComponent({ card, hidden, className, onClick, disabled, selected, dimmed }: CardProps) {
   if (hidden || !card) {
     return (
       <div
@@ -53,12 +55,13 @@ export function CardComponent({ card, hidden, className, onClick, disabled, sele
         card.suit === "clubs"    && "before:bg-emerald-700",
         card.suit === "diamonds" && "before:bg-blue-700",
         colorClass,
-        // Disabled cards stay FULLY READABLE — no opacity/grayscale/brightness
-        // filters (Android/Samsung browsers render those much darker than iOS).
-        // Just disable pointer interaction via the native `disabled` attr.
+        // Disabled but NOT dimmed (e.g. during bidding, opponent's turn) →
+        // fully readable, just non-clickable.
         disabled && "cursor-default",
-        // Playable cards get a subtle gold ring + lift hint so they stand out
-        // without dimming the rest of the hand.
+        // Dimmed = illegal play during your own turn. Keep face readable
+        // (opacity is mild so suit/rank still scan on Android/Samsung).
+        dimmed && "opacity-60 saturate-75",
+        // Playable cards get a subtle gold ring + lift hint so they stand out.
         !disabled && onClick && "ring-2 ring-primary/60 ring-offset-1 ring-offset-background hover:-translate-y-3 hover:shadow-xl active:translate-y-0 cursor-pointer",
         selected && "-translate-y-3 shadow-xl ring-2 ring-primary ring-offset-2 ring-offset-background",
         className
