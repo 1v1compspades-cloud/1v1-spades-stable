@@ -1,0 +1,34 @@
+Fix Android/Samsung mobile card visibility, especially during bidding.
+
+Issue:
+On Galaxy S23 Ultra / Android browser, cards in hand appear too dark during bidding or when they are not currently playable. On iPhone they look fine.
+
+Goal:
+Cards should remain readable on all devices, especially during bidding, even when disabled, waiting, or not currently playable.
+
+Core requirements:
+1. Do not dim the whole hand on Android.
+2. Do not apply opacity, brightness filters, grayscale, dark overlays, blur, or disabled-card styling to card faces just because it is not the player’s turn.
+3. Disabled/unplayable cards can be non-clickable, but their rank and suit must stay visible.
+4. Use pointer-events: none or game logic to prevent clicking instead of making cards dark.
+5. Make sure red suits are clearly red and black suits are clearly dark/black on light card faces.
+6. Keep currently playable cards highlighted, but do not make non-playable cards unreadable.
+7. Test responsive CSS for Android Chrome/Samsung Internet widths around 360px-430px.
+
+Bidding-specific requirements:
+1. When game phase is "bidding", all cards in the player hand should stay fully visible and readable.
+2. During bidding, the cards can be locked from being played, but they should not look disabled.
+3. Do not apply opacity, brightness filters, grayscale, dark overlays, blur, or disabled-card styling during bidding.
+4. Use game logic or pointer-events: none to prevent card clicks during bidding.
+5. Once bidding ends, normal playable-card highlighting can resume.
+6. This should fix Android/Samsung users who cannot clearly see their cards while deciding their bid.
+
+Likely fix:
+Search CSS for disabled, inactive, waiting, not-turn, card-disabled, hand-disabled, bidding, phase-bidding, opacity, filter, brightness, grayscale, or overlay rules affecting cards.
+
+Remove heavy opacity/filter from card text and card faces.
+
+Use a subtle border, glow, or outline for playable cards instead of dimming the rest.
+
+Important:
+Bidding requires players to see their full hand clearly, so never hide, dim, blur, or darken cards during the bidding phase.

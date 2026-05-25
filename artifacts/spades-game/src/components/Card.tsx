@@ -53,8 +53,13 @@ export function CardComponent({ card, hidden, className, onClick, disabled, sele
         card.suit === "clubs"    && "before:bg-emerald-700",
         card.suit === "diamonds" && "before:bg-blue-700",
         colorClass,
-        disabled && "opacity-40 cursor-not-allowed grayscale",
-        !disabled && onClick && "hover:-translate-y-3 hover:shadow-xl active:translate-y-0 cursor-pointer",
+        // Disabled cards stay FULLY READABLE — no opacity/grayscale/brightness
+        // filters (Android/Samsung browsers render those much darker than iOS).
+        // Just disable pointer interaction via the native `disabled` attr.
+        disabled && "cursor-default",
+        // Playable cards get a subtle gold ring + lift hint so they stand out
+        // without dimming the rest of the hand.
+        !disabled && onClick && "ring-2 ring-primary/60 ring-offset-1 ring-offset-background hover:-translate-y-3 hover:shadow-xl active:translate-y-0 cursor-pointer",
         selected && "-translate-y-3 shadow-xl ring-2 ring-primary ring-offset-2 ring-offset-background",
         className
       )}
