@@ -18,6 +18,9 @@ import {
   addSpectator,
   reconnectSpectator,
   performCoinToss,
+  addChallenger,
+  removeChallenger,
+  promoteNextChallenger,
   type GameState,
 } from "./engine.js";
 import type { Card } from "./deck.js";
@@ -58,6 +61,9 @@ function sanitizeStateForPlayer(
     firstBidderRound1: state.firstBidderRound1,
     lastActiveAt: state.lastActiveAt,
     ready: state.ready,
+    mode: state.mode,
+    challengerQueue: state.challengerQueue.map((c) => ({ id: c.id, name: c.name })),
+    kingStreak: state.kingStreak,
   };
 }
 
@@ -93,6 +99,9 @@ function sanitizeStateForSpectator(state: GameState): Record<string, unknown> {
     firstBidderRound1: state.firstBidderRound1,
     lastActiveAt: state.lastActiveAt,
     ready: state.ready,
+    mode: state.mode,
+    challengerQueue: state.challengerQueue.map((c) => ({ id: c.id, name: c.name })),
+    kingStreak: state.kingStreak,
   };
 }
 
@@ -141,6 +150,109 @@ function dealWithShuffleAnimation(
   }, SHUFFLE_ANIMATION_MS);
 }
 
+/** Delay between game_over and the KotT auto-promotion / next match. */
+const KING_NEXT_MATCH_DELAY_MS = 5000;
+
+/**
+ * KotT: at game_over, promote the queue head into the loser's seat and
+ * kick off a fresh match (coin toss → deal). No-op if mode != king, the
+ * queue is empty, or the scores are tied.
+ *
+ * Emits `you_are_seated` to the promoted client and `you_are_unseated`
+ * to the demoted client so each updates its local role state.
+ */
+/**
+ * Tracks rooms with a KotT rotation already scheduled so we don't stack
+ * timers if both the playCard hook and a late `join_queue` race to schedule.
+ */
+const kingRotationScheduled = new Set<string>();
+
+function scheduleKingNextMatch(io: SocketIOServer, roomCode: string): void {
+  if (kingRotationScheduled.has(roomCode)) return;
+  kingRotationScheduled.add(roomCode);
+  setTimeout(() => {
+    kingRotationScheduled.delete(roomCode);
+    try {
+      const cur = getRoom(roomCode);
+      if (!cur || cur.phase !== "game_over" || cur.mode !== "king") return;
+      if (cur.challengerQueue.length === 0) return;
+
+      const result = promoteNextChallenger(roomCode);
+      if (!result) {
+        // Couldn't promote (e.g. both seats empty). Leave in game_over;
+        // a future `join_queue` or `reconnect` will reschedule us.
+        return;
+      }
+
+      // Ensure the promoted challenger's socket is joined to the room so
+      // room-scoped emits (trick_complete, round_over, etc.) reach them.
+      const promotedSock = io.sockets.sockets.get(result.promoted.socketId);
+      if (promotedSock) {
+        promotedSock.join(roomCode);
+      } else {
+        // Promoted challenger vanished before rotation fired — roll back.
+        logger.warn({ roomCode, socketId: result.promoted.socketId }, "Promoted challenger disconnected; aborting rotation");
+        const rolled = getRoom(roomCode);
+        if (rolled) {
+          rolled.players[result.promoted.playerIndex] = null;
+          updateRoom(rolled);
+          broadcastState(io, rolled);
+          // Try again with the next challenger (if any).
+          if (rolled.challengerQueue.length > 0) {
+            scheduleKingNextMatch(io, roomCode);
+          }
+        }
+        return;
+      }
+
+      io.to(result.promoted.socketId).emit("you_are_seated", {
+        roomCode,
+        playerIndex: result.promoted.playerIndex,
+        name: result.promoted.name,
+      });
+      if (result.demoted) {
+        io.to(result.demoted.socketId).emit("you_are_unseated", {
+          roomCode,
+          previousIndex: result.demoted.previousIndex,
+        });
+      }
+
+      // Broadcast the freshly-reset state so everyone sees new seats + queue.
+      broadcastState(io, result.state);
+
+      // Coin toss → deal Round 1, mirroring the new_match flow.
+      const tossed = performCoinToss(result.state);
+      updateRoom(tossed);
+      broadcastState(io, tossed);
+
+      setTimeout(() => {
+        try {
+          const c = getRoom(roomCode);
+          if (!c || c.phase !== "coin_toss") return;
+          // Re-validate both seats are still filled — either side could have
+          // disconnected during the 3.5s coin-toss window.
+          if (!c.players[0] || !c.players[1]) {
+            logger.warn({ roomCode }, "Seat went empty during KotT coin toss; reverting to game_over");
+            c.phase = "game_over";
+            updateRoom(c);
+            broadcastState(io, c);
+            if (c.challengerQueue.length > 0) {
+              scheduleKingNextMatch(io, roomCode);
+            }
+            return;
+          }
+          const dealt = startRound(c);
+          dealWithShuffleAnimation(io, roomCode, dealt);
+        } catch (err: unknown) {
+          logger.error({ err, roomCode }, "Error dealing first round of KotT next match");
+        }
+      }, 3500);
+    } catch (err: unknown) {
+      logger.error({ err, roomCode }, "Error scheduling KotT next match");
+    }
+  }, KING_NEXT_MATCH_DELAY_MS);
+}
+
 /**
  * Broadcast game_state to both players AND all spectators.
  * Each gets a view sanitized for their role.
@@ -176,7 +288,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
     socket.on(
       "create_room",
       (
-        data: { playerName: string; matchTarget?: number; matchLabel?: string },
+        data: { playerName: string; matchTarget?: number; matchLabel?: string; mode?: string },
         callback: (res: { ok: boolean; roomCode?: string; playerIndex?: number; error?: string }) => void
       ) => {
         try {
@@ -189,7 +301,8 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           // Optional match label (e.g. "Quarterfinal 1"). Trimmed, length-capped.
           const rawLabel = typeof data.matchLabel === "string" ? data.matchLabel.trim() : "";
           const label = rawLabel ? rawLabel.slice(0, 40) : undefined;
-          const state = createRoom(data.playerName, socket.id, target, label);
+          const mode: "quick" | "king" = data.mode === "king" ? "king" : "quick";
+          const state = createRoom(data.playerName, socket.id, target, label, mode);
           socket.join(state.roomCode);
           logger.info({ roomCode: state.roomCode, playerName: data.playerName }, "Room created");
           callback({ ok: true, roomCode: state.roomCode, playerIndex: 0 });
@@ -350,6 +463,15 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
                   phase: result.state.phase,
                 });
               }
+
+              // KotT: auto-rotate to next challenger after game_over (if queue non-empty).
+              if (
+                result.state.phase === "game_over" &&
+                result.state.mode === "king" &&
+                result.state.challengerQueue.length > 0
+              ) {
+                scheduleKingNextMatch(io, data.roomCode);
+              }
             }, 700);
 
           } else {
@@ -502,6 +624,51 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           const state = setPlayerReady(code, socket.id, !!data.ready);
           callback?.({ ok: true });
           broadcastState(io, state);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+        }
+      }
+    );
+
+    socket.on(
+      "join_queue",
+      (
+        data: { roomCode: string; name: string },
+        callback?: (res: { ok: boolean; error?: string }) => void
+      ) => {
+        try {
+          const code = data.roomCode.toUpperCase().trim();
+          const state = addChallenger(code, data.name, socket.id);
+          // Ensure the queued spectator is in the socket.io room so they
+          // receive room-scoped events (and game_state) immediately.
+          socket.join(code);
+          logger.info({ roomCode: code, name: data.name }, "Challenger joined queue");
+          callback?.({ ok: true });
+          broadcastState(io, state);
+          // If the room is already in game_over (queue was empty when the
+          // match ended), kick off the rotation now that we have a challenger.
+          if (state.phase === "game_over" && state.mode === "king") {
+            scheduleKingNextMatch(io, code);
+          }
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+        }
+      }
+    );
+
+    socket.on(
+      "leave_queue",
+      (
+        data: { roomCode: string },
+        callback?: (res: { ok: boolean; error?: string }) => void
+      ) => {
+        try {
+          const code = data.roomCode.toUpperCase().trim();
+          const state = removeChallenger(code, socket.id);
+          callback?.({ ok: true });
+          if (state) broadcastState(io, state);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           callback?.({ ok: false, error: msg });

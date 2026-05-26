@@ -11,7 +11,7 @@ interface SocketContextType {
   gameState: GameState | null;
   error: string | null;
   connect: () => void;
-  createRoom: (name: string, matchTarget?: number, matchLabel?: string) => Promise<{ roomCode?: string; playerIndex?: number }>;
+  createRoom: (name: string, matchTarget?: number, matchLabel?: string, mode?: "quick" | "king") => Promise<{ roomCode?: string; playerIndex?: number }>;
   joinRoom: (code: string, name: string) => Promise<{ playerIndex?: number }>;
   reconnect: (roomCode: string, playerIndex: 0 | 1, playerName: string) => Promise<{ ok: boolean }>;
   startGame: (code: string) => void;
@@ -24,6 +24,8 @@ interface SocketContextType {
   clearGameState: () => void;
   joinAsSpectator: (code: string, name: string) => Promise<void>;
   reconnectAsSpectator: (code: string, name: string) => Promise<void>;
+  joinQueue: (code: string, name: string) => Promise<void>;
+  leaveQueue: (code: string) => Promise<void>;
 }
 
 const SocketContext = createContext<SocketContextType | null>(null);
@@ -95,12 +97,32 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const createRoom = (playerName: string, matchTarget?: number, matchLabel?: string) => {
+  const createRoom = (playerName: string, matchTarget?: number, matchLabel?: string, mode?: "quick" | "king") => {
     return new Promise<{ roomCode?: string; playerIndex?: number }>((resolve, reject) => {
       if (!socket) return reject("No socket");
-      socket.emit("create_room", { playerName, matchTarget, matchLabel }, (res: any) => {
+      socket.emit("create_room", { playerName, matchTarget, matchLabel, mode }, (res: any) => {
         if (res.ok) resolve({ roomCode: res.roomCode, playerIndex: res.playerIndex });
         else reject(res.error);
+      });
+    });
+  };
+
+  const joinQueue = (roomCode: string, name: string) => {
+    return new Promise<void>((resolve, reject) => {
+      if (!socket) return reject("No socket");
+      socket.emit("join_queue", { roomCode, name }, (res: { ok: boolean; error?: string }) => {
+        if (res.ok) resolve();
+        else reject(res.error || "Could not join queue");
+      });
+    });
+  };
+
+  const leaveQueue = (roomCode: string) => {
+    return new Promise<void>((resolve, reject) => {
+      if (!socket) return reject("No socket");
+      socket.emit("leave_queue", { roomCode }, (res: { ok: boolean; error?: string }) => {
+        if (res.ok) resolve();
+        else reject(res.error || "Could not leave queue");
       });
     });
   };
@@ -229,7 +251,9 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       setReady,
       clearGameState,
       joinAsSpectator,
-      reconnectAsSpectator
+      reconnectAsSpectator,
+      joinQueue,
+      leaveQueue,
     }}>
       {children}
     </SocketContext.Provider>

@@ -108,7 +108,20 @@ export interface GameState {
    * resetMatch / disconnect so a fresh opponent has to ready up again.
    */
   ready: [boolean, boolean];
+  /**
+   * Game mode. "quick" = standard single-match room.
+   * "king"  = King of the Table — winner stays, loser is replaced by the
+   * next challenger in the queue, and a fresh match auto-starts.
+   */
+  mode: "quick" | "king";
+  /** Challenger queue (KotT). Empty in quick mode. Spectators opt in. */
+  challengerQueue: { id: string; name: string; socketId: string }[];
+  /** Per-seat consecutive match wins (KotT). Reset on loss / new room. */
+  kingStreak: [number, number];
 }
+
+/** Max challengers waiting in the KotT queue. */
+export const KING_QUEUE_MAX = 20;
 
 function makeRoomCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -119,7 +132,12 @@ function makeRoomCode(): string {
   return code;
 }
 
-export function createGame(roomCode: string, matchTarget = 250, matchLabel?: string): GameState {
+export function createGame(
+  roomCode: string,
+  matchTarget = 250,
+  matchLabel?: string,
+  mode: "quick" | "king" = "quick",
+): GameState {
   return {
     roomCode,
     phase: "waiting",
@@ -148,6 +166,9 @@ export function createGame(roomCode: string, matchTarget = 250, matchLabel?: str
     firstBidderRound1: null,
     lastActiveAt: [Date.now(), Date.now()],
     ready: [false, false],
+    mode,
+    challengerQueue: [],
+    kingStreak: [0, 0],
   };
 }
 
@@ -581,14 +602,15 @@ export function createRoom(
   hostPlayerName: string,
   hostSocketId: string,
   matchTarget = 250,
-  matchLabel?: string
+  matchLabel?: string,
+  mode: "quick" | "king" = "quick",
 ): GameState {
   let code: string;
   do {
     code = makeRoomCode();
   } while (rooms.has(code));
 
-  const state = createGame(code, matchTarget, matchLabel);
+  const state = createGame(code, matchTarget, matchLabel, mode);
   const host: Player = {
     id: hostSocketId,
     name: hostPlayerName,
@@ -649,10 +671,151 @@ export function removePlayerFromRoom(socketId: string): GameState | null {
     const specIdx = state.spectators.findIndex((s) => s.socketId === socketId);
     if (specIdx >= 0) {
       state.spectators.splice(specIdx, 1);
+      // A leaving spectator is also dropped from the KotT queue.
+      const qIdx = state.challengerQueue.findIndex((c) => c.socketId === socketId);
+      if (qIdx >= 0) state.challengerQueue.splice(qIdx, 1);
+      return state;
+    }
+    // Or just a queued-only socket (shouldn't normally happen — queue is a
+    // subset of spectators — but defensive).
+    const qIdx = state.challengerQueue.findIndex((c) => c.socketId === socketId);
+    if (qIdx >= 0) {
+      state.challengerQueue.splice(qIdx, 1);
       return state;
     }
   }
   return null;
+}
+
+// ── King of the Table helpers ────────────────────────────────────────────────
+
+export function addChallenger(
+  roomCode: string,
+  name: string,
+  socketId: string
+): GameState {
+  const state = rooms.get(roomCode);
+  if (!state) throw new Error("Room not found");
+  if (state.mode !== "king") throw new Error("Queue only available in King of the Table mode");
+  if (state.players.some((p) => p?.socketId === socketId)) {
+    throw new Error("You're already at the table");
+  }
+  const trimmed = (name || "Challenger").slice(0, 24);
+  const existing = state.challengerQueue.findIndex((c) => c.socketId === socketId);
+  if (existing >= 0) {
+    state.challengerQueue[existing] = { id: socketId, name: trimmed, socketId };
+  } else {
+    if (state.challengerQueue.length >= KING_QUEUE_MAX) {
+      throw new Error("Challenger queue is full");
+    }
+    state.challengerQueue.push({ id: socketId, name: trimmed, socketId });
+  }
+  rooms.set(roomCode, state);
+  return state;
+}
+
+export function removeChallenger(
+  roomCode: string,
+  socketId: string
+): GameState | null {
+  const state = rooms.get(roomCode);
+  if (!state) return null;
+  const idx = state.challengerQueue.findIndex((c) => c.socketId === socketId);
+  if (idx < 0) return state;
+  state.challengerQueue.splice(idx, 1);
+  rooms.set(roomCode, state);
+  return state;
+}
+
+export interface KingPromotion {
+  state: GameState;
+  promoted: { socketId: string; playerIndex: 0 | 1; name: string };
+  /** Null when the loser already disconnected before promotion ran. */
+  demoted: { socketId: string; name: string; previousIndex: 0 | 1 } | null;
+}
+
+/**
+ * KotT: at game_over, identify the winning seat, bump their streak, demote
+ * the loser to a spectator, and promote the head of the queue into the
+ * loser's seat. Returns null if the mode isn't king, the queue is empty,
+ * or the scores are tied (rare). The returned state is fully reset for a
+ * fresh match (call performCoinToss + startRound next).
+ */
+export function promoteNextChallenger(
+  roomCode: string
+): KingPromotion | null {
+  const state = rooms.get(roomCode);
+  if (!state) return null;
+  if (state.mode !== "king") return null;
+  if (state.phase !== "game_over") return null;
+  if (state.challengerQueue.length === 0) return null;
+
+  const [s0, s1] = state.scores;
+
+  // Identify winner/loser. Normal path: higher score wins.
+  // Edge: the loser may have disconnected between game_over and rotation —
+  // their seat is null. In that case treat the surviving seat as the
+  // winner and fill the null seat with the challenger.
+  let winnerIdx: 0 | 1;
+  let loserIdx: 0 | 1;
+  const p0 = state.players[0];
+  const p1 = state.players[1];
+  if (p0 && !p1)      { winnerIdx = 0; loserIdx = 1; }
+  else if (!p0 && p1) { winnerIdx = 1; loserIdx = 0; }
+  else if (!p0 && !p1) {
+    // Both seats empty — KotT can't auto-resolve, abandon.
+    return null;
+  } else {
+    if (s0 === s1) return null;
+    winnerIdx = s0 > s1 ? 0 : 1;
+    loserIdx = winnerIdx === 0 ? 1 : 0;
+  }
+
+  const winner = state.players[winnerIdx];
+  const loser = state.players[loserIdx]; // may be null if they disconnected
+  if (!winner) return null;
+
+  // Bump streaks (winner +1, loser resets).
+  const newStreak: [number, number] = [state.kingStreak[0], state.kingStreak[1]];
+  newStreak[winnerIdx] = newStreak[winnerIdx] + 1;
+  newStreak[loserIdx] = 0;
+
+  // Move the loser to spectators (so they can re-queue if they want).
+  // Skip if loser already disconnected — there's no one to demote.
+  if (loser && !state.spectators.some((s) => s.socketId === loser.socketId)) {
+    state.spectators.push({
+      id: loser.socketId,
+      name: loser.name,
+      socketId: loser.socketId,
+    });
+  }
+
+  // Pop the queue head and seat them where the loser was.
+  const challenger = state.challengerQueue.shift()!;
+  // If the challenger is currently in the spectators list, take them out —
+  // they're a player now, not a watcher.
+  const sIdx = state.spectators.findIndex((s) => s.socketId === challenger.socketId);
+  if (sIdx >= 0) state.spectators.splice(sIdx, 1);
+
+  state.players[loserIdx] = {
+    id: challenger.socketId,
+    name: challenger.name,
+    socketId: challenger.socketId,
+    index: loserIdx,
+  };
+  state.kingStreak = newStreak;
+
+  // Reset all match state for a fresh fight; preserve mode/queue/spectators/
+  // kingStreak/players (resetMatch spreads state, so all of these are kept).
+  const fresh = resetMatch(state);
+  rooms.set(roomCode, fresh);
+  return {
+    state: fresh,
+    promoted: { socketId: challenger.socketId, playerIndex: loserIdx, name: challenger.name },
+    demoted: loser
+      ? { socketId: loser.socketId, name: loser.name, previousIndex: loserIdx }
+      : null,
+  };
 }
 
 export function addSpectator(

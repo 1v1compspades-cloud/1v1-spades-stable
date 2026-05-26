@@ -55,6 +55,12 @@ export interface GameState {
   lastActiveAt?: [number, number];
   /** Per-seat ready flag for the pre-match lobby. */
   ready?: [boolean, boolean];
+  /** Game mode. "quick" = standard. "king" = King of the Table. */
+  mode?: "quick" | "king";
+  /** Challenger queue (KotT). Empty in quick mode. */
+  challengerQueue?: { id: string; name: string }[];
+  /** Per-seat consecutive match wins (KotT). */
+  kingStreak?: [number, number];
 }
 
 export const SUIT_SYMBOLS: Record<Suit, string> = {

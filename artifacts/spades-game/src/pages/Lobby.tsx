@@ -58,7 +58,8 @@ export default function Lobby() {
     try {
       savePlayerName(nameInput);
       saveIsSpectator(false);
-      const res = await createRoom(nameInput, matchTarget, matchLabel.trim() || undefined);
+      const serverMode: "quick" | "king" = matchMode === "king" ? "king" : "quick";
+      const res = await createRoom(nameInput, matchTarget, matchLabel.trim() || undefined, serverMode);
       if (res.roomCode && res.playerIndex !== undefined) {
         saveRoomCode(res.roomCode);
         savePlayerIndex(res.playerIndex as 0 | 1);

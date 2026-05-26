@@ -34,11 +34,13 @@ export default function Room() {
   const roomCode = params?.roomCode;
 
   const {
+    socket,
     connected, status, gameState, connect, joinRoom, reconnect,
     startGame, placeBid, playCard, nextRound, newMatch,
     resetRoom: doResetRoom,
     setReady: doSetReady,
     reconnectAsSpectator,
+    joinQueue, leaveQueue,
   } = useSocket();
   const {
     playerName,
@@ -60,6 +62,35 @@ export default function Room() {
   }, []);
 
   const isHost = !isSpectator && playerIndex === 0;
+
+  // KotT: react to server-driven role swaps. When a spectator is promoted
+  // out of the challenger queue into a player seat, the server emits
+  // `you_are_seated`. The displaced player gets `you_are_unseated`.
+  // We must sync local storage so a refresh doesn't put them back in the
+  // wrong role.
+  useEffect(() => {
+    if (!socket) return;
+    const onSeated = (data: { roomCode: string; playerIndex: 0 | 1 }) => {
+      if (data.roomCode !== roomCode) return;
+      savePlayerIndex(data.playerIndex);
+      saveIsSpectator(false);
+      toast({ description: "You're up! You've been seated as a player." });
+    };
+    const onUnseated = (data: { roomCode: string }) => {
+      if (data.roomCode !== roomCode) return;
+      savePlayerIndex(null);
+      saveIsSpectator(true);
+      toast({
+        description: "Match over — you're now spectating. Tap 'Get in line' to play again.",
+      });
+    };
+    socket.on("you_are_seated", onSeated);
+    socket.on("you_are_unseated", onUnseated);
+    return () => {
+      socket.off("you_are_seated", onSeated);
+      socket.off("you_are_unseated", onUnseated);
+    };
+  }, [socket, roomCode, savePlayerIndex, saveIsSpectator, toast]);
 
   useEffect(() => {
     if (!roomCode) { setLocation("/"); return; }
@@ -168,6 +199,34 @@ export default function Room() {
   const handleStartGame = () => startGame(roomCode!);
   const handleNextRound = () => nextRound(roomCode!);
   const handleNewMatch  = () => newMatch(roomCode!);
+
+  // KotT queue actions (spectators only).
+  const isKingMode = gameState?.mode === "king";
+  const queue = gameState?.challengerQueue ?? [];
+  const mySocketId = socket?.id;
+  const inQueue = !!mySocketId && queue.some((c) => c.id === mySocketId);
+  const queuePosition = !!mySocketId
+    ? queue.findIndex((c) => c.id === mySocketId)
+    : -1;
+
+  const handleJoinQueue = async () => {
+    if (!roomCode || !playerName) return;
+    try {
+      await joinQueue(roomCode, playerName);
+      toast({ description: "You're in line for the next match." });
+    } catch (err: any) {
+      toast({ description: typeof err === "string" ? err : "Couldn't join the queue.", variant: "destructive" });
+    }
+  };
+  const handleLeaveQueue = async () => {
+    if (!roomCode) return;
+    try {
+      await leaveQueue(roomCode);
+      toast({ description: "You left the challenger line." });
+    } catch (err: any) {
+      toast({ description: typeof err === "string" ? err : "Couldn't leave the queue.", variant: "destructive" });
+    }
+  };
 
   const handleBid = async () => {
     if (!bidAmount || spectator) return;
@@ -404,6 +463,8 @@ export default function Room() {
     const bid   = gameState.bids[idx];
     const tricks = gameState.tricks[idx];
     const seatLabel = `Seat ${idx + 1}`;
+    const streak = gameState.kingStreak?.[idx] ?? 0;
+    const showCrown = isKingMode && streak > 0;
     const isTurn  = gameState.phase === "playing" && gameState.currentTurnIndex === idx;
     const isBidding = gameState.phase === "bidding" && gameState.currentBidder === idx;
     const isActive = isTurn || isBidding;
@@ -426,6 +487,15 @@ export default function Room() {
               {seatLabel}{isMe ? " · You" : ""}
             </span>
             <span className="font-bold font-serif truncate max-w-[120px]">
+              {showCrown && (
+                <span
+                  data-testid={`king-crown-seat-${idx + 1}`}
+                  title={`King streak: ${streak}`}
+                  className="mr-1 text-yellow-400"
+                >
+                  👑{streak > 1 && <span className="text-[10px] font-mono align-top ml-0.5">×{streak}</span>}
+                </span>
+              )}
               {name ?? "Waiting…"}
               {isActive && <span className="text-primary ml-2 animate-pulse">●</span>}
             </span>
@@ -1171,7 +1241,28 @@ export default function Room() {
               })()}
 
               <div className="space-y-2">
-                {spectator ? (
+                {isKingMode ? (
+                  queue.length > 0 ? (
+                    <div
+                      data-testid="kott-next-banner"
+                      className="text-center text-sm space-y-1 rounded-md border border-primary/40 bg-primary/10 p-3"
+                    >
+                      <p className="font-semibold text-primary">
+                        Next challenger: {queue[0]?.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        New match starts in a few seconds…
+                      </p>
+                    </div>
+                  ) : (
+                    <p
+                      data-testid="kott-waiting-banner"
+                      className="text-center text-muted-foreground italic text-sm"
+                    >
+                      Waiting for a challenger to join the line…
+                    </p>
+                  )
+                ) : spectator ? (
                   <p className="text-center text-muted-foreground italic text-sm">Waiting for host to start a new match…</p>
                 ) : playerIndex === 0 ? (
                   <Button onClick={handleNewMatch} className="w-full h-11 text-base">
@@ -1179,6 +1270,16 @@ export default function Room() {
                   </Button>
                 ) : (
                   <p className="text-center text-muted-foreground italic text-sm">Waiting for host to start a new match…</p>
+                )}
+                {isKingMode && spectator && !inQueue && (
+                  <Button
+                    onClick={handleJoinQueue}
+                    variant="outline"
+                    className="w-full h-11"
+                    data-testid="button-join-queue-gameover"
+                  >
+                    Get in line
+                  </Button>
                 )}
                 <Button
                   onClick={spectator ? handleLeaveSpectate : () => setLocation("/")}
@@ -1237,6 +1338,71 @@ export default function Room() {
             </div>
           ))}
         </div>
+      </div>
+    );
+  };
+
+  // ── King of the Table: challenger queue panel (visible to all) ────────────
+  const renderQueuePanel = () => {
+    if (!isKingMode) return null;
+    return (
+      <div
+        data-testid="kott-queue-panel"
+        className="px-4 py-2 bg-black/40 border-b border-primary/20 flex items-center gap-2 flex-wrap text-xs"
+      >
+        <Badge
+          variant="outline"
+          className="border-yellow-500/50 text-yellow-300 uppercase tracking-widest"
+        >
+          👑 King of the Table
+        </Badge>
+        {queue.length === 0 ? (
+          <span className="text-muted-foreground italic">No challengers in line yet.</span>
+        ) : (
+          <>
+            <span className="text-muted-foreground">Next up:</span>
+            {queue.slice(0, 5).map((c, i) => (
+              <Badge
+                key={c.id}
+                variant="outline"
+                data-testid={`queue-slot-${i}`}
+                className={cn(
+                  "text-xs font-mono",
+                  i === 0
+                    ? "border-primary/60 text-primary"
+                    : "border-border text-muted-foreground"
+                )}
+              >
+                {i + 1}. {c.name}
+              </Badge>
+            ))}
+            {queue.length > 5 && (
+              <span className="text-muted-foreground">+{queue.length - 5} more</span>
+            )}
+          </>
+        )}
+        {spectator && (
+          inQueue ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleLeaveQueue}
+              data-testid="button-leave-queue"
+              className="h-7 text-xs ml-auto"
+            >
+              Leave line (#{queuePosition + 1})
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              onClick={handleJoinQueue}
+              data-testid="button-join-queue"
+              className="h-7 text-xs ml-auto"
+            >
+              Get in line
+            </Button>
+          )
+        )}
       </div>
     );
   };
@@ -1334,6 +1500,7 @@ export default function Room() {
     return (
       <div className="h-[100dvh] flex flex-col bg-background overflow-hidden relative">
         {renderStatusPill()}
+        {renderQueuePanel()}
         {renderSpectatorWaiting()}
         {renderSpectatorFooter()}
       </div>
@@ -1344,10 +1511,14 @@ export default function Room() {
     <div className="h-[100dvh] flex flex-col bg-background overflow-hidden relative">
       {renderStatusPill()}
       {!spectator && gameState.phase === "waiting" ? (
-        renderWaiting()
+        <>
+          {renderQueuePanel()}
+          {renderWaiting()}
+        </>
       ) : (
         <>
           {renderPlayerInfo(topIndex, { isTopSeat: true })}
+          {renderQueuePanel()}
           {renderStatusBanner()}
           {renderTable()}
           {renderPlayerInfo(bottomIndex)}
