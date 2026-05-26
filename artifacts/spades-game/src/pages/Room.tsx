@@ -812,7 +812,6 @@ export default function Room() {
 
     return (
       <div className="flex-1 flex flex-col items-center justify-center relative overflow-hidden">
-        {renderLastTrickMini()}
         {/* Top seat hidden hand (always hidden — even players don't see opponent's cards) */}
         <div className="absolute top-4 flex justify-center w-full pointer-events-none">
           <div className="flex items-center gap-2">
@@ -854,23 +853,26 @@ export default function Room() {
               ♠ Spades Broken
             </div>
           )}
-          <div className="flex gap-8 relative z-10">
-            <div className="w-24 h-36 border-2 border-dashed border-white/10 rounded-lg flex items-center justify-center relative">
-              {topCard ? (
-                <div className="absolute inset-0 z-10 -translate-y-2">
-                  <CardComponent card={topCard} />
-                </div>
-              ) : null}
-              <span className="text-white/20 text-xs font-serif">{topLabel}</span>
+          <div className="flex flex-col items-center justify-center gap-2 relative z-10">
+            <div className="flex gap-8">
+              <div className="w-24 h-36 border-2 border-dashed border-white/10 rounded-lg flex items-center justify-center relative">
+                {topCard ? (
+                  <div className="absolute inset-0 z-10 -translate-y-2">
+                    <CardComponent card={topCard} />
+                  </div>
+                ) : null}
+                <span className="text-white/20 text-xs font-serif">{topLabel}</span>
+              </div>
+              <div className="w-24 h-36 border-2 border-dashed border-white/10 rounded-lg flex items-center justify-center relative">
+                {bottomCard ? (
+                  <div className="absolute inset-0 z-20 translate-y-2">
+                    <CardComponent card={bottomCard} />
+                  </div>
+                ) : null}
+                <span className="text-white/20 text-xs font-serif">{bottomLabel}</span>
+              </div>
             </div>
-            <div className="w-24 h-36 border-2 border-dashed border-white/10 rounded-lg flex items-center justify-center relative">
-              {bottomCard ? (
-                <div className="absolute inset-0 z-20 translate-y-2">
-                  <CardComponent card={bottomCard} />
-                </div>
-              ) : null}
-              <span className="text-white/20 text-xs font-serif">{bottomLabel}</span>
-            </div>
+            {renderLastTrickMini()}
           </div>
         </div>
 
@@ -1259,7 +1261,7 @@ export default function Room() {
     </div>
   );
 
-  // ── Last Trick Played mini panel (right wall of the table area) ───────────
+  // ── Last Hand Played (centered, inline below the trick area) ──────────────
   const renderLastTrickMini = () => {
     if (gameState.phase === "waiting" || gameState.phase === "coin_toss") return null;
     const last = gameState.lastCompletedTrick ?? [];
@@ -1269,7 +1271,7 @@ export default function Room() {
       if (!c) return <span className="text-muted-foreground/70">—</span>;
       const isRed = c.suit === "hearts" || c.suit === "diamonds";
       return (
-        <span className={`tabular-nums ${isRed ? "text-rose-400" : "text-foreground"}`}>
+        <span className={`tabular-nums font-bold ${isRed ? "text-rose-400" : "text-foreground"}`}>
           {formatCard(c)}
         </span>
       );
@@ -1278,16 +1280,18 @@ export default function Room() {
       <div
         id="lastCompletedTrickDisplay"
         data-testid="last-trick-mini"
-        className="absolute right-0.5 top-2 z-[3] w-[60px] sm:w-[78px] sm:right-1 sm:top-1/2 sm:-translate-y-1/2 px-1.5 py-1 sm:py-1.5 rounded-lg border border-primary/70 bg-black/85 backdrop-blur-sm shadow-md text-center pointer-events-none"
+        className="mt-3 flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-lg border border-primary/50 bg-black/70 backdrop-blur-sm shadow-md pointer-events-none max-w-full"
       >
-        <div className="text-[9px] sm:text-[10px] uppercase tracking-[1.5px] text-primary font-semibold mb-1 leading-none">
-          Last
+        <div className="text-[9px] sm:text-[10px] uppercase tracking-[1.5px] text-primary font-semibold leading-none">
+          Last Hand Played
         </div>
-        <div className="text-[12px] sm:text-[13px] font-bold leading-tight whitespace-nowrap" data-testid="last-trick-seat-1">
-          <span className="text-muted-foreground mr-0.5">S1:</span>{renderCard(seat0Card)}
-        </div>
-        <div className="text-[12px] sm:text-[13px] font-bold leading-tight whitespace-nowrap mt-0.5" data-testid="last-trick-seat-2">
-          <span className="text-muted-foreground mr-0.5">S2:</span>{renderCard(seat1Card)}
+        <div className="flex items-center justify-center gap-3 text-[11px] sm:text-[12px] leading-tight whitespace-nowrap">
+          <span data-testid="last-trick-seat-1">
+            <span className="text-muted-foreground mr-1">S1:</span>{renderCard(seat0Card)}
+          </span>
+          <span data-testid="last-trick-seat-2">
+            <span className="text-muted-foreground mr-1">S2:</span>{renderCard(seat1Card)}
+          </span>
         </div>
       </div>
     );
