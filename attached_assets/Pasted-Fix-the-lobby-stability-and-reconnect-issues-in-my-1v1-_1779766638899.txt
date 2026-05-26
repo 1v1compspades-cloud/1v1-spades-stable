@@ -1,0 +1,148 @@
+Fix the lobby stability and reconnect issues in my 1v1 Competitive Spades app.
+
+Problem from live tournament:
+- Some lobbies failed to load/start.
+- A match failed twice between Shaw and Mehdi.
+- One player went AFK.
+- Host/player got stuck waiting.
+- App crashed while waiting in the lobby/game room.
+- I need the app to recover instead of forcing a forfeit.
+
+Do NOT rewrite the whole app. Patch the current lobby/game flow safely.
+
+Add these fixes:
+
+1. Add lobby connection status
+Show clear status text:
+- “Connecting…”
+- “Waiting for opponent…”
+- “Opponent connected”
+- “Opponent disconnected”
+- “Reconnecting…”
+- “Connection failed — recreate room”
+
+2. Add reconnect support
+If a player refreshes, disconnects, crashes, or comes back to the same room code:
+- Rejoin them to the same room if the room still exists.
+- Restore their player seat.
+- Restore current game state if game already started.
+- Do not create duplicate players for the same user/browser.
+
+Use a stable playerId stored in localStorage:
+- If localStorage has playerId, reuse it.
+- If not, create one and save it.
+- Attach playerId to joinRoom/rejoinRoom events.
+
+3. Add host reset room button
+Add a visible button for the host only:
+“Reset Room”
+When clicked:
+- Clear current game state for that room.
+- Keep the same room code if possible.
+- Keep both players in lobby.
+- Set game status back to waiting/ready.
+- Do not crash if one player is missing.
+
+4. Add recreate room option
+If the room is broken or connection fails:
+Show button:
+“Recreate Room”
+When clicked:
+- Make a fresh room.
+- Move the host/player into the new room.
+- Show/copy the new room code.
+- Make sure old broken room does not affect the new one.
+
+5. Add AFK detection
+Track lastActive time for each player.
+Update lastActive when player:
+- moves mouse/touches screen
+- clicks
+- bids
+- plays card
+- sends any game action
+
+If a player is inactive for 2 minutes:
+- Show “Opponent may be AFK”
+If inactive for 5 minutes:
+- Show “Opponent AFK — host may reset room”
+Do NOT auto-forfeit yet unless that already exists.
+
+6. Add safe socket cleanup
+On disconnect:
+- Do not immediately delete the room.
+- Mark player as disconnected.
+- Give them at least 2 minutes to reconnect.
+- Only clean up empty rooms after 10 minutes.
+
+7. Prevent crashes from missing players
+Audit the lobby and game code so this never crashes:
+- room.players[0] missing
+- room.players[1] missing
+- opponent undefined
+- currentPlayer undefined
+- gameState undefined
+- socket disconnected
+- player seat missing
+
+Add guard clauses and safe fallbacks.
+
+Example:
+if (!room) return socket.emit("errorMessage", "Room not found");
+if (!player) return socket.emit("errorMessage", "Player not found. Try reconnecting.");
+if (!room.players || room.players.length < 2) {
+  room.status = "waiting";
+  io.to(roomCode).emit("lobbyStatus", room);
+  return;
+}
+
+8. Add room health check
+Every 10 seconds, server should emit roomHealth:
+- roomCode
+- player count
+- connected players
+- disconnected players
+- game status
+- whose turn
+- whether room is ready
+
+Client should display simple health:
+“Room OK”
+“Waiting for opponent”
+“Opponent disconnected”
+“Room issue detected”
+
+9. Add error messages instead of silent failure
+Any failed socket action should show a visible message in the UI.
+Examples:
+- “Room not found”
+- “You were disconnected. Tap reconnect.”
+- “Opponent left the room”
+- “Game state missing. Host can reset room.”
+
+10. Preserve existing gameplay
+Do not break:
+- bidding
+- turn order
+- coin flip
+- card dealing
+- trick resolution
+- scoring
+- nil bids
+- spades breaking
+- last cards played
+- mobile layout
+
+After implementing, test these cases:
+A. Player creates room, second player joins.
+B. Player refreshes and rejoins same room.
+C. Opponent refreshes mid-game and returns.
+D. One player disconnects before bidding.
+E. One player disconnects during bidding.
+F. One player disconnects during a hand.
+G. Host resets room while opponent disconnected.
+H. Broken room can recreate a fresh room.
+I. No crash when a player is undefined.
+J. Mobile Safari works without layout breaking.
+
+Give me the exact files changed and summarize the fix.

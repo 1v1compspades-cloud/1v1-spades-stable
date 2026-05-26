@@ -51,6 +51,8 @@ export interface GameState {
   coinFlipWinner: 0 | 1 | null;
   /** Seat that bids first in Round 1 — always the coin toss loser. */
   firstBidderRound1: 0 | 1 | null;
+  /** Per-seat epoch-ms of last meaningful activity (join/reconnect/bid/play). */
+  lastActiveAt?: [number, number];
 }
 
 export const SUIT_SYMBOLS: Record<Suit, string> = {

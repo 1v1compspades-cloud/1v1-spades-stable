@@ -2,9 +2,12 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import { io, Socket } from "socket.io-client";
 import { GameState, Card } from "@/lib/game";
 
+export type SocketStatus = "connecting" | "online" | "reconnecting" | "offline";
+
 interface SocketContextType {
   socket: Socket | null;
   connected: boolean;
+  status: SocketStatus;
   gameState: GameState | null;
   error: string | null;
   connect: () => void;
@@ -16,6 +19,8 @@ interface SocketContextType {
   playCard: (code: string, card: Card) => Promise<void>;
   nextRound: (code: string) => void;
   newMatch: (code: string) => void;
+  resetRoom: (code: string) => Promise<void>;
+  clearGameState: () => void;
   joinAsSpectator: (code: string, name: string) => Promise<void>;
   reconnectAsSpectator: (code: string, name: string) => Promise<void>;
 }
@@ -25,16 +30,41 @@ const SocketContext = createContext<SocketContextType | null>(null);
 export function SocketProvider({ children }: { children: ReactNode }) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
+  const [status, setStatus] = useState<SocketStatus>("offline");
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const s = io({ path: "/socket.io", autoConnect: false });
+    const s = io({
+      path: "/socket.io",
+      autoConnect: false,
+      // Automatically retry forever with capped exponential backoff so brief
+      // network blips / phone-locks / proxy hiccups don't kill the session.
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 800,
+      reconnectionDelayMax: 4000,
+      timeout: 10000,
+    });
     setSocket(s);
 
-    s.on("connect", () => setConnected(true));
-    s.on("disconnect", () => setConnected(false));
-    
+    s.on("connect", () => {
+      setConnected(true);
+      setStatus("online");
+      setError(null);
+    });
+    s.on("disconnect", () => {
+      setConnected(false);
+      setStatus("reconnecting");
+      // Drop cached gameState so the Room's auto re-attach effect fires once
+      // the socket comes back (server has a fresh socketId for us).
+      setGameState(null);
+    });
+    s.io.on("reconnect_attempt", () => setStatus("reconnecting"));
+    s.io.on("reconnect", () => setStatus("online"));
+    s.io.on("reconnect_error", () => setStatus("reconnecting"));
+    s.io.on("reconnect_failed", () => setStatus("offline"));
+
     s.on("game_state", (state: GameState) => {
       setGameState(state);
       setError(null);
@@ -59,6 +89,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
   const connect = () => {
     if (socket && !socket.connected) {
+      setStatus("connecting");
       socket.connect();
     }
   };
@@ -127,6 +158,18 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     socket?.emit("new_match", { roomCode });
   };
 
+  const resetRoom = (roomCode: string) => {
+    return new Promise<void>((resolve, reject) => {
+      if (!socket) return reject("No socket");
+      socket.emit("reset_room", { roomCode }, (res: { ok: boolean; error?: string }) => {
+        if (res.ok) resolve();
+        else reject(res.error || "Could not reset room");
+      });
+    });
+  };
+
+  const clearGameState = () => setGameState(null);
+
   const joinAsSpectator = (roomCode: string, spectatorName: string) => {
     return new Promise<void>((resolve, reject) => {
       if (!socket) return reject("No socket");
@@ -159,6 +202,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     <SocketContext.Provider value={{
       socket,
       connected,
+      status,
       gameState,
       error,
       connect,
@@ -170,6 +214,8 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       playCard,
       nextRound,
       newMatch,
+      resetRoom,
+      clearGameState,
       joinAsSpectator,
       reconnectAsSpectator
     }}>

@@ -33,8 +33,9 @@ export default function Room() {
   const roomCode = params?.roomCode;
 
   const {
-    connected, gameState, connect, joinRoom, reconnect,
+    connected, status, gameState, connect, joinRoom, reconnect,
     startGame, placeBid, playCard, nextRound, newMatch,
+    resetRoom: doResetRoom,
     reconnectAsSpectator,
   } = useSocket();
   const {
@@ -45,6 +46,16 @@ export default function Room() {
 
   const [bidAmount, setBidAmount] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+
+  // Tick every 15s so AFK indicators re-render without depending on socket events.
+  const [now, setNow] = useState<number>(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 15000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const isHost = !isSpectator && playerIndex === 0;
 
   useEffect(() => {
     if (!roomCode) { setLocation("/"); return; }
@@ -75,9 +86,24 @@ export default function Room() {
   }, [connected, roomCode, playerName, gameState, playerIndex, isSpectator, reconnect, reconnectAsSpectator, joinRoom, setLocation, savePlayerIndex, saveIsSpectator, toast]);
 
   if (!gameState || (!isSpectator && playerIndex === null)) {
+    const label =
+      status === "reconnecting" ? "Reconnecting to table…" :
+      status === "offline"      ? "Connection lost. Trying to reconnect…" :
+      "Connecting to table…";
     return (
-      <div className="min-h-screen flex items-center justify-center text-muted-foreground">
-        Connecting to table...
+      <div className="min-h-screen flex flex-col items-center justify-center gap-6 text-muted-foreground relative px-4 text-center">
+        <div className="absolute top-2 right-2">
+          {renderStatusPill()}
+        </div>
+        <div className="animate-pulse">{label}</div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setLocation("/")}
+          data-testid="button-bail-to-lobby"
+        >
+          Back to lobby
+        </Button>
       </div>
     );
   }
@@ -146,6 +172,84 @@ export default function Room() {
   const handleLeaveSpectate = () => {
     saveIsSpectator(false);
     setLocation("/");
+  };
+
+  const handleResetRoom = async () => {
+    if (!isHost || !roomCode) return;
+    const ok = typeof window !== "undefined"
+      ? window.confirm("Reset this room? Scores and current hand will be cleared. Both players stay in the room.")
+      : true;
+    if (!ok) return;
+    setIsResetting(true);
+    try {
+      await doResetRoom(roomCode);
+      toast({ description: "Room reset. Click Start when ready." });
+    } catch (err: any) {
+      toast({
+        description: typeof err === "string" ? err : "Couldn't reset the room.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  // Soft AFK detection — never auto-forfeits. Returns null / "may" / "afk".
+  const afkLevelFor = (idx: 0 | 1): null | "may" | "afk" => {
+    const ts = gameState.lastActiveAt?.[idx];
+    if (!ts) return null;
+    // Only flag during phases where it's their turn to act
+    const isTheirTurnish =
+      (gameState.phase === "bidding" && gameState.currentBidder === idx) ||
+      (gameState.phase === "playing"  && gameState.currentTurnIndex === idx) ||
+      (gameState.phase === "round_over" && idx === 0) ||
+      (gameState.phase === "waiting"    && idx === 0);
+    if (!isTheirTurnish) return null;
+    const elapsed = now - ts;
+    if (elapsed >= 5 * 60_000) return "afk";
+    if (elapsed >= 2 * 60_000) return "may";
+    return null;
+  };
+
+  // Connection status pill — always rendered top-right of the room.
+  // Function declaration so it can be referenced from the early-return above
+  // (function declarations are hoisted within their enclosing function scope).
+  function renderStatusPill() {
+    const map: Record<typeof status, { label: string; cls: string; dot: string }> = {
+      online: {
+        label: "Online",
+        cls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
+        dot: "bg-emerald-400",
+      },
+      connecting: {
+        label: "Connecting…",
+        cls: "border-yellow-500/40 bg-yellow-500/10 text-yellow-300",
+        dot: "bg-yellow-400 animate-pulse",
+      },
+      reconnecting: {
+        label: "Reconnecting…",
+        cls: "border-yellow-500/40 bg-yellow-500/10 text-yellow-300",
+        dot: "bg-yellow-400 animate-pulse",
+      },
+      offline: {
+        label: "Offline",
+        cls: "border-red-500/40 bg-red-500/10 text-red-300",
+        dot: "bg-red-400",
+      },
+    };
+    const v = map[status];
+    return (
+      <div
+        data-testid="connection-status"
+        className={cn(
+          "absolute top-2 right-2 z-[60] flex items-center gap-1.5 px-2 py-1 rounded-full border text-[10px] font-semibold uppercase tracking-widest backdrop-blur-sm pointer-events-none",
+          v.cls
+        )}
+      >
+        <span className={cn("inline-block w-1.5 h-1.5 rounded-full", v.dot)} />
+        {v.label}
+      </div>
+    );
   };
 
   // ── Status banner ──────────────────────────────────────────────────────────
@@ -264,6 +368,7 @@ export default function Room() {
     const isTurn  = gameState.phase === "playing" && gameState.currentTurnIndex === idx;
     const isBidding = gameState.phase === "bidding" && gameState.currentBidder === idx;
     const isActive = isTurn || isBidding;
+    const afk = afkLevelFor(idx);
 
     return (
       <div
@@ -292,6 +397,24 @@ export default function Room() {
             <Badge variant="outline" className="text-xs tabular-nums text-muted-foreground">
               {gameState.handSizes?.[idx] ?? 0} cards
             </Badge>
+            {afk === "may" && !isMe && (
+              <Badge
+                data-testid={`afk-badge-seat-${idx + 1}`}
+                variant="outline"
+                className="text-xs border-yellow-500/60 text-yellow-300"
+              >
+                ⏳ May be AFK
+              </Badge>
+            )}
+            {afk === "afk" && !isMe && (
+              <Badge
+                data-testid={`afk-badge-seat-${idx + 1}`}
+                variant="outline"
+                className="text-xs border-red-500/60 text-red-300"
+              >
+                ⚠ AFK
+              </Badge>
+            )}
           </div>
         </div>
 
@@ -381,6 +504,33 @@ export default function Room() {
           <div className="text-center space-y-2">
             <div className="animate-pulse text-muted-foreground">Waiting for Player 2…</div>
             <p className="text-xs text-muted-foreground">Give them the room code above</p>
+          </div>
+        )}
+
+        {isHost && (
+          <div className="w-full max-w-xs pt-2 space-y-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResetRoom}
+              disabled={isResetting}
+              data-testid="button-reset-room"
+              className="w-full"
+            >
+              {isResetting ? "Resetting…" : "↺ Reset Room"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setLocation("/")}
+              data-testid="button-leave-room"
+              className="w-full text-muted-foreground"
+            >
+              Leave room
+            </Button>
+            <p className="text-[10px] text-muted-foreground text-center px-2">
+              Stuck? Reset clears state and keeps both players in this room. Leave to create a fresh room from the lobby.
+            </p>
           </div>
         )}
       </div>
@@ -927,9 +1077,29 @@ export default function Room() {
   // Spectator: never see the waiting screen as theirs — show a neutral version
   // Spectator that joined before host hits "Start" — show waiting screen.
   // (Coin toss and beyond render the normal table layout with overlay.)
+  // Host-only floating "Reset Room" — visible during play (not waiting/game_over,
+  // since those screens already have their own host actions).
+  const showHostResetFab =
+    isHost &&
+    gameState.phase !== "waiting" &&
+    gameState.phase !== "game_over";
+
+  const renderHostResetFab = () => (
+    <button
+      type="button"
+      onClick={handleResetRoom}
+      disabled={isResetting}
+      data-testid="button-reset-room-fab"
+      className="absolute bottom-[calc(env(safe-area-inset-bottom)+6.5rem)] right-3 z-[55] px-3 py-1.5 rounded-full border border-red-500/40 bg-black/70 text-red-300 text-[10px] font-semibold uppercase tracking-widest backdrop-blur-sm shadow-lg hover:bg-red-500/10 active:scale-95 transition disabled:opacity-50"
+    >
+      {isResetting ? "Resetting…" : "↺ Reset Room"}
+    </button>
+  );
+
   if (spectator && gameState.phase === "waiting") {
     return (
       <div className="h-[100dvh] flex flex-col bg-background overflow-hidden relative">
+        {renderStatusPill()}
         {renderSpectatorWaiting()}
         {renderSpectatorFooter()}
       </div>
@@ -938,6 +1108,7 @@ export default function Room() {
 
   return (
     <div className="h-[100dvh] flex flex-col bg-background overflow-hidden relative">
+      {renderStatusPill()}
       {!spectator && gameState.phase === "waiting" ? (
         renderWaiting()
       ) : (
@@ -947,6 +1118,7 @@ export default function Room() {
           {renderTable()}
           {renderPlayerInfo(bottomIndex)}
           {spectator ? renderSpectatorFooter() : renderMyHand()}
+          {showHostResetFab && renderHostResetFab()}
         </>
       )}
     </div>

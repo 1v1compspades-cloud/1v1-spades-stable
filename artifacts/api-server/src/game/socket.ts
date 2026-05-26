@@ -13,6 +13,7 @@ import {
   getRoomBySocketId,
   reconnectPlayer,
   resetMatch,
+  resetRoom,
   addSpectator,
   reconnectSpectator,
   performCoinToss,
@@ -54,6 +55,7 @@ function sanitizeStateForPlayer(
     lastCompletedTrick: state.lastCompletedTrick,
     coinFlipWinner: state.coinFlipWinner,
     firstBidderRound1: state.firstBidderRound1,
+    lastActiveAt: state.lastActiveAt,
   };
 }
 
@@ -87,6 +89,7 @@ function sanitizeStateForSpectator(state: GameState): Record<string, unknown> {
     lastCompletedTrick: state.lastCompletedTrick,
     coinFlipWinner: state.coinFlipWinner,
     firstBidderRound1: state.firstBidderRound1,
+    lastActiveAt: state.lastActiveAt,
   };
 }
 
@@ -467,6 +470,25 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           callback({ ok: false, error: msg });
+        }
+      }
+    );
+
+    socket.on(
+      "reset_room",
+      (
+        data: { roomCode: string },
+        callback?: (res: { ok: boolean; error?: string }) => void
+      ) => {
+        try {
+          const code = data.roomCode.toUpperCase().trim();
+          const state = resetRoom(code, socket.id);
+          logger.info({ roomCode: code }, "Room reset by host");
+          callback?.({ ok: true });
+          broadcastState(io, state);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
         }
       }
     );

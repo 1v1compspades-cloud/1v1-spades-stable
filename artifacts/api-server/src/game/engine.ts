@@ -95,6 +95,12 @@ export interface GameState {
    * first bidder by simple parity, without re-flipping.
    */
   firstBidderRound1: 0 | 1 | null;
+  /**
+   * Per-seat timestamp (epoch ms) of the last meaningful activity from that
+   * player: join, reconnect, bid, or card played. Used by the client to
+   * surface a soft AFK indicator. Never used to auto-forfeit.
+   */
+  lastActiveAt: [number, number];
 }
 
 function makeRoomCode(): string {
@@ -133,6 +139,7 @@ export function createGame(roomCode: string, matchTarget = 250, matchLabel?: str
     lastCompletedTrick: [],
     coinFlipWinner: null,
     firstBidderRound1: null,
+    lastActiveAt: [Date.now(), Date.now()],
   };
 }
 
@@ -220,7 +227,28 @@ export function resetMatch(state: GameState): GameState {
     // New match → re-toss the coin
     coinFlipWinner: null,
     firstBidderRound1: null,
+    lastActiveAt: [Date.now(), Date.now()],
   };
+}
+
+/**
+ * Host-triggered hard reset: clear all match state but keep both player
+ * seats (and the room code) so the same two players can immediately replay
+ * without re-sharing the code. Equivalent to `resetMatch` followed by
+ * forcing phase back to "waiting" so the host re-clicks "Start".
+ */
+export function resetRoom(
+  roomCode: string,
+  requesterSocketId: string
+): GameState {
+  const state = rooms.get(roomCode);
+  if (!state) throw new Error("Room not found");
+  if (state.players[0]?.socketId !== requesterSocketId) {
+    throw new Error("Only the host can reset the room");
+  }
+  const reset = resetMatch(state);
+  rooms.set(roomCode, reset);
+  return reset;
 }
 
 export function placeBid(
@@ -237,6 +265,9 @@ export function placeBid(
 
   const newBids = [...state.bids] as (number | null)[];
   newBids[playerIndex] = amount;
+
+  const newLastActive: [number, number] = [...state.lastActiveAt] as [number, number];
+  newLastActive[playerIndex] = Date.now();
 
   const otherIndex = playerIndex === 0 ? 1 : 0;
   const bothBid = newBids[otherIndex] !== null;
@@ -255,6 +286,7 @@ export function placeBid(
     currentTurnIndex: bothBid ? firstBidder : null,
     leadPlayerIndex: bothBid ? firstBidder : state.leadPlayerIndex,
     trickLeader: bothBid ? firstBidder : state.trickLeader,
+    lastActiveAt: newLastActive,
   };
 
   return { state: newState, bothBid };
@@ -333,12 +365,16 @@ export function playCard(
     { card, playerIndex },
   ];
 
+  const newLastActive: [number, number] = [...state.lastActiveAt] as [number, number];
+  newLastActive[playerIndex] = Date.now();
+
   let newState: GameState = {
     ...state,
     hands: newHands,
     currentTrick: newTrick,
     spadesBroken: state.spadesBroken || card.suit === "spades",
     lastCardPlayed: { card, playerIndex },
+    lastActiveAt: newLastActive,
   };
 
   if (newTrick.length < 2) {
@@ -548,6 +584,7 @@ export function joinRoom(
     index: 1,
   };
   state.players[1] = joiner;
+  state.lastActiveAt[1] = Date.now();
   rooms.set(roomCode, state);
   return { state, playerIndex: 1 };
 }
@@ -650,6 +687,7 @@ export function reconnectPlayer(
     player.id = newSocketId;
   }
 
+  state.lastActiveAt[playerIndex] = Date.now();
   rooms.set(roomCode, state);
   return state;
 }
