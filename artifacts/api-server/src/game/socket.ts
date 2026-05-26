@@ -96,6 +96,51 @@ function sanitizeStateForSpectator(state: GameState): Record<string, unknown> {
   };
 }
 
+/** Duration of the visual shuffle + deal animation between phases. */
+const SHUFFLE_ANIMATION_MS = 2600;
+
+/**
+ * Reveal a freshly-dealt round in two steps:
+ *   1. Broadcast as `phase: "shuffling"` so clients play the shuffle/deal
+ *      animation while hiding the new hand.
+ *   2. After SHUFFLE_ANIMATION_MS, broadcast the real `phase: "bidding"`
+ *      state and emit `round_started`.
+ *
+ * Bids placed during step (1) are rejected by the socket handler's phase
+ * guard, so this is safe even though the dealt state has currentBidder set.
+ */
+function dealWithShuffleAnimation(
+  io: SocketIOServer,
+  roomCode: string,
+  dealt: GameState
+): void {
+  const shuffling: GameState = { ...dealt, phase: "shuffling" };
+  updateRoom(shuffling);
+  broadcastState(io, shuffling);
+
+  setTimeout(() => {
+    try {
+      const current = getRoom(roomCode);
+      if (!current || current.phase !== "shuffling") return;
+      const ready: GameState = { ...current, phase: "bidding" };
+      updateRoom(ready);
+      broadcastState(io, ready);
+      const firstBidder = ready.currentBidder;
+      for (let i = 0; i < 2; i++) {
+        const p = ready.players[i];
+        if (p) {
+          io.to(p.socketId).emit("round_started", {
+            roundNumber: ready.roundNumber,
+            yourBidTurn: i === firstBidder,
+          });
+        }
+      }
+    } catch (err: unknown) {
+      logger.error({ err, roomCode }, "Error transitioning from shuffling to bidding");
+    }
+  }, SHUFFLE_ANIMATION_MS);
+}
+
 /**
  * Broadcast game_state to both players AND all spectators.
  * Each gets a view sanitized for their role.
@@ -208,18 +253,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           const cur = getRoom(data.roomCode);
           if (!cur || cur.phase !== "coin_toss") return;
           const dealt = startRound(cur);
-          updateRoom(dealt);
-          broadcastState(io, dealt);
-          const firstBidder = dealt.currentBidder;
-          for (let i = 0; i < 2; i++) {
-            const p = dealt.players[i];
-            if (p) {
-              io.to(p.socketId).emit("round_started", {
-                roundNumber: dealt.roundNumber,
-                yourBidTurn: i === firstBidder,
-              });
-            }
-          }
+          dealWithShuffleAnimation(io, data.roomCode, dealt);
         }, 3500);
       } catch (err: unknown) {
         logger.error({ err }, "Error starting game");
@@ -240,6 +274,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
             (p) => p?.socketId === socket.id
           ) as 0 | 1;
           if (playerIndex < 0) throw new Error("Player not found");
+          if (state.phase !== "bidding") throw new Error("Not in bidding phase");
 
           const { state: newState, bothBid } = placeBid(state, playerIndex, data.amount);
           updateRoom(newState);
@@ -339,19 +374,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         if (state.players[0]?.socketId !== socket.id) return;
 
         const newState = startRound(state);
-        updateRoom(newState);
-
-        const firstBidder = newState.currentBidder;
-        broadcastState(io, newState);
-        for (let i = 0; i < 2; i++) {
-          const p = newState.players[i];
-          if (p) {
-            io.to(p.socketId).emit("round_started", {
-              roundNumber: newState.roundNumber,
-              yourBidTurn: i === firstBidder,
-            });
-          }
-        }
+        dealWithShuffleAnimation(io, data.roomCode, newState);
       } catch (err: unknown) {
         logger.error({ err }, "Error advancing round");
       }
@@ -410,18 +433,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
             const current = getRoom(data.roomCode);
             if (!current || current.phase !== "coin_toss") return;
             const dealt = startRound(current);
-            updateRoom(dealt);
-            const firstBidder = dealt.currentBidder;
-            broadcastState(io, dealt);
-            for (let i = 0; i < 2; i++) {
-              const p = dealt.players[i];
-              if (p) {
-                io.to(p.socketId).emit("round_started", {
-                  roundNumber: dealt.roundNumber,
-                  yourBidTurn: i === firstBidder,
-                });
-              }
-            }
+            dealWithShuffleAnimation(io, data.roomCode, dealt);
           } catch (err: unknown) {
             logger.error({ err }, "Error dealing first round of new match");
           }

@@ -3,6 +3,7 @@ import { useRoute, useLocation } from "wouter";
 import { useSocket } from "@/hooks/useSocket";
 import { useGameStorage } from "@/hooks/useGameStorage";
 import { CardComponent } from "@/components/Card";
+import { ShuffleOverlay } from "@/components/ShuffleOverlay";
 import { isCardPlayable, sortHandBySuit, SUIT_SYMBOLS, SUIT_COLORS } from "@/lib/game";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -875,6 +876,9 @@ export default function Room() {
             {renderLastTrickMini()}
           </div>
         </div>
+
+        {/* Shuffle / deal animation — shown to all roles for ~2.6s before each round */}
+        {gameState.phase === "shuffling" && <ShuffleOverlay />}
 
         {/* Coin toss overlay — shown to all roles for ~3.5s, server transitions to bidding */}
         {gameState.phase === "coin_toss" && gameState.coinFlipWinner !== null && (() => {

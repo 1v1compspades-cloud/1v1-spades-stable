@@ -11,6 +11,7 @@ import {
 export type GamePhase =
   | "waiting"
   | "coin_toss"
+  | "shuffling"
   | "bidding"
   | "playing"
   | "round_over"
