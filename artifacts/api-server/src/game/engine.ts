@@ -101,6 +101,12 @@ export interface GameState {
    * surface a soft AFK indicator. Never used to auto-forfeit.
    */
   lastActiveAt: [number, number];
+  /**
+   * Per-seat ready flag for the pre-match lobby. Both must be true before
+   * the host can press "Start Match" (server enforces). Reset on
+   * resetMatch / disconnect so a fresh opponent has to ready up again.
+   */
+  ready: [boolean, boolean];
 }
 
 function makeRoomCode(): string {
@@ -140,6 +146,7 @@ export function createGame(roomCode: string, matchTarget = 250, matchLabel?: str
     coinFlipWinner: null,
     firstBidderRound1: null,
     lastActiveAt: [Date.now(), Date.now()],
+    ready: [false, false],
   };
 }
 
@@ -228,7 +235,32 @@ export function resetMatch(state: GameState): GameState {
     coinFlipWinner: null,
     firstBidderRound1: null,
     lastActiveAt: [Date.now(), Date.now()],
+    ready: [false, false],
   };
+}
+
+/**
+ * Toggle/set the ready flag for a seat. Only meaningful in "waiting" phase;
+ * silently no-ops otherwise so a late `set_ready` race after Start can't
+ * corrupt mid-game state.
+ */
+export function setPlayerReady(
+  roomCode: string,
+  socketId: string,
+  value: boolean
+): GameState {
+  const state = rooms.get(roomCode);
+  if (!state) throw new Error("Room not found");
+  const idx = state.players.findIndex((p) => p?.socketId === socketId);
+  if (idx < 0) throw new Error("Player not found");
+  if (state.phase !== "waiting") {
+    // No-op outside the lobby; just return current state so the broadcast
+    // reflects truth without throwing.
+    return state;
+  }
+  state.ready[idx as 0 | 1] = !!value;
+  rooms.set(roomCode, state);
+  return state;
 }
 
 /**
@@ -604,6 +636,11 @@ export function removePlayerFromRoom(socketId: string): GameState | null {
         // Null out the slot but preserve phase — reconnectPlayer will restore the seat.
         // We intentionally do NOT set phase = "game_over" so the room stays recoverable.
         state.players[i] = null;
+        // Clear ready so a fresh opponent (or the same one on reconnect) has
+        // to re-ready before the host can start. Only meaningful in waiting phase.
+        if (state.phase === "waiting") {
+          state.ready[i as 0 | 1] = false;
+        }
         return state;
       }
     }

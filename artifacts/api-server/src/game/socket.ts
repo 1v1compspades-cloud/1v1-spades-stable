@@ -14,6 +14,7 @@ import {
   reconnectPlayer,
   resetMatch,
   resetRoom,
+  setPlayerReady,
   addSpectator,
   reconnectSpectator,
   performCoinToss,
@@ -56,6 +57,7 @@ function sanitizeStateForPlayer(
     coinFlipWinner: state.coinFlipWinner,
     firstBidderRound1: state.firstBidderRound1,
     lastActiveAt: state.lastActiveAt,
+    ready: state.ready,
   };
 }
 
@@ -90,6 +92,7 @@ function sanitizeStateForSpectator(state: GameState): Record<string, unknown> {
     coinFlipWinner: state.coinFlipWinner,
     firstBidderRound1: state.firstBidderRound1,
     lastActiveAt: state.lastActiveAt,
+    ready: state.ready,
   };
 }
 
@@ -190,6 +193,8 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         if (!state.players[1]) return;
         // Only meaningful from "waiting" phase.
         if (state.phase !== "waiting") return;
+        // Both players must have readied up.
+        if (!state.ready[0] || !state.ready[1]) return;
 
         // Step 1: flip the coin once and broadcast the result.
         const tossed = performCoinToss(state);
@@ -470,6 +475,24 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           callback({ ok: false, error: msg });
+        }
+      }
+    );
+
+    socket.on(
+      "set_ready",
+      (
+        data: { roomCode: string; ready: boolean },
+        callback?: (res: { ok: boolean; error?: string }) => void
+      ) => {
+        try {
+          const code = data.roomCode.toUpperCase().trim();
+          const state = setPlayerReady(code, socket.id, !!data.ready);
+          callback?.({ ok: true });
+          broadcastState(io, state);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
         }
       }
     );

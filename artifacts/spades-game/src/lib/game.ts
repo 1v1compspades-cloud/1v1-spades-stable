@@ -53,6 +53,8 @@ export interface GameState {
   firstBidderRound1: 0 | 1 | null;
   /** Per-seat epoch-ms of last meaningful activity (join/reconnect/bid/play). */
   lastActiveAt?: [number, number];
+  /** Per-seat ready flag for the pre-match lobby. */
+  ready?: [boolean, boolean];
 }
 
 export const SUIT_SYMBOLS: Record<Suit, string> = {

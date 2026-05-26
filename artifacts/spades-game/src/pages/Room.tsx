@@ -36,6 +36,7 @@ export default function Room() {
     connected, status, gameState, connect, joinRoom, reconnect,
     startGame, placeBid, playCard, nextRound, newMatch,
     resetRoom: doResetRoom,
+    setReady: doSetReady,
     reconnectAsSpectator,
   } = useSocket();
   const {
@@ -192,6 +193,19 @@ export default function Room() {
   const handleLeaveSpectate = () => {
     saveIsSpectator(false);
     setLocation("/");
+  };
+
+  const handleToggleReady = async () => {
+    if (!roomCode || playerIndex === null) return;
+    const current = gameState?.ready?.[playerIndex] ?? false;
+    try {
+      await doSetReady(roomCode, !current);
+    } catch (err: any) {
+      toast({
+        description: typeof err === "string" ? err : "Couldn't update ready status.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleResetRoom = async () => {
@@ -456,138 +470,324 @@ export default function Room() {
     );
   };
 
-  // ── Waiting screen (players only — spectators bypass this) ─────────────────
-  const renderWaiting = () => {
-    const opponent = gameState.players[playerIndex === 0 ? 1 : 0];
+  // ── Shared lobby pieces (used by both player + spectator waiting screens) ──
+  const matchSettingsItems: { label: string; value: string }[] = [
+    { label: "Race to", value: String(gameState?.matchTarget ?? 250) },
+    { label: "Nil bids", value: "Allowed (±125)" },
+    { label: "Hidden hands", value: "Enforced" },
+    { label: "Anti-cheat", value: "Server-authoritative" },
+  ];
+
+  const renderMatchSettingsCard = () => (
+    <div
+      data-testid="lobby-match-settings"
+      className="rounded-xl border border-primary/30 bg-black/40 p-4 space-y-3 shadow-inner"
+    >
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-widest text-primary/90">
+          Match Settings
+        </h3>
+        {gameState.matchLabel && (
+          <span
+            data-testid="match-label"
+            className="px-2 py-0.5 rounded-full border border-primary/40 bg-primary/10 text-primary text-[10px] font-semibold uppercase tracking-widest truncate max-w-[60%]"
+          >
+            {gameState.matchLabel}
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+        {matchSettingsItems.map((it) => (
+          <div key={it.label} className="text-[11px] leading-tight">
+            <div className="text-muted-foreground uppercase tracking-wider">{it.label}</div>
+            <div className="text-foreground font-semibold">{it.value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderPlayerPanel = (seatIdx: 0 | 1, opts?: { selfIndex?: 0 | 1 | null }) => {
+    const p = gameState.players[seatIdx];
+    const ready = !!gameState.ready?.[seatIdx];
+    const isSelf = opts?.selfIndex === seatIdx;
+    const seatLabel = `Player ${seatIdx + 1}`;
     return (
-      <div className="flex flex-col items-center justify-center h-full space-y-8 px-4">
-        <div className="text-center space-y-3 w-full max-w-xs">
-          {gameState.matchLabel && (
-            <div
-              data-testid="match-label"
-              className="inline-block px-3 py-1 rounded-full border border-primary/40 bg-primary/10 text-primary text-xs font-semibold uppercase tracking-widest"
+      <div
+        data-testid={`lobby-player-panel-${seatIdx}`}
+        className={cn(
+          "rounded-xl border p-4 flex flex-col gap-2 min-h-[140px] transition-colors",
+          p
+            ? ready
+              ? "border-emerald-500/60 bg-emerald-500/[0.06]"
+              : "border-primary/40 bg-white/[0.03]"
+            : "border-dashed border-border bg-white/[0.02]",
+        )}
+      >
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            {seatLabel}{isSelf ? " · You" : ""}{seatIdx === 0 ? " · Host" : ""}
+          </span>
+          {p && (
+            <span
+              data-testid={`lobby-ready-status-${seatIdx}`}
+              className={cn(
+                "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest border",
+                ready
+                  ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300"
+                  : "border-yellow-500/50 bg-yellow-500/10 text-yellow-300",
+              )}
             >
-              {gameState.matchLabel}
+              {ready ? "✓ Ready" : "Not ready"}
+            </span>
+          )}
+        </div>
+        <div className="flex-1 flex items-center">
+          {p ? (
+            <div className="font-serif text-xl font-bold text-primary truncate">
+              {p.name}
+            </div>
+          ) : (
+            <div className="text-muted-foreground italic text-sm animate-pulse">
+              Waiting for player…
             </div>
           )}
-          <p className="text-xs text-muted-foreground uppercase tracking-widest">{`Seat ${(playerIndex as number) + 1} · You`}</p>
-          <h2 className="text-2xl font-serif text-primary">Room Code</h2>
-          <div className="text-5xl font-mono tracking-widest font-bold bg-background p-6 rounded-lg border-2 border-primary shadow-[0_0_15px_rgba(234,179,8,0.2)]">
-            {roomCode}
-          </div>
-          <div className="grid grid-cols-1 gap-2 pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => copyToClipboard(roomCode!, "Room code")}
-              data-testid="button-copy-code"
-            >
-              📋 Copy Room Code
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => copyToClipboard(buildLink(false), "Player invite link")}
-              data-testid="button-copy-player-link"
-            >
-              🔗 Copy Player Invite Link
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => copyToClipboard(buildLink(true), "Spectator link")}
-              data-testid="button-copy-spectator-link"
-            >
-              👀 Copy Spectator Link
-            </Button>
-          </div>
         </div>
+      </div>
+    );
+  };
 
-        {opponent ? (
-          <div className="space-y-4 text-center w-full max-w-xs">
-            <div className="bg-white/5 rounded-lg p-4 border border-border space-y-1">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">Opponent joined</p>
-              <p className="text-xl font-serif font-bold text-primary">{opponent.name}</p>
+  // ── Waiting screen (players only — spectators bypass this) ─────────────────
+  const renderWaiting = () => {
+    const me = playerIndex !== null ? gameState.players[playerIndex] : null;
+    const opponentIdx: 0 | 1 = playerIndex === 0 ? 1 : 0;
+    const opponent = gameState.players[opponentIdx];
+    const myReady    = !!gameState.ready?.[playerIndex as 0 | 1];
+    const oppReady   = !!gameState.ready?.[opponentIdx];
+    const bothPresent = !!me && !!opponent;
+    const bothReady   = bothPresent && myReady && oppReady;
+    const canStart    = isHost && bothReady;
+
+    const statusMsg = !opponent
+      ? "Waiting for opponent…"
+      : !bothReady
+        ? "Waiting for both players to ready up…"
+        : "Ready to start.";
+    const statusTone = !opponent
+      ? "text-muted-foreground"
+      : !bothReady
+        ? "text-yellow-300"
+        : "text-emerald-300";
+
+    return (
+      <div className="flex-1 overflow-y-auto px-4 py-6 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
+        <div className="mx-auto w-full max-w-2xl">
+          <div className="rounded-2xl border-2 border-primary/40 bg-gradient-to-b from-emerald-950/70 via-emerald-950/40 to-black/70 shadow-[0_10px_60px_-10px_rgba(234,179,8,0.25)] backdrop-blur-sm overflow-hidden">
+            {/* Header */}
+            <div className="px-5 pt-6 pb-4 text-center border-b border-primary/20">
+              <div className="flex items-center justify-center gap-2 text-base mb-2" aria-hidden>
+                <span className="text-primary">♠</span>
+                <span className="text-red-500">♥</span>
+                <span className="text-blue-500">♦</span>
+                <span className="text-emerald-500">♣</span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-serif font-bold text-primary tracking-wider drop-shadow-[0_2px_8px_rgba(234,179,8,0.25)]">
+                1v1 Competitive Spades
+              </h1>
+              <p className="text-[11px] uppercase tracking-widest text-muted-foreground mt-1">
+                Pre-match lobby
+              </p>
             </div>
-            {playerIndex === 0 ? (
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">A coin flip will decide who bids first.</p>
-                <Button size="lg" onClick={handleStartGame} className="w-full text-lg h-14">
-                  Flip Coin &amp; Start
+
+            {/* Room code + invite */}
+            <div className="px-5 pt-5 pb-4 space-y-3 border-b border-primary/20">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground text-center">
+                Room Code
+              </p>
+              <div
+                data-testid="lobby-room-code"
+                className="text-4xl sm:text-5xl font-mono tracking-[0.3em] font-bold text-center text-primary bg-black/50 py-4 rounded-lg border-2 border-primary/50 shadow-[inset_0_0_20px_rgba(234,179,8,0.15)] select-all"
+              >
+                {roomCode}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => copyToClipboard(buildLink(false), "Invite link")}
+                  data-testid="button-copy-invite-link"
+                  className="min-h-[44px] border-primary/40 hover:bg-primary/10"
+                >
+                  🔗 Copy Invite Link
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => copyToClipboard(buildLink(true), "Spectator link")}
+                  data-testid="button-copy-spectator-link"
+                  className="min-h-[44px]"
+                >
+                  👀 Copy Spectator Link
                 </Button>
               </div>
-            ) : (
-              <p className="text-muted-foreground italic text-sm">Waiting for host to start the game…</p>
-            )}
-          </div>
-        ) : (
-          <div className="text-center space-y-2">
-            <div className="animate-pulse text-muted-foreground">Waiting for Player 2…</div>
-            <p className="text-xs text-muted-foreground">Give them the room code above</p>
-          </div>
-        )}
+            </div>
 
-        {isHost && (
-          <div className="w-full max-w-xs pt-2 space-y-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleResetRoom}
-              disabled={isResetting}
-              data-testid="button-reset-room"
-              className="w-full"
-            >
-              {isResetting ? "Resetting…" : "↺ Reset Room"}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setLocation("/")}
-              data-testid="button-leave-room"
-              className="w-full text-muted-foreground"
-            >
-              Leave room
-            </Button>
-            <p className="text-[10px] text-muted-foreground text-center px-2">
-              Stuck? Reset clears state and keeps both players in this room. Leave to create a fresh room from the lobby.
-            </p>
+            {/* Player panels */}
+            <div className="px-5 py-5 space-y-3 border-b border-primary/20">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                Players
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {renderPlayerPanel(0, { selfIndex: playerIndex })}
+                {renderPlayerPanel(1, { selfIndex: playerIndex })}
+              </div>
+            </div>
+
+            {/* Match settings */}
+            <div className="px-5 py-5 border-b border-primary/20">
+              {renderMatchSettingsCard()}
+            </div>
+
+            {/* Status + actions */}
+            <div className="px-5 pt-4 pb-6 space-y-3">
+              <div
+                data-testid="lobby-status-message"
+                className={cn(
+                  "text-center text-sm font-semibold tracking-wide",
+                  statusTone,
+                )}
+              >
+                {statusMsg}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <Button
+                  onClick={handleToggleReady}
+                  data-testid="button-ready-up"
+                  className={cn(
+                    "min-h-[48px] text-base font-bold tracking-wide active:scale-[0.98] transition-transform",
+                    myReady
+                      ? "bg-emerald-600 hover:bg-emerald-600/90 text-white"
+                      : "bg-primary hover:bg-primary/90",
+                  )}
+                >
+                  {myReady ? "✓ Ready (Tap to Cancel)" : "Ready Up"}
+                </Button>
+                {isHost ? (
+                  <Button
+                    onClick={handleStartGame}
+                    disabled={!canStart}
+                    data-testid="button-start-match"
+                    variant="default"
+                    className="min-h-[48px] text-base font-bold tracking-wide bg-amber-500 hover:bg-amber-500/90 text-black disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed active:scale-[0.98] transition-transform"
+                  >
+                    Start Match
+                  </Button>
+                ) : (
+                  <div
+                    className="min-h-[48px] flex items-center justify-center text-xs text-muted-foreground italic border border-dashed border-border rounded-md"
+                    data-testid="lobby-host-only-hint"
+                  >
+                    Host controls the start
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                {isHost && (
+                  <Button
+                    variant="outline"
+                    onClick={handleResetRoom}
+                    disabled={isResetting}
+                    data-testid="button-reset-room"
+                    className="min-h-[44px]"
+                  >
+                    {isResetting ? "Resetting…" : "↺ Reset Room"}
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  onClick={() => setLocation("/")}
+                  data-testid="button-leave-room"
+                  className={cn(
+                    "min-h-[44px] text-muted-foreground hover:text-foreground",
+                    !isHost && "sm:col-span-2",
+                  )}
+                >
+                  Leave Room
+                </Button>
+              </div>
+
+              {isHost && !bothReady && opponent && (
+                <p className="text-[10px] text-muted-foreground text-center px-2">
+                  Start Match unlocks once both players are ready.
+                </p>
+              )}
+            </div>
           </div>
-        )}
+        </div>
       </div>
     );
   };
 
   // ── Spectator waiting screen ──────────────────────────────────────────────
   const renderSpectatorWaiting = () => (
-    <div className="flex flex-col items-center justify-center h-full space-y-6 px-4 text-center">
-      <Badge variant="outline" className="border-primary/40 text-primary uppercase tracking-widest text-xs">
-        Spectator
-      </Badge>
-      <div>
-        {gameState.matchLabel && (
-          <div
-            data-testid="match-label"
-            className="inline-block px-3 py-1 mb-2 rounded-full border border-primary/40 bg-primary/10 text-primary text-xs font-semibold uppercase tracking-widest"
-          >
-            {gameState.matchLabel}
+    <div className="flex-1 overflow-y-auto px-4 py-6 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
+      <div className="mx-auto w-full max-w-2xl">
+        <div className="rounded-2xl border-2 border-primary/40 bg-gradient-to-b from-emerald-950/70 via-emerald-950/40 to-black/70 shadow-[0_10px_60px_-10px_rgba(234,179,8,0.25)] backdrop-blur-sm overflow-hidden">
+          <div className="px-5 pt-6 pb-4 text-center border-b border-primary/20">
+            <Badge variant="outline" className="border-primary/40 text-primary uppercase tracking-widest text-[10px] mb-2">
+              Spectator
+            </Badge>
+            <h1 className="text-2xl sm:text-3xl font-serif font-bold text-primary tracking-wider">
+              1v1 Competitive Spades
+            </h1>
+            <p className="text-[11px] uppercase tracking-widest text-muted-foreground mt-1">
+              Watching room
+            </p>
           </div>
-        )}
-        <p className="text-xs text-muted-foreground uppercase tracking-widest">Watching room</p>
-        <div className="text-4xl font-mono tracking-widest font-bold mt-2">{roomCode}</div>
-      </div>
-      <p className="text-muted-foreground text-sm max-w-xs">
-        Waiting for the players to start. You'll see all the action — hands stay hidden.
-      </p>
-      <div className="w-full max-w-xs grid grid-cols-1 gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => copyToClipboard(buildLink(true), "Spectator link")}
-          data-testid="button-copy-spectator-link"
-        >
-          👀 Copy Spectator Link
-        </Button>
-        <Button variant="outline" onClick={handleLeaveSpectate}>Leave</Button>
+
+          <div className="px-5 pt-5 pb-4 space-y-3 border-b border-primary/20">
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground text-center">
+              Room Code
+            </p>
+            <div className="text-4xl sm:text-5xl font-mono tracking-[0.3em] font-bold text-center text-primary bg-black/50 py-4 rounded-lg border-2 border-primary/50 shadow-[inset_0_0_20px_rgba(234,179,8,0.15)] select-all">
+              {roomCode}
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => copyToClipboard(buildLink(true), "Spectator link")}
+              data-testid="button-copy-spectator-link"
+              className="w-full min-h-[44px]"
+            >
+              👀 Copy Spectator Link
+            </Button>
+          </div>
+
+          <div className="px-5 py-5 space-y-3 border-b border-primary/20">
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Players</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {renderPlayerPanel(0)}
+              {renderPlayerPanel(1)}
+            </div>
+          </div>
+
+          <div className="px-5 py-5 border-b border-primary/20">
+            {renderMatchSettingsCard()}
+          </div>
+
+          <div className="px-5 pt-4 pb-6 space-y-3">
+            <p className="text-center text-sm text-muted-foreground">
+              Waiting for the players to start. Hands stay hidden — you'll see bids, tricks, and scores live.
+            </p>
+            <Button
+              variant="ghost"
+              onClick={handleLeaveSpectate}
+              data-testid="button-leave-spectate"
+              className="w-full min-h-[44px] text-muted-foreground hover:text-foreground"
+            >
+              Leave Room
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

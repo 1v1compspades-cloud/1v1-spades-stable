@@ -20,6 +20,7 @@ interface SocketContextType {
   nextRound: (code: string) => void;
   newMatch: (code: string) => void;
   resetRoom: (code: string) => Promise<void>;
+  setReady: (code: string, ready: boolean) => Promise<void>;
   clearGameState: () => void;
   joinAsSpectator: (code: string, name: string) => Promise<void>;
   reconnectAsSpectator: (code: string, name: string) => Promise<void>;
@@ -168,6 +169,16 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const setReady = (roomCode: string, ready: boolean) => {
+    return new Promise<void>((resolve, reject) => {
+      if (!socket) return reject("No socket");
+      socket.emit("set_ready", { roomCode, ready }, (res: { ok: boolean; error?: string }) => {
+        if (res.ok) resolve();
+        else reject(res.error || "Could not update ready status");
+      });
+    });
+  };
+
   const clearGameState = () => setGameState(null);
 
   const joinAsSpectator = (roomCode: string, spectatorName: string) => {
@@ -215,6 +226,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       nextRound,
       newMatch,
       resetRoom,
+      setReady,
       clearGameState,
       joinAsSpectator,
       reconnectAsSpectator
