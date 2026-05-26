@@ -10,8 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function Lobby() {
   const [, setLocation] = useLocation();
-  const { connect, connected, createRoom, joinRoom, joinAsSpectator } = useSocket();
-  const { playerName, savePlayerName, saveRoomCode, savePlayerIndex, saveIsSpectator } = useGameStorage();
+  const { connect, connected, createRoom, joinRoom, joinAsSpectator, createTournament, joinTournament } = useSocket();
+  const { playerName, savePlayerName, saveRoomCode, savePlayerIndex, saveIsSpectator, saveTournamentToken, getTournamentToken } = useGameStorage();
   const { toast } = useToast();
 
   // Parse ?room=XXX&mode=spectator from the URL (once on mount)
@@ -26,6 +26,8 @@ export default function Lobby() {
   const [nameInput, setNameInput] = useState(playerName);
   const [joinCodeInput, setJoinCodeInput] = useState(initialParams.code);
   const [matchTarget, setMatchTarget] = useState<250 | 500>(250);
+  const [tournamentSize, setTournamentSize] = useState<4 | 8>(4);
+  const [tournamentName, setTournamentName] = useState<string>("");
   const [matchLabel, setMatchLabel] = useState<string>("");
   const [labelMode, setLabelMode] = useState<"none" | "preset" | "custom">("none");
   const LABEL_PRESETS = [
@@ -58,6 +60,17 @@ export default function Lobby() {
     try {
       savePlayerName(nameInput);
       saveIsSpectator(false);
+      if (matchMode === "custom") {
+        const res = await createTournament({
+          hostName: nameInput.trim(),
+          name: tournamentName.trim() || undefined,
+          size: tournamentSize,
+          matchTarget,
+        });
+        saveTournamentToken(res.code, res.token);
+        setLocation(`/tournament/${res.code}`);
+        return;
+      }
       const serverMode: "quick" | "king" = matchMode === "king" ? "king" : "quick";
       const res = await createRoom(nameInput, matchTarget, matchLabel.trim() || undefined, serverMode);
       if (res.roomCode && res.playerIndex !== undefined) {
@@ -66,7 +79,7 @@ export default function Lobby() {
         setLocation(`/room/${res.roomCode}`);
       }
     } catch (err: any) {
-      toast({ description: err || "Failed to create room", variant: "destructive" });
+      toast({ description: err || "Failed to create", variant: "destructive" });
     } finally {
       setIsCreating(false);
     }
@@ -74,19 +87,31 @@ export default function Lobby() {
 
   const handleJoin = async (): Promise<void> => {
     if (!nameInput.trim()) { toast({ description: "Please enter your name", variant: "destructive" }); return; }
-    if (!joinCodeInput.trim()) { toast({ description: "Please enter a room code", variant: "destructive" }); return; }
+    if (!joinCodeInput.trim()) { toast({ description: "Please enter a code", variant: "destructive" }); return; }
     setIsJoining(true);
     try {
       savePlayerName(nameInput);
       saveIsSpectator(false);
-      const res = await joinRoom(joinCodeInput.toUpperCase(), nameInput);
+      const code = joinCodeInput.toUpperCase();
+      if (matchMode === "custom") {
+        // Join the tournament lobby, then navigate to the tournament page.
+        // If we already have a token cached for this code (e.g. reconnect from
+        // the same browser), pass it so the server treats this as the same
+        // seat rather than failing with "name taken".
+        const existing = getTournamentToken(code);
+        const res = await joinTournament(code, nameInput.trim(), existing || undefined);
+        saveTournamentToken(code, res.token);
+        setLocation(`/tournament/${code}`);
+        return;
+      }
+      const res = await joinRoom(code, nameInput);
       if (res.playerIndex !== undefined) {
-        saveRoomCode(joinCodeInput.toUpperCase());
+        saveRoomCode(code);
         savePlayerIndex(res.playerIndex as 0 | 1);
-        setLocation(`/room/${joinCodeInput.toUpperCase()}`);
+        setLocation(`/room/${code}`);
       }
     } catch (err: any) {
-      toast({ description: err || "Failed to join room", variant: "destructive" });
+      toast({ description: err || "Failed to join", variant: "destructive" });
     } finally {
       setIsJoining(false);
     }
@@ -195,9 +220,48 @@ export default function Lobby() {
               })}
             </div>
             <p className="text-xs text-muted-foreground">
-              Mode picker is a preview — every selection still creates a standard 1v1 room for now.
+              {matchMode === "king"
+                ? "King of the Table: winner stays, queue replaces the loser."
+                : matchMode === "custom"
+                ? "Custom Tournament: single-elimination bracket of 4 or 8 players."
+                : "Other modes still create a standard 1v1 room for now."}
             </p>
           </div>
+
+          {matchMode === "custom" && (
+            <div className="space-y-3 pt-2 border-t border-border/50">
+              <div className="space-y-2">
+                <Label className="text-sm">Bracket size</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {([4, 8] as const).map((s) => (
+                    <Button
+                      key={s}
+                      type="button"
+                      variant={tournamentSize === s ? "default" : "outline"}
+                      onClick={() => setTournamentSize(s)}
+                      disabled={isCreating || isJoining}
+                      className="h-12 font-mono"
+                      data-testid={`tournament-size-${s}`}
+                    >
+                      {s} players
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="tournament-name" className="text-sm">Tournament name <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <Input
+                  id="tournament-name"
+                  placeholder="e.g. Friday Night Spades"
+                  value={tournamentName}
+                  onChange={(e) => setTournamentName(e.target.value.slice(0, 40))}
+                  maxLength={40}
+                  disabled={isCreating || isJoining}
+                  data-testid="input-tournament-name"
+                />
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2 pt-2 border-t border-border/50">
             <Label className="text-sm">Match target</Label>
@@ -285,15 +349,16 @@ export default function Lobby() {
                 onClick={handleCreate}
                 disabled={isCreating || isJoining || isSpectating}
                 className="w-full py-6 text-lg font-bold shadow-lg shadow-primary/20 active:scale-[0.98] transition-transform"
+                data-testid="button-create"
               >
-                {isCreating ? "Creating..." : "Create Room"}
+                {isCreating ? "Creating..." : matchMode === "custom" ? "Create Tournament" : "Create Room"}
               </Button>
             </div>
 
             <div className="space-y-4">
               <div className="flex gap-2">
                 <Input
-                  placeholder="Enter room code"
+                  placeholder={matchMode === "custom" ? "Tournament code" : "Enter room code"}
                   value={joinCodeInput}
                   onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
                   className="text-center uppercase font-mono py-6 placeholder:normal-case placeholder:font-sans placeholder:tracking-normal"
@@ -305,8 +370,9 @@ export default function Lobby() {
                 disabled={isCreating || isJoining || isSpectating || !joinCodeInput}
                 variant="secondary"
                 className="w-full py-6 text-lg font-bold active:scale-[0.98] transition-transform"
+                data-testid="button-join"
               >
-                {isJoining ? "Joining..." : "Join Match"}
+                {isJoining ? "Joining..." : matchMode === "custom" ? "Join Tournament" : "Join Match"}
               </Button>
             </div>
           </div>

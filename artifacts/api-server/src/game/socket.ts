@@ -24,6 +24,24 @@ import {
   type GameState,
 } from "./engine.js";
 import type { Card } from "./deck.js";
+import {
+  createTournament as createTournamentEntity,
+  joinTournament as joinTournamentEntity,
+  leaveTournament as leaveTournamentEntity,
+  startTournament as startTournamentEntity,
+  getTournament,
+  recordMatchResult,
+  attachRoomToMatch,
+  findActiveMatchForPlayer,
+  reattachPlayerSocket,
+  getPlayerSocketIdByName,
+  sanitizeTournament,
+  setPendingAssignment,
+  clearPendingAssignment,
+  type Tournament,
+  type TournamentMatch,
+  type PendingAssignment,
+} from "./tournament.js";
 
 function sanitizeStateForPlayer(
   state: GameState,
@@ -64,6 +82,7 @@ function sanitizeStateForPlayer(
     mode: state.mode,
     challengerQueue: state.challengerQueue.map((c) => ({ id: c.id, name: c.name })),
     kingStreak: state.kingStreak,
+    tournamentRef: state.tournamentRef,
   };
 }
 
@@ -102,6 +121,7 @@ function sanitizeStateForSpectator(state: GameState): Record<string, unknown> {
     mode: state.mode,
     challengerQueue: state.challengerQueue.map((c) => ({ id: c.id, name: c.name })),
     kingStreak: state.kingStreak,
+    tournamentRef: state.tournamentRef,
   };
 }
 
@@ -152,6 +172,149 @@ function dealWithShuffleAnimation(
 
 /** Delay between game_over and the KotT auto-promotion / next match. */
 const KING_NEXT_MATCH_DELAY_MS = 5000;
+
+/**
+ * Tournament: spin up a freshly-seated game room for a bracket match.
+ * Looks up both players' current socketIds, creates the room with player A
+ * as host, joins player B, records the room code on the match, and emits
+ * `match_assigned` to each player's socket so the client can navigate.
+ */
+function createMatchRoomAndAssign(
+  io: SocketIOServer,
+  t: Tournament,
+  match: TournamentMatch
+): void {
+  if (!match.playerA || !match.playerB) {
+    logger.warn({ code: t.code, matchId: match.id }, "createMatchRoomAndAssign called with incomplete pair");
+    return;
+  }
+  if (match.roomCode) return; // already created
+
+  const sA = getPlayerSocketIdByName(t, match.playerA.name);
+  const sB = getPlayerSocketIdByName(t, match.playerB.name);
+  if (!sA || !sB) {
+    logger.warn(
+      { code: t.code, matchId: match.id, sA, sB },
+      "Cannot create tournament match room — missing player socketIds"
+    );
+    return;
+  }
+
+  const labelBase = match.round === t.rounds.length ? "Finals" : `R${match.round} M${match.position + 1}`;
+  const label = `${t.name} · ${labelBase}`;
+
+  const room = createRoom(
+    match.playerA.name,
+    sA,
+    t.matchTarget,
+    label,
+    "quick",
+    { code: t.code, matchId: match.id }
+  );
+  joinRoom(room.roomCode, match.playerB.name, sB);
+  attachRoomToMatch(t.code, match.id, room.roomCode);
+
+  // Make both player sockets join the game-room channel so they get
+  // game_state broadcasts immediately.
+  for (const sid of [sA, sB]) {
+    const sock = io.sockets.sockets.get(sid);
+    if (sock) sock.join(room.roomCode);
+  }
+
+  // Record + emit assignments. Store as pending so a refresh on the tournament
+  // page can re-deliver them via subscribe_tournament.
+  const pendingA: PendingAssignment = {
+    matchId: match.id,
+    roomCode: room.roomCode,
+    playerIndex: 0,
+    matchLabel: label,
+    opponentName: match.playerB.name,
+  };
+  const pendingB: PendingAssignment = {
+    matchId: match.id,
+    roomCode: room.roomCode,
+    playerIndex: 1,
+    matchLabel: label,
+    opponentName: match.playerA.name,
+  };
+  setPendingAssignment(t, match.playerA.name, pendingA);
+  setPendingAssignment(t, match.playerB.name, pendingB);
+
+  io.to(sA).emit("match_assigned", { tournamentCode: t.code, ...pendingA });
+  io.to(sB).emit("match_assigned", { tournamentCode: t.code, ...pendingB });
+
+  logger.info(
+    { tournament: t.code, match: match.id, room: room.roomCode, a: match.playerA.name, b: match.playerB.name },
+    "Tournament match room created"
+  );
+}
+
+/**
+ * Tournament: called from the playCard handler when a tournament-linked
+ * game room hits game_over. Advances the bracket, eliminates the loser,
+ * creates next-round rooms when both feeder matches resolve, and
+ * announces completion when the final lands.
+ */
+function advanceTournamentOnGameOver(io: SocketIOServer, state: GameState): void {
+  if (!state.tournamentRef) return;
+  const { code, matchId } = state.tournamentRef;
+  const t = getTournament(code);
+  if (!t) {
+    logger.warn({ code }, "Game ended with tournamentRef but tournament missing");
+    return;
+  }
+  const [s0, s1] = state.scores;
+  if (s0 === s1) {
+    // Spades engine prevents true ties at game_over, but be defensive.
+    logger.warn({ code, matchId, s0, s1 }, "Tournament match ended in a tie — cannot advance");
+    return;
+  }
+  const winnerSeat: "A" | "B" = s0 > s1 ? "A" : "B";
+
+  let effect;
+  try {
+    effect = recordMatchResult(code, matchId, winnerSeat);
+  } catch (err: unknown) {
+    logger.error({ err, code, matchId }, "Failed to record tournament match result");
+    return;
+  }
+
+  // Clear pending assignments for BOTH players of the resolved match —
+  // the room they were pointing at is now over.
+  const resolvedA = effect.resolvedMatch.playerA?.name;
+  const resolvedB = effect.resolvedMatch.playerB?.name;
+  if (resolvedA) clearPendingAssignment(effect.tournament, resolvedA);
+  if (resolvedB) clearPendingAssignment(effect.tournament, resolvedB);
+
+  // Notify the loser they're out.
+  const loserName = effect.loserName;
+  if (loserName) {
+    const loserSid = getPlayerSocketIdByName(effect.tournament, loserName);
+    if (loserSid) {
+      io.to(loserSid).emit("tournament_eliminated", {
+        tournamentCode: code,
+        round: effect.resolvedMatch.round,
+        finishedRound: effect.resolvedMatch.round,
+      });
+    }
+  }
+
+  // Spin up rooms for any next-round matches that now have both feeders.
+  for (const next of effect.newlyReadyMatches) {
+    createMatchRoomAndAssign(io, effect.tournament, next);
+  }
+
+  // Broadcast updated bracket state to all tournament subscribers.
+  io.to(`tournament:${code}`).emit("tournament_state", sanitizeTournament(effect.tournament));
+
+  if (effect.isFinal && effect.championName) {
+    io.to(`tournament:${code}`).emit("tournament_complete", {
+      tournamentCode: code,
+      champion: effect.championName,
+    });
+    logger.info({ code, champion: effect.championName }, "Tournament complete");
+  }
+}
 
 /**
  * KotT: at game_over, promote the queue head into the loser's seat and
@@ -472,6 +635,14 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
               ) {
                 scheduleKingNextMatch(io, data.roomCode);
               }
+
+              // Tournament: advance the bracket if this match was a bracket node.
+              if (
+                result.state.phase === "game_over" &&
+                result.state.tournamentRef
+              ) {
+                advanceTournamentOnGameOver(io, result.state);
+              }
             }, 700);
 
           } else {
@@ -669,6 +840,143 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           const state = removeChallenger(code, socket.id);
           callback?.({ ok: true });
           if (state) broadcastState(io, state);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+        }
+      }
+    );
+
+    // ── Custom Tournament events ───────────────────────────────────────────
+
+    socket.on(
+      "create_tournament",
+      (
+        data: { hostName: string; name?: string; size?: number; matchTarget?: number },
+        callback?: (res: { ok: boolean; code?: string; token?: string; error?: string }) => void
+      ) => {
+        try {
+          const host = (data.hostName || "Host").slice(0, 24);
+          const { tournament: t, hostToken } = createTournamentEntity(host, socket.id, {
+            name: data.name,
+            size: data.size,
+            matchTarget: data.matchTarget,
+          });
+          socket.join(`tournament:${t.code}`);
+          logger.info({ code: t.code, host, size: t.size }, "Tournament created");
+          callback?.({ ok: true, code: t.code, token: hostToken });
+          io.to(`tournament:${t.code}`).emit("tournament_state", sanitizeTournament(t));
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+        }
+      }
+    );
+
+    socket.on(
+      "join_tournament",
+      (
+        data: { code: string; name: string; token?: string },
+        callback?: (res: { ok: boolean; error?: string; state?: unknown; token?: string }) => void
+      ) => {
+        try {
+          const code = (data.code || "").toUpperCase().trim();
+          const name = (data.name || "").slice(0, 24);
+          const { tournament: t, token, joinedFresh } = joinTournamentEntity(code, name, socket.id, data.token);
+          socket.join(`tournament:${code}`);
+          logger.info({ code, name, joinedFresh }, "Tournament joined");
+          callback?.({ ok: true, state: sanitizeTournament(t), token });
+          io.to(`tournament:${code}`).emit("tournament_state", sanitizeTournament(t));
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+        }
+      }
+    );
+
+    socket.on(
+      "leave_tournament",
+      (
+        data: { code: string },
+        callback?: (res: { ok: boolean; error?: string }) => void
+      ) => {
+        try {
+          const code = (data.code || "").toUpperCase().trim();
+          const t = leaveTournamentEntity(code, socket.id);
+          socket.leave(`tournament:${code}`);
+          callback?.({ ok: true });
+          if (t) io.to(`tournament:${code}`).emit("tournament_state", sanitizeTournament(t));
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+        }
+      }
+    );
+
+    socket.on(
+      "subscribe_tournament",
+      (
+        data: { code: string; playerName?: string; token?: string },
+        callback?: (res: { ok: boolean; error?: string; state?: unknown; yourMatch?: { roomCode: string | null; matchId: string } | null; authenticated?: boolean }) => void
+      ) => {
+        try {
+          const code = (data.code || "").toUpperCase().trim();
+          const t = getTournament(code);
+          if (!t) throw new Error("Tournament not found");
+          socket.join(`tournament:${code}`);
+          // Token-authenticated reattach: only if BOTH name and token match.
+          // Without this, anyone who knew a participant's display name could
+          // hijack their socket binding (and their future match_assigned).
+          let authenticated = false;
+          if (data.playerName && data.token) {
+            const result = reattachPlayerSocket(code, data.playerName, data.token, socket.id);
+            if (result) {
+              authenticated = true;
+              // Re-emit any pending match assignment so a refresh on the
+              // tournament page lands them back in their live match.
+              const pending = result.player.pendingAssignment;
+              if (pending) {
+                // Join the game room so subsequent game_state broadcasts arrive.
+                socket.join(pending.roomCode);
+                socket.emit("match_assigned", {
+                  tournamentCode: code,
+                  ...pending,
+                });
+              }
+            }
+          }
+          const yourMatch = authenticated && data.playerName
+            ? findActiveMatchForPlayer(t, data.playerName)
+            : null;
+          callback?.({
+            ok: true,
+            state: sanitizeTournament(t),
+            yourMatch: yourMatch ? { roomCode: yourMatch.roomCode, matchId: yourMatch.id } : null,
+            authenticated,
+          });
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+        }
+      }
+    );
+
+    socket.on(
+      "start_tournament",
+      (
+        data: { code: string; token?: string },
+        callback?: (res: { ok: boolean; error?: string }) => void
+      ) => {
+        try {
+          const code = (data.code || "").toUpperCase().trim();
+          const t = startTournamentEntity(code, socket.id, data.token);
+          logger.info({ code, size: t.size }, "Tournament started by host");
+          callback?.({ ok: true });
+          // Spin up Round 1 rooms for each match, in order.
+          for (const match of t.rounds[0]) {
+            createMatchRoomAndAssign(io, t, match);
+          }
+          io.to(`tournament:${code}`).emit("tournament_state", sanitizeTournament(t));
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           callback?.({ ok: false, error: msg });

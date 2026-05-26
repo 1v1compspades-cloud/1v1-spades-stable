@@ -45,6 +45,18 @@ export function useGameStorage() {
     localStorage.removeItem("spades_isSpectator");
   };
 
+  // ── Tournament tokens (per-tournament secret, keyed by tournament code) ──
+  const tournamentTokenKey = (code: string) => `spades_tournament_token_${code.toUpperCase()}`;
+  const saveTournamentToken = (code: string, token: string) => {
+    localStorage.setItem(tournamentTokenKey(code), token);
+  };
+  const getTournamentToken = (code: string): string | null => {
+    return localStorage.getItem(tournamentTokenKey(code));
+  };
+  const clearTournamentToken = (code: string) => {
+    localStorage.removeItem(tournamentTokenKey(code));
+  };
+
   return {
     playerName,
     roomCode,
@@ -54,6 +66,9 @@ export function useGameStorage() {
     saveRoomCode,
     savePlayerIndex,
     saveIsSpectator,
-    clearStorage
+    clearStorage,
+    saveTournamentToken,
+    getTournamentToken,
+    clearTournamentToken,
   };
 }

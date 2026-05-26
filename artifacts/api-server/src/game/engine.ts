@@ -118,6 +118,11 @@ export interface GameState {
   challengerQueue: { id: string; name: string; socketId: string }[];
   /** Per-seat consecutive match wins (KotT). Reset on loss / new room. */
   kingStreak: [number, number];
+  /**
+   * If this room is part of a Custom Tournament bracket match, link back
+   * so the socket layer can advance the bracket on game_over.
+   */
+  tournamentRef?: { code: string; matchId: string };
 }
 
 /** Max challengers waiting in the KotT queue. */
@@ -604,6 +609,7 @@ export function createRoom(
   matchTarget = 250,
   matchLabel?: string,
   mode: "quick" | "king" = "quick",
+  tournamentRef?: { code: string; matchId: string },
 ): GameState {
   let code: string;
   do {
@@ -611,6 +617,7 @@ export function createRoom(
   } while (rooms.has(code));
 
   const state = createGame(code, matchTarget, matchLabel, mode);
+  if (tournamentRef) state.tournamentRef = tournamentRef;
   const host: Player = {
     id: hostSocketId,
     name: hostPlayerName,

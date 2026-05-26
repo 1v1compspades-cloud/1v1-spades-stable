@@ -52,6 +52,27 @@ Two players can play a full head-to-head Spades match in real time via their bro
 
 Spectators can join any room with the room code and watch live. They see scores, bids, tricks, card counts, played cards, round summaries, and the game-over screen — but never see either player's hand. Spectators cannot bid, play, or advance the game. Multiple spectators per room are allowed. Refresh restores spectators as spectators and players as players.
 
+## Custom Tournament mode
+
+Single-elimination bracket of 4 or 8 players, random seeding, every match is a standard 1v1 game.
+
+- Server: `artifacts/api-server/src/game/tournament.ts` — Tournament store, bracket build/advance, `recordMatchResult`, `setPendingAssignment`.
+- Socket events: `create_tournament`, `join_tournament`, `leave_tournament`, `subscribe_tournament`, `start_tournament` + server pushes `tournament_state`, `match_assigned`, `tournament_eliminated`, `tournament_complete`.
+- Tournament-scope Socket.io room: `tournament:${code}` (separate from per-game rooms).
+- Each game room created for a bracket match carries `GameState.tournamentRef = { code, matchId }`. The `playCard` → `game_over` hook calls `advanceTournamentOnGameOver(io, state)`, mirroring the KotT hook.
+- Round 1 rooms are spun up immediately at start; Round 2+ rooms are created lazily in `recordMatchResult` once both feeder matches resolve.
+- Match labels for tournament rooms: `"${name} · R${round} M${pos+1}"` or `"${name} · Finals"`.
+- Frontend page: `artifacts/spades-game/src/pages/Tournament.tsx` — lobby, bracket, my-match CTA, champion screen. Lobby's `custom` mode swaps the Create/Join buttons to Create Tournament / Join Tournament.
+
+### Tournament identity & reconnect (token-based)
+
+- Every tournament participant (host + joiners) is issued a per-player secret token at join time (crypto.randomUUID). The token is returned in the create/join callback and the client stores it in localStorage under `spades_tournament_token_${CODE}`. The token is NEVER included in `sanitizeTournament` (no leak to other clients).
+- `subscribe_tournament` only rebinds a player's socketId when BOTH the claimed name AND a matching token are presented. Without that, anyone who knew a participant's display name could hijack their seat (and their future `match_assigned`).
+- `start_tournament` accepts EITHER the host's current socketId OR the host token — so a host can refresh in the lobby and still start.
+- `reattachPlayerSocket` also refreshes `t.hostSocketId` when the reconnecting player is the host.
+- `createMatchRoomAndAssign` writes a `pendingAssignment` onto each player record. On an authenticated `subscribe_tournament`, if a pending assignment exists, the server re-emits `match_assigned` (and re-joins the game room) — so a refresh on the tournament page during a live match lands the player back into their seat. `recordMatchResult` clears `pendingAssignment` for both players of the resolved match.
+- Fresh-join path rejects duplicate names (case-insensitive, trimmed). Reconnecting from the same browser works because the cached token is passed through `joinTournament`.
+
 ## Mock tournament tools
 
 Lightweight helpers for running 8-player test brackets manually (no real bracket UI yet):

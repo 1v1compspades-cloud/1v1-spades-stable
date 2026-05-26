@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { io, Socket } from "socket.io-client";
-import { GameState, Card } from "@/lib/game";
+import { GameState, Card, TournamentState, MatchAssignedPayload } from "@/lib/game";
 
 export type SocketStatus = "connecting" | "online" | "reconnecting" | "offline";
 
@@ -26,6 +26,17 @@ interface SocketContextType {
   reconnectAsSpectator: (code: string, name: string) => Promise<void>;
   joinQueue: (code: string, name: string) => Promise<void>;
   leaveQueue: (code: string) => Promise<void>;
+  // ── Custom Tournament ──────────────────────────────────────────────────
+  tournament: TournamentState | null;
+  matchAssignment: MatchAssignedPayload | null;
+  tournamentEliminated: { code: string; round: number } | null;
+  createTournament: (opts: { hostName: string; name?: string; size: 4 | 8; matchTarget: number }) => Promise<{ code: string; token: string }>;
+  joinTournament: (code: string, name: string, token?: string) => Promise<{ token: string }>;
+  leaveTournament: (code: string) => Promise<void>;
+  startTournament: (code: string, token?: string) => Promise<void>;
+  subscribeTournament: (code: string, playerName?: string, token?: string) => Promise<{ state: TournamentState; yourMatch: { roomCode: string | null; matchId: string } | null; authenticated: boolean }>;
+  clearMatchAssignment: () => void;
+  clearTournamentEliminated: () => void;
 }
 
 const SocketContext = createContext<SocketContextType | null>(null);
@@ -36,6 +47,9 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<SocketStatus>("offline");
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tournament, setTournament] = useState<TournamentState | null>(null);
+  const [matchAssignment, setMatchAssignment] = useState<MatchAssignedPayload | null>(null);
+  const [tournamentEliminated, setTournamentEliminated] = useState<{ code: string; round: number } | null>(null);
 
   useEffect(() => {
     const s = io({
@@ -83,6 +97,20 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     });
     s.on("opponent_reconnected", () => {
       setError(null);
+    });
+
+    // ── Tournament listeners ─────────────────────────────────────────────
+    s.on("tournament_state", (state: TournamentState) => {
+      setTournament(state);
+    });
+    s.on("match_assigned", (payload: MatchAssignedPayload) => {
+      setMatchAssignment(payload);
+    });
+    s.on("tournament_eliminated", (payload: { tournamentCode: string; round: number }) => {
+      setTournamentEliminated({ code: payload.tournamentCode, round: payload.round });
+    });
+    s.on("tournament_complete", () => {
+      // tournament_state will follow with status=complete
     });
 
     return () => {
@@ -203,6 +231,61 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
   const clearGameState = () => setGameState(null);
 
+  // ── Tournament actions ───────────────────────────────────────────────────
+  const createTournament = (opts: { hostName: string; name?: string; size: 4 | 8; matchTarget: number }) => {
+    return new Promise<{ code: string; token: string }>((resolve, reject) => {
+      if (!socket) return reject("No socket");
+      socket.emit("create_tournament", opts, (res: { ok: boolean; code?: string; token?: string; error?: string }) => {
+        if (res.ok && res.code && res.token) resolve({ code: res.code, token: res.token });
+        else reject(res.error || "Could not create tournament");
+      });
+    });
+  };
+  const joinTournament = (code: string, name: string, token?: string) => {
+    return new Promise<{ token: string }>((resolve, reject) => {
+      if (!socket) return reject("No socket");
+      socket.emit("join_tournament", { code, name, token }, (res: { ok: boolean; error?: string; token?: string }) => {
+        if (res.ok && res.token) resolve({ token: res.token });
+        else reject(res.error || "Could not join tournament");
+      });
+    });
+  };
+  const leaveTournament = (code: string) => {
+    return new Promise<void>((resolve, reject) => {
+      if (!socket) return reject("No socket");
+      socket.emit("leave_tournament", { code }, (res: { ok: boolean; error?: string }) => {
+        if (res.ok) { setTournament(null); resolve(); }
+        else reject(res.error || "Could not leave tournament");
+      });
+    });
+  };
+  const startTournament = (code: string, token?: string) => {
+    return new Promise<void>((resolve, reject) => {
+      if (!socket) return reject("No socket");
+      socket.emit("start_tournament", { code, token }, (res: { ok: boolean; error?: string }) => {
+        if (res.ok) resolve();
+        else reject(res.error || "Could not start tournament");
+      });
+    });
+  };
+  const subscribeTournament = (code: string, playerName?: string, token?: string) => {
+    return new Promise<{ state: TournamentState; yourMatch: { roomCode: string | null; matchId: string } | null; authenticated: boolean }>((resolve, reject) => {
+      if (!socket) return reject("No socket");
+      socket.emit(
+        "subscribe_tournament",
+        { code, playerName, token },
+        (res: { ok: boolean; error?: string; state?: TournamentState; yourMatch?: { roomCode: string | null; matchId: string } | null; authenticated?: boolean }) => {
+          if (res.ok && res.state) {
+            setTournament(res.state);
+            resolve({ state: res.state, yourMatch: res.yourMatch ?? null, authenticated: !!res.authenticated });
+          } else reject(res.error || "Could not subscribe to tournament");
+        }
+      );
+    });
+  };
+  const clearMatchAssignment = () => setMatchAssignment(null);
+  const clearTournamentEliminated = () => setTournamentEliminated(null);
+
   const joinAsSpectator = (roomCode: string, spectatorName: string) => {
     return new Promise<void>((resolve, reject) => {
       if (!socket) return reject("No socket");
@@ -254,6 +337,16 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       reconnectAsSpectator,
       joinQueue,
       leaveQueue,
+      tournament,
+      matchAssignment,
+      tournamentEliminated,
+      createTournament,
+      joinTournament,
+      leaveTournament,
+      startTournament,
+      subscribeTournament,
+      clearMatchAssignment,
+      clearTournamentEliminated,
     }}>
       {children}
     </SocketContext.Provider>

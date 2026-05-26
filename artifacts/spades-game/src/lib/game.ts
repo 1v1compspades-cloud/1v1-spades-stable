@@ -61,6 +61,48 @@ export interface GameState {
   challengerQueue?: { id: string; name: string }[];
   /** Per-seat consecutive match wins (KotT). */
   kingStreak?: [number, number];
+  /** Link back to the Custom Tournament bracket (if this is a bracket match). */
+  tournamentRef?: { code: string; matchId: string };
+}
+
+// ── Custom Tournament shared types ──────────────────────────────────────────
+
+export type TournamentStatus = "lobby" | "in_progress" | "complete";
+export type TournamentSize = 4 | 8;
+export type BracketSeat = "A" | "B";
+
+export interface TournamentMatch {
+  id: string;
+  round: number;
+  position: number;
+  playerA: { name: string } | null;
+  playerB: { name: string } | null;
+  roomCode: string | null;
+  winner: BracketSeat | null;
+  winnerName: string | null;
+}
+
+export interface TournamentState {
+  code: string;
+  name: string;
+  hostName: string;
+  size: TournamentSize;
+  matchTarget: number;
+  status: TournamentStatus;
+  players: { id: string; name: string }[];
+  rounds: TournamentMatch[][];
+  champion: string | null;
+  eliminated: string[];
+  createdAt: number;
+}
+
+export interface MatchAssignedPayload {
+  tournamentCode: string;
+  matchId: string;
+  roomCode: string;
+  playerIndex: 0 | 1;
+  matchLabel: string;
+  opponentName: string;
 }
 
 export const SUIT_SYMBOLS: Record<Suit, string> = {
