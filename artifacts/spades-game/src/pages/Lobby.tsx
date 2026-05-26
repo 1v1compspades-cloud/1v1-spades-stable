@@ -32,6 +32,16 @@ export default function Lobby() {
     "Quarterfinal 1", "Quarterfinal 2", "Quarterfinal 3", "Quarterfinal 4",
     "Semifinal 1", "Semifinal 2", "Finals",
   ] as const;
+  const MATCH_MODES = [
+    { id: "quick",     label: "Quick Match",          blurb: "Jump in, single match" },
+    { id: "mock",      label: "Mock Tournament",      blurb: "Practice bracket runs" },
+    { id: "sunday",    label: "Sunday Prize",         blurb: "Weekly prize event" },
+    { id: "king",      label: "King of the Table",    blurb: "Winner stays, queue challengers" },
+    { id: "bo3",       label: "Best of 3 Showmatch",  blurb: "First to 2 wins" },
+    { id: "custom",    label: "Custom Tournament",    blurb: "Define your own format" },
+  ] as const;
+  type MatchMode = typeof MATCH_MODES[number]["id"];
+  const [matchMode, setMatchMode] = useState<MatchMode>("quick");
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [isSpectating, setIsSpectating] = useState(false);
@@ -157,6 +167,35 @@ export default function Lobby() {
               onChange={(e) => setNameInput(e.target.value)}
               className="text-lg py-6"
             />
+          </div>
+
+          <div className="space-y-2 pt-2 border-t border-border/50">
+            <Label className="text-sm">Match mode</Label>
+            <div className="grid grid-cols-2 gap-2" data-testid="match-mode-picker">
+              {MATCH_MODES.map((m) => {
+                const active = matchMode === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setMatchMode(m.id)}
+                    disabled={isCreating || isJoining}
+                    data-testid={`mode-${m.id}`}
+                    className={`flex flex-col items-start text-left rounded-md border px-3 py-2 transition disabled:opacity-50 ${
+                      active
+                        ? "border-primary bg-primary/15 text-primary shadow-[0_0_0_1px_hsla(35,90%,55%,0.5)]"
+                        : "border-border bg-white/5 hover:border-primary/50 hover:bg-primary/5"
+                    }`}
+                  >
+                    <span className="text-sm font-semibold leading-tight">{m.label}</span>
+                    <span className="text-[10px] text-muted-foreground leading-snug mt-0.5">{m.blurb}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Mode picker is a preview — every selection still creates a standard 1v1 room for now.
+            </p>
           </div>
 
           <div className="space-y-2 pt-2 border-t border-border/50">
