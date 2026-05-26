@@ -18,3 +18,9 @@ id = "fC9K314dXo4T5GiNkockm"
 uri = "file://solo-spades-v-mock-tourney-tools.zip"
 type = "unspecified"
 title = "Spades — Trick display + first-bidder leads"
+
+[[outputs]]
+id = "JYb6YhT4u-OrN3pw2Mr7P"
+uri = "file://artifacts/spades-game/public/audio/spades_lofi_loop.mp3"
+type = "audio"
+title = "spades_lofi_loop"
