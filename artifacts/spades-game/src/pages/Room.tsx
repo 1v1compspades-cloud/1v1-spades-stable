@@ -277,11 +277,15 @@ export default function Room() {
       <div
         data-testid="connection-status"
         className={cn(
-          "absolute top-2 right-2 z-[60] flex items-center gap-1.5 px-2 py-1 rounded-full border text-[10px] font-semibold uppercase tracking-widest backdrop-blur-sm pointer-events-none",
+          "absolute z-40 flex items-center gap-1.5 rounded-full border px-2 py-[3px] text-[9px] font-bold uppercase tracking-[0.08em] leading-none backdrop-blur-sm pointer-events-none shadow-none",
           v.cls
         )}
+        style={{
+          top: "max(6px, env(safe-area-inset-top))",
+          right: "calc(env(safe-area-inset-right) + 10px)",
+        }}
       >
-        <span className={cn("inline-block w-1.5 h-1.5 rounded-full", v.dot)} />
+        <span className={cn("inline-block w-[7px] h-[7px] rounded-full", v.dot)} />
         {v.label}
       </div>
     );
@@ -391,7 +395,7 @@ export default function Room() {
   };
 
   // ── Player info row (renders any seat by index) ────────────────────────────
-  const renderPlayerInfo = (idx: 0 | 1) => {
+  const renderPlayerInfo = (idx: 0 | 1, opts?: { isTopSeat?: boolean }) => {
     const isMe = !spectator && idx === playerIndex;
     const p    = gameState.players[idx];
     const name = p?.name;
@@ -408,11 +412,13 @@ export default function Room() {
     return (
       <div
         data-testid={`player-info-seat-${idx + 1}`}
-        className={`flex items-center justify-between px-4 py-3 bg-black/40 border-y backdrop-blur-sm transition-shadow ${
+        className={cn(
+          "flex items-center justify-between px-4 py-3 bg-black/40 border-y backdrop-blur-sm transition-shadow",
           isActive
             ? "border-primary/60 shadow-[inset_0_0_0_1px_hsla(35,90%,55%,0.5),0_0_12px_-2px_hsla(35,90%,55%,0.35)]"
-            : "border-border"
-        }`}
+            : "border-border",
+          opts?.isTopSeat && "pt-[calc(env(safe-area-inset-top)+1.75rem)]",
+        )}
       >
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex flex-col leading-tight">
@@ -1341,7 +1347,7 @@ export default function Room() {
         renderWaiting()
       ) : (
         <>
-          {renderPlayerInfo(topIndex)}
+          {renderPlayerInfo(topIndex, { isTopSeat: true })}
           {renderStatusBanner()}
           {renderTable()}
           {renderPlayerInfo(bottomIndex)}
