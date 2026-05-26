@@ -39,8 +39,10 @@ export default function Room() {
     reconnectAsSpectator,
   } = useSocket();
   const {
-    playerName, playerIndex, isSpectator,
-    savePlayerIndex, saveIsSpectator,
+    playerName,
+    roomCode: storedRoomCode,
+    playerIndex, isSpectator,
+    saveRoomCode, savePlayerIndex, saveIsSpectator,
   } = useGameStorage();
   const { toast } = useToast();
 
@@ -62,8 +64,26 @@ export default function Room() {
     if (!connected) connect();
   }, [roomCode, connected, connect, setLocation]);
 
+  // Stale-room-code guard: if the URL room differs from the last room we
+  // stored, drop the cached seat / spectator flag so we don't blindly call
+  // reconnect() with someone else's seat index for a room we've never been in.
+  useEffect(() => {
+    if (!roomCode) return;
+    if (storedRoomCode && storedRoomCode !== roomCode) {
+      savePlayerIndex(null);
+      saveIsSpectator(false);
+    }
+    if (storedRoomCode !== roomCode) {
+      saveRoomCode(roomCode);
+    }
+  }, [roomCode, storedRoomCode, saveRoomCode, savePlayerIndex, saveIsSpectator]);
+
   useEffect(() => {
     if (!connected || !roomCode || !playerName || gameState) return;
+    // Wait for the stale-room-code guard above to settle before attempting
+    // any join/reconnect — otherwise we might fire with a stale playerIndex
+    // from a previous room.
+    if (storedRoomCode !== roomCode) return;
     if (isSpectator) {
       reconnectAsSpectator(roomCode, playerName).catch(err => {
         toast({ description: err || "Spectator session expired.", variant: "destructive" });
@@ -83,7 +103,7 @@ export default function Room() {
         setLocation("/");
       });
     }
-  }, [connected, roomCode, playerName, gameState, playerIndex, isSpectator, reconnect, reconnectAsSpectator, joinRoom, setLocation, savePlayerIndex, saveIsSpectator, toast]);
+  }, [connected, roomCode, storedRoomCode, playerName, gameState, playerIndex, isSpectator, reconnect, reconnectAsSpectator, joinRoom, setLocation, savePlayerIndex, saveIsSpectator, toast]);
 
   if (!gameState || (!isSpectator && playerIndex === null)) {
     const label =

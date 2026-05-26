@@ -682,6 +682,12 @@ export function reconnectPlayer(
       index: playerIndex,
     };
   } else {
+    // Name must match the seat — protects against a stranger with the room
+    // code claiming someone else's seat. Case-insensitive, trim-tolerant.
+    const norm = (s: string) => s.trim().toLowerCase();
+    if (norm(player.name) !== norm(playerName)) {
+      throw new Error("That seat is held by another player");
+    }
     // Update socketId to the new connection
     player.socketId = newSocketId;
     player.id = newSocketId;
