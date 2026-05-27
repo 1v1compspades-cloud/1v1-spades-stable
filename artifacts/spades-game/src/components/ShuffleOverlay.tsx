@@ -46,25 +46,20 @@ const DISCARD_SLIDE_MS = DISCARD_START_MS + 90; // then slide off
 // than a cross/star pattern. Deal order is CLOCKWISE starting from the dealer
 // (bottom/south), then west, north, east — matching how a real dealer flicks
 // cards around the table starting with the player on their left.
-const PILE_RADIUS = 100;
-const PILE_OFFSETS: { tx: number; ty: number; rot: number; key: "bottom" | "left" | "top" | "right" }[] = [
-  { tx: 0,             ty: PILE_RADIUS,  rot: 0,   key: "bottom" }, // dealer / south
-  { tx: -PILE_RADIUS,  ty: 0,            rot: -8,  key: "left"   }, // west
-  { tx: 0,             ty: -PILE_RADIUS, rot: 0,   key: "top"    }, // north
-  { tx: PILE_RADIUS,   ty: 0,            rot: 8,   key: "right"  }, // east
+//
+// IMPORTANT: PILE_RADIUS must stay in sync with the hardcoded translate()
+// values in the shuffle-deal-* and shuffle-pile-discard-* keyframes in
+// index.css. We use hardcoded keyframes (not CSS-var-driven) because var()
+// resolution inside @keyframes is unreliable across browsers — the symptom
+// was cards collapsing into a vertical stack at center.
+const PILE_RADIUS = 80;
+type PileKey = "bottom" | "left" | "top" | "right";
+const PILE_OFFSETS: { tx: number; ty: number; rot: number; key: PileKey; dealKeyframe: string; discardKeyframe?: string }[] = [
+  { tx: 0,             ty: PILE_RADIUS,  rot: 0,   key: "bottom", dealKeyframe: "shuffle-deal-bottom" }, // dealer / south
+  { tx: -PILE_RADIUS,  ty: 0,            rot: -8,  key: "left",   dealKeyframe: "shuffle-deal-left",  discardKeyframe: "shuffle-pile-discard-left"  }, // west
+  { tx: 0,             ty: -PILE_RADIUS, rot: 0,   key: "top",    dealKeyframe: "shuffle-deal-top"    }, // north
+  { tx: PILE_RADIUS,   ty: 0,            rot: 8,   key: "right",  dealKeyframe: "shuffle-deal-right", discardKeyframe: "shuffle-pile-discard-right" }, // east
 ];
-
-// Curved-arc midpoint: cards travel from center to each pile through an arc
-// that bows CLOCKWISE (perpendicular to the radial direction, rotated -90°).
-// Perp of (tx, ty) rotated CW = (ty, -tx); scaled to 0.45 for a visible but
-// not exaggerated arc.
-const ARC_BOW = 0.45;
-function midpoint(tx: number, ty: number): { mx: number; my: number } {
-  return {
-    mx: tx / 2 + ty * ARC_BOW,
-    my: ty / 2 + -tx * ARC_BOW,
-  };
-}
 
 export function ShuffleOverlay() {
   // Timeline (server animation budget = 2600ms):
@@ -80,42 +75,12 @@ export function ShuffleOverlay() {
       className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-lg overflow-hidden"
       style={{ animation: "shuffle-fade-in 200ms ease-out both" }}
     >
-      <div className="absolute top-[14%] sm:top-[18%] text-center pointer-events-none px-4">
+      <div className="absolute top-[10%] sm:top-[14%] text-center pointer-events-none px-4">
         <p className="text-[10px] sm:text-xs uppercase tracking-[0.4em] text-primary/80">
           Dealer is shuffling
         </p>
         <p className="mt-1 text-[10px] sm:text-xs text-muted-foreground">
-          1v1 Spades uses <span className="text-amber-300 font-semibold">26 cards</span> · the West &amp; East hands are removed
-        </p>
-        {import.meta.env.DEV && (
-          <p
-            data-testid="deal-anim-debug-label"
-            className="mt-1 text-[9px] uppercase tracking-widest text-amber-300/80 font-mono"
-          >
-            [dev] Using 1v1 four-pile deal animation
-          </p>
-        )}
-      </div>
-
-      {/* "Half deck removed" banner — fades in at the moment the side piles
-          get discarded so the player visibly understands that 26 of the 52
-          cards just left the table. Sits below the card stage. */}
-      <div
-        data-testid="deal-deck-removed-banner"
-        className="absolute bottom-[18%] sm:bottom-[20%] text-center pointer-events-none px-4"
-        style={{
-          animation: `shuffle-fade-in 300ms ease-out ${DISCARD_START_MS}ms both`,
-          opacity: 0,
-        }}
-      >
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-destructive/15 border border-destructive/40">
-          <span className="text-destructive text-base sm:text-lg leading-none">−</span>
-          <span className="text-xs sm:text-sm font-semibold text-destructive uppercase tracking-wider">
-            26 cards removed
-          </span>
-        </div>
-        <p className="mt-1.5 text-[10px] sm:text-xs text-muted-foreground">
-          13 cards × 2 hands · West &amp; East piles discarded
+          1v1 Spades uses <span className="text-amber-300 font-semibold">26 cards</span> · West &amp; East hands removed
         </p>
       </div>
 
@@ -222,9 +187,9 @@ export function ShuffleOverlay() {
               data-testid={`deal-pile-${pile.key}`}
               style={{
                 transform: `translate(${pile.tx}px, ${pile.ty}px) rotate(${pile.rot}deg)`,
-                animation: isSide
+                animation: isSide && pile.discardKeyframe
                   ? `shuffle-fade-in 240ms ease-out ${pileFadeIn}ms both, ` +
-                    `shuffle-pile-discard 380ms ease-in ${DISCARD_SLIDE_MS}ms both`
+                    `${pile.discardKeyframe} 380ms ease-in ${DISCARD_SLIDE_MS}ms both`
                   : `shuffle-fade-in 240ms ease-out ${pileFadeIn}ms both`,
                 opacity: 0,
               }}
@@ -277,36 +242,30 @@ export function ShuffleOverlay() {
 
         {/* DEAL cards — fly from the center cut-pile out to each of the 4
             piles in CLOCKWISE rotation starting from the dealer (bottom):
-            bottom → left → top → right. Each card travels along a curved
-            arc (midpoint computed perpendicular to the radial direction)
-            so the deal visibly sweeps around the round table. */}
+            bottom → left → top → right. Each card uses one of 4 hardcoded
+            keyframes (shuffle-deal-bottom / left / top / right) so the
+            translate target is baked into the keyframe — no CSS-variable
+            indirection that can fail to resolve. */}
         {Array.from({ length: DEAL_ROUNDS * 4 }).map((_, i) => {
           const pile = PILE_OFFSETS[i % 4]!;
-          const { mx, my } = midpoint(pile.tx, pile.ty);
           const delay = DEAL_START_MS + i * DEAL_STAGGER_MS;
-          // Per-card target + midpoint via CSS custom properties consumed by
-          // shuffle-deal-to (which interpolates start → midpoint → end).
           const style: CSSProperties = {
-            animation: `shuffle-deal-to ${DEAL_FLY_MS}ms cubic-bezier(0.4, 0, 0.6, 1) ${delay}ms both`,
+            animation: `${pile.dealKeyframe} ${DEAL_FLY_MS}ms cubic-bezier(0.4, 0, 0.6, 1) ${delay}ms both`,
             opacity: 0,
-            // Cast so React accepts CSS custom properties on inline style.
-            ["--deal-tx" as unknown as string]: `${pile.tx}px`,
-            ["--deal-ty" as unknown as string]: `${pile.ty}px`,
-            ["--deal-mid-tx" as unknown as string]: `${mx}px`,
-            ["--deal-mid-ty" as unknown as string]: `${my}px`,
-            ["--deal-rot" as unknown as string]: `${pile.rot}deg`,
           };
           return (
-            <div key={`d-${i}`} className="absolute" style={style}>
+            <div key={`d-${i}`} className="absolute" data-testid={`deal-card-${pile.key}-${i}`} style={style}>
               <CardBack />
             </div>
           );
         })}
       </div>
 
-      <div
-        className="absolute bottom-[16%] sm:bottom-[20%] text-center pointer-events-none px-4 space-y-1"
-      >
+      {/* Bottom messaging — positioned well below the card stage so it never
+          overlaps the active center (North + South piles). "Dealing the
+          cards…" fades out as the side piles get discarded, then the
+          "26 cards removed" callout fades in. */}
+      <div className="absolute bottom-6 sm:bottom-10 text-center pointer-events-none px-4 space-y-1.5">
         <p
           className="text-xs sm:text-sm text-muted-foreground italic"
           style={{
@@ -315,16 +274,23 @@ export function ShuffleOverlay() {
         >
           Dealing the cards…
         </p>
-        <p
+        <div
           data-testid="deal-discard-explainer"
-          className="text-[11px] sm:text-xs uppercase tracking-wider text-destructive/90 font-semibold"
           style={{
             animation: `shuffle-fade-in 220ms ease-out ${DISCARD_START_MS}ms both`,
             opacity: 0,
           }}
         >
-          Side hands discarded — 1v1 hands locked in
-        </p>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-destructive/15 border border-destructive/40">
+            <span className="text-destructive text-base sm:text-lg leading-none">−</span>
+            <span className="text-xs sm:text-sm font-semibold text-destructive uppercase tracking-wider">
+              26 cards removed
+            </span>
+          </div>
+          <p className="mt-1.5 text-[10px] sm:text-xs text-muted-foreground">
+            13 cards × 2 hands · North &amp; South keep their 13-card hands
+          </p>
+        </div>
       </div>
     </div>
   );

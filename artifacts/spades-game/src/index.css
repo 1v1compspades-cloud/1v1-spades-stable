@@ -199,27 +199,43 @@
   0%   { transform: translate(0, 0) rotate(0deg) scale(1);   opacity: 1; }
   100% { transform: translate(0, 42vh) rotate(12deg) scale(0.7); opacity: 0; }
 }
-/* 4-pile deal: fly from center to (--deal-tx, --deal-ty) along a CURVED arc
-   that passes through (--deal-mid-tx, --deal-mid-ty) at the midpoint, so each
-   card visibly sweeps around the table clockwise like a real dealer. */
-@keyframes shuffle-deal-to {
-  0%   {
-    transform: translate(0, 0) rotate(0deg) scale(1.05);
-    opacity: 1;
-  }
-  50%  {
-    transform: translate(var(--deal-mid-tx, 0), var(--deal-mid-ty, 0)) rotate(calc(var(--deal-rot, 0deg) * 0.5)) scale(1.02);
-    opacity: 1;
-  }
-  100% {
-    transform: translate(var(--deal-tx, 0), var(--deal-ty, 0)) rotate(var(--deal-rot, 0deg)) scale(1);
-    opacity: 0;
-  }
+/* 4-pile deal: HARDCODED per-direction keyframes. Cards fly from center
+   along a curved arc (50% stop) to each of 4 pile positions around the
+   table. Hardcoded values (PILE_RADIUS = 80) — keep these in sync with
+   PILE_RADIUS in ShuffleOverlay.tsx if you change either.
+
+   Avoided var()-based keyframes here because they don't reliably resolve
+   custom properties across all browsers when the keyframe is registered
+   globally — symptom was cards collapsing toward the center. */
+@keyframes shuffle-deal-bottom {
+  0%   { transform: translate(0,    0)    rotate(0deg) scale(1.05); opacity: 1; }
+  50%  { transform: translate(32px, 40px) rotate(0deg) scale(1.02); opacity: 1; }
+  100% { transform: translate(0,    80px) rotate(0deg) scale(1);    opacity: 0; }
 }
-/* Side-pile discard: slide off-table while fading. */
-@keyframes shuffle-pile-discard {
-  0%   { transform: translate(var(--deal-tx, 0), var(--deal-ty, 0)) rotate(var(--deal-rot, 0deg)) scale(1); opacity: 1; }
-  100% { transform: translate(calc(var(--deal-tx, 0) * 2.2), 18vh) rotate(-22deg) scale(0.7); opacity: 0; }
+@keyframes shuffle-deal-left {
+  0%   { transform: translate(0,     0)    rotate(0deg)  scale(1.05); opacity: 1; }
+  50%  { transform: translate(-40px, 32px) rotate(-4deg) scale(1.02); opacity: 1; }
+  100% { transform: translate(-80px, 0)    rotate(-8deg) scale(1);    opacity: 0; }
+}
+@keyframes shuffle-deal-top {
+  0%   { transform: translate(0,     0)     rotate(0deg) scale(1.05); opacity: 1; }
+  50%  { transform: translate(-32px, -40px) rotate(0deg) scale(1.02); opacity: 1; }
+  100% { transform: translate(0,     -80px) rotate(0deg) scale(1);    opacity: 0; }
+}
+@keyframes shuffle-deal-right {
+  0%   { transform: translate(0,    0)     rotate(0deg) scale(1.05); opacity: 1; }
+  50%  { transform: translate(40px, -32px) rotate(4deg) scale(1.02); opacity: 1; }
+  100% { transform: translate(80px, 0)     rotate(8deg) scale(1);    opacity: 0; }
+}
+/* Side-pile discard: slide off-table while fading. One per side so the
+   transforms are also hardcoded (matches deal-left / deal-right end state). */
+@keyframes shuffle-pile-discard-left {
+  0%   { transform: translate(-80px,  0)    rotate(-8deg)  scale(1);   opacity: 1; }
+  100% { transform: translate(-220px, 18vh) rotate(-22deg) scale(0.7); opacity: 0; }
+}
+@keyframes shuffle-pile-discard-right {
+  0%   { transform: translate(80px,  0)    rotate(8deg)  scale(1);   opacity: 1; }
+  100% { transform: translate(220px, 18vh) rotate(22deg) scale(0.7); opacity: 0; }
 }
 /* Side-pile dim/glow overlay during the discard moment. */
 @keyframes shuffle-pile-dim {
