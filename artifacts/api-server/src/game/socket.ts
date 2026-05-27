@@ -772,8 +772,12 @@ async function createMatchRoomAndAssign(
     "quick",
     { code: t.code, matchId: match.id }
   );
-  // Tournament matches get a turn clock — quick + KotT remain untimed.
-  room.turnTimeoutMs = TOURNAMENT_TURN_TIMEOUT_MS;
+  // Turn timer is OFF by default for every room type (Quick, KotT, Tournament).
+  // Hosts can still pause/resume/reset via admin tools; auto-play on idle is
+  // disabled until the per-room "Turn Timer" setting ships (post-June-1).
+  // The TOURNAMENT_TURN_TIMEOUT_MS constant above is retained so re-enabling
+  // is a one-line change.
+  room.turnTimeoutMs = null;
   // AWAIT the commits inside the lock so `match_assigned` is never emitted
   // before the room is durable + audited. Clients refresh-recovering via
   // pendingAssignment must not see a room code the DB doesn't yet know about.

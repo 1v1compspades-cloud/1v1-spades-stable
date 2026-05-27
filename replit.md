@@ -129,6 +129,13 @@ When a third+ player clicks Join Match on a King-of-the-Table room (mode=`king`)
 - `phase: "coin_toss"` is broadcast for ~3.5s before Round 1 deal so all 3 roles see the result with an overlay (`coin-toss-overlay` testid).
 - `resetMatch` (New Match button) clears coin state so the next match re-flips.
 
+## Turn timer (currently OFF by default)
+
+- As of the post–June 1 prep window, **no room type arms a turn timer**. Quick Match and KotT were already untimed; tournament match rooms also now set `turnTimeoutMs = null` (single line in `socket.ts` `createMatchRoomAndAssign`, with the `TOURNAMENT_TURN_TIMEOUT_MS = 30_000` constant retained above so re-enabling is a one-line swap).
+- `armTurnTimer` early-returns when `turnTimeoutMs` is null/0 (existing guard). No auto-bid / auto-play fires.
+- Host pause/resume/reset admin tools remain functional — they're no-ops on rooms without a timer armed, which is the expected behavior.
+- Deferred (post-June-1) — per-room "Turn Timer" dropdown (Off / 30 / 60 / 90), tournament-create selector defaulting to 60, 10-second-remaining client warning, expanded auto-action policy. Plan in conversation history; do NOT ship before the June 1 event.
+
 ## Gotchas
 
 - Always restart the API Server workflow after backend changes; the frontend is hot-reloaded by Vite.
