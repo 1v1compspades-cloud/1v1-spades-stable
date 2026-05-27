@@ -41,14 +41,30 @@ const DEAL_END_MS = DEAL_START_MS + DEAL_ROUNDS * 4 * DEAL_STAGGER_MS + DEAL_FLY
 const DISCARD_START_MS = DEAL_END_MS; // side piles glow + label
 const DISCARD_SLIDE_MS = DISCARD_START_MS + 90; // then slide off
 
-// Pile positions on the virtual table — kept compact so the overlay never
-// hides the bidding bar / hand / score on mobile.
-const PILE_OFFSETS: { tx: number; ty: number; rot: number; key: "left" | "top" | "right" | "bottom" }[] = [
-  { tx: -120, ty: 0,    rot: -8,  key: "left" },
-  { tx: 0,    ty: -78,  rot: 0,   key: "top" },
-  { tx: 120,  ty: 0,    rot: 8,   key: "right" },
-  { tx: 0,    ty: 78,   rot: 0,   key: "bottom" },
+// Pile positions on the virtual table — arranged on a true CIRCLE of equal
+// radius around the center so the deal reads as "around a round table" rather
+// than a cross/star pattern. Deal order is CLOCKWISE starting from the dealer
+// (bottom/south), then west, north, east — matching how a real dealer flicks
+// cards around the table starting with the player on their left.
+const PILE_RADIUS = 100;
+const PILE_OFFSETS: { tx: number; ty: number; rot: number; key: "bottom" | "left" | "top" | "right" }[] = [
+  { tx: 0,             ty: PILE_RADIUS,  rot: 0,   key: "bottom" }, // dealer / south
+  { tx: -PILE_RADIUS,  ty: 0,            rot: -8,  key: "left"   }, // west
+  { tx: 0,             ty: -PILE_RADIUS, rot: 0,   key: "top"    }, // north
+  { tx: PILE_RADIUS,   ty: 0,            rot: 8,   key: "right"  }, // east
 ];
+
+// Curved-arc midpoint: cards travel from center to each pile through an arc
+// that bows CLOCKWISE (perpendicular to the radial direction, rotated -90°).
+// Perp of (tx, ty) rotated CW = (ty, -tx); scaled to 0.45 for a visible but
+// not exaggerated arc.
+const ARC_BOW = 0.45;
+function midpoint(tx: number, ty: number): { mx: number; my: number } {
+  return {
+    mx: tx / 2 + ty * ARC_BOW,
+    my: ty / 2 + -tx * ARC_BOW,
+  };
+}
 
 export function ShuffleOverlay() {
   // Timeline (server animation budget = 2600ms):
@@ -80,6 +96,24 @@ export function ShuffleOverlay() {
 
       {/* Card stage — centered fixed-size box so all animations are anchored */}
       <div className="relative w-72 h-56 sm:w-96 sm:h-64 flex items-center justify-center">
+        {/* CIRCULAR TABLE OUTLINE — subtle felt circle behind the piles so
+            the 4 dealt hands read as positions around a round table, not at
+            cardinal points in empty space. */}
+        <div
+          aria-hidden="true"
+          data-testid="deal-table-outline"
+          className="absolute rounded-full pointer-events-none"
+          style={{
+            width: `${PILE_RADIUS * 2 + 80}px`,
+            height: `${PILE_RADIUS * 2 + 80}px`,
+            border: "1px dashed rgba(245, 197, 24, 0.18)",
+            boxShadow: "inset 0 0 40px rgba(16, 80, 50, 0.35)",
+            background: "radial-gradient(circle at center, rgba(20,90,60,0.18) 0%, rgba(0,0,0,0) 70%)",
+            animation: `shuffle-fade-in 400ms ease-out ${DEAL_START_MS - 200}ms both`,
+            opacity: 0,
+          }}
+        />
+
         {/* LEFT half-stack: flies in, then riffles toward center */}
         <div
           className="absolute"
@@ -216,18 +250,25 @@ export function ShuffleOverlay() {
           );
         })}
 
-        {/* DEAL cards — fly from the center cut-pile out to each of the
-            4 piles in rotation: left → top → right → bottom. */}
+        {/* DEAL cards — fly from the center cut-pile out to each of the 4
+            piles in CLOCKWISE rotation starting from the dealer (bottom):
+            bottom → left → top → right. Each card travels along a curved
+            arc (midpoint computed perpendicular to the radial direction)
+            so the deal visibly sweeps around the round table. */}
         {Array.from({ length: DEAL_ROUNDS * 4 }).map((_, i) => {
           const pile = PILE_OFFSETS[i % 4]!;
+          const { mx, my } = midpoint(pile.tx, pile.ty);
           const delay = DEAL_START_MS + i * DEAL_STAGGER_MS;
-          // Per-card target via CSS custom properties consumed by shuffle-deal-to.
+          // Per-card target + midpoint via CSS custom properties consumed by
+          // shuffle-deal-to (which interpolates start → midpoint → end).
           const style: CSSProperties = {
             animation: `shuffle-deal-to ${DEAL_FLY_MS}ms cubic-bezier(0.4, 0, 0.6, 1) ${delay}ms both`,
             opacity: 0,
             // Cast so React accepts CSS custom properties on inline style.
             ["--deal-tx" as unknown as string]: `${pile.tx}px`,
             ["--deal-ty" as unknown as string]: `${pile.ty}px`,
+            ["--deal-mid-tx" as unknown as string]: `${mx}px`,
+            ["--deal-mid-ty" as unknown as string]: `${my}px`,
             ["--deal-rot" as unknown as string]: `${pile.rot}deg`,
           };
           return (
