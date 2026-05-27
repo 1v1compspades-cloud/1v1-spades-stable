@@ -36,3 +36,9 @@ id = "MxM-c9DHUh3LpF6jz9ODs"
 uri = "file://BUILD_LOCK.md"
 type = "text"
 title = "BUILD LOCK — june-1-stable"
+
+[[outputs]]
+id = "iNTy9s2B8Im2QUzqMKFEW"
+uri = "file://attached_assets/june-1-risk-assessment.md"
+type = "text"
+title = "June 1 Risk Assessment — ~92% confidence"
