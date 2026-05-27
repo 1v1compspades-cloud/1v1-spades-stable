@@ -350,93 +350,254 @@ export interface MatchResultEffect {
   loserName: string | null;
 }
 
+export type RecordMatchResolution =
+  /** First-time recording — caller should fire side effects (broadcast, room creation). */
+  | { kind: "advanced"; effect: MatchResultEffect }
+  /** This exact (matchId, winner) was already recorded — caller MUST NOT re-fire side effects. */
+  | { kind: "replay"; effect: MatchResultEffect }
+  /** Result was refused — bracket was NOT mutated. */
+  | {
+      kind: "rejected";
+      reason:
+        | "not_found"
+        | "wrong_phase"
+        | "no_winner_player"
+        | "winner_conflict"
+        | "db_error";
+      message: string;
+    };
+
+// ── Per-tournament serial lock ──────────────────────────────────────────
+// `recordMatchResult` is the ONLY mutation that can advance a bracket.
+// Wrapping every call in a per-tournament queue means two concurrent
+// game_over events (or a game_over + a manual forfeit) for the same
+// tournament serialize cleanly — no torn reads, no half-advanced bracket.
+const tournamentLocks = new Map<string, Promise<unknown>>();
+async function withTournamentLock<T>(
+  code: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const prev = tournamentLocks.get(code) ?? Promise.resolve();
+  const next = prev.then(fn, fn);
+  const handle = next.catch(() => undefined);
+  tournamentLocks.set(code, handle);
+  try {
+    return await next;
+  } finally {
+    if (tournamentLocks.get(code) === handle) tournamentLocks.delete(code);
+  }
+}
+
+/** Test-only: drain pending tournament locks. */
+export async function flushTournamentLocks(): Promise<void> {
+  const pending = Array.from(tournamentLocks.values());
+  await Promise.allSettled(pending);
+}
+
 /**
- * Called from the socket layer when a tournament-linked game room reaches
- * game_over. Records the winner, advances the bracket, and reports
- * any newly-ready next-round matches so the caller can spin up their rooms.
+ * Atomically record a match result. The full sequence — resolved-match
+ * update, winner advancement into next round, loser elimination, and an
+ * audit-log entry — is wrapped in a single DB transaction via
+ * `recordMatchResultTx`. The in-memory bracket is snapshotted before
+ * any mutation and restored on any failure, so a DB error or conflict
+ * cannot leave a half-mutated bracket behind.
+ *
+ * Idempotency is enforced two ways:
+ *   1. In-memory: if the match already has a `winner`, a same-winner call
+ *      returns `kind: "replay"` with no DB write and no audit row.
+ *   2. DB: `tournament_matches` row with non-null `winner_name` is
+ *      detected inside the tx and short-circuits the second writer.
+ *
+ * Concurrency is serialized per-tournament so two simultaneous
+ * `game_over` events for the same bracket cannot race.
+ *
+ * Pass an optional `roomCodeForAudit` when the resolved match's
+ * `roomCode` field has already been cleared (e.g. forfeit before a room
+ * existed) but you still want the audit row to reference a room.
  */
-export function recordMatchResult(
+export async function recordMatchResult(
   code: string,
   matchId: string,
-  winnerSeat: BracketSeat
-): MatchResultEffect {
-  const t = tournaments.get(code);
-  if (!t) throw new Error("Tournament not found");
-  if (t.status !== "in_progress") throw new Error("Tournament not in progress");
+  winnerSeat: BracketSeat,
+  opts: { roomCodeForAudit?: string | null } = {},
+): Promise<RecordMatchResolution> {
+  // Import lazily to avoid a circular dep with persistence.ts (which
+  // imports from engine.ts which is in the same package).
+  const { recordMatchResultTx } = await import("./persistence.js");
+  const { logger } = await import("../lib/logger.js");
 
-  let resolved: TournamentMatch | null = null;
-  let resolvedRoundIdx = -1;
-  let resolvedPosition = -1;
-  for (let r = 0; r < t.rounds.length; r++) {
-    const idx = t.rounds[r].findIndex((m) => m.id === matchId);
-    if (idx >= 0) {
-      resolved = t.rounds[r][idx];
-      resolvedRoundIdx = r;
-      resolvedPosition = idx;
-      break;
+  return withTournamentLock(code, async () => {
+    const t = tournaments.get(code);
+    if (!t) {
+      return {
+        kind: "rejected",
+        reason: "not_found",
+        message: "Tournament not found",
+      };
     }
-  }
-  if (!resolved) throw new Error(`Bracket match ${matchId} not found`);
-  if (resolved.winner) {
-    // Idempotent re-call — return the existing state with no new effects.
+    if (t.status !== "in_progress" && t.status !== "complete") {
+      return {
+        kind: "rejected",
+        reason: "wrong_phase",
+        message: `Tournament status is ${t.status}`,
+      };
+    }
+
+    let resolved: TournamentMatch | null = null;
+    let resolvedRoundIdx = -1;
+    let resolvedPosition = -1;
+    for (let r = 0; r < t.rounds.length; r++) {
+      const idx = t.rounds[r].findIndex((m) => m.id === matchId);
+      if (idx >= 0) {
+        resolved = t.rounds[r][idx];
+        resolvedRoundIdx = r;
+        resolvedPosition = idx;
+        break;
+      }
+    }
+    if (!resolved) {
+      return {
+        kind: "rejected",
+        reason: "not_found",
+        message: `Bracket match ${matchId} not found`,
+      };
+    }
+    const isFinal = resolvedRoundIdx === t.rounds.length - 1;
+
+    // ── In-memory idempotency: same match, already decided ──────────
+    if (resolved.winner) {
+      if (resolved.winner === winnerSeat) {
+        return {
+          kind: "replay",
+          effect: {
+            tournament: t,
+            resolvedMatch: resolved,
+            newlyReadyMatches: [],
+            isFinal,
+            championName: t.champion,
+            loserName: null,
+          },
+        };
+      }
+      return {
+        kind: "rejected",
+        reason: "winner_conflict",
+        message: `Match ${matchId} already resolved with winner ${resolved.winner}; refused to overwrite with ${winnerSeat}`,
+      };
+    }
+
+    const winnerName =
+      winnerSeat === "A" ? resolved.playerA?.name : resolved.playerB?.name;
+    const loserName =
+      winnerSeat === "A" ? resolved.playerB?.name : resolved.playerA?.name;
+    if (!winnerName) {
+      return {
+        kind: "rejected",
+        reason: "no_winner_player",
+        message: "Match has no winner-side player",
+      };
+    }
+
+    // ── Snapshot every field we are about to mutate ─────────────────
+    const snapshotRounds = structuredClone(t.rounds);
+    const snapshotEliminated = [...t.eliminated];
+    const snapshotStatus = t.status;
+    const snapshotChampion = t.champion;
+    const snapshotCompletedAt = t.completedAt;
+
+    // ── Apply in-memory mutation ────────────────────────────────────
+    resolved.winner = winnerSeat;
+    resolved.winnerName = winnerName;
+    if (loserName) t.eliminated.push(loserName);
+
+    let newlyReady: TournamentMatch[] = [];
+    if (isFinal) {
+      t.status = "complete";
+      t.completedAt = Date.now();
+      t.champion = winnerName;
+    } else {
+      const nextMatch =
+        t.rounds[resolvedRoundIdx + 1][Math.floor(resolvedPosition / 2)];
+      if (resolvedPosition % 2 === 0) {
+        nextMatch.playerA = { name: winnerName };
+      } else {
+        nextMatch.playerB = { name: winnerName };
+      }
+      if (nextMatch.playerA && nextMatch.playerB && !nextMatch.roomCode) {
+        newlyReady = [nextMatch];
+      }
+    }
+
+    // ── Commit to DB in a single transaction ────────────────────────
+    const auditRoomCode =
+      opts.roomCodeForAudit !== undefined
+        ? opts.roomCodeForAudit
+        : resolved.roomCode;
+    const outcome = await recordMatchResultTx({
+      tournamentCode: code,
+      matchId,
+      round: resolved.round,
+      position: resolved.position,
+      playerAName: resolved.playerA?.name ?? null,
+      playerBName: resolved.playerB?.name ?? null,
+      winnerName,
+      roomCode: auditRoomCode,
+      matchState: { ...resolved },
+      auditPayload: {
+        tournamentCode: code,
+        tournamentName: t.name,
+        matchId,
+        round: resolved.round,
+        position: resolved.position,
+        winnerSeat,
+        winnerName,
+        loserName: loserName ?? null,
+        isFinal,
+        newlyReadyMatchIds: newlyReady.map((m) => m.id),
+      },
+    });
+
+    // ── Rollback in-memory on any failure ───────────────────────────
+    if (!outcome.ok) {
+      t.rounds = snapshotRounds;
+      t.eliminated = snapshotEliminated;
+      t.status = snapshotStatus;
+      t.champion = snapshotChampion;
+      t.completedAt = snapshotCompletedAt;
+      const detail =
+        outcome.reason === "winner_conflict"
+          ? `DB already has winner=${outcome.existingWinner}, refused to overwrite with ${outcome.attemptedWinner}`
+          : outcome.message;
+      logger.error(
+        { code, matchId, reason: outcome.reason, detail },
+        "Tournament bracket advancement aborted — in-memory state rolled back",
+      );
+      return { kind: "rejected", reason: outcome.reason, message: detail };
+    }
+
+    // First-time vs DB-replay (e.g. crash between DB commit and prior
+    // in-memory apply): in both cases the live in-memory bracket has
+    // ADVANCED for the first time in this process, so callers should
+    // fire side effects. Audit-log row was only written on firstTime.
+    if (!outcome.firstTime) {
+      logger.info(
+        { code, matchId, winnerName },
+        "Tournament match was already recorded in DB — in-memory caught up without re-auditing",
+      );
+    }
+
     return {
-      tournament: t,
-      resolvedMatch: resolved,
-      newlyReadyMatches: [],
-      isFinal: resolvedRoundIdx === t.rounds.length - 1,
-      championName: t.champion,
-      loserName: null,
+      kind: "advanced",
+      effect: {
+        tournament: t,
+        resolvedMatch: resolved,
+        newlyReadyMatches: newlyReady,
+        isFinal,
+        championName: isFinal ? winnerName : null,
+        loserName: loserName ?? null,
+      },
     };
-  }
-
-  const winnerName = winnerSeat === "A" ? resolved.playerA?.name : resolved.playerB?.name;
-  const loserName  = winnerSeat === "A" ? resolved.playerB?.name : resolved.playerA?.name;
-  if (!winnerName) throw new Error("Match has no winner-side player");
-
-  resolved.winner = winnerSeat;
-  resolved.winnerName = winnerName;
-  if (loserName) t.eliminated.push(loserName);
-
-  // Is this the final?
-  const isFinal = resolvedRoundIdx === t.rounds.length - 1;
-  if (isFinal) {
-    t.status = "complete";
-    t.completedAt = Date.now();
-    t.champion = winnerName;
-    return {
-      tournament: t,
-      resolvedMatch: resolved,
-      newlyReadyMatches: [],
-      isFinal: true,
-      championName: winnerName,
-      loserName: loserName ?? null,
-    };
-  }
-
-  // Promote winner into the next round.
-  const nextRound = t.rounds[resolvedRoundIdx + 1];
-  const nextMatch = nextRound[Math.floor(resolvedPosition / 2)];
-  // Pairs (0,1) feed slot A/B of nextMatch[0]; (2,3) → nextMatch[1]; etc.
-  // Even position → playerA, odd position → playerB.
-  if (resolvedPosition % 2 === 0) {
-    nextMatch.playerA = { name: winnerName };
-  } else {
-    nextMatch.playerB = { name: winnerName };
-  }
-
-  const newlyReady: TournamentMatch[] = [];
-  if (nextMatch.playerA && nextMatch.playerB && !nextMatch.roomCode) {
-    newlyReady.push(nextMatch);
-  }
-
-  return {
-    tournament: t,
-    resolvedMatch: resolved,
-    newlyReadyMatches: newlyReady,
-    isFinal: false,
-    championName: null,
-    loserName: loserName ?? null,
-  };
+  });
 }
 
 /**

@@ -406,7 +406,7 @@ async function handlePlayResult(
             scheduleKingNextMatch(io, roomCode);
           }
           if (merged.phase === "game_over" && merged.tournamentRef) {
-            advanceTournamentOnGameOver(io, merged);
+            void advanceTournamentOnGameOver(io, merged);
           }
         } catch (err) {
           logger.error({ err, roomCode }, "handlePlayResult post-delay failed");
@@ -511,7 +511,7 @@ function forfeitTournamentMatch(
       reason,
     });
     broadcastState(io, finalState);
-    advanceTournamentOnGameOver(io, finalState);
+    await advanceTournamentOnGameOver(io, finalState);
   });
 }
 
@@ -685,7 +685,7 @@ async function createMatchRoomAndAssign(
  * creates next-round rooms when both feeder matches resolve, and
  * announces completion when the final lands.
  */
-function advanceTournamentOnGameOver(io: SocketIOServer, state: GameState): void {
+async function advanceTournamentOnGameOver(io: SocketIOServer, state: GameState): Promise<void> {
   if (!state.tournamentRef) return;
   const { code, matchId } = state.tournamentRef;
   const t = getTournament(code);
@@ -701,13 +701,21 @@ function advanceTournamentOnGameOver(io: SocketIOServer, state: GameState): void
   }
   const winnerSeat: "A" | "B" = s0 > s1 ? "A" : "B";
 
-  let effect;
-  try {
-    effect = recordMatchResult(code, matchId, winnerSeat);
-  } catch (err: unknown) {
-    logger.error({ err, code, matchId }, "Failed to record tournament match result");
+  const resolution = await recordMatchResult(code, matchId, winnerSeat);
+  if (resolution.kind === "rejected") {
+    logger.error(
+      { code, matchId, reason: resolution.reason, message: resolution.message },
+      "Failed to record tournament match result — bracket not advanced",
+    );
     return;
   }
+  if (resolution.kind === "replay") {
+    // Same (matchId, winner) already recorded in this process — don't
+    // double-emit eliminated/state/complete or re-create rooms.
+    logger.info({ code, matchId }, "Ignoring duplicate game_over for already-recorded tournament match");
+    return;
+  }
+  const effect = resolution.effect;
 
   // Clear pending assignments for BOTH players of the resolved match —
   // the room they were pointing at is now over.

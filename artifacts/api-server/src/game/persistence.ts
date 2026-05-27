@@ -1,11 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { eq, lt, and } from "drizzle-orm";
+import { eq, lt, and, isNull } from "drizzle-orm";
 import {
   db,
   activeRoomsTable,
   gameAuditLogTable,
   reconnectTokensTable,
+  tournamentMatchesTable,
   type ActiveRoomRow,
+  type TournamentMatchRow,
 } from "@workspace/db";
 import { updateRoom, type GameState } from "./engine.js";
 import { hashState } from "./hash.js";
@@ -457,6 +459,175 @@ export async function commit(
 ): Promise<{ ok: boolean; newHash: string | null }> {
   updateRoom(state);
   return persistRoom(state, audit);
+}
+
+// ── Tournament bracket advancement (atomic) ─────────────────────────────
+// `tournament_matches` is the durability layer for bracket results. The
+// composite primary key (tournament_code, match_id) is the idempotency
+// guard: a second attempt to record the same match either races at the
+// row level (one UPDATE wins, the other sees winnerName already set) or
+// arrives after-the-fact and is reported as a duplicate.
+//
+// `recordMatchResultTx` is the ONLY supported way to commit a match
+// result. It wraps the row write AND the audit log entry in a single DB
+// transaction so a crash or DB error cannot leave half-state behind.
+// Callers are responsible for applying the corresponding in-memory
+// mutation only AFTER this returns ok — and rolling that mutation back
+// (snapshot/restore) on any non-ok outcome.
+
+export type RecordMatchOutcome =
+  | { ok: true; firstTime: true;  row: TournamentMatchRow }
+  | { ok: true; firstTime: false; row: TournamentMatchRow }
+  | { ok: false; reason: "winner_conflict"; existingWinner: string; attemptedWinner: string }
+  | { ok: false; reason: "db_error"; message: string };
+
+export interface RecordMatchArgs {
+  tournamentCode: string;
+  matchId: string;
+  round: number;
+  position: number;
+  playerAName: string | null;
+  playerBName: string | null;
+  winnerName: string;
+  /** Room the match was played in, if known. May be null for a forfeited match. */
+  roomCode: string | null;
+  /** Full TournamentMatch struct AFTER applying the result (for snapshot). */
+  matchState: unknown;
+  /** Small audit payload — winner seat, loser, round, etc. NOT the whole bracket. */
+  auditPayload: Record<string, unknown>;
+}
+
+export async function recordMatchResultTx(
+  args: RecordMatchArgs,
+): Promise<RecordMatchOutcome> {
+  try {
+    return await db.transaction(async (tx) => {
+      // 1. Read current row (if any). No FOR UPDATE needed — the upsert
+      //    below is the actual race point; this read just lets us
+      //    short-circuit the common "already done" replay cleanly.
+      const existing = await tx
+        .select()
+        .from(tournamentMatchesTable)
+        .where(
+          and(
+            eq(tournamentMatchesTable.tournamentCode, args.tournamentCode),
+            eq(tournamentMatchesTable.matchId, args.matchId),
+          ),
+        )
+        .limit(1);
+      const row = existing[0];
+
+      // 2a. Already resolved → idempotency check.
+      if (row?.winnerName) {
+        if (row.winnerName === args.winnerName) {
+          // True replay: same match, same winner — no audit log, no row write.
+          return { ok: true as const, firstTime: false as const, row };
+        }
+        return {
+          ok: false as const,
+          reason: "winner_conflict" as const,
+          existingWinner: row.winnerName,
+          attemptedWinner: args.winnerName,
+        };
+      }
+
+      // 2b. Upsert with race-safe predicate. ON CONFLICT DO UPDATE only
+      //     fires when winnerName IS NULL — if two concurrent txs reach
+      //     this point, exactly one update affects a row, the other
+      //     returns nothing.
+      const now = new Date();
+      const upserted = await tx
+        .insert(tournamentMatchesTable)
+        .values({
+          tournamentCode: args.tournamentCode,
+          matchId: args.matchId,
+          round: args.round,
+          position: args.position,
+          playerAName: args.playerAName,
+          playerBName: args.playerBName,
+          winnerName: args.winnerName,
+          roomCode: args.roomCode,
+          state: args.matchState as Record<string, unknown>,
+          createdAt: now,
+          updatedAt: now,
+          completedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [
+            tournamentMatchesTable.tournamentCode,
+            tournamentMatchesTable.matchId,
+          ],
+          set: {
+            winnerName: args.winnerName,
+            roomCode: args.roomCode,
+            state: args.matchState as Record<string, unknown>,
+            updatedAt: now,
+            completedAt: now,
+          },
+          setWhere: isNull(tournamentMatchesTable.winnerName),
+        })
+        .returning();
+
+      // 3. If the upsert affected zero rows, someone beat us. Re-read and
+      //    treat as a conflict / replay accordingly.
+      if (upserted.length === 0) {
+        const fresh = await tx
+          .select()
+          .from(tournamentMatchesTable)
+          .where(
+            and(
+              eq(tournamentMatchesTable.tournamentCode, args.tournamentCode),
+              eq(tournamentMatchesTable.matchId, args.matchId),
+            ),
+          )
+          .limit(1);
+        const w = fresh[0]?.winnerName;
+        if (w && w === args.winnerName) {
+          return { ok: true as const, firstTime: false as const, row: fresh[0]! };
+        }
+        return {
+          ok: false as const,
+          reason: "winner_conflict" as const,
+          existingWinner: w ?? "(unknown)",
+          attemptedWinner: args.winnerName,
+        };
+      }
+
+      // 4. Audit log row inside the SAME tx — either both persist or
+      //    both roll back. The roomCode is denormalized so the audit row
+      //    is searchable from the room side.
+      await tx.insert(gameAuditLogTable).values({
+        roomCode: args.roomCode,
+        action: "tournament_advance",
+        actorSeat: null,
+        actorToken: null,
+        payload: args.auditPayload,
+        prevStateHash: null,
+        newStateHash: null,
+        error: null,
+      });
+
+      return { ok: true as const, firstTime: true as const, row: upserted[0] };
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error(
+      { err, tournamentCode: args.tournamentCode, matchId: args.matchId },
+      "recordMatchResultTx failed",
+    );
+    return { ok: false, reason: "db_error", message };
+  }
+}
+
+/** Test helper / cleanup: drop all bracket rows for a tournament. */
+export async function deleteTournamentMatches(tournamentCode: string): Promise<void> {
+  try {
+    await db
+      .delete(tournamentMatchesTable)
+      .where(eq(tournamentMatchesTable.tournamentCode, tournamentCode));
+  } catch (err) {
+    logger.warn({ err, tournamentCode }, "deleteTournamentMatches failed");
+  }
 }
 
 /** Delete audit-log rows older than the retention window. */
