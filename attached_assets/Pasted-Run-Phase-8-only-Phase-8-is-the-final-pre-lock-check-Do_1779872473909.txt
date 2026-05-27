@@ -1,0 +1,108 @@
+Run Phase 8 only.
+
+Phase 8 is the final pre-lock check.
+
+Do not add new features.
+Do not implement tournament persistence/rehydration.
+Do not add schema files or migrations.
+Only fix Red tournament blockers.
+If an issue is Yellow, report it but do not change code unless it is very low-risk.
+
+Goal:
+Pre-tournament smoke test and rollback plan for June 1.
+
+Test/report:
+
+1. Build/version control
+- confirm current checkpoint/stable build name
+- note rollback instructions
+- confirm typecheck passes
+- confirm app starts cleanly
+- confirm no test/debug routes expose private game state
+
+2. Full tournament flow
+- create tournament
+- add players
+- generate bracket
+- start match
+- player 1 joins
+- player 2 joins
+- spectator joins
+- bidding works
+- dealing works
+- card play works
+- scoring works
+- match completes
+- winner advances
+- final match works
+- champion is displayed
+
+3. Disconnect/reconnect test
+- player refreshes during lobby
+- player refreshes during bidding
+- player refreshes after cards are dealt
+- player refreshes after one card is played
+- spectator refreshes
+- player lands back in same seat when supported
+
+4. Admin intervention test
+- host pauses match
+- host resumes match
+- host resets timer
+- host force-forfeits player
+- host marks winner manually
+- host remakes a stuck room
+- bracket remains consistent
+- audit log records admin actions
+
+5. Anti-cheat test
+- player A cannot see player B hand
+- player B cannot see player A hand
+- spectator cannot see either hidden hand
+- discard hands remain hidden by default
+- raw state is not exposed in HTTP/debug routes
+
+6. Mobile test
+- iPhone player view works
+- bid buttons visible
+- cards playable
+- no overlapping last trick/card UI
+- scroll not blocking gameplay
+- connection pill does not block gameplay
+
+7. Stream test
+- stream/spectator route opens cleanly on desktop
+- Watch Live link works if available
+- Twitch/OBS browser source should be usable
+- stream can see board clearly
+- backup screen/bracket is ready
+
+8. Known June 1 operational risks
+- tournament persistence is not implemented
+- server restart will not recover active tournament bracket
+- exact 4/8/16/32 bracket size required
+- no bye support expected
+- extras must be backups
+- no deploys during tournament window
+- restart only before event after smoke test
+
+9. Emergency fallback plan
+- if tournament mode breaks, use manual bracket + direct rooms
+- if reconnect breaks, remake room and manually restore score
+- if bracket breaks, host manually advances winners
+- if stream route breaks, share normal spectator screen
+- if app fully breaks, switch to stable checkpoint
+
+10. Final readiness rating
+Classify each area:
+- Green: ready
+- Yellow: usable with caution
+- Red: tournament blocker
+
+Return:
+- final smoke test report
+- stable build identifier
+- rollback instructions
+- known issues
+- red/yellow/green ratings
+- go/no-go recommendation for June 1
