@@ -1,0 +1,73 @@
+PHASE 5 — Competitive rules validation
+
+Goal:
+Lock down the 1v1 Competitive Spades rules so the game feels fair, consistent, and tournament-ready.
+
+Do not redesign the UI in this phase unless required for testing/clarity.
+
+Rules to validate:
+1. Dealer / non-dealer flow
+   - dealer determined correctly
+   - non-dealer bids first
+   - dealer bids second
+   - non-dealer may edit bid until dealer submits
+   - dealer may edit bid until first card is played
+   - correct player leads the first trick
+
+2. Card play legality
+   - player must follow suit if possible
+   - player cannot play off-suit while holding led suit
+   - spades cannot be led until broken unless player only has spades
+   - spades become broken only through legal play/cut
+   - server validates every played card against the player’s actual hand
+
+3. Trick/book logic
+   - correct trick winner
+   - trick winner leads next
+   - books increment correctly
+   - round ends after all playable cards are complete
+
+4. Scoring
+   - made bid: 10 points per bid book + 1 bag per overtrick
+   - failed bid: lose bid value
+   - nil: +125 if successful, -125 if failed
+   - nil still accumulates bags if applicable
+   - under 250 score: 5 bags = -50
+   - at 250+ score: 10 bags = -100
+   - tie games trigger 3 extra rounds until winner by total score
+
+5. Discard/hidden hand rules
+   - side/discard hands stay hidden by default
+   - optional reveal mode only reveals if explicitly enabled
+   - spectator mode never exposes hidden hands unless reveal mode allows it
+
+6. Renege handling
+   - define server-detectable renege cases
+   - if automatic detection is possible, flag it
+   - if manual callout is required, add clean host/admin path
+   - penalty: guilty player loses their bid while opponent gains theirs
+
+7. Optional no-spade redeal
+   - if enabled, allow redeal when a player has no spades
+   - if disabled, game continues normally
+
+Testing requirements:
+- Add unit tests or deterministic test helpers for each rule above.
+- Add at least 5 scripted test hands:
+  1. normal bid/make
+  2. failed bid
+  3. successful nil
+  4. failed nil
+  5. spade break/follow-suit edge case
+- Add one test for bag penalty under 250.
+- Add one test for bag penalty at 250+.
+- Add one test for tie-breaker extra rounds.
+
+Return:
+- changed files
+- rules confirmed working
+- rules that still need manual host judgment
+- test checklist
+- any edge cases found
+
+Run typecheck and tests before summary.

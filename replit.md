@@ -48,7 +48,7 @@ A 2-player competitive Spades card game with hidden hands, bidding, turn synchro
 
 ## Product
 
-Two players can play a full head-to-head Spades match in real time via their browsers. The game enforces all standard Spades rules: hidden hands, sequential bidding, suit-following, spades-broken rule, nil bids (1v1 Competitive house rule: ±125), bag penalties (10 bags = -100), and set penalties. First player to reach the target (250 or 500) and lead wins. Tied at target triggers a 3-round tiebreaker block; persistent tie starts a new block.
+Two players can play a full head-to-head Spades match in real time via their browsers. The game enforces all standard Spades rules: hidden hands, sequential bidding, suit-following, spades-broken rule, nil bids (1v1 Competitive house rule: ±125), tier-based bag penalties (pre-round score < 250 → every 5 bags = −50; pre-round score ≥ 250 → every 10 bags = −100; threshold is locked at round start), and set penalties. First player to reach the target (250 or 500) and lead wins. Tied at target triggers a 3-round tiebreaker block; persistent tie starts a new block.
 
 Spectators can join any room with the room code and watch live. They see scores, bids, tricks, card counts, played cards, round summaries, and the game-over screen — but never see either player's hand. Spectators cannot bid, play, or advance the game. Multiple spectators per room are allowed. Refresh restores spectators as spectators and players as players.
 

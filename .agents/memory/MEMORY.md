@@ -4,3 +4,5 @@
 - [Stale snapshot merge across delays](stale-snapshot-merge.md) — any state computed before a `setTimeout` reveal must overlay the post-delay roster/activity fields from the freshly-locked current state before committing.
 - [Anchor reconnect gating on in-memory flag, not DB lookup](reconnect-flag-anchor.md) — gating "is this seat tokenized?" on a live DB query fails-open under DB outage and re-enables name-only hijack; persist the flag in the state instead.
 - [Atomic bracket advancement](tournament-tx-atomic.md) — snapshot in-memory + per-key lock + `ON CONFLICT DO UPDATE … setWhere=isNull(winner)` with audit row in the same tx; return advanced/replay/rejected so callers skip duplicate broadcasts.
+- [Spades 1v1 Competitive scoring rules](spades-scoring-rules.md) — bag tier locked at pre-round score (5/−50 sub-250, 10/−100 at 250+); bags never reset.
+- [Scripted-round helper gotchas](scripted-round-helper.md) — `tricks0` is a hint not a guarantee; even round numbers flip leader via `getFirstBidderForRound`.

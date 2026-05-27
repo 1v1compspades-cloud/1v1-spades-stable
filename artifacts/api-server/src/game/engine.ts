@@ -555,10 +555,23 @@ export function playCard(
       roundResult.newBags[1],
     ];
 
-    // Deduct 100 for every 10 bags
+    // 1v1 Competitive bag penalties (per-seat, threshold depends on the
+    // seat's PRE-round score):
+    //   - score < 250 at start of round → every 5 bags = -50
+    //   - score ≥ 250 at start of round → every 10 bags = -100
+    // Crossing the 250 threshold mid-round does not reclassify this round's
+    // penalty (threshold is locked at round start) — keeps the math deterministic.
+    const bagPenalty = (preScore: number, oldBags: number, freshBags: number): number => {
+      if (preScore < 250) {
+        const crossed = Math.floor(freshBags / 5) - Math.floor(oldBags / 5);
+        return crossed * 50;
+      }
+      const crossed = Math.floor(freshBags / 10) - Math.floor(oldBags / 10);
+      return crossed * 100;
+    };
     const finalScores: [number, number] = [
-      newScores[0] - (Math.floor(newBags[0] / 10) - Math.floor(state.bags[0] / 10)) * 100,
-      newScores[1] - (Math.floor(newBags[1] / 10) - Math.floor(state.bags[1] / 10)) * 100,
+      newScores[0] - bagPenalty(state.scores[0], state.bags[0], newBags[0]),
+      newScores[1] - bagPenalty(state.scores[1], state.bags[1], newBags[1]),
     ];
 
     const roundHistory: RoundScore = {
