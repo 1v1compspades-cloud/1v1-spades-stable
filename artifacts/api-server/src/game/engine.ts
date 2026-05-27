@@ -932,6 +932,21 @@ export function getRoomBySocketId(socketId: string): GameState | null {
   return null;
 }
 
+/**
+ * Read-only scan: find the room that contains this socket in ANY role
+ * (seated player, spectator, or queued challenger). Used by the disconnect
+ * handler to pick the per-room lock BEFORE mutating, so the actual
+ * remove happens inside `withRoomLock`.
+ */
+export function findRoomBySocketAny(socketId: string): GameState | null {
+  for (const [, state] of rooms) {
+    if (state.players.some((p) => p?.socketId === socketId)) return state;
+    if (state.spectators.some((s) => s.socketId === socketId)) return state;
+    if (state.challengerQueue.some((c) => c.socketId === socketId)) return state;
+  }
+  return null;
+}
+
 export function cleanupRoom(roomCode: string): void {
   rooms.delete(roomCode);
 }

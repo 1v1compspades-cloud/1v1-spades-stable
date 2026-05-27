@@ -1,3 +1,4 @@
-- [Spades stale-sweep semantics](spades-sweep-semantics.md) — sweep "complete" entities by completion timestamp, not createdAt, or long matches get nuked seconds after finishing.
-- [Spades socket observability](spades-socket-observability.md) — playerName tagging must cover reconnect + spectator paths, not just create/join, or disconnect logs lose identity.
-- [Spades shuffle timing budget](spades-shuffle-timing.md) — client deal+discard animation must fit inside server SHUFFLE_ANIMATION_MS (2600ms) or the deal arrives mid-animation.
+- [Per-room serial lock pattern](room-lock-pattern.md) — JS Promise-chain lock cleanup must use sync identity check on the stored handle, never `await` inside `finally`.
+- [Async closure narrowing trap](ts-async-closure-narrow.md) — `let x: T | null = null` assigned inside an awaited closure narrows to `never` after a `!x` throw guard; assert via `as T` at the destructure, not `x!` at every use.
+- [Sync-mutate-then-lock-commit](sync-mutate-lock-commit.md) — when the room key is unknown up front, do the sync atomic mutation first, then lock that room only for the durable persist+broadcast.
+- [Stale snapshot merge across delays](stale-snapshot-merge.md) — any state computed before a `setTimeout` reveal must overlay the post-delay roster/activity fields from the freshly-locked current state before committing.

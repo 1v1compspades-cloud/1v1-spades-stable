@@ -28,6 +28,7 @@ import {
   type GameState,
   type PlayCardResult,
 } from "./engine.js";
+import { withRoomLock, commit, clearLastHashFor } from "./persistence.js";
 import type { Card } from "./deck.js";
 import {
   createTournament as createTournamentEntity,
@@ -267,36 +268,49 @@ function armTurnTimer(io: SocketIOServer, state: GameState): void {
 }
 
 function autoBidFor(io: SocketIOServer, state: GameState, playerIndex: 0 | 1): void {
-  const amount = pickAutoBid(state, playerIndex);
-  try {
-    const { state: newState, bothBid } = placeBid(state, playerIndex, amount);
-    updateRoom(newState);
-    io.to(state.roomCode).emit("turn_auto_action", {
-      playerIndex, kind: "bid", amount,
-    });
-    armTurnTimer(io, newState);
-    broadcastState(io, newState);
-    for (let i = 0; i < 2; i++) {
-      const p = newState.players[i];
-      if (p) io.to(p.socketId).emit("bid_placed", { playerIndex, amount, bothBid });
+  void withRoomLock(state.roomCode, async () => {
+    // Re-read inside the lock — the snapshot passed in could be stale.
+    const cur = getRoom(state.roomCode);
+    if (!cur || cur.phase !== "bidding" || cur.currentBidder !== playerIndex) return;
+    const amount = pickAutoBid(cur, playerIndex);
+    try {
+      const { state: newState, bothBid } = placeBid(cur, playerIndex, amount);
+      armTurnTimer(io, newState);
+      await commit(newState, {
+        action: "bid_placed",
+        actorSeat: playerIndex,
+        payload: { amount, auto: true, bothBid },
+      });
+      io.to(state.roomCode).emit("turn_auto_action", {
+        playerIndex, kind: "bid", amount,
+      });
+      broadcastState(io, newState);
+      for (let i = 0; i < 2; i++) {
+        const p = newState.players[i];
+        if (p) io.to(p.socketId).emit("bid_placed", { playerIndex, amount, bothBid });
+      }
+    } catch (err) {
+      logger.error({ err, roomCode: state.roomCode, playerIndex }, "Auto-bid failed");
     }
-  } catch (err) {
-    logger.error({ err, roomCode: state.roomCode, playerIndex }, "Auto-bid failed");
-  }
+  });
 }
 
 function autoPlayFor(io: SocketIOServer, state: GameState, playerIndex: 0 | 1): void {
-  const card = pickAutoPlayCard(state, playerIndex);
-  if (!card) return;
-  try {
-    const result = playCard(state, playerIndex, card);
-    io.to(state.roomCode).emit("turn_auto_action", {
-      playerIndex, kind: "play", card,
-    });
-    handlePlayResult(io, state.roomCode, state, result);
-  } catch (err) {
-    logger.error({ err, roomCode: state.roomCode, playerIndex }, "Auto-play failed");
-  }
+  void withRoomLock(state.roomCode, async () => {
+    const cur = getRoom(state.roomCode);
+    if (!cur || cur.phase !== "playing" || cur.currentTurnIndex !== playerIndex) return;
+    const card = pickAutoPlayCard(cur, playerIndex);
+    if (!card) return;
+    try {
+      const result = playCard(cur, playerIndex, card);
+      io.to(state.roomCode).emit("turn_auto_action", {
+        playerIndex, kind: "play", card,
+      });
+      await handlePlayResult(io, state.roomCode, cur, result, playerIndex, true);
+    } catch (err) {
+      logger.error({ err, roomCode: state.roomCode, playerIndex }, "Auto-play failed");
+    }
+  });
 }
 
 /**
@@ -304,58 +318,99 @@ function autoPlayFor(io: SocketIOServer, state: GameState, playerIndex: 0 | 1): 
  * `autoPlayFor`. Owns the trick-complete two-phase reveal, round_over /
  * game_over emits, KotT rotation, and tournament-bracket advancement.
  */
-function handlePlayResult(
+async function handlePlayResult(
   io: SocketIOServer,
   roomCode: string,
   preState: GameState,
   result: PlayCardResult,
-): void {
+  actorSeat: 0 | 1,
+  isAuto: boolean,
+): Promise<void> {
   if (result.trickComplete && result.intermediateState) {
     const inter = result.intermediateState;
     inter.turnDeadline = null;
     clearTurnTimer(roomCode);
-    updateRoom(inter);
+    await commit(inter, {
+      action: "trick_completed",
+      actorSeat,
+      payload: { winner: result.trickWinner, auto: isAuto },
+    });
     broadcastState(io, inter);
     io.to(roomCode).emit("trick_complete", {
       winner: result.trickWinner,
       tricks: inter.tricks,
     });
 
+    // Schedule the second phase under the same per-room lock so it can't
+    // interleave with another action that arrives during the 700ms delay.
     setTimeout(() => {
-      try {
-        const current = getRoom(roomCode);
-        if (!current) return;
-        // Preserve the room's turnTimeoutMs across the result swap (engine
-        // doesn't know about it).
-        result.state.turnTimeoutMs = current.turnTimeoutMs;
-        armTurnTimer(io, result.state);
-        updateRoom(result.state);
-        broadcastState(io, result.state);
-
-        if (result.roundComplete) {
-          io.to(roomCode).emit("round_over", {
-            scores: result.state.scores,
-            bags: result.state.bags,
-            tricks: result.state.tricks,
-            bids: [preState.bids[0], preState.bids[1]],
-            roundHistory: result.state.roundHistory,
-            phase: result.state.phase,
+      void withRoomLock(roomCode, async () => {
+        try {
+          const current = getRoom(roomCode);
+          if (!current) return;
+          // `result.state` was computed BEFORE the 700ms reveal. Any changes
+          // that happened during the delay (disconnect/reconnect/spectator
+          // join+leave/queue mutations) live on `current`. Overlay the
+          // engine's gameplay deltas onto current's transient roster so we
+          // don't clobber them.
+          const merged: GameState = {
+            ...result.state,
+            players: current.players,
+            spectators: current.spectators,
+            challengerQueue: current.challengerQueue,
+            ready: current.ready,
+            turnTimeoutMs: current.turnTimeoutMs,
+            // Reconnect during the reveal bumps lastActiveAt on `current`;
+            // don't regress it from the stale snapshot.
+            lastActiveAt: current.lastActiveAt,
+          };
+          armTurnTimer(io, merged);
+          const action =
+            merged.phase === "game_over"
+              ? "match_completed"
+              : result.roundComplete
+              ? "round_completed"
+              : "trick_advanced";
+          await commit(merged, {
+            action,
+            actorSeat,
+            payload: {
+              roundComplete: result.roundComplete,
+              gameOver: merged.phase === "game_over",
+              scores: merged.scores,
+            },
           });
+          broadcastState(io, merged);
+
+          if (result.roundComplete) {
+            io.to(roomCode).emit("round_over", {
+              scores: merged.scores,
+              bags: merged.bags,
+              tricks: merged.tricks,
+              bids: [preState.bids[0], preState.bids[1]],
+              roundHistory: merged.roundHistory,
+              phase: merged.phase,
+            });
+          }
+          if (merged.phase === "game_over" && merged.mode === "king" && merged.challengerQueue.length > 0) {
+            scheduleKingNextMatch(io, roomCode);
+          }
+          if (merged.phase === "game_over" && merged.tournamentRef) {
+            advanceTournamentOnGameOver(io, merged);
+          }
+        } catch (err) {
+          logger.error({ err, roomCode }, "handlePlayResult post-delay failed");
         }
-        if (result.state.phase === "game_over" && result.state.mode === "king" && result.state.challengerQueue.length > 0) {
-          scheduleKingNextMatch(io, roomCode);
-        }
-        if (result.state.phase === "game_over" && result.state.tournamentRef) {
-          advanceTournamentOnGameOver(io, result.state);
-        }
-      } catch (err) {
-        logger.error({ err, roomCode }, "handlePlayResult post-delay failed");
-      }
+      });
     }, 700);
   } else {
     result.state.turnTimeoutMs = preState.turnTimeoutMs;
     armTurnTimer(io, result.state);
-    updateRoom(result.state);
+    await commit(result.state, {
+      action: "card_played",
+      actorSeat,
+      payload: { auto: isAuto },
+    });
     broadcastState(io, result.state);
   }
 }
@@ -409,40 +464,45 @@ function forfeitTournamentMatch(
   forfeitSeat: 0 | 1,
   reason: "disconnect" | "host_forced",
 ): void {
-  const state = getRoom(roomCode);
-  if (!state) return;
-  if (!state.tournamentRef) return;
-  if (state.phase === "game_over") return;
+  void withRoomLock(roomCode, async () => {
+    const state = getRoom(roomCode);
+    if (!state) return;
+    if (!state.tournamentRef) return;
+    if (state.phase === "game_over") return;
 
-  clearTurnTimer(roomCode);
-  const winnerSeat: 0 | 1 = forfeitSeat === 0 ? 1 : 0;
-  const finalScores: [number, number] = [state.scores[0], state.scores[1]];
-  finalScores[winnerSeat] = Math.max(finalScores[winnerSeat], state.matchTarget);
-  // Force a strict inequality so advanceTournamentOnGameOver picks a winner.
-  if (finalScores[winnerSeat] <= finalScores[forfeitSeat]) {
-    finalScores[winnerSeat] = finalScores[forfeitSeat] + 1;
-  }
+    clearTurnTimer(roomCode);
+    const winnerSeat: 0 | 1 = forfeitSeat === 0 ? 1 : 0;
+    const finalScores: [number, number] = [state.scores[0], state.scores[1]];
+    finalScores[winnerSeat] = Math.max(finalScores[winnerSeat], state.matchTarget);
+    if (finalScores[winnerSeat] <= finalScores[forfeitSeat]) {
+      finalScores[winnerSeat] = finalScores[forfeitSeat] + 1;
+    }
 
-  const forfeitedName = state.players[forfeitSeat]?.name ?? null;
-  const winnerName = state.players[winnerSeat]?.name ?? null;
-  const finalState: GameState = {
-    ...state,
-    phase: "game_over",
-    scores: finalScores,
-    currentBidder: null,
-    currentTurnIndex: null,
-    turnDeadline: null,
-  };
-  updateRoom(finalState);
-  io.to(roomCode).emit("match_forfeit", {
-    roomCode,
-    forfeitSeat,
-    forfeitedName,
-    winnerName,
-    reason,
+    const forfeitedName = state.players[forfeitSeat]?.name ?? null;
+    const winnerName = state.players[winnerSeat]?.name ?? null;
+    const finalState: GameState = {
+      ...state,
+      phase: "game_over",
+      scores: finalScores,
+      currentBidder: null,
+      currentTurnIndex: null,
+      turnDeadline: null,
+    };
+    await commit(finalState, {
+      action: "forfeit",
+      actorSeat: forfeitSeat,
+      payload: { reason, forfeitedName, winnerName, finalScores },
+    });
+    io.to(roomCode).emit("match_forfeit", {
+      roomCode,
+      forfeitSeat,
+      forfeitedName,
+      winnerName,
+      reason,
+    });
+    broadcastState(io, finalState);
+    advanceTournamentOnGameOver(io, finalState);
   });
-  broadcastState(io, finalState);
-  advanceTournamentOnGameOver(io, finalState);
 }
 
 /** Duration of the visual shuffle + deal animation between phases. */
@@ -458,36 +518,44 @@ const SHUFFLE_ANIMATION_MS = 2600;
  * Bids placed during step (1) are rejected by the socket handler's phase
  * guard, so this is safe even though the dealt state has currentBidder set.
  */
-function dealWithShuffleAnimation(
+async function dealWithShuffleAnimation(
   io: SocketIOServer,
   roomCode: string,
   dealt: GameState
-): void {
+): Promise<void> {
   const shuffling: GameState = { ...dealt, phase: "shuffling" };
-  updateRoom(shuffling);
+  await commit(shuffling, {
+    action: "cards_dealt",
+    payload: { roundNumber: dealt.roundNumber },
+  });
   broadcastState(io, shuffling);
 
   setTimeout(() => {
-    try {
-      const current = getRoom(roomCode);
-      if (!current || current.phase !== "shuffling") return;
-      const ready: GameState = { ...current, phase: "bidding" };
-      armTurnTimer(io, ready);
-      updateRoom(ready);
-      broadcastState(io, ready);
-      const firstBidder = ready.currentBidder;
-      for (let i = 0; i < 2; i++) {
-        const p = ready.players[i];
-        if (p) {
-          io.to(p.socketId).emit("round_started", {
-            roundNumber: ready.roundNumber,
-            yourBidTurn: i === firstBidder,
-          });
+    void withRoomLock(roomCode, async () => {
+      try {
+        const current = getRoom(roomCode);
+        if (!current || current.phase !== "shuffling") return;
+        const ready: GameState = { ...current, phase: "bidding" };
+        armTurnTimer(io, ready);
+        await commit(ready, {
+          action: "bidding_started",
+          payload: { roundNumber: ready.roundNumber, firstBidder: ready.currentBidder },
+        });
+        broadcastState(io, ready);
+        const firstBidder = ready.currentBidder;
+        for (let i = 0; i < 2; i++) {
+          const p = ready.players[i];
+          if (p) {
+            io.to(p.socketId).emit("round_started", {
+              roundNumber: ready.roundNumber,
+              yourBidTurn: i === firstBidder,
+            });
+          }
         }
+      } catch (err: unknown) {
+        logger.error({ err, roomCode }, "Error transitioning from shuffling to bidding");
       }
-    } catch (err: unknown) {
-      logger.error({ err, roomCode }, "Error transitioning from shuffling to bidding");
-    }
+    });
   }, SHUFFLE_ANIMATION_MS);
 }
 
@@ -515,11 +583,11 @@ function roundLabelForMatch(totalRounds: number, round: number, position: number
  * as host, joins player B, records the room code on the match, and emits
  * `match_assigned` to each player's socket so the client can navigate.
  */
-function createMatchRoomAndAssign(
+async function createMatchRoomAndAssign(
   io: SocketIOServer,
   t: Tournament,
   match: TournamentMatch
-): void {
+): Promise<void> {
   if (!match.playerA || !match.playerB) {
     logger.warn({ code: t.code, matchId: match.id }, "createMatchRoomAndAssign called with incomplete pair");
     return;
@@ -549,8 +617,21 @@ function createMatchRoomAndAssign(
   );
   // Tournament matches get a turn clock — quick + KotT remain untimed.
   room.turnTimeoutMs = TOURNAMENT_TURN_TIMEOUT_MS;
-  updateRoom(room);
-  joinRoom(room.roomCode, match.playerB.name, sB);
+  // AWAIT the commits inside the lock so `match_assigned` is never emitted
+  // before the room is durable + audited. Clients refresh-recovering via
+  // pendingAssignment must not see a room code the DB doesn't yet know about.
+  await withRoomLock(room.roomCode, async () => {
+    await commit(room, {
+      action: "room_created",
+      payload: { mode: "quick", tournamentMatch: match.id, host: match.playerA?.name, label },
+    });
+    const joined = joinRoom(room.roomCode, match.playerB!.name, sB);
+    await commit(joined.state, {
+      action: "player_joined",
+      actorSeat: 1,
+      payload: { name: match.playerB?.name, tournamentMatch: match.id },
+    });
+  });
   attachRoomToMatch(t.code, match.id, room.roomCode);
 
   // Make both player sockets join the game-room channel so they get
@@ -638,13 +719,24 @@ function advanceTournamentOnGameOver(io: SocketIOServer, state: GameState): void
     }
   }
 
-  // Spin up rooms for any next-round matches that now have both feeders.
-  for (const next of effect.newlyReadyMatches) {
-    createMatchRoomAndAssign(io, effect.tournament, next);
-  }
-
-  // Broadcast updated bracket state to all tournament subscribers.
+  // Broadcast the immediate bracket update (loser eliminated, winner advanced)
+  // so subscribers see the resolution right away.
   io.to(`tournament:${code}`).emit("tournament_state", sanitizeTournament(effect.tournament));
+
+  // Spin up rooms for any next-round matches that now have both feeders, then
+  // re-broadcast so subscribers observe the new roomCode assignments. The
+  // initial broadcast above intentionally fires BEFORE these awaits so the
+  // gameplay caller (handlePlayResult) isn't blocked; the second broadcast
+  // closes the window where the bracket shows next-round matches without
+  // their rooms yet.
+  void (async () => {
+    for (const next of effect.newlyReadyMatches) {
+      await createMatchRoomAndAssign(io, effect.tournament, next);
+    }
+    if (effect.newlyReadyMatches.length > 0) {
+      io.to(`tournament:${code}`).emit("tournament_state", sanitizeTournament(effect.tournament));
+    }
+  })();
 
   if (effect.isFinal && effect.championName) {
     io.to(`tournament:${code}`).emit("tournament_complete", {
@@ -674,84 +766,93 @@ function scheduleKingNextMatch(io: SocketIOServer, roomCode: string): void {
   kingRotationScheduled.add(roomCode);
   setTimeout(() => {
     kingRotationScheduled.delete(roomCode);
-    try {
-      const cur = getRoom(roomCode);
-      if (!cur || cur.phase !== "game_over" || cur.mode !== "king") return;
-      if (cur.challengerQueue.length === 0) return;
+    void withRoomLock(roomCode, async () => {
+      try {
+        const cur = getRoom(roomCode);
+        if (!cur || cur.phase !== "game_over" || cur.mode !== "king") return;
+        if (cur.challengerQueue.length === 0) return;
 
-      const result = promoteNextChallenger(roomCode);
-      if (!result) {
-        // Couldn't promote (e.g. both seats empty). Leave in game_over;
-        // a future `join_queue` or `reconnect` will reschedule us.
-        return;
-      }
+        const result = promoteNextChallenger(roomCode);
+        if (!result) return;
 
-      // Ensure the promoted challenger's socket is joined to the room so
-      // room-scoped emits (trick_complete, round_over, etc.) reach them.
-      const promotedSock = io.sockets.sockets.get(result.promoted.socketId);
-      if (promotedSock) {
-        promotedSock.join(roomCode);
-      } else {
-        // Promoted challenger vanished before rotation fired — roll back.
-        logger.warn({ roomCode, socketId: result.promoted.socketId }, "Promoted challenger disconnected; aborting rotation");
-        const rolled = getRoom(roomCode);
-        if (rolled) {
-          rolled.players[result.promoted.playerIndex] = null;
-          updateRoom(rolled);
-          broadcastState(io, rolled);
-          // Try again with the next challenger (if any).
-          if (rolled.challengerQueue.length > 0) {
-            scheduleKingNextMatch(io, roomCode);
-          }
-        }
-        return;
-      }
-
-      io.to(result.promoted.socketId).emit("you_are_seated", {
-        roomCode,
-        playerIndex: result.promoted.playerIndex,
-        name: result.promoted.name,
-      });
-      if (result.demoted) {
-        io.to(result.demoted.socketId).emit("you_are_unseated", {
-          roomCode,
-          previousIndex: result.demoted.previousIndex,
-        });
-      }
-
-      // Broadcast the freshly-reset state so everyone sees new seats + queue.
-      broadcastState(io, result.state);
-
-      // Coin toss → deal Round 1, mirroring the new_match flow.
-      const tossed = performCoinToss(result.state);
-      updateRoom(tossed);
-      broadcastState(io, tossed);
-
-      setTimeout(() => {
-        try {
-          const c = getRoom(roomCode);
-          if (!c || c.phase !== "coin_toss") return;
-          // Re-validate both seats are still filled — either side could have
-          // disconnected during the 3.5s coin-toss window.
-          if (!c.players[0] || !c.players[1]) {
-            logger.warn({ roomCode }, "Seat went empty during KotT coin toss; reverting to game_over");
-            c.phase = "game_over";
-            updateRoom(c);
-            broadcastState(io, c);
-            if (c.challengerQueue.length > 0) {
+        const promotedSock = io.sockets.sockets.get(result.promoted.socketId);
+        if (promotedSock) {
+          promotedSock.join(roomCode);
+        } else {
+          logger.warn({ roomCode, socketId: result.promoted.socketId }, "Promoted challenger disconnected; aborting rotation");
+          const rolled = getRoom(roomCode);
+          if (rolled) {
+            rolled.players[result.promoted.playerIndex] = null;
+            await commit(rolled, {
+              action: "king_rotation_aborted",
+              payload: { reason: "promoted_socket_gone" },
+            });
+            broadcastState(io, rolled);
+            if (rolled.challengerQueue.length > 0) {
               scheduleKingNextMatch(io, roomCode);
             }
-            return;
           }
-          const dealt = startRound(c);
-          dealWithShuffleAnimation(io, roomCode, dealt);
-        } catch (err: unknown) {
-          logger.error({ err, roomCode }, "Error dealing first round of KotT next match");
+          return;
         }
-      }, 3500);
-    } catch (err: unknown) {
-      logger.error({ err, roomCode }, "Error scheduling KotT next match");
-    }
+
+        // promoteNextChallenger already wrote result.state to the map; persist + audit it.
+        await commit(result.state, {
+          action: "king_rotation",
+          payload: {
+            promoted: { seat: result.promoted.playerIndex, name: result.promoted.name },
+            demoted: result.demoted ? { seat: result.demoted.previousIndex } : null,
+          },
+        });
+
+        io.to(result.promoted.socketId).emit("you_are_seated", {
+          roomCode,
+          playerIndex: result.promoted.playerIndex,
+          name: result.promoted.name,
+        });
+        if (result.demoted) {
+          io.to(result.demoted.socketId).emit("you_are_unseated", {
+            roomCode,
+            previousIndex: result.demoted.previousIndex,
+          });
+        }
+        broadcastState(io, result.state);
+
+        const tossed = performCoinToss(result.state);
+        await commit(tossed, {
+          action: "coin_toss",
+          payload: { winner: tossed.coinFlipWinner, firstBidder: tossed.firstBidderRound1 },
+        });
+        broadcastState(io, tossed);
+
+        setTimeout(() => {
+          void withRoomLock(roomCode, async () => {
+            try {
+              const c = getRoom(roomCode);
+              if (!c || c.phase !== "coin_toss") return;
+              if (!c.players[0] || !c.players[1]) {
+                logger.warn({ roomCode }, "Seat went empty during KotT coin toss; reverting to game_over");
+                c.phase = "game_over";
+                await commit(c, {
+                  action: "king_rotation_aborted",
+                  payload: { reason: "seat_empty_during_coin_toss" },
+                });
+                broadcastState(io, c);
+                if (c.challengerQueue.length > 0) {
+                  scheduleKingNextMatch(io, roomCode);
+                }
+                return;
+              }
+              const dealt = startRound(c);
+              await dealWithShuffleAnimation(io, roomCode, dealt);
+            } catch (err: unknown) {
+              logger.error({ err, roomCode }, "Error dealing first round of KotT next match");
+            }
+          });
+        }, 3500);
+      } catch (err: unknown) {
+        logger.error({ err, roomCode }, "Error scheduling KotT next match");
+      }
+    });
   }, KING_NEXT_MATCH_DELAY_MS);
 }
 
@@ -796,7 +897,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
 
     socket.on(
       "create_room",
-      (
+      async (
         data: { playerName: string; matchTarget?: number; matchLabel?: string; mode?: string },
         callback: (res: { ok: boolean; roomCode?: string; playerIndex?: number; error?: string }) => void
       ) => {
@@ -804,17 +905,21 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           if (!checkRate(socket.id, "create_room", 5, 30_000)) {
             return callback({ ok: false, error: "Slow down — too many rooms created. Try again in a moment." });
           }
-          // Accept any positive integer match target. Default to 250.
-          // UI restricts to 250/500; lower values are allowed for tests.
           const rawTarget = Number(data.matchTarget);
           const target = Number.isFinite(rawTarget) && rawTarget > 0 && rawTarget <= 5000
             ? Math.floor(rawTarget)
             : 250;
-          // Optional match label (e.g. "Quarterfinal 1"). Trimmed, length-capped.
           const rawLabel = typeof data.matchLabel === "string" ? data.matchLabel.trim() : "";
           const label = rawLabel ? rawLabel.slice(0, 40) : undefined;
           const mode: "quick" | "king" = data.mode === "king" ? "king" : "quick";
           const state = createRoom(data.playerName, socket.id, target, label, mode);
+          await withRoomLock(state.roomCode, async () => {
+            await commit(state, {
+              action: "room_created",
+              actorSeat: 0,
+              payload: { mode, matchTarget: target, host: data.playerName, label },
+            });
+          });
           socket.join(state.roomCode);
           (socket.data as { playerName?: string }).playerName = data.playerName;
           logger.info({ roomCode: state.roomCode, playerName: data.playerName, socketId: socket.id }, "Room created");
@@ -829,7 +934,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
 
     socket.on(
       "join_room",
-      (
+      async (
         data: { roomCode: string; playerName: string },
         callback: (res: { ok: boolean; playerIndex?: number; error?: string }) => void
       ) => {
@@ -838,19 +943,30 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
             return callback({ ok: false, error: "Slow down — too many join attempts." });
           }
           const code = data.roomCode.toUpperCase().trim();
-          const { state, playerIndex } = joinRoom(code, data.playerName, socket.id);
+          let result: { state: GameState; playerIndex: number } | null = null;
+          let joinErr: Error | null = null;
+          await withRoomLock(code, async () => {
+            try {
+              const r = joinRoom(code, data.playerName, socket.id);
+              result = r;
+              await commit(r.state, {
+                action: "player_joined",
+                actorSeat: r.playerIndex,
+                payload: { name: data.playerName },
+              });
+            } catch (e) {
+              joinErr = e as Error;
+            }
+          });
+          if (joinErr || !result) throw joinErr ?? new Error("Join failed");
+          const { state, playerIndex } = result as { state: GameState; playerIndex: number };
           socket.join(code);
           (socket.data as { playerName?: string }).playerName = data.playerName;
           logger.info({ roomCode: code, playerName: data.playerName, socketId: socket.id }, "Player joined room");
-
           callback({ ok: true, playerIndex });
-
-          // Notify host
           const hostSocket = state.players[0]?.socketId;
           if (hostSocket) {
-            io.to(hostSocket).emit("opponent_joined", {
-              playerName: data.playerName,
-            });
+            io.to(hostSocket).emit("opponent_joined", { playerName: data.playerName });
           }
           broadcastState(io, state);
         } catch (err: unknown) {
@@ -861,33 +977,39 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
     );
 
     socket.on("start_game", (data: { roomCode: string }) => {
-      try {
-        const state = getRoom(data.roomCode);
-        if (!state) return;
-        if (state.players[0]?.socketId !== socket.id) return;
-        if (!state.players[1]) return;
-        // Only meaningful from "waiting" phase.
-        if (state.phase !== "waiting") return;
-        // Both players must have readied up.
-        if (!state.ready[0] || !state.ready[1]) return;
+      void withRoomLock(data.roomCode, async () => {
+        try {
+          const state = getRoom(data.roomCode);
+          if (!state) return;
+          if (state.players[0]?.socketId !== socket.id) return;
+          if (!state.players[1]) return;
+          if (state.phase !== "waiting") return;
+          if (!state.ready[0] || !state.ready[1]) return;
 
-        // Step 1: flip the coin once and broadcast the result.
-        const tossed = performCoinToss(state);
-        updateRoom(tossed);
-        broadcastState(io, tossed);
+          const tossed = performCoinToss(state);
+          await commit(tossed, {
+            action: "coin_toss",
+            actorSeat: 0,
+            payload: { winner: tossed.coinFlipWinner, firstBidder: tossed.firstBidderRound1 },
+          });
+          broadcastState(io, tossed);
 
-        // Step 2: after a brief display delay, deal Round 1 and start bidding.
-        // The loser bids first in Round 1 (handled by startRound via
-        // getFirstBidderForRound).
-        setTimeout(() => {
-          const cur = getRoom(data.roomCode);
-          if (!cur || cur.phase !== "coin_toss") return;
-          const dealt = startRound(cur);
-          dealWithShuffleAnimation(io, data.roomCode, dealt);
-        }, 3500);
-      } catch (err: unknown) {
-        logger.error({ err }, "Error starting game");
-      }
+          setTimeout(() => {
+            void withRoomLock(data.roomCode, async () => {
+              try {
+                const cur = getRoom(data.roomCode);
+                if (!cur || cur.phase !== "coin_toss") return;
+                const dealt = startRound(cur);
+                await dealWithShuffleAnimation(io, data.roomCode, dealt);
+              } catch (err: unknown) {
+                logger.error({ err }, "Error dealing first round");
+              }
+            });
+          }, 3500);
+        } catch (err: unknown) {
+          logger.error({ err }, "Error starting game");
+        }
+      });
     });
 
     socket.on(
@@ -896,41 +1018,45 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         data: { roomCode: string; amount: number },
         callback: (res: { ok: boolean; error?: string }) => void
       ) => {
-        try {
-          if (!checkRate(socket.id, "place_bid", 20, 5_000)) {
-            return callback({ ok: false, error: "Slow down." });
-          }
-          const state = getRoom(data.roomCode);
-          if (!state) throw new Error("Room not found");
-
-          const playerIndex = state.players.findIndex(
-            (p) => p?.socketId === socket.id
-          ) as 0 | 1;
-          if (playerIndex < 0) throw new Error("Player not found");
-          if (state.phase !== "bidding") throw new Error("Not in bidding phase");
-
-          const { state: newState, bothBid } = placeBid(state, playerIndex, data.amount);
-          armTurnTimer(io, newState);
-          updateRoom(newState);
-
-          callback({ ok: true });
-
-          // Send updated state to both players + spectators
-          broadcastState(io, newState);
-          for (let i = 0; i < 2; i++) {
-            const p = newState.players[i];
-            if (p) {
-              io.to(p.socketId).emit("bid_placed", {
-                playerIndex,
-                amount: data.amount,
-                bothBid,
-              });
-            }
-          }
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : "Unknown error";
-          callback({ ok: false, error: msg });
+        if (!checkRate(socket.id, "place_bid", 20, 5_000)) {
+          return callback({ ok: false, error: "Slow down." });
         }
+        void withRoomLock(data.roomCode, async () => {
+          try {
+            const state = getRoom(data.roomCode);
+            if (!state) throw new Error("Room not found");
+
+            const playerIndex = state.players.findIndex(
+              (p) => p?.socketId === socket.id
+            ) as 0 | 1;
+            if (playerIndex < 0) throw new Error("Player not found");
+            if (state.phase !== "bidding") throw new Error("Not in bidding phase");
+
+            const { state: newState, bothBid } = placeBid(state, playerIndex, data.amount);
+            armTurnTimer(io, newState);
+            await commit(newState, {
+              action: "bid_placed",
+              actorSeat: playerIndex,
+              payload: { amount: data.amount, auto: false, bothBid },
+            });
+
+            callback({ ok: true });
+            broadcastState(io, newState);
+            for (let i = 0; i < 2; i++) {
+              const p = newState.players[i];
+              if (p) {
+                io.to(p.socketId).emit("bid_placed", {
+                  playerIndex,
+                  amount: data.amount,
+                  bothBid,
+                });
+              }
+            }
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "Unknown error";
+            callback({ ok: false, error: msg });
+          }
+        });
       }
     );
 
@@ -940,75 +1066,88 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         data: { roomCode: string; card: Card },
         callback: (res: { ok: boolean; error?: string }) => void
       ) => {
-        try {
-          if (!checkRate(socket.id, "play_card", 30, 5_000)) {
-            return callback({ ok: false, error: "Slow down." });
-          }
-          const state = getRoom(data.roomCode);
-          if (!state) throw new Error("Room not found");
-
-          const playerIndex = state.players.findIndex(
-            (p) => p?.socketId === socket.id
-          ) as 0 | 1;
-          if (playerIndex < 0) throw new Error("Player not found");
-
-          const result = playCard(state, playerIndex, data.card);
-
-          callback({ ok: true });
-
-          handlePlayResult(io, data.roomCode, state, result);
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : "Unknown error";
-          callback({ ok: false, error: msg });
+        if (!checkRate(socket.id, "play_card", 30, 5_000)) {
+          return callback({ ok: false, error: "Slow down." });
         }
+        void withRoomLock(data.roomCode, async () => {
+          try {
+            const state = getRoom(data.roomCode);
+            if (!state) throw new Error("Room not found");
+
+            const playerIndex = state.players.findIndex(
+              (p) => p?.socketId === socket.id
+            ) as 0 | 1;
+            if (playerIndex < 0) throw new Error("Player not found");
+
+            const result = playCard(state, playerIndex, data.card);
+
+            callback({ ok: true });
+
+            await handlePlayResult(io, data.roomCode, state, result, playerIndex, false);
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "Unknown error";
+            callback({ ok: false, error: msg });
+          }
+        });
       }
     );
 
     socket.on("next_round", (data: { roomCode: string }) => {
-      try {
-        const state = getRoom(data.roomCode);
-        if (!state) return;
-        if (state.phase !== "round_over") return;
+      void withRoomLock(data.roomCode, async () => {
+        try {
+          const state = getRoom(data.roomCode);
+          if (!state) return;
+          if (state.phase !== "round_over") return;
+          if (state.players[0]?.socketId !== socket.id) return;
 
-        // Only host can advance
-        if (state.players[0]?.socketId !== socket.id) return;
-
-        const newState = startRound(state);
-        dealWithShuffleAnimation(io, data.roomCode, newState);
-      } catch (err: unknown) {
-        logger.error({ err }, "Error advancing round");
-      }
+          const newState = startRound(state);
+          await dealWithShuffleAnimation(io, data.roomCode, newState);
+        } catch (err: unknown) {
+          logger.error({ err }, "Error advancing round");
+        }
+      });
     });
 
     socket.on(
       "reconnect_player",
-      (
+      async (
         data: { roomCode: string; playerIndex: 0 | 1; playerName: string },
         callback: (res: { ok: boolean; error?: string }) => void
       ) => {
         try {
           const code = data.roomCode.toUpperCase().trim();
-          const state = reconnectPlayer(code, data.playerIndex, socket.id, data.playerName);
+          let state: GameState | null = null;
+          let recErr: Error | null = null;
+          await withRoomLock(code, async () => {
+            try {
+              state = reconnectPlayer(code, data.playerIndex, socket.id, data.playerName);
+              await commit(state, {
+                action: "reconnect",
+                actorSeat: data.playerIndex,
+                payload: { playerName: data.playerName, role: "player" },
+              });
+            } catch (e) {
+              recErr = e as Error;
+            }
+          });
+          if (recErr || !state) throw recErr ?? new Error("Reconnect failed");
+          const s: GameState = state!;
           socket.join(code);
           socket.data.playerName = data.playerName;
           logger.info(
             { roomCode: code, playerIndex: data.playerIndex, playerName: data.playerName },
             "Player reconnected"
           );
-          // Reconnect cancels any pending auto-forfeit for this seat.
           cancelAutoForfeit(code, data.playerIndex);
 
           callback({ ok: true });
 
-          // Notify the other player that their opponent is back
           const otherIndex = data.playerIndex === 0 ? 1 : 0;
-          const other = state.players[otherIndex];
+          const other = s.players[otherIndex];
           if (other) {
-            io.to(other.socketId).emit("opponent_reconnected", {
-              playerName: data.playerName,
-            });
+            io.to(other.socketId).emit("opponent_reconnected", { playerName: data.playerName });
           }
-          broadcastState(io, state);
+          broadcastState(io, s);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           logger.warn({ err, data }, "Reconnect failed");
@@ -1018,56 +1157,72 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
     );
 
     socket.on("new_match", (data: { roomCode: string }) => {
-      try {
-        const state = getRoom(data.roomCode);
-        if (!state) return;
-        if (state.phase !== "game_over") return;
-        // Only host can start a new match
-        if (state.players[0]?.socketId !== socket.id) return;
-        // Need both players present
-        if (!state.players[0] || !state.players[1]) return;
+      void withRoomLock(data.roomCode, async () => {
+        try {
+          const state = getRoom(data.roomCode);
+          if (!state) return;
+          if (state.phase !== "game_over") return;
+          if (state.players[0]?.socketId !== socket.id) return;
+          if (!state.players[0] || !state.players[1]) return;
 
-        // New match → re-toss the coin and broadcast the coin_toss phase
-        // for ~3.5s before dealing Round 1 (mirrors `start_game`).
-        const reset  = resetMatch(state);
-        const tossed = performCoinToss(reset);
-        updateRoom(tossed);
-        broadcastState(io, tossed);
+          const reset  = resetMatch(state);
+          const tossed = performCoinToss(reset);
+          await commit(tossed, {
+            action: "coin_toss",
+            actorSeat: 0,
+            payload: { newMatch: true, winner: tossed.coinFlipWinner, firstBidder: tossed.firstBidderRound1 },
+          });
+          broadcastState(io, tossed);
 
-        setTimeout(() => {
-          try {
-            const current = getRoom(data.roomCode);
-            if (!current || current.phase !== "coin_toss") return;
-            const dealt = startRound(current);
-            dealWithShuffleAnimation(io, data.roomCode, dealt);
-          } catch (err: unknown) {
-            logger.error({ err }, "Error dealing first round of new match");
-          }
-        }, 3500);
-      } catch (err: unknown) {
-        logger.error({ err }, "Error starting new match");
-      }
+          setTimeout(() => {
+            void withRoomLock(data.roomCode, async () => {
+              try {
+                const current = getRoom(data.roomCode);
+                if (!current || current.phase !== "coin_toss") return;
+                const dealt = startRound(current);
+                await dealWithShuffleAnimation(io, data.roomCode, dealt);
+              } catch (err: unknown) {
+                logger.error({ err }, "Error dealing first round of new match");
+              }
+            });
+          }, 3500);
+        } catch (err: unknown) {
+          logger.error({ err }, "Error starting new match");
+        }
+      });
     });
 
     socket.on(
       "join_as_spectator",
-      (
+      async (
         data: { roomCode: string; spectatorName: string },
         callback: (res: { ok: boolean; error?: string }) => void
       ) => {
         try {
           const code = data.roomCode.toUpperCase().trim();
           const name = (data.spectatorName || "Spectator").slice(0, 24);
-          const state = addSpectator(code, name, socket.id);
+          let state: GameState | null = null;
+          let specErr: Error | null = null;
+          await withRoomLock(code, async () => {
+            try {
+              state = addSpectator(code, name, socket.id);
+              await commit(state, {
+                action: "spectator_joined",
+                payload: { name },
+              });
+            } catch (e) {
+              specErr = e as Error;
+            }
+          });
+          if (specErr || !state) throw specErr ?? new Error("Spectator join failed");
+          const s: GameState = state!;
           socket.join(code);
           socket.data.playerName = name;
           logger.info({ roomCode: code, playerName: name }, "Spectator joined");
 
           callback({ ok: true });
-          // Send the spectator their view
-          socket.emit("game_state", sanitizeStateForSpectator(state));
-          // Refresh everyone else so they see updated spectatorCount
-          broadcastState(io, state);
+          socket.emit("game_state", sanitizeStateForSpectator(s));
+          broadcastState(io, s);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           callback({ ok: false, error: msg });
@@ -1077,21 +1232,35 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
 
     socket.on(
       "reconnect_spectator",
-      (
+      async (
         data: { roomCode: string; spectatorName: string },
         callback: (res: { ok: boolean; error?: string }) => void
       ) => {
         try {
           const code = data.roomCode.toUpperCase().trim();
           const name = (data.spectatorName || "Spectator").slice(0, 24);
-          const state = reconnectSpectator(code, name, socket.id);
+          let state: GameState | null = null;
+          let recErr: Error | null = null;
+          await withRoomLock(code, async () => {
+            try {
+              state = reconnectSpectator(code, name, socket.id);
+              await commit(state, {
+                action: "reconnect",
+                payload: { name, role: "spectator" },
+              });
+            } catch (e) {
+              recErr = e as Error;
+            }
+          });
+          if (recErr || !state) throw recErr ?? new Error("Spectator reconnect failed");
+          const s: GameState = state!;
           socket.join(code);
           socket.data.playerName = name;
           logger.info({ roomCode: code, playerName: name }, "Spectator reconnected");
 
           callback({ ok: true });
-          socket.emit("game_state", sanitizeStateForSpectator(state));
-          broadcastState(io, state);
+          socket.emit("game_state", sanitizeStateForSpectator(s));
+          broadcastState(io, s);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           callback({ ok: false, error: msg });
@@ -1101,15 +1270,30 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
 
     socket.on(
       "set_ready",
-      (
+      async (
         data: { roomCode: string; ready: boolean },
         callback?: (res: { ok: boolean; error?: string }) => void
       ) => {
         try {
           const code = data.roomCode.toUpperCase().trim();
-          const state = setPlayerReady(code, socket.id, !!data.ready);
+          let state: GameState | null = null;
+          let rErr: Error | null = null;
+          await withRoomLock(code, async () => {
+            try {
+              state = setPlayerReady(code, socket.id, !!data.ready);
+              const seatIdx = state.players.findIndex((p) => p?.socketId === socket.id);
+              await commit(state, {
+                action: "player_ready",
+                actorSeat: seatIdx >= 0 ? seatIdx : null,
+                payload: { ready: !!data.ready },
+              });
+            } catch (e) {
+              rErr = e as Error;
+            }
+          });
+          if (rErr || !state) throw rErr ?? new Error("set_ready failed");
           callback?.({ ok: true });
-          broadcastState(io, state);
+          broadcastState(io, state!);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           callback?.({ ok: false, error: msg });
@@ -1119,22 +1303,32 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
 
     socket.on(
       "join_queue",
-      (
+      async (
         data: { roomCode: string; name: string },
         callback?: (res: { ok: boolean; error?: string }) => void
       ) => {
         try {
           const code = data.roomCode.toUpperCase().trim();
-          const state = addChallenger(code, data.name, socket.id);
-          // Ensure the queued spectator is in the socket.io room so they
-          // receive room-scoped events (and game_state) immediately.
+          let state: GameState | null = null;
+          let qErr: Error | null = null;
+          await withRoomLock(code, async () => {
+            try {
+              state = addChallenger(code, data.name, socket.id);
+              await commit(state, {
+                action: "challenger_joined",
+                payload: { name: data.name },
+              });
+            } catch (e) {
+              qErr = e as Error;
+            }
+          });
+          if (qErr || !state) throw qErr ?? new Error("join_queue failed");
+          const s: GameState = state!;
           socket.join(code);
           logger.info({ roomCode: code, name: data.name }, "Challenger joined queue");
           callback?.({ ok: true });
-          broadcastState(io, state);
-          // If the room is already in game_over (queue was empty when the
-          // match ended), kick off the rotation now that we have a challenger.
-          if (state.phase === "game_over" && state.mode === "king") {
+          broadcastState(io, s);
+          if (s.phase === "game_over" && s.mode === "king") {
             scheduleKingNextMatch(io, code);
           }
         } catch (err: unknown) {
@@ -1146,13 +1340,22 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
 
     socket.on(
       "leave_queue",
-      (
+      async (
         data: { roomCode: string },
         callback?: (res: { ok: boolean; error?: string }) => void
       ) => {
         try {
           const code = data.roomCode.toUpperCase().trim();
-          const state = removeChallenger(code, socket.id);
+          let state: GameState | null = null;
+          await withRoomLock(code, async () => {
+            state = removeChallenger(code, socket.id);
+            if (state) {
+              await commit(state, {
+                action: "challenger_left",
+                payload: { socketId: socket.id },
+              });
+            }
+          });
           callback?.({ ok: true });
           if (state) broadcastState(io, state);
         } catch (err: unknown) {
@@ -1318,7 +1521,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
 
     socket.on(
       "start_tournament",
-      (
+      async (
         data: { code: string; token?: string },
         callback?: (res: { ok: boolean; error?: string }) => void
       ) => {
@@ -1327,9 +1530,11 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           const t = startTournamentEntity(code, socket.id, data.token);
           logger.info({ code, size: t.size }, "Tournament started by host");
           callback?.({ ok: true });
-          // Spin up Round 1 rooms for each match, in order.
+          // Spin up Round 1 rooms for each match, in order. Await so each
+          // room is durable + announced before the next starts (and before
+          // the bracket broadcast tells subscribers about the new rooms).
           for (const match of t.rounds[0]) {
-            createMatchRoomAndAssign(io, t, match);
+            await createMatchRoomAndAssign(io, t, match);
           }
           io.to(`tournament:${code}`).emit("tournament_state", sanitizeTournament(t));
         } catch (err: unknown) {
@@ -1341,16 +1546,30 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
 
     socket.on(
       "reset_room",
-      (
+      async (
         data: { roomCode: string },
         callback?: (res: { ok: boolean; error?: string }) => void
       ) => {
         try {
           const code = data.roomCode.toUpperCase().trim();
-          const state = resetRoom(code, socket.id);
+          let state: GameState | null = null;
+          let rErr: Error | null = null;
+          await withRoomLock(code, async () => {
+            try {
+              state = resetRoom(code, socket.id);
+              await commit(state, {
+                action: "room_reset",
+                actorSeat: 0,
+                payload: {},
+              });
+            } catch (e) {
+              rErr = e as Error;
+            }
+          });
+          if (rErr || !state) throw rErr ?? new Error("reset_room failed");
           logger.info({ roomCode: code }, "Room reset by host");
           callback?.({ ok: true });
-          broadcastState(io, state);
+          broadcastState(io, state!);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           callback?.({ ok: false, error: msg });
@@ -1366,6 +1585,8 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
       // BEFORE removePlayerFromRoom nulls it, so we can arm an auto-forfeit.
       const before = getRoomBySocketId(socket.id);
       let tournamentSeat: { roomCode: string; idx: 0 | 1 } | null = null;
+      let beforeRoomCode: string | null = null;
+      if (before) beforeRoomCode = before.roomCode;
       if (
         before &&
         before.tournamentRef &&
@@ -1378,14 +1599,24 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         }
       }
 
+      // removePlayerFromRoom is a synchronous scan-and-mutate (atomic from
+      // JS's POV — no other handler can observe a half-removed slot). Run it
+      // first so we know which room to lock; then take that room's lock for
+      // the durable commit + broadcast. This avoids the "pre-scan then race
+      // with in-flight join inside the lock" window the architect flagged.
       const state = removePlayerFromRoom(socket.id);
       if (state) {
-        const remaining = state.players.find((p) => p !== null);
-        if (remaining) {
-          io.to(remaining.socketId).emit("opponent_disconnected", {});
-        }
-        // Refresh remaining viewers so spectatorCount stays accurate
-        broadcastState(io, state);
+        void withRoomLock(state.roomCode, async () => {
+          await commit(state, {
+            action: "disconnect",
+            payload: { socketId: socket.id, playerName: playerName ?? null },
+          });
+          const remaining = state.players.find((p) => p !== null);
+          if (remaining) {
+            io.to(remaining.socketId).emit("opponent_disconnected", {});
+          }
+          broadcastState(io, state);
+        });
       }
 
       if (tournamentSeat) {

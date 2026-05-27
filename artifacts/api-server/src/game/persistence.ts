@@ -5,7 +5,7 @@ import {
   gameAuditLogTable,
   type ActiveRoomRow,
 } from "@workspace/db";
-import type { GameState } from "./engine.js";
+import { updateRoom, type GameState } from "./engine.js";
 import { hashState } from "./hash.js";
 import { logger } from "../lib/logger.js";
 
@@ -228,6 +228,106 @@ export async function appendAuditLog(args: {
       "appendAuditLog failed",
     );
   }
+}
+
+// ── Per-room serial queue ────────────────────────────────────────────────
+// Each room has a FIFO of pending mutation+persist operations. A handler
+// acquires the lock for the WHOLE read→compute→commit→broadcast cycle so
+// two concurrent handlers (e.g. both players acting at once) can never
+// build on a stale snapshot.
+//
+// The queue degrades gracefully on errors: a failed fn does NOT poison the
+// chain — the next caller still runs.
+
+const roomLocks = new Map<string, Promise<unknown>>();
+
+export async function withRoomLock<T>(
+  roomCode: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const prev = roomLocks.get(roomCode) ?? Promise.resolve();
+  // Run fn whether prev resolved or rejected — keep the chain alive.
+  const next = prev.then(fn, fn);
+  // Store a swallowed-rejection version so awaiters down the chain don't crash.
+  const handle = next.catch(() => undefined);
+  roomLocks.set(roomCode, handle);
+  try {
+    return await next;
+  } finally {
+    // Identity-check cleanup: only drop the map entry if no newer caller has
+    // already chained behind us. No await in finally — sync identity check
+    // against the exact handle we stored avoids the false-positive race
+    // where a still-pending tail gets evicted.
+    if (roomLocks.get(roomCode) === handle) {
+      roomLocks.delete(roomCode);
+    }
+  }
+}
+
+// ── Audit chain: track last persisted hash per room ─────────────────────
+const lastHashByRoom = new Map<string, string>();
+
+export function getLastHashFor(roomCode: string): string | null {
+  return lastHashByRoom.get(roomCode) ?? null;
+}
+export function clearLastHashFor(roomCode: string): void {
+  lastHashByRoom.delete(roomCode);
+}
+
+/**
+ * Persist a state mutation + append a single audit row chained on the
+ * room's previous hash. Resolves after BOTH writes complete — callers
+ * `await` this so the next mutation on the same room (gated by
+ * `withRoomLock`) cannot start until the DB is durable.
+ *
+ * On persist failure: logs loudly (via the inner helpers) and continues.
+ * Live in-memory game state is the source of truth for the current process
+ * — the DB write is a durability/audit concern. If you need hard "DB or
+ * nothing" semantics, wrap your handler and roll back on a null return.
+ */
+export async function persistRoom(
+  state: GameState,
+  audit: {
+    action: string;
+    actorToken?: string | null;
+    actorSeat?: number | null;
+    payload?: unknown;
+  },
+): Promise<{ ok: boolean; newHash: string | null }> {
+  const prevHash = lastHashByRoom.get(state.roomCode) ?? null;
+  const newHash = await saveRoomState(state);
+  if (newHash) {
+    lastHashByRoom.set(state.roomCode, newHash);
+  }
+  await appendAuditLog({
+    roomCode: state.roomCode,
+    action: audit.action,
+    actorToken: audit.actorToken ?? null,
+    actorSeat: audit.actorSeat ?? null,
+    payload: audit.payload ?? null,
+    prevStateHash: prevHash,
+    newStateHash: newHash,
+    error: newHash ? null : "saveRoomState_failed",
+  });
+  return { ok: newHash !== null, newHash };
+}
+
+/**
+ * One-shot mutation primitive: writes to the in-memory Map AND persists
+ * AND audits, in that order. Call from inside `withRoomLock` to guarantee
+ * per-room serial ordering.
+ */
+export async function commit(
+  state: GameState,
+  audit: {
+    action: string;
+    actorToken?: string | null;
+    actorSeat?: number | null;
+    payload?: unknown;
+  },
+): Promise<{ ok: boolean; newHash: string | null }> {
+  updateRoom(state);
+  return persistRoom(state, audit);
 }
 
 /** Delete audit-log rows older than the retention window. */
