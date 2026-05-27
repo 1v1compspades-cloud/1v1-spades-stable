@@ -24,3 +24,15 @@ id = "JYb6YhT4u-OrN3pw2Mr7P"
 uri = "file://artifacts/spades-game/public/audio/spades_lofi_loop.mp3"
 type = "audio"
 title = "spades_lofi_loop"
+
+[[outputs]]
+id = "kyhQhhmas1hgcsj8zJifI"
+uri = "file://attached_assets/phase-8-final-report.md"
+type = "text"
+title = "Phase 8 Final Report — june-1-stable"
+
+[[outputs]]
+id = "MxM-c9DHUh3LpF6jz9ODs"
+uri = "file://BUILD_LOCK.md"
+type = "text"
+title = "BUILD LOCK — june-1-stable"
