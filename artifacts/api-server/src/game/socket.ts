@@ -663,7 +663,7 @@ function buildAdminDashboard(
 }
 
 /** Duration of the visual shuffle + deal animation between phases. */
-const SHUFFLE_ANIMATION_MS = 2600;
+const SHUFFLE_ANIMATION_MS = 3100;
 
 /**
  * Reveal a freshly-dealt round in two steps:
