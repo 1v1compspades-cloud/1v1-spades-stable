@@ -61,6 +61,7 @@ import {
   getAdminAuditLog,
   findMatchById,
   detachMatchRoom,
+  replacePlayer,
   type Tournament,
   type TournamentMatch,
   type PendingAssignment,
@@ -2114,6 +2115,59 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           }
           io.to(`tournament:${code}`).emit("admin_audit_appended", { code });
           callback?.({ ok: true, replay: isReplay });
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+        }
+      }
+    );
+
+    socket.on(
+      "host_replace_player",
+      (
+        data: { code: string; oldName: string; newName: string; token?: string },
+        callback?: (res: { ok: boolean; error?: string; newPlayerToken?: string; removedName?: string; replacementName?: string }) => void
+      ) => {
+        // Rate-limit per-socket: replacement is a lobby-only admin action,
+        // 5 per 30s is plenty for legitimate use and stops a buggy/malicious
+        // host client from spamming roster updates to the whole tournament.
+        if (!checkRate(socket.id, "host_replace_player", 5, 30_000)) {
+          callback?.({ ok: false, error: "Too many replacement attempts — slow down" });
+          return;
+        }
+        try {
+          const code = (data.code || "").toUpperCase().trim();
+          const t = getTournament(code);
+          if (!t) throw new Error("Tournament not found");
+          const host = requireTournamentHost(t, data.token);
+          if (t.status !== "lobby") {
+            // Explicit message: spec requirement #9.
+            throw new Error("Cannot replace players after the tournament has started");
+          }
+          const result = replacePlayer(code, data.oldName || "", data.newName || "");
+          appendAdminAudit(t, {
+            action: "replace_player",
+            actorName: host.name,
+            payload: {
+              removedName: result.removedName,
+              replacementName: result.replacementName,
+            },
+          });
+          // Broadcast the new roster to the tournament room so every lobby
+          // viewer's player list updates immediately.
+          io.to(`tournament:${code}`).emit(
+            "tournament_state",
+            sanitizeTournament(t),
+          );
+          io.to(`tournament:${code}`).emit("admin_audit_appended", { code });
+          // Token is returned ONLY to the calling host via the callback.
+          // It does NOT enter `sanitizeTournament` or any broadcast.
+          callback?.({
+            ok: true,
+            newPlayerToken: result.newPlayerToken,
+            removedName: result.removedName,
+            replacementName: result.replacementName,
+          });
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           callback?.({ ok: false, error: msg });

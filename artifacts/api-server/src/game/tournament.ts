@@ -75,7 +75,8 @@ export type AdminAuditAction =
   | "remake_room"
   | "mark_winner"
   | "force_forfeit"
-  | "force_start";
+  | "force_start"
+  | "replace_player";
 
 export interface AdminAuditEntry {
   ts: number;
@@ -246,6 +247,70 @@ export function joinTournament(
   const token = makeToken();
   t.players.push({ id: socketId, name: name.slice(0, 24), socketId, token });
   return { tournament: t, token, joinedFresh: true };
+}
+
+export interface ReplacePlayerResult {
+  tournament: Tournament;
+  /** New per-player token issued to the replacement. Returned to host so they
+   *  can pass it (via a join link) to the actual backup person. NEVER goes
+   *  into the sanitized tournament state. */
+  newPlayerToken: string;
+  /** Display name of the player who was removed (post-trim). */
+  removedName: string;
+  /** Display name of the replacement (post-trim/cap). */
+  replacementName: string;
+}
+
+/**
+ * Host-only pre-start replacement. Swap a registered player for a backup
+ * while still in the lobby — preserves tournament size, keeps the slot
+ * occupied, and issues a fresh token (the old token is invalidated).
+ *
+ * Throws "Tournament already started" if status !== "lobby".
+ * Throws "Cannot replace the host" — host must cancel the tournament.
+ * Throws "Player not found" / "Name already taken" with clear messaging.
+ *
+ * Auth: the caller MUST gate this with `requireTournamentHost(t, token)` —
+ * this function does NOT re-check the host token itself.
+ */
+export function replacePlayer(
+  code: string,
+  oldName: string,
+  newName: string,
+): ReplacePlayerResult {
+  const t = tournaments.get(code);
+  if (!t) throw new Error("Tournament not found");
+  if (t.status !== "lobby") {
+    throw new Error("Cannot replace players after the tournament has started");
+  }
+  const oldKey = (oldName || "").trim().toLowerCase();
+  if (!oldKey) throw new Error("Old player name is required");
+  const newTrimmed = (newName || "").trim().slice(0, 24);
+  if (!newTrimmed) throw new Error("Replacement name is required");
+  const newKey = newTrimmed.toLowerCase();
+  if (oldKey === t.hostName.trim().toLowerCase()) {
+    throw new Error("Cannot replace the host");
+  }
+  const idx = t.players.findIndex(
+    (p) => p.name.trim().toLowerCase() === oldKey,
+  );
+  if (idx < 0) throw new Error("Player not found in tournament");
+  // Reject collision with ANY other slot (including the host).
+  const collision = t.players.find(
+    (p, i) => i !== idx && p.name.trim().toLowerCase() === newKey,
+  );
+  if (collision) throw new Error("Replacement name is already taken in this tournament");
+
+  const removedName = t.players[idx].name;
+  const token = makeToken();
+  // Replace in-place — keeps roster order/index stable.
+  t.players[idx] = {
+    id: "",
+    name: newTrimmed,
+    socketId: "",
+    token,
+  };
+  return { tournament: t, newPlayerToken: token, removedName, replacementName: newTrimmed };
 }
 
 export function leaveTournament(code: string, socketId: string): Tournament | null {

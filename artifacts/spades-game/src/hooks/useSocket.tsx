@@ -47,6 +47,7 @@ interface SocketContextType {
   adminRemakeRoom: (code: string, matchId: string, token: string) => Promise<{ ok: true; newRoomCode?: string }>;
   adminMarkWinner: (code: string, matchId: string, winnerSeat: "A" | "B", token: string) => Promise<{ ok: true; replay?: boolean }>;
   adminForceForfeit: (code: string, matchId: string, forfeitSeat: "A" | "B", token: string) => Promise<unknown>;
+  hostReplacePlayer: (code: string, oldName: string, newName: string, token: string) => Promise<{ ok: true; newPlayerToken: string; removedName: string; replacementName: string }>;
 }
 
 const SocketContext = createContext<SocketContextType | null>(null);
@@ -354,6 +355,11 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     adminCall<{ ok: true; replay?: boolean }>("admin_mark_winner", { code, matchId, winnerSeat, token });
   const adminForceForfeit = (code: string, matchId: string, forfeitSeat: "A" | "B", token: string) =>
     adminCall("admin_force_forfeit", { code, matchId, forfeitSeat, token });
+  const hostReplacePlayer = (code: string, oldName: string, newName: string, token: string) =>
+    adminCall<{ ok: true; newPlayerToken: string; removedName: string; replacementName: string }>(
+      "host_replace_player",
+      { code, oldName, newName, token },
+    );
 
   const reconnectAsSpectator = (roomCode: string, spectatorName: string) => {
     return new Promise<void>((resolve, reject) => {
@@ -411,6 +417,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       adminRemakeRoom,
       adminMarkWinner,
       adminForceForfeit,
+      hostReplacePlayer,
     }}>
       {children}
     </SocketContext.Provider>

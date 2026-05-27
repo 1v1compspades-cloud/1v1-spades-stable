@@ -91,6 +91,16 @@ Token-gated dashboard the tournament host uses to recover from disconnects, AFK,
 - Bracket-repair safety: `recordMatchResult` is already idempotent (returns `"replay"` for same winner, `"rejected"` for conflict) — `admin_mark_winner` reuses that, so a host can safely retry on flaky connections without double-advancing.
 - Audit log content (in-memory): action, actor name, matchId, roomCode, free-form payload (winner seat, forfeit seat, old room code, etc.). Bracket advancements ALSO write to the DB-backed `game_audit_log` via `recordMatchResultTx`.
 
+## Pre-start player replacement (Phase 7)
+
+- Host-only swap of a registered player for a backup, allowed only while `t.status === "lobby"`.
+- Server: `replacePlayer(code, oldName, newName)` in `tournament.ts` validates lobby status, rejects host slot, rejects duplicate names, replaces in place (preserves roster index), issues a fresh per-player token, returns `{ newPlayerToken, removedName, replacementName }`.
+- Socket event `host_replace_player` (in `socket.ts`) is gated by `requireTournamentHost(t, data.token)`, throws `"Cannot replace players after the tournament has started"` if status changed, writes an `AdminAuditEntry { action: "replace_player", payload: { removedName, replacementName } }`, broadcasts `tournament_state` + `admin_audit_appended`.
+- Token isolation: the new player token goes back to the host via callback only; it never enters `sanitizeTournament` (matches the existing per-player token model).
+- Backup-join path: host's success dialog produces `…/tournament/<CODE>?join_name=<NAME>&join_token=<TOKEN>`. Tournament.tsx parses this query on mount, writes name + token to localStorage via existing keys (`spades_player_name`, `spades_tournament_token_${CODE}`), strips the query, and the normal `subscribe_tournament` flow then authenticates as a reconnect.
+- UI: lobby roster shows a small "Replace" button on each non-host filled slot (host-only). After confirm, a copy-link dialog appears with the backup's join URL.
+- Audit action union extended in BOTH `artifacts/api-server/src/game/tournament.ts` AND `artifacts/spades-game/src/lib/game.ts` (`"replace_player"`).
+
 ## Match labels (auto-set for tournament matches)
 
 - Server auto-sets `GameState.matchLabel` for tournament rooms to `"${tournamentName} · ${roundLabel}"`. Round labels: `Finals`, `Semifinal N`, `Quarterfinal N`, `Round of 16 · M{n}`, `Round of 32 · M{n}` (`roundLabelForMatch` in socket.ts; mirrored in Tournament.tsx bracket headers).

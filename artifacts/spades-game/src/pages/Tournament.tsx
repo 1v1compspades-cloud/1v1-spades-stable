@@ -191,7 +191,17 @@ export default function Tournament() {
     tournament, subscribeTournament, joinTournament, leaveTournament, startTournament,
     matchAssignment, clearMatchAssignment, forceForfeitMatch,
     tournamentEliminated, clearTournamentEliminated,
+    hostReplacePlayer,
   } = useSocket();
+
+  // Host-side "replace player" dialog state.
+  const [replaceTarget, setReplaceTarget] = useState<string | null>(null);
+  const [replaceNameInput, setReplaceNameInput] = useState("");
+  const [replaceBusy, setReplaceBusy] = useState(false);
+  const [replaceResult, setReplaceResult] = useState<{
+    replacementName: string;
+    joinUrl: string;
+  } | null>(null);
 
   // Auto-navigation countdown for the full-screen "Match Ready" overlay.
   const MATCH_READY_AUTO_NAV_MS = 12_000;
@@ -203,6 +213,27 @@ export default function Tournament() {
   const [hostSnapshot, setHostSnapshot] = useState<string | null>(null); // remembered host on join
 
   useEffect(() => { connect(); }, [connect]);
+
+  // Honour a `?join_name=...&join_token=...` query string. This is the URL
+  // the host pastes to a backup player after a `host_replace_player` call —
+  // it pre-claims the replaced slot using the token that was issued for it.
+  // We store the token+name in localStorage so the existing subscribe path
+  // picks it up exactly like a refresh-reconnect, then strip the query so
+  // the URL doesn't keep re-applying on every render.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    const joinName = url.searchParams.get("join_name");
+    const joinToken = url.searchParams.get("join_token");
+    if (!joinName || !joinToken) return;
+    savePlayerName(joinName);
+    saveTournamentToken(code, joinToken);
+    setNameInput(joinName);
+    url.searchParams.delete("join_name");
+    url.searchParams.delete("join_token");
+    window.history.replaceState({}, "", url.pathname + (url.search ? `?${url.searchParams.toString()}` : ""));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Subscribe / resubscribe whenever socket reconnects.
   useEffect(() => {
@@ -301,6 +332,36 @@ export default function Tournament() {
       setLocation("/");
     } catch (err: unknown) {
       toast({ description: typeof err === "string" ? err : "Failed to leave", variant: "destructive" });
+    }
+  };
+
+  const handleReplaceConfirm = async () => {
+    if (!t || !replaceTarget) return;
+    const newName = replaceNameInput.trim();
+    if (!newName) {
+      toast({ description: "Enter a backup player name", variant: "destructive" });
+      return;
+    }
+    const token = getTournamentToken(code);
+    if (!token) {
+      toast({ description: "Host token missing — refresh and try again", variant: "destructive" });
+      return;
+    }
+    setReplaceBusy(true);
+    try {
+      const res = await hostReplacePlayer(code, replaceTarget, newName, token);
+      // Build the backup's auto-join URL with the freshly-issued token.
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const base = typeof window !== "undefined" ? window.document.baseURI.replace(origin, "").replace(/\/$/, "") : "";
+      const joinUrl = `${origin}${base}/tournament/${code}?join_name=${encodeURIComponent(res.replacementName)}&join_token=${encodeURIComponent(res.newPlayerToken)}`;
+      setReplaceResult({ replacementName: res.replacementName, joinUrl });
+      setReplaceTarget(null);
+      setReplaceNameInput("");
+      toast({ description: `Replaced ${res.removedName} with ${res.replacementName}` });
+    } catch (err: unknown) {
+      toast({ description: typeof err === "string" ? err : "Replace failed", variant: "destructive" });
+    } finally {
+      setReplaceBusy(false);
     }
   };
 
@@ -415,16 +476,33 @@ export default function Tournament() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {Array.from({ length: t.size }).map((_, i) => {
                   const p = t.players[i];
+                  const isHostSlot = !!p && p.name.trim().toLowerCase() === t.hostName.trim().toLowerCase();
+                  const canReplace = !!p && !isHostSlot && iAmHost;
                   return (
                     <div
                       key={i}
-                      className={`rounded-md border px-3 py-2 text-sm font-medium ${
+                      className={`rounded-md border px-3 py-2 text-sm font-medium flex items-center justify-between gap-2 ${
                         p ? "border-primary/40 bg-primary/10" : "border-dashed border-border bg-white/[0.02] text-muted-foreground"
                       }`}
                       data-testid={`slot-${i}`}
                     >
-                      {p ? p.name : "Empty"}
-                      {p && p.name === t.hostName && <span className="ml-1 text-xs text-primary/80">(host)</span>}
+                      <span className="truncate">
+                        {p ? p.name : "Empty"}
+                        {isHostSlot && <span className="ml-1 text-xs text-primary/80">(host)</span>}
+                      </span>
+                      {canReplace && (
+                        <button
+                          type="button"
+                          className="shrink-0 text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded border border-border/60 text-muted-foreground hover:text-foreground hover:border-foreground/60"
+                          onClick={() => {
+                            setReplaceTarget(p!.name);
+                            setReplaceNameInput("");
+                          }}
+                          data-testid={`replace-player-${i}`}
+                        >
+                          Replace
+                        </button>
+                      )}
                     </div>
                   );
                 })}
@@ -538,6 +616,81 @@ export default function Tournament() {
             </div>
           </div>
         )}
+
+        {/* Host: Replace player dialog */}
+        <AlertDialog open={!!replaceTarget} onOpenChange={(o) => { if (!o) { setReplaceTarget(null); setReplaceNameInput(""); } }}>
+          <AlertDialogContent data-testid="replace-player-dialog">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Replace player</AlertDialogTitle>
+              <AlertDialogDescription>
+                Swap <span className="font-semibold text-foreground">{replaceTarget ?? ""}</span> for a backup. Only works before the tournament starts.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-2">
+              <Label htmlFor="replace-name">Backup player name</Label>
+              <Input
+                id="replace-name"
+                value={replaceNameInput}
+                onChange={(e) => setReplaceNameInput(e.target.value.slice(0, 24))}
+                placeholder="Enter backup name"
+                data-testid="replace-player-input"
+                autoFocus
+              />
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="replace-player-cancel" disabled={replaceBusy}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                data-testid="replace-player-confirm"
+                disabled={replaceBusy || !replaceNameInput.trim()}
+                onClick={(e) => { e.preventDefault(); void handleReplaceConfirm(); }}
+              >
+                {replaceBusy ? "Replacing…" : "Replace"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Host: Replacement success — copyable join URL for the backup */}
+        <AlertDialog open={!!replaceResult} onOpenChange={(o) => { if (!o) setReplaceResult(null); }}>
+          <AlertDialogContent data-testid="replace-success-dialog">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Send this link to the backup</AlertDialogTitle>
+              <AlertDialogDescription>
+                <span className="font-semibold text-foreground">{replaceResult?.replacementName}</span> now owns the slot. They must open this link to claim it (it contains their one-time join token).
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-2">
+              <Label htmlFor="replace-join-url" className="sr-only">Join URL</Label>
+              <Input
+                id="replace-join-url"
+                readOnly
+                value={replaceResult?.joinUrl ?? ""}
+                onFocus={(e) => e.currentTarget.select()}
+                className="font-mono text-xs"
+                data-testid="replace-join-url"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (!replaceResult) return;
+                  void navigator.clipboard.writeText(replaceResult.joinUrl).then(
+                    () => toast({ description: "Link copied" }),
+                    () => toast({ description: "Copy failed — select manually", variant: "destructive" }),
+                  );
+                }}
+                data-testid="replace-join-copy"
+              >
+                Copy link
+              </Button>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogAction data-testid="replace-success-close" onClick={() => setReplaceResult(null)}>
+                Done
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Champion */}
         {isComplete && (

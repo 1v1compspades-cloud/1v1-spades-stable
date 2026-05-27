@@ -80,7 +80,8 @@ export type AdminAuditAction =
   | "remake_room"
   | "mark_winner"
   | "force_forfeit"
-  | "force_start";
+  | "force_start"
+  | "replace_player";
 
 export interface AdminAuditEntry {
   ts: number;
