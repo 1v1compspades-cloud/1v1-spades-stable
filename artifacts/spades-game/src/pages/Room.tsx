@@ -80,6 +80,7 @@ export default function Room() {
     roomCode: storedRoomCode,
     playerIndex, isSpectator,
     saveRoomCode, savePlayerIndex, saveIsSpectator,
+    getPlayerToken, savePlayerToken, clearPlayerToken,
   } = useGameStorage();
   const { toast } = useToast();
 
@@ -157,19 +158,26 @@ export default function Room() {
         setLocation("/");
       });
     } else if (playerIndex !== null) {
-      reconnect(roomCode, playerIndex, playerName).catch(err => {
+      const token = getPlayerToken(roomCode, playerIndex) || undefined;
+      reconnect(roomCode, playerIndex, playerName, token).catch(err => {
         toast({ description: err || "Session expired. Please rejoin.", variant: "destructive" });
+        // A token mismatch / missing-token error is terminal for this browser —
+        // drop the stale token so the next visit to this code starts clean.
+        clearPlayerToken(roomCode, playerIndex);
         setLocation("/");
       });
     } else {
       joinRoom(roomCode, playerName).then((res) => {
-        if (res.playerIndex !== undefined) savePlayerIndex(res.playerIndex as 0 | 1);
+        if (res.playerIndex !== undefined) {
+          savePlayerIndex(res.playerIndex as 0 | 1);
+          if (res.token) savePlayerToken(roomCode, res.playerIndex as 0 | 1, res.token);
+        }
       }).catch(err => {
         toast({ description: err || "Failed to join room", variant: "destructive" });
         setLocation("/");
       });
     }
-  }, [connected, roomCode, storedRoomCode, playerName, gameState, playerIndex, isSpectator, reconnect, reconnectAsSpectator, joinRoom, setLocation, savePlayerIndex, saveIsSpectator, toast]);
+  }, [connected, roomCode, storedRoomCode, playerName, gameState, playerIndex, isSpectator, reconnect, reconnectAsSpectator, joinRoom, setLocation, savePlayerIndex, saveIsSpectator, toast, getPlayerToken, savePlayerToken, clearPlayerToken]);
 
   if (!gameState || (!isSpectator && playerIndex === null)) {
     const label =

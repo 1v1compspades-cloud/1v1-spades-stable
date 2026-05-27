@@ -14,6 +14,7 @@ import {
   removePlayerFromRoom,
   getRoomBySocketId,
   reconnectPlayer,
+  restoreRoom,
   resetMatch,
   resetRoom,
   setPlayerReady,
@@ -28,7 +29,16 @@ import {
   type GameState,
   type PlayCardResult,
 } from "./engine.js";
-import { withRoomLock, commit, clearLastHashFor } from "./persistence.js";
+import {
+  withRoomLock,
+  commit,
+  clearLastHashFor,
+  issueReconnectToken,
+  validateReconnectToken,
+  deleteReconnectTokensForRoom,
+  loadAllActiveRooms,
+  expireStaleRoomStates,
+} from "./persistence.js";
 import type { Card } from "./deck.js";
 import {
   createTournament as createTournamentEntity,
@@ -876,6 +886,67 @@ function broadcastState(
   }
 }
 
+// ── Boot recovery ────────────────────────────────────────────────────────
+// After a server restart, the in-memory `rooms` Map is empty but the
+// `active_rooms` table still holds the durable state for every live room.
+// Reload them so:
+//   - Players who refresh / reconnect can land back on their seat
+//     (reconnect_player will validate against the rehydrated state).
+//   - Turn timers that were mid-flight at shutdown get re-armed, with a
+//     2s grace if the original deadline has already passed (so a sleeping
+//     player isn't auto-played the instant the server comes back).
+//   - TTL-expired rooms get pruned in one pass so we don't rehydrate
+//     garbage.
+const POST_BOOT_GRACE_MS = 2_000;
+
+export async function rehydrateRoomsOnBoot(io: SocketIOServer): Promise<{
+  loaded: number;
+  expired: number;
+  timersArmed: number;
+}> {
+  // Drop TTL-expired rows first so we don't rehydrate them just to discard.
+  const expired = await expireStaleRoomStates();
+  const rows = await loadAllActiveRooms();
+  let timersArmed = 0;
+  for (const row of rows) {
+    try {
+      const state = row.state as unknown as GameState;
+      if (!state || typeof state !== "object") continue;
+      // game_over rooms are kept for the 2h TTL window so spectators can
+      // still load the final screen, but they don't need a turn timer.
+      restoreRoom(state);
+      if (
+        state.turnTimeoutMs &&
+        state.turnDeadline !== null &&
+        (state.phase === "playing" || state.phase === "bidding")
+      ) {
+        const remaining = (state.turnDeadline ?? 0) - Date.now();
+        // Apply the post-boot grace: if the deadline already lapsed, give
+        // the actor at least POST_BOOT_GRACE_MS to reconnect before the
+        // auto-action fires. We DO this by stretching state.turnTimeoutMs
+        // for one cycle, then armTurnTimer re-derives the deadline.
+        const originalBudget = state.turnTimeoutMs;
+        state.turnTimeoutMs = Math.max(remaining, POST_BOOT_GRACE_MS);
+        try {
+          armTurnTimer(io, state);
+        } finally {
+          // Restore the per-room budget so subsequent turns use the normal
+          // 30s timeout, not the stretched grace window.
+          state.turnTimeoutMs = originalBudget;
+        }
+        timersArmed++;
+      }
+    } catch (err) {
+      logger.warn({ err, roomCode: row.roomCode }, "rehydrateRoomsOnBoot: skip row");
+    }
+  }
+  logger.info(
+    { loaded: rows.length, expired, timersArmed },
+    "Rehydrated rooms from active_rooms",
+  );
+  return { loaded: rows.length, expired, timersArmed };
+}
+
 export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
   // Start the periodic stale-entity sweep once per process. Idempotent in
   // case setupSocketIO is ever called more than once.
@@ -899,7 +970,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
       "create_room",
       async (
         data: { playerName: string; matchTarget?: number; matchLabel?: string; mode?: string },
-        callback: (res: { ok: boolean; roomCode?: string; playerIndex?: number; error?: string }) => void
+        callback: (res: { ok: boolean; roomCode?: string; playerIndex?: number; token?: string; error?: string }) => void
       ) => {
         try {
           if (!checkRate(socket.id, "create_room", 5, 30_000)) {
@@ -920,10 +991,28 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
               payload: { mode, matchTarget: target, host: data.playerName, label },
             });
           });
+          // Issue the seat-0 reconnect token AFTER commit so the row exists if
+          // the client immediately tries to reconnect. Token rotation on every
+          // create_room of the same code keeps a leaked token from a previous
+          // tenant of the same code from carrying over.
+          // We only set tokenizedSeats[0]=true once issue+commit BOTH succeed,
+          // so reconnect can fail-closed for tokenized seats without locking
+          // out rooms where the DB write genuinely failed.
+          let token: string | undefined;
+          try {
+            token = await issueReconnectToken(state.roomCode, 0, data.playerName);
+            state.tokenizedSeats = state.tokenizedSeats ?? [false, false];
+            state.tokenizedSeats[0] = true;
+            await withRoomLock(state.roomCode, async () => {
+              await commit(state, { action: "token_issued", actorSeat: 0, payload: { seat: 0 } });
+            });
+          } catch (err) {
+            logger.warn({ err, roomCode: state.roomCode }, "issueReconnectToken failed (create_room)");
+          }
           socket.join(state.roomCode);
           (socket.data as { playerName?: string }).playerName = data.playerName;
           logger.info({ roomCode: state.roomCode, playerName: data.playerName, socketId: socket.id }, "Room created");
-          callback({ ok: true, roomCode: state.roomCode, playerIndex: 0 });
+          callback({ ok: true, roomCode: state.roomCode, playerIndex: 0, token });
           broadcastState(io, state);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
@@ -936,7 +1025,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
       "join_room",
       async (
         data: { roomCode: string; playerName: string },
-        callback: (res: { ok: boolean; playerIndex?: number; error?: string }) => void
+        callback: (res: { ok: boolean; playerIndex?: number; token?: string; error?: string }) => void
       ) => {
         try {
           if (!checkRate(socket.id, "join_room", 10, 30_000)) {
@@ -960,10 +1049,21 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           });
           if (joinErr || !result) throw joinErr ?? new Error("Join failed");
           const { state, playerIndex } = result as { state: GameState; playerIndex: number };
+          let token: string | undefined;
+          try {
+            token = await issueReconnectToken(code, playerIndex as 0 | 1, data.playerName);
+            state.tokenizedSeats = state.tokenizedSeats ?? [false, false];
+            state.tokenizedSeats[playerIndex as 0 | 1] = true;
+            await withRoomLock(code, async () => {
+              await commit(state, { action: "token_issued", actorSeat: playerIndex, payload: { seat: playerIndex } });
+            });
+          } catch (err) {
+            logger.warn({ err, roomCode: code }, "issueReconnectToken failed (join_room)");
+          }
           socket.join(code);
           (socket.data as { playerName?: string }).playerName = data.playerName;
           logger.info({ roomCode: code, playerName: data.playerName, socketId: socket.id }, "Player joined room");
-          callback({ ok: true, playerIndex });
+          callback({ ok: true, playerIndex, token });
           const hostSocket = state.players[0]?.socketId;
           if (hostSocket) {
             io.to(hostSocket).emit("opponent_joined", { playerName: data.playerName });
@@ -1111,11 +1211,42 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
     socket.on(
       "reconnect_player",
       async (
-        data: { roomCode: string; playerIndex: 0 | 1; playerName: string },
+        data: { roomCode: string; playerIndex: 0 | 1; playerName: string; token?: string },
         callback: (res: { ok: boolean; error?: string }) => void
       ) => {
         try {
           const code = data.roomCode.toUpperCase().trim();
+          // Token-first validation, gated on the per-seat tokenizedSeats
+          // flag in the (persisted) GameState — NOT a DB lookup. This way
+          // a DB outage cannot silently downgrade a tokenized seat back to
+          // the name-match path (which is hijack-prone for null-slot
+          // seats after disconnect).
+          //   - flag=true  → token required and must validate; if DB is
+          //                  down, we reject with a retryable error
+          //                  rather than fall back.
+          //   - flag=false → legacy/no-token-on-file room; fall back to
+          //                  engine name match (preserves existing UX for
+          //                  rooms created before tokens shipped).
+          const existing = getRoom(code);
+          const seatTokenized = existing?.tokenizedSeats?.[data.playerIndex] === true;
+          if (seatTokenized) {
+            if (!data.token) {
+              throw new Error("Reconnect token required for this seat");
+            }
+            const v = await validateReconnectToken(code, data.playerIndex, data.token);
+            if (!v.ok) {
+              // token_mismatch / not_found → caller is wrong. db_error → we
+              // refuse to fail open: caller should retry, not be auto-trusted.
+              throw new Error(
+                v.reason === "db_error"
+                  ? "Reconnect temporarily unavailable, please retry"
+                  : v.reason === "token_mismatch"
+                  ? "That seat is held by another player"
+                  : "Reconnect token invalid",
+              );
+            }
+            data = { ...data, playerName: v.displayName };
+          }
           let state: GameState | null = null;
           let recErr: Error | null = null;
           await withRoomLock(code, async () => {

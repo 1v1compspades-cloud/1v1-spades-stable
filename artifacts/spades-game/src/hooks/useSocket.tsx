@@ -11,9 +11,9 @@ interface SocketContextType {
   gameState: GameState | null;
   error: string | null;
   connect: () => void;
-  createRoom: (name: string, matchTarget?: number, matchLabel?: string, mode?: "quick" | "king") => Promise<{ roomCode?: string; playerIndex?: number }>;
-  joinRoom: (code: string, name: string) => Promise<{ playerIndex?: number }>;
-  reconnect: (roomCode: string, playerIndex: 0 | 1, playerName: string) => Promise<{ ok: boolean }>;
+  createRoom: (name: string, matchTarget?: number, matchLabel?: string, mode?: "quick" | "king") => Promise<{ roomCode?: string; playerIndex?: number; token?: string }>;
+  joinRoom: (code: string, name: string) => Promise<{ playerIndex?: number; token?: string }>;
+  reconnect: (roomCode: string, playerIndex: 0 | 1, playerName: string, token?: string) => Promise<{ ok: boolean }>;
   startGame: (code: string) => void;
   placeBid: (code: string, amount: number) => Promise<void>;
   playCard: (code: string, card: Card) => Promise<void>;
@@ -127,10 +127,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   };
 
   const createRoom = (playerName: string, matchTarget?: number, matchLabel?: string, mode?: "quick" | "king") => {
-    return new Promise<{ roomCode?: string; playerIndex?: number }>((resolve, reject) => {
+    return new Promise<{ roomCode?: string; playerIndex?: number; token?: string }>((resolve, reject) => {
       if (!socket) return reject("No socket");
       socket.emit("create_room", { playerName, matchTarget, matchLabel, mode }, (res: any) => {
-        if (res.ok) resolve({ roomCode: res.roomCode, playerIndex: res.playerIndex });
+        if (res.ok) resolve({ roomCode: res.roomCode, playerIndex: res.playerIndex, token: res.token });
         else reject(res.error);
       });
     });
@@ -157,10 +157,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   };
 
   const joinRoom = (roomCode: string, playerName: string) => {
-    return new Promise<{ playerIndex?: number }>((resolve, reject) => {
+    return new Promise<{ playerIndex?: number; token?: string }>((resolve, reject) => {
       if (!socket) return reject("No socket");
       socket.emit("join_room", { roomCode, playerName }, (res: any) => {
-        if (res.ok) resolve({ playerIndex: res.playerIndex });
+        if (res.ok) resolve({ playerIndex: res.playerIndex, token: res.token });
         else reject(res.error);
       });
     });
@@ -188,12 +188,12 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const reconnect = (roomCode: string, playerIndex: 0 | 1, playerName: string) => {
+  const reconnect = (roomCode: string, playerIndex: 0 | 1, playerName: string, token?: string) => {
     return new Promise<{ ok: boolean }>((resolve, reject) => {
       if (!socket) return reject("No socket");
       socket.emit(
         "reconnect_player",
-        { roomCode, playerIndex, playerName },
+        { roomCode, playerIndex, playerName, token },
         (res: { ok: boolean; error?: string }) => {
           if (res.ok) resolve({ ok: true });
           else reject(res.error);

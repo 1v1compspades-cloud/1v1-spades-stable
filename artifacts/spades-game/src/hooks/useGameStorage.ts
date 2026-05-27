@@ -87,15 +87,54 @@ export function useGameStorage() {
     localStorage.removeItem(tournamentTokenKey(code));
   };
 
-  // One-time sweep on mount: drop any expired tournament tokens left behind
-  // from past sessions, so localStorage doesn't grow unbounded.
+  // ── Per-room player tokens (per-seat secret) ─────────────────────────────
+  // Keyed by (roomCode, seat). Same TTL-wrapped JSON shape as tournament
+  // tokens so the sweep below catches both. The server is auth-of-record:
+  // a stale or wrong token is rejected and the user is asked to rejoin.
+  const playerTokenKey = (code: string, seat: 0 | 1) =>
+    `spades_player_token_${code.toUpperCase()}_${seat}`;
+  const savePlayerToken = (code: string, seat: 0 | 1, token: string) => {
+    localStorage.setItem(
+      playerTokenKey(code, seat),
+      JSON.stringify({ token, savedAt: Date.now() }),
+    );
+  };
+  const getPlayerToken = (code: string, seat: 0 | 1): string | null => {
+    const raw = localStorage.getItem(playerTokenKey(code, seat));
+    if (!raw) return null;
+    if (!raw.startsWith("{")) {
+      savePlayerToken(code, seat, raw);
+      return raw;
+    }
+    try {
+      const parsed = JSON.parse(raw) as { token?: string; savedAt?: number };
+      if (!parsed?.token || !parsed?.savedAt) {
+        localStorage.removeItem(playerTokenKey(code, seat));
+        return null;
+      }
+      if (Date.now() - parsed.savedAt > TOKEN_TTL_MS) {
+        localStorage.removeItem(playerTokenKey(code, seat));
+        return null;
+      }
+      return parsed.token;
+    } catch {
+      localStorage.removeItem(playerTokenKey(code, seat));
+      return null;
+    }
+  };
+  const clearPlayerToken = (code: string, seat: 0 | 1) => {
+    localStorage.removeItem(playerTokenKey(code, seat));
+  };
+
+  // One-time sweep on mount: drop any expired tournament/player tokens left
+  // behind from past sessions, so localStorage doesn't grow unbounded.
   useEffect(() => {
     try {
-      const prefix = "spades_tournament_token_";
+      const prefixes = ["spades_tournament_token_", "spades_player_token_"];
       const now = Date.now();
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const k = localStorage.key(i);
-        if (!k || !k.startsWith(prefix)) continue;
+        if (!k || !prefixes.some((p) => k.startsWith(p))) continue;
         const raw = localStorage.getItem(k);
         if (!raw || !raw.startsWith("{")) continue;
         try {
@@ -125,5 +164,8 @@ export function useGameStorage() {
     saveTournamentToken,
     getTournamentToken,
     clearTournamentToken,
+    savePlayerToken,
+    getPlayerToken,
+    clearPlayerToken,
   };
 }

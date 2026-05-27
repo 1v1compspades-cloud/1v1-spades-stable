@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import app from "./app.js";
 import { logger } from "./lib/logger.js";
-import { setupSocketIO } from "./game/socket.js";
+import { setupSocketIO, rehydrateRoomsOnBoot } from "./game/socket.js";
 
 const rawPort = process.env["PORT"];
 
@@ -18,7 +18,15 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 const httpServer = createServer(app);
-setupSocketIO(httpServer);
+const io = setupSocketIO(httpServer);
+
+// Rehydrate persisted rooms in the background. Don't block listen() — if
+// the DB is slow or down, the server should still accept new connections;
+// new rooms simply won't have the older sessions available until the
+// rehydrate completes.
+void rehydrateRoomsOnBoot(io).catch((err) => {
+  logger.error({ err }, "rehydrateRoomsOnBoot failed");
+});
 
 httpServer.listen(port, () => {
   logger.info({ port }, "Server listening");

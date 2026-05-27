@@ -1,8 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { eq, lt, and } from "drizzle-orm";
 import {
   db,
   activeRoomsTable,
   gameAuditLogTable,
+  reconnectTokensTable,
   type ActiveRoomRow,
 } from "@workspace/db";
 import { updateRoom, type GameState } from "./engine.js";
@@ -141,6 +143,133 @@ export async function deleteRoomState(roomCode: string): Promise<void> {
       .where(eq(activeRoomsTable.roomCode, roomCode));
   } catch (err) {
     logger.warn({ err, roomCode }, "deleteRoomState failed");
+  }
+}
+
+/** Load ALL persisted active_rooms rows (for boot recovery). */
+export async function loadAllActiveRooms(): Promise<ActiveRoomRow[]> {
+  try {
+    return await db.select().from(activeRoomsTable);
+  } catch (err) {
+    logger.warn({ err }, "loadAllActiveRooms failed");
+    return [];
+  }
+}
+
+// ── Reconnect tokens ─────────────────────────────────────────────────────
+// One token per (room, seat). Trust on reconnect is anchored on this token,
+// NEVER the display name — name match alone allows seat hijack by anyone
+// who knows the room code + opponent's name.
+
+/**
+ * Issue (or rotate) a reconnect token for a (room, seat, displayName).
+ * Upserts on the (room, seat) unique index so the seat always has exactly
+ * one current token. Returns the token even when the DB write fails so
+ * gameplay isn't gated on durability — but logs loudly because a missing
+ * token means the seat can't be reclaimed after a server restart.
+ */
+export async function issueReconnectToken(
+  roomCode: string,
+  seat: 0 | 1,
+  displayName: string,
+): Promise<string> {
+  const token = randomUUID();
+  const now = new Date();
+  try {
+    await db
+      .insert(reconnectTokensTable)
+      .values({
+        token,
+        roomCode,
+        seat,
+        displayName,
+        createdAt: now,
+        lastSeenAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [reconnectTokensTable.roomCode, reconnectTokensTable.seat],
+        set: { token, displayName, lastSeenAt: now },
+      });
+  } catch (err) {
+    logger.warn({ err, roomCode, seat }, "issueReconnectToken failed");
+  }
+  return token;
+}
+
+export type TokenValidation =
+  | { ok: true; displayName: string }
+  | { ok: false; reason: "no_record" | "token_mismatch" | "db_error" };
+
+/**
+ * Validate a reconnect token against the DB row for (roomCode, seat).
+ * `lastSeenAt` is bumped on success.
+ */
+export async function validateReconnectToken(
+  roomCode: string,
+  seat: 0 | 1,
+  token: string,
+): Promise<TokenValidation> {
+  try {
+    const rows = await db
+      .select()
+      .from(reconnectTokensTable)
+      .where(
+        and(
+          eq(reconnectTokensTable.roomCode, roomCode),
+          eq(reconnectTokensTable.seat, seat),
+        ),
+      )
+      .limit(1);
+    const row = rows[0];
+    if (!row) return { ok: false, reason: "no_record" };
+    if (row.token !== token) return { ok: false, reason: "token_mismatch" };
+    try {
+      await db
+        .update(reconnectTokensTable)
+        .set({ lastSeenAt: new Date() })
+        .where(eq(reconnectTokensTable.token, token));
+    } catch {
+      // best-effort — touch failures don't invalidate the token
+    }
+    return { ok: true, displayName: row.displayName };
+  } catch (err) {
+    logger.warn({ err, roomCode, seat }, "validateReconnectToken failed");
+    return { ok: false, reason: "db_error" };
+  }
+}
+
+/** Check whether a DB token record exists for (roomCode, seat). */
+export async function hasReconnectTokenRecord(
+  roomCode: string,
+  seat: 0 | 1,
+): Promise<boolean> {
+  try {
+    const rows = await db
+      .select({ token: reconnectTokensTable.token })
+      .from(reconnectTokensTable)
+      .where(
+        and(
+          eq(reconnectTokensTable.roomCode, roomCode),
+          eq(reconnectTokensTable.seat, seat),
+        ),
+      )
+      .limit(1);
+    return rows.length > 0;
+  } catch (err) {
+    logger.warn({ err, roomCode, seat }, "hasReconnectTokenRecord failed");
+    // Fail-open: if the DB is unreachable, don't lock players out of their seats.
+    return false;
+  }
+}
+
+/** Drop all tokens for a room (called when a room is fully cleaned up). */
+export async function deleteReconnectTokensForRoom(roomCode: string): Promise<void> {
+  try {
+    await db
+      .delete(reconnectTokensTable)
+      .where(eq(reconnectTokensTable.roomCode, roomCode));
+  } catch (err) {
+    logger.warn({ err, roomCode }, "deleteReconnectTokensForRoom failed");
   }
 }
 

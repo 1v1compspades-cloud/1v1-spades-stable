@@ -12,7 +12,7 @@ import { ConnectionPill } from "@/components/ConnectionPill";
 export default function Lobby() {
   const [, setLocation] = useLocation();
   const { connect, connected, socket, createRoom, joinRoom, joinAsSpectator, createTournament, joinTournament } = useSocket();
-  const { playerName, savePlayerName, saveRoomCode, savePlayerIndex, saveIsSpectator, saveTournamentToken, getTournamentToken } = useGameStorage();
+  const { playerName, savePlayerName, saveRoomCode, savePlayerIndex, saveIsSpectator, saveTournamentToken, getTournamentToken, savePlayerToken } = useGameStorage();
   const { toast } = useToast();
 
   // Parse ?room=XXX&mode=spectator from the URL (once on mount)
@@ -68,6 +68,9 @@ export default function Lobby() {
       if (res.roomCode && res.playerIndex !== undefined) {
         saveRoomCode(res.roomCode);
         savePlayerIndex(res.playerIndex as 0 | 1);
+        if (res.token) {
+          savePlayerToken(res.roomCode, res.playerIndex as 0 | 1, res.token);
+        }
         setLocation(`/room/${res.roomCode}`);
       }
     } catch (err: any) {
@@ -101,6 +104,9 @@ export default function Lobby() {
         if (res.playerIndex !== undefined) {
           saveRoomCode(code);
           savePlayerIndex(res.playerIndex as 0 | 1);
+          if (res.token) {
+            savePlayerToken(code, res.playerIndex as 0 | 1, res.token);
+          }
           setLocation(`/room/${code}`);
         }
       } catch (joinErr: any) {

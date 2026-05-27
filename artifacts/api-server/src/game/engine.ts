@@ -136,6 +136,17 @@ export interface GameState {
    * Broadcast to clients so they can render a countdown.
    */
   turnDeadline?: number | null;
+  /**
+   * Per-seat flag: true once a reconnect token has been successfully
+   * issued for that seat (DB row written). Reconnect is then gated
+   * STRICTLY on a valid token — fallback to engine name-match is only
+   * allowed when this flag is false (legacy rooms or rooms where the
+   * issue write genuinely failed). Anchoring on this in-memory/persisted
+   * flag — and NOT on a runtime DB lookup — prevents a DB outage from
+   * silently downgrading a tokenized seat back to the hijack-prone
+   * name-match path.
+   */
+  tokenizedSeats?: [boolean, boolean];
 }
 
 /** Max challengers waiting in the KotT queue. */
@@ -189,6 +200,7 @@ export function createGame(
     kingStreak: [0, 0],
     turnTimeoutMs: null,
     turnDeadline: null,
+    tokenizedSeats: [false, false],
   };
 }
 
@@ -954,6 +966,21 @@ export function cleanupRoom(roomCode: string): void {
 /** Iterate all live rooms (used by the stale-room sweeper). */
 export function getAllRooms(): GameState[] {
   return Array.from(rooms.values());
+}
+
+/**
+ * Boot-time rehydration: put a previously-persisted room back into the
+ * in-memory Map. Caller is responsible for sanitization concerns (the
+ * stored state has socketId="" stripped, which reconnectPlayer naturally
+ * handles by updating the slot's socketId on the next reconnect_player).
+ */
+export function restoreRoom(state: GameState): void {
+  // Defensive: spectators/queue carry stale socketIds from before the
+  // restart, so clear them — those clients will rejoin via reconnect_spectator
+  // / join_queue and re-register fresh socket ids.
+  state.spectators = [];
+  state.challengerQueue = [];
+  rooms.set(state.roomCode, state);
 }
 
 export function reconnectPlayer(

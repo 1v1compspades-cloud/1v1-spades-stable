@@ -2,3 +2,4 @@
 - [Async closure narrowing trap](ts-async-closure-narrow.md) — `let x: T | null = null` assigned inside an awaited closure narrows to `never` after a `!x` throw guard; assert via `as T` at the destructure, not `x!` at every use.
 - [Sync-mutate-then-lock-commit](sync-mutate-lock-commit.md) — when the room key is unknown up front, do the sync atomic mutation first, then lock that room only for the durable persist+broadcast.
 - [Stale snapshot merge across delays](stale-snapshot-merge.md) — any state computed before a `setTimeout` reveal must overlay the post-delay roster/activity fields from the freshly-locked current state before committing.
+- [Anchor reconnect gating on in-memory flag, not DB lookup](reconnect-flag-anchor.md) — gating "is this seat tokenized?" on a live DB query fails-open under DB outage and re-enables name-only hijack; persist the flag in the state instead.
