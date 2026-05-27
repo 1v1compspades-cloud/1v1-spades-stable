@@ -54,7 +54,7 @@ Spectators can join any room with the room code and watch live. They see scores,
 
 ## Custom Tournament mode
 
-Single-elimination bracket of 4 or 8 players, random seeding, every match is a standard 1v1 game.
+Single-elimination bracket of 4, 8, 16, or 32 players, random seeding, every match is a standard 1v1 game.
 
 - Server: `artifacts/api-server/src/game/tournament.ts` — Tournament store, bracket build/advance, `recordMatchResult`, `setPendingAssignment`.
 - Socket events: `create_tournament`, `join_tournament`, `leave_tournament`, `subscribe_tournament`, `start_tournament` + server pushes `tournament_state`, `match_assigned`, `tournament_eliminated`, `tournament_complete`.
@@ -73,14 +73,16 @@ Single-elimination bracket of 4 or 8 players, random seeding, every match is a s
 - `createMatchRoomAndAssign` writes a `pendingAssignment` onto each player record. On an authenticated `subscribe_tournament`, if a pending assignment exists, the server re-emits `match_assigned` (and re-joins the game room) — so a refresh on the tournament page during a live match lands the player back into their seat. `recordMatchResult` clears `pendingAssignment` for both players of the resolved match.
 - Fresh-join path rejects duplicate names (case-insensitive, trimmed). Reconnecting from the same browser works because the cached token is passed through `joinTournament`.
 
-## Mock tournament tools
+## Match labels (auto-set for tournament matches)
 
-Lightweight helpers for running 8-player test brackets manually (no real bracket UI yet):
-
-- Optional **Match label** field in the Lobby (e.g. "Quarterfinal 1", "Finals"). Capped at 40 chars server-side; trimmed blanks become `undefined`.
-- Label is stored on `GameState.matchLabel`, sent in both player and spectator sanitized views.
-- Label is shown to both roles in: waiting screens, in-game status banner header (active play for players), spectator footer, and game-over overlay.
+- Server auto-sets `GameState.matchLabel` for tournament rooms to `"${tournamentName} · ${roundLabel}"`. Round labels: `Finals`, `Semifinal N`, `Quarterfinal N`, `Round of 16 · M{n}`, `Round of 32 · M{n}` (`roundLabelForMatch` in socket.ts; mirrored in Tournament.tsx bracket headers).
+- Quick Match and King of the Table rooms have NO matchLabel — the manual label widget was removed from the Lobby once real Tournament mode shipped.
+- Label is sent in both player and spectator sanitized views; shown in waiting screens, in-game status banner header, spectator footer, and game-over overlay.
 - Game-over overlay has **Copy result** (plain text) and **Copy for Discord** (code-block) buttons. The Discord block contains: match label, winner/loser + final scores, rounds played, target, room code.
+
+## KotT join-when-full fallback
+
+When a third+ player clicks Join Match on a King-of-the-Table room (mode=`king`) and both seats are filled, the Lobby catches "Room is full" and automatically retries as `join_as_spectator` + `join_queue`. The user lands in `/room/<code>` as a spectator + queued challenger and auto-rotates into the loser's seat when the next match ends (per the existing `scheduleKingNextMatch` flow). Quick Match rooms (mode=`quick`) still hard-cap at 2 seats and reject the third joiner.
 
 ## Bidding order (coin toss + alternation)
 

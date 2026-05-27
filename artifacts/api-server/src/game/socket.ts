@@ -179,10 +179,12 @@ const KING_NEXT_MATCH_DELAY_MS = 5000;
  * Anything earlier falls back to "R{round} M{pos+1}".
  */
 function roundLabelForMatch(totalRounds: number, round: number, position: number): string {
-  const fromFinal = totalRounds - round; // 0 = final, 1 = semi, 2 = quarter
+  const fromFinal = totalRounds - round; // 0 = final, 1 = semi, 2 = quarter, ...
   if (fromFinal === 0) return "Finals";
   if (fromFinal === 1) return `Semifinal ${position + 1}`;
   if (fromFinal === 2) return `Quarterfinal ${position + 1}`;
+  if (fromFinal === 3) return `Round of 16 · M${position + 1}`;
+  if (fromFinal === 4) return `Round of 32 · M${position + 1}`;
   return `R${round} M${position + 1}`;
 }
 

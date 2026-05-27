@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function Lobby() {
   const [, setLocation] = useLocation();
-  const { connect, connected, createRoom, joinRoom, joinAsSpectator, createTournament, joinTournament } = useSocket();
+  const { connect, connected, socket, createRoom, joinRoom, joinAsSpectator, createTournament, joinTournament } = useSocket();
   const { playerName, savePlayerName, saveRoomCode, savePlayerIndex, saveIsSpectator, saveTournamentToken, getTournamentToken } = useGameStorage();
   const { toast } = useToast();
 
@@ -26,21 +26,12 @@ export default function Lobby() {
   const [nameInput, setNameInput] = useState(playerName);
   const [joinCodeInput, setJoinCodeInput] = useState(initialParams.code);
   const [matchTarget, setMatchTarget] = useState<250 | 500>(250);
-  const [tournamentSize, setTournamentSize] = useState<4 | 8>(4);
+  const [tournamentSize, setTournamentSize] = useState<4 | 8 | 16 | 32>(4);
   const [tournamentName, setTournamentName] = useState<string>("");
-  const [matchLabel, setMatchLabel] = useState<string>("");
-  const [labelMode, setLabelMode] = useState<"none" | "preset" | "custom">("none");
-  const LABEL_PRESETS = [
-    "Quarterfinal 1", "Quarterfinal 2", "Quarterfinal 3", "Quarterfinal 4",
-    "Semifinal 1", "Semifinal 2", "Finals",
-  ] as const;
   const MATCH_MODES = [
-    { id: "quick",     label: "Quick Match",          blurb: "Jump in, single match" },
-    { id: "mock",      label: "Mock Tournament",      blurb: "Practice bracket runs" },
-    { id: "sunday",    label: "Sunday Prize",         blurb: "Weekly prize event" },
+    { id: "quick",     label: "Quick Match",          blurb: "Single head-to-head match" },
     { id: "king",      label: "King of the Table",    blurb: "Winner stays, queue challengers" },
-    { id: "bo3",       label: "Best of 3 Showmatch",  blurb: "First to 2 wins" },
-    { id: "custom",    label: "Custom Tournament",    blurb: "Define your own format" },
+    { id: "custom",    label: "Custom Tournament",    blurb: "Single-elimination bracket" },
   ] as const;
   type MatchMode = typeof MATCH_MODES[number]["id"];
   const [matchMode, setMatchMode] = useState<MatchMode>("quick");
@@ -72,7 +63,7 @@ export default function Lobby() {
         return;
       }
       const serverMode: "quick" | "king" = matchMode === "king" ? "king" : "quick";
-      const res = await createRoom(nameInput, matchTarget, matchLabel.trim() || undefined, serverMode);
+      const res = await createRoom(nameInput, matchTarget, undefined, serverMode);
       if (res.roomCode && res.playerIndex !== undefined) {
         saveRoomCode(res.roomCode);
         savePlayerIndex(res.playerIndex as 0 | 1);
@@ -104,11 +95,32 @@ export default function Lobby() {
         setLocation(`/tournament/${code}`);
         return;
       }
-      const res = await joinRoom(code, nameInput);
-      if (res.playerIndex !== undefined) {
-        saveRoomCode(code);
-        savePlayerIndex(res.playerIndex as 0 | 1);
-        setLocation(`/room/${code}`);
+      try {
+        const res = await joinRoom(code, nameInput);
+        if (res.playerIndex !== undefined) {
+          saveRoomCode(code);
+          savePlayerIndex(res.playerIndex as 0 | 1);
+          setLocation(`/room/${code}`);
+        }
+      } catch (joinErr: any) {
+        const msg = String(joinErr || "");
+        // King of the Table fallback: if both seats are full, slot the user
+        // into the challenger queue + spectator list so they can watch and
+        // auto-rotate in when a seat opens.
+        if (matchMode === "king" && /full/i.test(msg)) {
+          await joinAsSpectator(code, nameInput);
+          try { await new Promise<void>((resolve, reject) => {
+            if (!socket) return reject("No socket");
+            socket.emit("join_queue", { roomCode: code, name: nameInput }, (r: { ok: boolean; error?: string }) => r.ok ? resolve() : reject(r.error));
+          }); } catch { /* spectator-only fallback is still fine */ }
+          savePlayerIndex(null);
+          saveIsSpectator(true);
+          saveRoomCode(code);
+          toast({ description: "Table is full — you're in the challenger queue." });
+          setLocation(`/room/${code}`);
+          return;
+        }
+        throw joinErr;
       }
     } catch (err: any) {
       toast({ description: err || "Failed to join", variant: "destructive" });
@@ -223,8 +235,8 @@ export default function Lobby() {
               {matchMode === "king"
                 ? "King of the Table: winner stays, queue replaces the loser."
                 : matchMode === "custom"
-                ? "Custom Tournament: single-elimination bracket of 4 or 8 players."
-                : "Other modes still create a standard 1v1 room for now."}
+                ? "Custom Tournament: single-elimination bracket of 4, 8, 16, or 32 players."
+                : "Quick Match: one head-to-head game, first to the target wins."}
             </p>
           </div>
 
@@ -233,7 +245,7 @@ export default function Lobby() {
               <div className="space-y-2">
                 <Label className="text-sm">Bracket size</Label>
                 <div className="grid grid-cols-2 gap-2">
-                  {([4, 8] as const).map((s) => (
+                  {([4, 8, 16, 32] as const).map((s) => (
                     <Button
                       key={s}
                       type="button"
@@ -282,65 +294,6 @@ export default function Lobby() {
             <p className="text-xs text-muted-foreground">
               First player to reach the target while leading wins. Ties go to tiebreaker rounds.
             </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-sm">Match label <span className="text-muted-foreground font-normal">(optional)</span></Label>
-            <div className="grid grid-cols-2 gap-2" data-testid="match-label-presets">
-              {LABEL_PRESETS.map((p) => {
-                const active = labelMode === "preset" && matchLabel === p;
-                return (
-                  <Button
-                    key={p}
-                    type="button"
-                    size="sm"
-                    variant={active ? "default" : "outline"}
-                    onClick={() => { setLabelMode("preset"); setMatchLabel(p); }}
-                    disabled={isCreating || isJoining}
-                    data-testid={`preset-${p.toLowerCase().replace(/\s+/g, "-")}`}
-                    className="h-10 text-xs font-semibold"
-                  >
-                    {p}
-                  </Button>
-                );
-              })}
-              <Button
-                type="button"
-                size="sm"
-                variant={labelMode === "custom" ? "default" : "outline"}
-                onClick={() => { setLabelMode("custom"); setMatchLabel(""); }}
-                disabled={isCreating || isJoining}
-                data-testid="preset-custom"
-                className="h-10 text-xs font-semibold"
-              >
-                Custom Label
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={labelMode === "none" ? "default" : "ghost"}
-                onClick={() => { setLabelMode("none"); setMatchLabel(""); }}
-                disabled={isCreating || isJoining}
-                data-testid="preset-none"
-                className="h-10 text-xs"
-              >
-                No Label
-              </Button>
-            </div>
-            {labelMode === "custom" && (
-              <Input
-                id="match-label"
-                placeholder="Enter custom match label"
-                value={matchLabel}
-                onChange={(e) => setMatchLabel(e.target.value.slice(0, 40))}
-                maxLength={40}
-                disabled={isCreating || isJoining}
-                data-testid="input-match-label"
-                className="py-5 mt-2"
-                autoFocus
-              />
-            )}
-            <p className="text-xs text-muted-foreground">Shown to both players and spectators. Only the host sets this when creating.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-border/50">

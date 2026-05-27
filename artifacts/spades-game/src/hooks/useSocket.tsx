@@ -30,7 +30,7 @@ interface SocketContextType {
   tournament: TournamentState | null;
   matchAssignment: MatchAssignedPayload | null;
   tournamentEliminated: { code: string; round: number } | null;
-  createTournament: (opts: { hostName: string; name?: string; size: 4 | 8; matchTarget: number }) => Promise<{ code: string; token: string }>;
+  createTournament: (opts: { hostName: string; name?: string; size: 4 | 8 | 16 | 32; matchTarget: number }) => Promise<{ code: string; token: string }>;
   joinTournament: (code: string, name: string, token?: string) => Promise<{ token: string }>;
   leaveTournament: (code: string) => Promise<void>;
   startTournament: (code: string, token?: string) => Promise<void>;
@@ -232,7 +232,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const clearGameState = () => setGameState(null);
 
   // ── Tournament actions ───────────────────────────────────────────────────
-  const createTournament = (opts: { hostName: string; name?: string; size: 4 | 8; matchTarget: number }) => {
+  const createTournament = (opts: { hostName: string; name?: string; size: 4 | 8 | 16 | 32; matchTarget: number }) => {
     return new Promise<{ code: string; token: string }>((resolve, reject) => {
       if (!socket) return reject("No socket");
       socket.emit("create_tournament", opts, (res: { ok: boolean; code?: string; token?: string; error?: string }) => {

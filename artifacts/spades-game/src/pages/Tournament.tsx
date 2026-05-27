@@ -71,6 +71,8 @@ function BracketView({
     if (fromFinal === 0) return "Finals";
     if (fromFinal === 1) return "Semifinals";
     if (fromFinal === 2) return "Quarterfinals";
+    if (fromFinal === 3) return "Round of 16";
+    if (fromFinal === 4) return "Round of 32";
     return `Round ${roundIdx + 1}`;
   };
 

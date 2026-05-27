@@ -11,7 +11,7 @@
  */
 
 export type TournamentStatus = "lobby" | "in_progress" | "complete";
-export type TournamentSize = 4 | 8;
+export type TournamentSize = 4 | 8 | 16 | 32;
 export type BracketSeat = "A" | "B";
 
 export interface PendingAssignment {
@@ -123,7 +123,10 @@ export function createTournament(
   hostSocketId: string,
   opts: { name?: string; size?: number; matchTarget?: number } = {}
 ): CreateTournamentResult {
-  const size: TournamentSize = opts.size === 8 ? 8 : 4;
+  const size: TournamentSize =
+    opts.size === 32 ? 32 :
+    opts.size === 16 ? 16 :
+    opts.size === 8 ? 8 : 4;
   const target = Number.isFinite(opts.matchTarget) && opts.matchTarget! > 0 && opts.matchTarget! <= 5000
     ? Math.floor(opts.matchTarget!)
     : 250;
