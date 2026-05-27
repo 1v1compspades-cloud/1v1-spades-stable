@@ -32,13 +32,14 @@ const STACK_SIZE = 7;
 const DEAL_ROUNDS = 4;
 // Per-card stagger inside the deal phase. Tight so the whole 16-card deal
 // finishes in well under the discard window.
-const DEAL_STAGGER_MS = 35;
-const DEAL_FLY_MS = 260;
+const DEAL_STAGGER_MS = 22;
+const DEAL_FLY_MS = 200;
 // Phase timings (must add up to ≤ SHUFFLE_ANIMATION_MS = 2600ms on server).
+// Tight: deal ends ≈2102ms, discard glow ≈2102ms, slide ≈2192ms + 380ms = 2572ms.
 const DEAL_START_MS = 1550;
-const DEAL_END_MS = DEAL_START_MS + DEAL_ROUNDS * 4 * DEAL_STAGGER_MS + DEAL_FLY_MS; // ≈ 2370
+const DEAL_END_MS = DEAL_START_MS + DEAL_ROUNDS * 4 * DEAL_STAGGER_MS + DEAL_FLY_MS; // ≈ 2102
 const DISCARD_START_MS = DEAL_END_MS; // side piles glow + label
-const DISCARD_SLIDE_MS = DISCARD_START_MS + 120; // then slide off
+const DISCARD_SLIDE_MS = DISCARD_START_MS + 90; // then slide off
 
 // Pile positions on the virtual table — kept compact so the overlay never
 // hides the bidding bar / hand / score on mobile.
