@@ -6,6 +6,7 @@ import {
   dealHands,
   determineTrickWinner,
   sortHand,
+  cardValue,
 } from "./deck.js";
 
 export type GamePhase =
@@ -123,6 +124,18 @@ export interface GameState {
    * so the socket layer can advance the bracket on game_over.
    */
   tournamentRef?: { code: string; matchId: string };
+  /**
+   * Per-turn budget in ms. When set (tournament rooms), the socket layer
+   * arms a setTimeout for each turn and auto-bids / auto-plays on expiry.
+   * Null / undefined → no timer (Quick Match, KotT).
+   */
+  turnTimeoutMs?: number | null;
+  /**
+   * Epoch ms by which the current actor (bidder or card-player) must act
+   * before being auto-played. Cleared between turns / during animations.
+   * Broadcast to clients so they can render a countdown.
+   */
+  turnDeadline?: number | null;
 }
 
 /** Max challengers waiting in the KotT queue. */
@@ -174,7 +187,34 @@ export function createGame(
     mode,
     challengerQueue: [],
     kingStreak: [0, 0],
+    turnTimeoutMs: null,
+    turnDeadline: null,
   };
+}
+
+/**
+ * Sensible default bid used by the turn-timer auto-bidder. Held to a
+ * conservative 3 — close to the long-run average of a random hand and
+ * unlikely to wreck either side. Could be made smarter later.
+ */
+export function pickAutoBid(): number {
+  return 3;
+}
+
+/**
+ * Pick the lowest legal card for `playerIndex` to auto-play on a turn
+ * timeout. Walks the hand low-to-high, returning the first card
+ * `canPlayCard` accepts. Falls back to the hand's lowest card if no legal
+ * play is found (shouldn't happen — guaranteed to exist by Spades rules).
+ */
+export function pickAutoPlayCard(state: GameState, playerIndex: 0 | 1): Card | null {
+  const hand = state.hands[playerIndex];
+  if (hand.length === 0) return null;
+  const sorted = [...hand].sort((a, b) => cardValue(a) - cardValue(b));
+  for (const c of sorted) {
+    if (canPlayCard(state, playerIndex, c).ok) return c;
+  }
+  return sorted[0] ?? null;
 }
 
 /**

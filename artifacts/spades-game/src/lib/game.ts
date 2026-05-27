@@ -63,12 +63,16 @@ export interface GameState {
   kingStreak?: [number, number];
   /** Link back to the Custom Tournament bracket (if this is a bracket match). */
   tournamentRef?: { code: string; matchId: string };
+  /** Per-turn budget in ms for tournament rooms (null/undefined otherwise). */
+  turnTimeoutMs?: number | null;
+  /** Epoch ms by which the current actor must act before auto-play kicks in. */
+  turnDeadline?: number | null;
 }
 
 // ── Custom Tournament shared types ──────────────────────────────────────────
 
 export type TournamentStatus = "lobby" | "in_progress" | "complete";
-export type TournamentSize = 4 | 8;
+export type TournamentSize = 4 | 8 | 16 | 32;
 export type BracketSeat = "A" | "B";
 
 export interface TournamentMatch {

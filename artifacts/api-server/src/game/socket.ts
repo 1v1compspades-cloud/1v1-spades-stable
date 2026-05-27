@@ -9,6 +9,8 @@ import {
   startRound,
   placeBid,
   playCard,
+  pickAutoBid,
+  pickAutoPlayCard,
   removePlayerFromRoom,
   getRoomBySocketId,
   reconnectPlayer,
@@ -22,6 +24,7 @@ import {
   removeChallenger,
   promoteNextChallenger,
   type GameState,
+  type PlayCardResult,
 } from "./engine.js";
 import type { Card } from "./deck.js";
 import {
@@ -83,6 +86,8 @@ function sanitizeStateForPlayer(
     challengerQueue: state.challengerQueue.map((c) => ({ id: c.id, name: c.name })),
     kingStreak: state.kingStreak,
     tournamentRef: state.tournamentRef,
+    turnTimeoutMs: state.turnTimeoutMs ?? null,
+    turnDeadline: state.turnDeadline ?? null,
   };
 }
 
@@ -122,7 +127,251 @@ function sanitizeStateForSpectator(state: GameState): Record<string, unknown> {
     challengerQueue: state.challengerQueue.map((c) => ({ id: c.id, name: c.name })),
     kingStreak: state.kingStreak,
     tournamentRef: state.tournamentRef,
+    turnTimeoutMs: state.turnTimeoutMs ?? null,
+    turnDeadline: state.turnDeadline ?? null,
   };
+}
+
+// ── Turn timers (tournament rooms only) ─────────────────────────────────────
+// Per-turn soft clock: when a tournament room's actor (bidder or card-player)
+// is idle past `turnTimeoutMs`, the server auto-bids / auto-plays for them.
+// Quick Match and KotT rooms set turnTimeoutMs = null and never arm a timer.
+
+const TOURNAMENT_TURN_TIMEOUT_MS = 30_000;
+const TOURNAMENT_AUTO_FORFEIT_MS = 120_000; // disconnect grace before auto-forfeit
+const turnTimers = new Map<string, NodeJS.Timeout>();
+
+function clearTurnTimer(roomCode: string): void {
+  const h = turnTimers.get(roomCode);
+  if (h) {
+    clearTimeout(h);
+    turnTimers.delete(roomCode);
+  }
+}
+
+/**
+ * Arm (or rearm) the turn timer for a tournament-linked room. MUTATES
+ * `state.turnDeadline` so callers should `armTurnTimer` BEFORE calling
+ * `broadcastState` so clients receive the new deadline in one push.
+ *
+ * No-op when `state.turnTimeoutMs` is null/0 (non-tournament rooms) or
+ * when there's no current actor (animation / round_over / game_over).
+ */
+function armTurnTimer(io: SocketIOServer, state: GameState): void {
+  clearTurnTimer(state.roomCode);
+  const budget = state.turnTimeoutMs;
+  if (!budget || budget <= 0) {
+    state.turnDeadline = null;
+    return;
+  }
+  const actor: 0 | 1 | null =
+    state.phase === "bidding" ? state.currentBidder :
+    state.phase === "playing" ? state.currentTurnIndex :
+    null;
+  if (actor === null) {
+    state.turnDeadline = null;
+    return;
+  }
+  const deadline = Date.now() + budget;
+  state.turnDeadline = deadline;
+
+  const handle = setTimeout(() => {
+    turnTimers.delete(state.roomCode);
+    try {
+      const cur = getRoom(state.roomCode);
+      if (!cur) return;
+      // Bail if a real action moved the game on — the deadline marker is the
+      // authoritative "this scheduled callback is still relevant" check.
+      if (cur.turnDeadline !== deadline) return;
+      if (cur.phase === "bidding" && cur.currentBidder === actor) {
+        autoBidFor(io, cur, actor);
+      } else if (cur.phase === "playing" && cur.currentTurnIndex === actor) {
+        autoPlayFor(io, cur, actor);
+      }
+    } catch (err) {
+      logger.error({ err, roomCode: state.roomCode }, "Turn timer auto-action failed");
+    }
+  }, budget);
+  turnTimers.set(state.roomCode, handle);
+}
+
+function autoBidFor(io: SocketIOServer, state: GameState, playerIndex: 0 | 1): void {
+  const amount = pickAutoBid();
+  try {
+    const { state: newState, bothBid } = placeBid(state, playerIndex, amount);
+    updateRoom(newState);
+    io.to(state.roomCode).emit("turn_auto_action", {
+      playerIndex, kind: "bid", amount,
+    });
+    armTurnTimer(io, newState);
+    broadcastState(io, newState);
+    for (let i = 0; i < 2; i++) {
+      const p = newState.players[i];
+      if (p) io.to(p.socketId).emit("bid_placed", { playerIndex, amount, bothBid });
+    }
+  } catch (err) {
+    logger.error({ err, roomCode: state.roomCode, playerIndex }, "Auto-bid failed");
+  }
+}
+
+function autoPlayFor(io: SocketIOServer, state: GameState, playerIndex: 0 | 1): void {
+  const card = pickAutoPlayCard(state, playerIndex);
+  if (!card) return;
+  try {
+    const result = playCard(state, playerIndex, card);
+    io.to(state.roomCode).emit("turn_auto_action", {
+      playerIndex, kind: "play", card,
+    });
+    handlePlayResult(io, state.roomCode, state, result);
+  } catch (err) {
+    logger.error({ err, roomCode: state.roomCode, playerIndex }, "Auto-play failed");
+  }
+}
+
+/**
+ * Shared post-play pipeline used by both the real `play_card` handler and
+ * `autoPlayFor`. Owns the trick-complete two-phase reveal, round_over /
+ * game_over emits, KotT rotation, and tournament-bracket advancement.
+ */
+function handlePlayResult(
+  io: SocketIOServer,
+  roomCode: string,
+  preState: GameState,
+  result: PlayCardResult,
+): void {
+  if (result.trickComplete && result.intermediateState) {
+    const inter = result.intermediateState;
+    inter.turnDeadline = null;
+    clearTurnTimer(roomCode);
+    updateRoom(inter);
+    broadcastState(io, inter);
+    io.to(roomCode).emit("trick_complete", {
+      winner: result.trickWinner,
+      tricks: inter.tricks,
+    });
+
+    setTimeout(() => {
+      try {
+        const current = getRoom(roomCode);
+        if (!current) return;
+        // Preserve the room's turnTimeoutMs across the result swap (engine
+        // doesn't know about it).
+        result.state.turnTimeoutMs = current.turnTimeoutMs;
+        armTurnTimer(io, result.state);
+        updateRoom(result.state);
+        broadcastState(io, result.state);
+
+        if (result.roundComplete) {
+          io.to(roomCode).emit("round_over", {
+            scores: result.state.scores,
+            bags: result.state.bags,
+            tricks: result.state.tricks,
+            bids: [preState.bids[0], preState.bids[1]],
+            roundHistory: result.state.roundHistory,
+            phase: result.state.phase,
+          });
+        }
+        if (result.state.phase === "game_over" && result.state.mode === "king" && result.state.challengerQueue.length > 0) {
+          scheduleKingNextMatch(io, roomCode);
+        }
+        if (result.state.phase === "game_over" && result.state.tournamentRef) {
+          advanceTournamentOnGameOver(io, result.state);
+        }
+      } catch (err) {
+        logger.error({ err, roomCode }, "handlePlayResult post-delay failed");
+      }
+    }, 700);
+  } else {
+    result.state.turnTimeoutMs = preState.turnTimeoutMs;
+    armTurnTimer(io, result.state);
+    updateRoom(result.state);
+    broadcastState(io, result.state);
+  }
+}
+
+// ── Tournament auto-forfeit on disconnect ───────────────────────────────────
+// When a seated tournament-match player disconnects, give them a 2-minute
+// grace window to reconnect. If the window expires, forfeit the match so the
+// bracket can keep advancing.
+
+const disconnectForfeitTimers = new Map<string, NodeJS.Timeout>();
+
+function scheduleAutoForfeit(io: SocketIOServer, roomCode: string, playerIndex: 0 | 1): void {
+  const key = `${roomCode}:${playerIndex}`;
+  const existing = disconnectForfeitTimers.get(key);
+  if (existing) clearTimeout(existing);
+  const handle = setTimeout(() => {
+    disconnectForfeitTimers.delete(key);
+    try {
+      const cur = getRoom(roomCode);
+      if (!cur) return;
+      if (cur.players[playerIndex] !== null) return; // reconnected
+      if (cur.phase === "game_over") return;
+      if (!cur.tournamentRef) return;
+      logger.info({ roomCode, playerIndex }, "Auto-forfeiting disconnected tournament player");
+      forfeitTournamentMatch(io, roomCode, playerIndex, "disconnect");
+    } catch (err) {
+      logger.error({ err, roomCode, playerIndex }, "Auto-forfeit fire failed");
+    }
+  }, TOURNAMENT_AUTO_FORFEIT_MS);
+  disconnectForfeitTimers.set(key, handle);
+}
+
+function cancelAutoForfeit(roomCode: string, playerIndex: 0 | 1): void {
+  const key = `${roomCode}:${playerIndex}`;
+  const h = disconnectForfeitTimers.get(key);
+  if (h) {
+    clearTimeout(h);
+    disconnectForfeitTimers.delete(key);
+  }
+}
+
+/**
+ * Mark a tournament match as forfeited by `forfeitSeat`. The opposing side
+ * is recorded as winner at `matchTarget`, the game flips to game_over, and
+ * the bracket advancement pipeline runs as if the match had naturally ended.
+ * Idempotent: no-op if already past game_over or not a tournament room.
+ */
+function forfeitTournamentMatch(
+  io: SocketIOServer,
+  roomCode: string,
+  forfeitSeat: 0 | 1,
+  reason: "disconnect" | "host_forced",
+): void {
+  const state = getRoom(roomCode);
+  if (!state) return;
+  if (!state.tournamentRef) return;
+  if (state.phase === "game_over") return;
+
+  clearTurnTimer(roomCode);
+  const winnerSeat: 0 | 1 = forfeitSeat === 0 ? 1 : 0;
+  const finalScores: [number, number] = [state.scores[0], state.scores[1]];
+  finalScores[winnerSeat] = Math.max(finalScores[winnerSeat], state.matchTarget);
+  // Force a strict inequality so advanceTournamentOnGameOver picks a winner.
+  if (finalScores[winnerSeat] <= finalScores[forfeitSeat]) {
+    finalScores[winnerSeat] = finalScores[forfeitSeat] + 1;
+  }
+
+  const forfeitedName = state.players[forfeitSeat]?.name ?? null;
+  const winnerName = state.players[winnerSeat]?.name ?? null;
+  const finalState: GameState = {
+    ...state,
+    phase: "game_over",
+    scores: finalScores,
+    currentBidder: null,
+    currentTurnIndex: null,
+    turnDeadline: null,
+  };
+  updateRoom(finalState);
+  io.to(roomCode).emit("match_forfeit", {
+    roomCode,
+    forfeitSeat,
+    forfeitedName,
+    winnerName,
+    reason,
+  });
+  broadcastState(io, finalState);
+  advanceTournamentOnGameOver(io, finalState);
 }
 
 /** Duration of the visual shuffle + deal animation between phases. */
@@ -152,6 +401,7 @@ function dealWithShuffleAnimation(
       const current = getRoom(roomCode);
       if (!current || current.phase !== "shuffling") return;
       const ready: GameState = { ...current, phase: "bidding" };
+      armTurnTimer(io, ready);
       updateRoom(ready);
       broadcastState(io, ready);
       const firstBidder = ready.currentBidder;
@@ -226,6 +476,9 @@ function createMatchRoomAndAssign(
     "quick",
     { code: t.code, matchId: match.id }
   );
+  // Tournament matches get a turn clock — quick + KotT remain untimed.
+  room.turnTimeoutMs = TOURNAMENT_TURN_TIMEOUT_MS;
+  updateRoom(room);
   joinRoom(room.roomCode, match.playerB.name, sB);
   attachRoomToMatch(t.code, match.id, room.roomCode);
 
@@ -568,6 +821,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           if (state.phase !== "bidding") throw new Error("Not in bidding phase");
 
           const { state: newState, bothBid } = placeBid(state, playerIndex, data.amount);
+          armTurnTimer(io, newState);
           updateRoom(newState);
 
           callback({ ok: true });
@@ -610,61 +864,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
 
           callback({ ok: true });
 
-          if (result.trickComplete && result.intermediateState) {
-            // ── Trick just completed: two-phase update ──────────────────────
-            // Phase 1: store intermediate state (cards visible, no one can play)
-            // and push it to both clients immediately.
-            updateRoom(result.intermediateState);
-            broadcastState(io, result.intermediateState);
-            io.to(data.roomCode).emit("trick_complete", {
-              winner: result.trickWinner,
-              tricks: result.intermediateState.tricks,
-            });
-
-            // Phase 2 (after 700 ms): store final state and push cleared table.
-            setTimeout(() => {
-              // Guard: make sure the room still exists and hasn't been modified
-              // by a reconnect or other event during the delay.
-              const current = getRoom(data.roomCode);
-              if (!current) return;
-
-              updateRoom(result.state);
-              broadcastState(io, result.state);
-
-              if (result.roundComplete) {
-                io.to(data.roomCode).emit("round_over", {
-                  scores: result.state.scores,
-                  bags: result.state.bags,
-                  tricks: result.state.tricks,
-                  bids: [state.bids[0], state.bids[1]],
-                  roundHistory: result.state.roundHistory,
-                  phase: result.state.phase,
-                });
-              }
-
-              // KotT: auto-rotate to next challenger after game_over (if queue non-empty).
-              if (
-                result.state.phase === "game_over" &&
-                result.state.mode === "king" &&
-                result.state.challengerQueue.length > 0
-              ) {
-                scheduleKingNextMatch(io, data.roomCode);
-              }
-
-              // Tournament: advance the bracket if this match was a bracket node.
-              if (
-                result.state.phase === "game_over" &&
-                result.state.tournamentRef
-              ) {
-                advanceTournamentOnGameOver(io, result.state);
-              }
-            }, 700);
-
-          } else {
-            // ── Mid-trick (first card played): push state immediately ────────
-            updateRoom(result.state);
-            broadcastState(io, result.state);
-          }
+          handlePlayResult(io, data.roomCode, state, result);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           callback({ ok: false, error: msg });
@@ -699,6 +899,8 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           const state = reconnectPlayer(code, data.playerIndex, socket.id, data.playerName);
           socket.join(code);
           logger.info({ roomCode: code, playerIndex: data.playerIndex }, "Player reconnected");
+          // Reconnect cancels any pending auto-forfeit for this seat.
+          cancelAutoForfeit(code, data.playerIndex);
 
           callback({ ok: true });
 
@@ -977,6 +1179,38 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
     );
 
     socket.on(
+      "tournament_force_forfeit",
+      (
+        data: { code: string; matchId: string; forfeitSeat: "A" | "B"; token?: string },
+        callback?: (res: { ok: boolean; error?: string }) => void
+      ) => {
+        try {
+          const code = (data.code || "").toUpperCase().trim();
+          const t = getTournament(code);
+          if (!t) throw new Error("Tournament not found");
+          // Host token is stored on the host's player record (stable across
+          // socket refreshes), matched by hostName.
+          const hostPlayer = t.players.find(
+            (p) => p.name.trim().toLowerCase() === t.hostName.trim().toLowerCase()
+          );
+          if (!hostPlayer || !data.token || data.token !== hostPlayer.token) {
+            throw new Error("Only the tournament host can force a forfeit");
+          }
+          const match = t.rounds.flat().find((m) => m.id === data.matchId);
+          if (!match) throw new Error("Match not found");
+          if (!match.roomCode) throw new Error("Match has not started yet");
+          if (match.winner) throw new Error("Match already resolved");
+          const seatIdx: 0 | 1 = data.forfeitSeat === "A" ? 0 : 1;
+          forfeitTournamentMatch(io, match.roomCode, seatIdx, "host_forced");
+          callback?.({ ok: true });
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+        }
+      }
+    );
+
+    socket.on(
       "start_tournament",
       (
         data: { code: string; token?: string },
@@ -1020,6 +1254,22 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
 
     socket.on("disconnect", () => {
       logger.info({ socketId: socket.id }, "Socket disconnected");
+      // Snapshot which tournament-match seat this socket occupied (if any)
+      // BEFORE removePlayerFromRoom nulls it, so we can arm an auto-forfeit.
+      const before = getRoomBySocketId(socket.id);
+      let tournamentSeat: { roomCode: string; idx: 0 | 1 } | null = null;
+      if (
+        before &&
+        before.tournamentRef &&
+        before.phase !== "waiting" &&
+        before.phase !== "game_over"
+      ) {
+        const seat = before.players.findIndex((p) => p?.socketId === socket.id);
+        if (seat === 0 || seat === 1) {
+          tournamentSeat = { roomCode: before.roomCode, idx: seat };
+        }
+      }
+
       const state = removePlayerFromRoom(socket.id);
       if (state) {
         const remaining = state.players.find((p) => p !== null);
@@ -1028,6 +1278,10 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         }
         // Refresh remaining viewers so spectatorCount stays accurate
         broadcastState(io, state);
+      }
+
+      if (tournamentSeat) {
+        scheduleAutoForfeit(io, tournamentSeat.roomCode, tournamentSeat.idx);
       }
     });
   });

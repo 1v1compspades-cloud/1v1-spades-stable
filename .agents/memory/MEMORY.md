@@ -1,0 +1,1 @@
+- [Tournament turn timers](tournament-turn-timers.md) — arm-before-broadcast pattern, deadline-equality stale-callback guard, why state preservation works.

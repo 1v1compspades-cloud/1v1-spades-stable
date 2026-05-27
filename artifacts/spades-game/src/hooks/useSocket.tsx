@@ -35,6 +35,7 @@ interface SocketContextType {
   leaveTournament: (code: string) => Promise<void>;
   startTournament: (code: string, token?: string) => Promise<void>;
   subscribeTournament: (code: string, playerName?: string, token?: string) => Promise<{ state: TournamentState; yourMatch: { roomCode: string | null; matchId: string } | null; authenticated: boolean }>;
+  forceForfeitMatch: (code: string, matchId: string, forfeitSeat: "A" | "B", token?: string) => Promise<void>;
   clearMatchAssignment: () => void;
   clearTournamentEliminated: () => void;
 }
@@ -283,6 +284,19 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       );
     });
   };
+  const forceForfeitMatch = (code: string, matchId: string, forfeitSeat: "A" | "B", token?: string) => {
+    return new Promise<void>((resolve, reject) => {
+      if (!socket) return reject("No socket");
+      socket.emit(
+        "tournament_force_forfeit",
+        { code, matchId, forfeitSeat, token },
+        (res: { ok: boolean; error?: string }) => {
+          if (res.ok) resolve();
+          else reject(res.error || "Could not force forfeit");
+        }
+      );
+    });
+  };
   const clearMatchAssignment = () => setMatchAssignment(null);
   const clearTournamentEliminated = () => setTournamentEliminated(null);
 
@@ -345,6 +359,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       leaveTournament,
       startTournament,
       subscribeTournament,
+      forceForfeitMatch,
       clearMatchAssignment,
       clearTournamentEliminated,
     }}>

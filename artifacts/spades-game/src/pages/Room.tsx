@@ -28,6 +28,39 @@ function formatCard(card: unknown): string {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 
+/**
+ * Live countdown bar for tournament-room turn timers. Re-renders every 250ms
+ * while a deadline is in the future. No-op for non-tournament rooms (no
+ * turnTimeoutMs) or when there's no active actor (deadline is null).
+ */
+function TurnTimerBar({ deadline, total, label }: { deadline: number; total: number; label: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const h = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(h);
+  }, []);
+  const remaining = Math.max(0, deadline - now);
+  const pct = Math.max(0, Math.min(100, (remaining / total) * 100));
+  const seconds = Math.ceil(remaining / 1000);
+  const urgent = remaining < 10_000;
+  return (
+    <div className="px-4 py-1 bg-black/30" data-testid="turn-timer-bar">
+      <div className="flex items-center justify-between text-[10px] uppercase tracking-wider mb-0.5">
+        <span className="text-muted-foreground">{label}</span>
+        <span className={urgent ? "text-destructive font-semibold" : "text-muted-foreground"}>
+          {seconds}s
+        </span>
+      </div>
+      <div className="h-1 rounded-full bg-white/10 overflow-hidden">
+        <div
+          className={`h-full transition-all duration-200 ${urgent ? "bg-destructive" : "bg-primary"}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function Room() {
   const [, params] = useRoute("/room/:roomCode");
   const [, setLocation] = useLocation();
@@ -438,6 +471,17 @@ export default function Room() {
       gameState.tiebreakerRound <= 3 &&
       (phase === "bidding" || phase === "playing" || phase === "round_over");
 
+    const turnDeadline = gameState.turnDeadline ?? null;
+    const turnBudget = gameState.turnTimeoutMs ?? null;
+    const actorIdx: 0 | 1 | null =
+      phase === "bidding" ? currentBidder :
+      phase === "playing" ? currentTurnIndex :
+      null;
+    const showTurnTimer = !!turnDeadline && !!turnBudget && actorIdx !== null;
+    const timerLabel = !spectator && actorIdx === playerIndex
+      ? "Your turn — auto-play when timer expires"
+      : `${actorIdx !== null ? gameState.players[actorIdx]?.name ?? `Seat ${actorIdx + 1}` : "Opponent"} thinking…`;
+
     return (
       <div>
         {gameState.matchLabel && renderMatchLabelBar()}
@@ -445,6 +489,9 @@ export default function Room() {
           <div className="text-center py-1 px-4 text-xs tracking-wider uppercase bg-orange-500/15 text-orange-300 font-semibold">
             Tiebreaker · Round {gameState.tiebreakerRound} of 3
           </div>
+        )}
+        {showTurnTimer && turnDeadline && turnBudget && (
+          <TurnTimerBar deadline={turnDeadline} total={turnBudget} label={timerLabel} />
         )}
         <div className={`text-center py-2 px-4 text-sm tracking-wide transition-colors ${colorClass}`}>
           {message}

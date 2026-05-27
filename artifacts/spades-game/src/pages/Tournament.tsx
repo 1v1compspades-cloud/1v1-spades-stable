@@ -62,9 +62,13 @@ function MatchCell({
 function BracketView({
   t,
   myName,
+  iAmHost,
+  onForfeit,
 }: {
   t: TournamentState;
   myName: string;
+  iAmHost: boolean;
+  onForfeit?: (matchId: string, seat: "A" | "B") => void;
 }) {
   const roundLabel = (roundIdx: number): string => {
     const fromFinal = t.rounds.length - 1 - roundIdx;
@@ -84,9 +88,38 @@ function BracketView({
             {roundLabel(ri)}
           </div>
           <div className="flex flex-col gap-3 justify-around flex-1">
-            {round.map((m) => (
-              <MatchCell key={m.id} match={m} highlightName={myName} />
-            ))}
+            {round.map((m) => {
+              const isLive = !!m.roomCode && !m.winner && !!m.playerA && !!m.playerB;
+              return (
+                <div key={m.id} className="flex flex-col items-center gap-1">
+                  <MatchCell match={m} highlightName={myName} />
+                  {iAmHost && isLive && onForfeit && (
+                    <div className="flex gap-1 w-full max-w-[200px]" data-testid={`forfeit-controls-${m.id}`}>
+                      <button
+                        type="button"
+                        className="flex-1 text-[9px] uppercase tracking-wider px-1.5 py-1 rounded border border-destructive/40 text-destructive/80 hover-elevate active-elevate-2"
+                        onClick={() => {
+                          if (confirm(`Forfeit ${m.playerA?.name} (Seat A)?`)) onForfeit(m.id, "A");
+                        }}
+                        data-testid={`forfeit-${m.id}-A`}
+                      >
+                        Forfeit A
+                      </button>
+                      <button
+                        type="button"
+                        className="flex-1 text-[9px] uppercase tracking-wider px-1.5 py-1 rounded border border-destructive/40 text-destructive/80 hover-elevate active-elevate-2"
+                        onClick={() => {
+                          if (confirm(`Forfeit ${m.playerB?.name} (Seat B)?`)) onForfeit(m.id, "B");
+                        }}
+                        data-testid={`forfeit-${m.id}-B`}
+                      >
+                        Forfeit B
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       ))}
@@ -103,9 +136,13 @@ export default function Tournament() {
   const {
     connect, connected,
     tournament, subscribeTournament, joinTournament, leaveTournament, startTournament,
-    matchAssignment, clearMatchAssignment,
+    matchAssignment, clearMatchAssignment, forceForfeitMatch,
     tournamentEliminated, clearTournamentEliminated,
   } = useSocket();
+
+  // Auto-navigation countdown for the full-screen "Match Ready" overlay.
+  const MATCH_READY_AUTO_NAV_MS = 12_000;
+  const [matchReadyCountdown, setMatchReadyCountdown] = useState<number | null>(null);
 
   const [nameInput, setNameInput] = useState(playerName);
   const [joining, setJoining] = useState(false);
@@ -124,7 +161,9 @@ export default function Tournament() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connected, code]);
 
-  // When a match is assigned (start or next round), save state + navigate.
+  // When a match is assigned (start or next round), save state and show a
+  // full-screen "Match Ready" overlay. The overlay auto-navigates to the room
+  // after MATCH_READY_AUTO_NAV_MS so an idle player still lands in their seat.
   useEffect(() => {
     if (!matchAssignment) return;
     if (matchAssignment.tournamentCode !== code) return;
@@ -132,11 +171,41 @@ export default function Tournament() {
     saveIsSpectator(false);
     saveRoomCode(matchAssignment.roomCode);
     savePlayerIndex(matchAssignment.playerIndex as 0 | 1);
-    toast({ description: `Match ready: ${matchAssignment.matchLabel} vs ${matchAssignment.opponentName}` });
-    clearMatchAssignment();
-    setLocation(`/room/${matchAssignment.roomCode}`);
+    setMatchReadyCountdown(Math.ceil(MATCH_READY_AUTO_NAV_MS / 1000));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchAssignment]);
+
+  // Tick the countdown + auto-navigate when it hits zero.
+  useEffect(() => {
+    if (matchReadyCountdown === null) return;
+    if (matchReadyCountdown <= 0) {
+      const target = matchAssignment?.roomCode;
+      clearMatchAssignment();
+      setMatchReadyCountdown(null);
+      if (target) setLocation(`/room/${target}`);
+      return;
+    }
+    const h = setTimeout(() => setMatchReadyCountdown((n) => (n === null ? null : n - 1)), 1000);
+    return () => clearTimeout(h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchReadyCountdown]);
+
+  const acceptMatchReady = () => {
+    const target = matchAssignment?.roomCode;
+    clearMatchAssignment();
+    setMatchReadyCountdown(null);
+    if (target) setLocation(`/room/${target}`);
+  };
+
+  const handleHostForfeit = async (matchId: string, seat: "A" | "B") => {
+    try {
+      const token = getTournamentToken(code) || undefined;
+      await forceForfeitMatch(code, matchId, seat, token);
+      toast({ description: `Forfeited seat ${seat}` });
+    } catch (err: unknown) {
+      toast({ description: typeof err === "string" ? err : "Could not force forfeit", variant: "destructive" });
+    }
+  };
 
   const t = tournament && tournament.code === code ? tournament : null;
   const iAmInRoster = useMemo(() => {
@@ -346,7 +415,7 @@ export default function Tournament() {
               <CardTitle className="text-base">Bracket</CardTitle>
             </CardHeader>
             <CardContent>
-              <BracketView t={t} myName={playerName || ""} />
+              <BracketView t={t} myName={playerName || ""} iAmHost={iAmHost} onForfeit={handleHostForfeit} />
             </CardContent>
           </Card>
         )}
@@ -376,6 +445,33 @@ export default function Tournament() {
               </Button>
             </CardContent>
           </Card>
+        )}
+
+        {/* Match Ready full-screen overlay — appears on match_assigned. */}
+        {matchAssignment && matchAssignment.tournamentCode === code && matchReadyCountdown !== null && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4"
+            data-testid="match-ready-overlay"
+          >
+            <div className="max-w-md w-full rounded-xl border border-primary/40 bg-card shadow-2xl p-6 text-center space-y-4">
+              <div className="text-xs uppercase tracking-widest text-primary/80">Your match is ready</div>
+              <div className="text-2xl font-serif text-primary" data-testid="match-ready-label">
+                {matchAssignment.matchLabel}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                You vs <span className="text-foreground font-semibold">{matchAssignment.opponentName}</span>
+              </div>
+              <div className="text-xs font-mono text-muted-foreground/80">Room {matchAssignment.roomCode}</div>
+              <div className="pt-2 space-y-2">
+                <Button onClick={acceptMatchReady} className="w-full" data-testid="button-enter-match">
+                  Enter match →
+                </Button>
+                <div className="text-[11px] text-muted-foreground" data-testid="match-ready-countdown">
+                  Auto-entering in {matchReadyCountdown}s
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Champion */}
