@@ -508,7 +508,63 @@ export default function Tournament() {
                 })}
               </div>
 
-              {!iAmInRoster && (
+              {/* Invite link — visible to every roster member, always shown.
+                  Points to /tournament/<CODE> (the lobby), NOT a 1v1 room.
+                  Copy button disables when the lobby is full. */}
+              {iAmInRoster && (() => {
+                const slotsOpen = Math.max(0, t.size - t.players.length);
+                const isFull = slotsOpen === 0;
+                const origin = typeof window !== "undefined" ? window.location.origin : "";
+                const base = typeof window !== "undefined" ? window.document.baseURI.replace(origin, "").replace(/\/$/, "") : "";
+                const inviteUrl = `${origin}${base}/tournament/${t.code}`;
+                const handleCopyInvite = async () => {
+                  try {
+                    await navigator.clipboard.writeText(inviteUrl);
+                    toast({ description: "Invite link copied" });
+                  } catch {
+                    toast({ description: "Could not copy — long-press the link to copy manually", variant: "destructive" });
+                  }
+                };
+                return (
+                  <div className="rounded-md border border-border/50 bg-white/[0.02] p-3 space-y-2" data-testid="invite-link-section">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs uppercase tracking-wide text-muted-foreground">Invite link</span>
+                      <span
+                        className={`text-xs font-medium ${isFull ? "text-amber-400" : "text-muted-foreground"}`}
+                        data-testid="capacity-text"
+                      >
+                        {isFull ? `Lobby full (${t.size}/${t.size})` : `${slotsOpen} slot${slotsOpen === 1 ? "" : "s"} open · ${t.players.length}/${t.size}`}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        readOnly
+                        value={inviteUrl}
+                        onFocus={(e) => e.currentTarget.select()}
+                        className="font-mono text-xs"
+                        data-testid="invite-link-input"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleCopyInvite}
+                        disabled={isFull}
+                        data-testid="button-copy-invite"
+                      >
+                        Copy
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {isFull
+                        ? `All ${t.size} slots are filled. Use the Replace button on a slot to swap in a backup.`
+                        : `Share with up to ${slotsOpen} more player${slotsOpen === 1 ? "" : "s"}. They'll land here and just enter their name.`}
+                    </p>
+                  </div>
+                );
+              })()}
+
+              {/* Join form — only when NOT in roster AND lobby has room. */}
+              {!iAmInRoster && t.players.length < t.size && (
                 <div className="space-y-2 pt-2 border-t border-border/50">
                   <Label htmlFor="t-name">Your name</Label>
                   <div className="flex gap-2">
@@ -523,7 +579,19 @@ export default function Tournament() {
                       {joining ? "Joining…" : "Join"}
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">Share the code <span className="font-mono text-primary">{t.code}</span> with friends so they can join too.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Joining as player {t.players.length + 1} of {t.size}. Name must be unique in this lobby.
+                  </p>
+                </div>
+              )}
+
+              {/* Lobby-full state for non-roster visitors. */}
+              {!iAmInRoster && t.players.length >= t.size && (
+                <div
+                  className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200"
+                  data-testid="lobby-full-banner"
+                >
+                  This tournament lobby is full ({t.size}/{t.size}). Ask the host to use the Replace button on a slot if they need to swap in a backup.
                 </div>
               )}
 

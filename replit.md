@@ -101,6 +101,14 @@ Token-gated dashboard the tournament host uses to recover from disconnects, AFK,
 - UI: lobby roster shows a small "Replace" button on each non-host filled slot (host-only). After confirm, a copy-link dialog appears with the backup's join URL.
 - Audit action union extended in BOTH `artifacts/api-server/src/game/tournament.ts` AND `artifacts/spades-game/src/lib/game.ts` (`"replace_player"`).
 
+## Tournament invite link
+
+- Tournament lobby (`/tournament/<CODE>`) shows an "Invite link" panel to every roster member with a copy-to-clipboard button. The link is `${origin}${BASE_URL}/tournament/<CODE>` — points to the **tournament lobby**, NOT a 1v1 `/room/<CODE>` route.
+- Visiting the link as a non-roster user shows the existing name+Join form (gated by `!iAmInRoster`). Visiting when the lobby is full shows a "Lobby full" amber banner instead — no join form, server would reject anyway with "Tournament is full".
+- Copy button disables when `t.players.length >= t.size`. Capacity text on the panel updates live: `"3 slots open · 5/8"` → `"Lobby full (8/8)"`.
+- Capacity rule is purely `t.size` (4/8/16/32 from `TournamentSize`); the 1v1 `maxPlayers=2` rule belongs to `engine.ts` rooms and is not used here.
+- Duplicate-name guard lives in `joinTournament` (case-insensitive, trimmed) and surfaces to the user as toast `"Name already taken in this tournament"`.
+
 ## Match labels (auto-set for tournament matches)
 
 - Server auto-sets `GameState.matchLabel` for tournament rooms to `"${tournamentName} · ${roundLabel}"`. Round labels: `Finals`, `Semifinal N`, `Quarterfinal N`, `Round of 16 · M{n}`, `Round of 32 · M{n}` (`roundLabelForMatch` in socket.ts; mirrored in Tournament.tsx bracket headers).
