@@ -84,6 +84,9 @@ export function ShuffleOverlay() {
         <p className="text-[10px] sm:text-xs uppercase tracking-[0.4em] text-primary/80">
           Dealer is shuffling
         </p>
+        <p className="mt-1 text-[10px] sm:text-xs text-muted-foreground">
+          1v1 Spades uses <span className="text-amber-300 font-semibold">26 cards</span> · the West &amp; East hands are removed
+        </p>
         {import.meta.env.DEV && (
           <p
             data-testid="deal-anim-debug-label"
@@ -92,6 +95,28 @@ export function ShuffleOverlay() {
             [dev] Using 1v1 four-pile deal animation
           </p>
         )}
+      </div>
+
+      {/* "Half deck removed" banner — fades in at the moment the side piles
+          get discarded so the player visibly understands that 26 of the 52
+          cards just left the table. Sits below the card stage. */}
+      <div
+        data-testid="deal-deck-removed-banner"
+        className="absolute bottom-[18%] sm:bottom-[20%] text-center pointer-events-none px-4"
+        style={{
+          animation: `shuffle-fade-in 300ms ease-out ${DISCARD_START_MS}ms both`,
+          opacity: 0,
+        }}
+      >
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-destructive/15 border border-destructive/40">
+          <span className="text-destructive text-base sm:text-lg leading-none">−</span>
+          <span className="text-xs sm:text-sm font-semibold text-destructive uppercase tracking-wider">
+            26 cards removed
+          </span>
+        </div>
+        <p className="mt-1.5 text-[10px] sm:text-xs text-muted-foreground">
+          13 cards × 2 hands · West &amp; East piles discarded
+        </p>
       </div>
 
       {/* Card stage — centered fixed-size box so all animations are anchored */}
