@@ -67,9 +67,10 @@ function BracketView({
   myName: string;
 }) {
   const roundLabel = (roundIdx: number): string => {
-    const isFinal = roundIdx === t.rounds.length - 1;
-    if (isFinal) return "Final";
-    if (roundIdx === t.rounds.length - 2) return "Semifinals";
+    const fromFinal = t.rounds.length - 1 - roundIdx;
+    if (fromFinal === 0) return "Finals";
+    if (fromFinal === 1) return "Semifinals";
+    if (fromFinal === 2) return "Quarterfinals";
     return `Round ${roundIdx + 1}`;
   };
 

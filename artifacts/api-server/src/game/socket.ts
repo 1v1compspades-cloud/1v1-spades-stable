@@ -174,6 +174,19 @@ function dealWithShuffleAnimation(
 const KING_NEXT_MATCH_DELAY_MS = 5000;
 
 /**
+ * Human-friendly label for a bracket match given its round (1-indexed) and
+ * position. Final round → "Finals". Semi → "Semifinal N". Quarter → "Quarterfinal N".
+ * Anything earlier falls back to "R{round} M{pos+1}".
+ */
+function roundLabelForMatch(totalRounds: number, round: number, position: number): string {
+  const fromFinal = totalRounds - round; // 0 = final, 1 = semi, 2 = quarter
+  if (fromFinal === 0) return "Finals";
+  if (fromFinal === 1) return `Semifinal ${position + 1}`;
+  if (fromFinal === 2) return `Quarterfinal ${position + 1}`;
+  return `R${round} M${position + 1}`;
+}
+
+/**
  * Tournament: spin up a freshly-seated game room for a bracket match.
  * Looks up both players' current socketIds, creates the room with player A
  * as host, joins player B, records the room code on the match, and emits
@@ -200,7 +213,7 @@ function createMatchRoomAndAssign(
     return;
   }
 
-  const labelBase = match.round === t.rounds.length ? "Finals" : `R${match.round} M${match.position + 1}`;
+  const labelBase = roundLabelForMatch(t.rounds.length, match.round, match.position);
   const label = `${t.name} · ${labelBase}`;
 
   const room = createRoom(
