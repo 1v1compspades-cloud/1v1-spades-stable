@@ -68,6 +68,14 @@ export function ShuffleOverlay() {
         <p className="text-[10px] sm:text-xs uppercase tracking-[0.4em] text-primary/80">
           Dealer is shuffling
         </p>
+        {import.meta.env.DEV && (
+          <p
+            data-testid="deal-anim-debug-label"
+            className="mt-1 text-[9px] uppercase tracking-widest text-amber-300/80 font-mono"
+          >
+            [dev] Using 1v1 four-pile deal animation
+          </p>
+        )}
       </div>
 
       {/* Card stage — centered fixed-size box so all animations are anchored */}
