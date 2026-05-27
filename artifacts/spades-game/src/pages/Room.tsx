@@ -66,12 +66,24 @@ export default function Room() {
   const [, setLocation] = useLocation();
   const roomCode = params?.roomCode;
 
+  // Honour a "?spectator=1" query flag on the URL. Used by the tournament
+  // bracket's "Watch Live" link so a viewer can drop straight into a live
+  // match without going through the lobby. Pure URL hint — the server is
+  // still the source of truth: spectators are added to `state.spectators[]`
+  // and all broadcasts use `sanitizeStateForSpectator` (no hands, no raw
+  // state), and seat-gated actions reject anyone not in `players[]`.
+  const wantsSpectate = (() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("spectator") === "1";
+  })();
+
   const {
     socket,
     connected, status, gameState, connect, joinRoom, reconnect,
     startGame, placeBid, playCard, nextRound, newMatch,
     resetRoom: doResetRoom,
     setReady: doSetReady,
+    joinAsSpectator,
     reconnectAsSpectator,
     joinQueue, leaveQueue,
   } = useSocket();
@@ -134,6 +146,9 @@ export default function Room() {
   // Stale-room-code guard: if the URL room differs from the last room we
   // stored, drop the cached seat / spectator flag so we don't blindly call
   // reconnect() with someone else's seat index for a room we've never been in.
+  // If the URL carries `?spectator=1` (Watch Live from the tournament
+  // bracket), force the spectator flag on AFTER the wipe so we never
+  // accidentally try to take a player seat.
   useEffect(() => {
     if (!roomCode) return;
     if (storedRoomCode && storedRoomCode !== roomCode) {
@@ -143,7 +158,11 @@ export default function Room() {
     if (storedRoomCode !== roomCode) {
       saveRoomCode(roomCode);
     }
-  }, [roomCode, storedRoomCode, saveRoomCode, savePlayerIndex, saveIsSpectator]);
+    if (wantsSpectate) {
+      savePlayerIndex(null);
+      saveIsSpectator(true);
+    }
+  }, [roomCode, storedRoomCode, wantsSpectate, saveRoomCode, savePlayerIndex, saveIsSpectator]);
 
   useEffect(() => {
     if (!connected || !roomCode || !playerName || gameState) return;
@@ -152,7 +171,14 @@ export default function Room() {
     // from a previous room.
     if (storedRoomCode !== roomCode) return;
     if (isSpectator) {
-      reconnectAsSpectator(roomCode, playerName).catch(err => {
+      // Fresh spectate via `?spectator=1` has no prior session, so the
+      // `reconnect_spectator` handler would reject. Use `join_as_spectator`
+      // for first-time entry; fall back to reconnect on later refreshes
+      // (which will already have a spectator record on the server).
+      const spectateCall = wantsSpectate
+        ? joinAsSpectator(roomCode, playerName)
+        : reconnectAsSpectator(roomCode, playerName);
+      spectateCall.catch(err => {
         toast({ description: err || "Spectator session expired.", variant: "destructive" });
         saveIsSpectator(false);
         setLocation("/");
@@ -177,7 +203,7 @@ export default function Room() {
         setLocation("/");
       });
     }
-  }, [connected, roomCode, storedRoomCode, playerName, gameState, playerIndex, isSpectator, reconnect, reconnectAsSpectator, joinRoom, setLocation, savePlayerIndex, saveIsSpectator, toast, getPlayerToken, savePlayerToken, clearPlayerToken]);
+  }, [connected, roomCode, storedRoomCode, playerName, gameState, playerIndex, isSpectator, wantsSpectate, reconnect, reconnectAsSpectator, joinAsSpectator, joinRoom, setLocation, savePlayerIndex, saveIsSpectator, toast, getPlayerToken, savePlayerToken, clearPlayerToken]);
 
   if (!gameState || (!isSpectator && playerIndex === null)) {
     const label =

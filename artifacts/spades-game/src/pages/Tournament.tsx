@@ -109,6 +109,17 @@ function BracketView({
               return (
                 <div key={m.id} className="flex flex-col items-center gap-1">
                   <MatchCell match={m} highlightName={myName} />
+                  {isLive && (
+                    <a
+                      href={`/room/${m.roomCode}?spectator=1`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full max-w-[200px] text-center text-[10px] uppercase tracking-wider px-2 py-1 rounded border border-primary/40 text-primary/90 hover-elevate active-elevate-2"
+                      data-testid={`watch-live-${m.id}`}
+                    >
+                      👀 Watch Live
+                    </a>
+                  )}
                   {iAmHost && isLive && onForfeit && (
                     <div className="flex gap-1 w-full max-w-[200px]" data-testid={`forfeit-controls-${m.id}`}>
                       <button
