@@ -1336,6 +1336,15 @@ export default function Room() {
                     Get in line
                   </Button>
                 )}
+                {gameState.tournamentRef && (
+                  <Button
+                    onClick={() => setLocation(`/tournament/${gameState.tournamentRef!.code}`)}
+                    className="w-full h-11"
+                    data-testid="button-back-to-tournament"
+                  >
+                    Back to Tournament Bracket
+                  </Button>
+                )}
                 <Button
                   onClick={spectator ? handleLeaveSpectate : () => setLocation("/")}
                   variant="outline"
