@@ -23,6 +23,8 @@ import {
   addChallenger,
   removeChallenger,
   promoteNextChallenger,
+  getAllRooms,
+  cleanupRoom,
   type GameState,
   type PlayCardResult,
 } from "./engine.js";
@@ -41,10 +43,79 @@ import {
   sanitizeTournament,
   setPendingAssignment,
   clearPendingAssignment,
+  getAllTournaments,
+  deleteTournament,
   type Tournament,
   type TournamentMatch,
   type PendingAssignment,
 } from "./tournament.js";
+
+// ── Per-socket rate limiting ────────────────────────────────────────────
+// Token-bucket-ish: a sliding window of recent timestamps per (socketId, kind).
+// Rejects with a friendly error before the action runs. Cleared on disconnect.
+const rateBuckets = new Map<string, number[]>();
+function rateKey(socketId: string, kind: string): string {
+  return `${socketId}:${kind}`;
+}
+/**
+ * Returns true if the call should proceed; false if it exceeded the bucket.
+ * `limit` actions per `windowMs` allowed per socket per kind.
+ */
+function checkRate(socketId: string, kind: string, limit: number, windowMs: number): boolean {
+  const key = rateKey(socketId, kind);
+  const now = Date.now();
+  const arr = rateBuckets.get(key) ?? [];
+  const fresh = arr.filter((t) => now - t < windowMs);
+  if (fresh.length >= limit) {
+    rateBuckets.set(key, fresh);
+    return false;
+  }
+  fresh.push(now);
+  rateBuckets.set(key, fresh);
+  return true;
+}
+function clearRateForSocket(socketId: string): void {
+  for (const k of Array.from(rateBuckets.keys())) {
+    if (k.startsWith(`${socketId}:`)) rateBuckets.delete(k);
+  }
+}
+
+// ── Stale entity sweeper ────────────────────────────────────────────────
+// Removes rooms idle for > 30min in non-active phases, and tournaments
+// that have been complete for > 1h or stalled in lobby for > 24h.
+const STALE_ROOM_IDLE_MS = 30 * 60 * 1000;
+const STALE_TOURNEY_COMPLETE_MS = 60 * 60 * 1000;
+const STALE_TOURNEY_LOBBY_MS = 24 * 60 * 60 * 1000;
+const SWEEP_INTERVAL_MS = 5 * 60 * 1000;
+
+function sweepStaleEntities(): void {
+  const now = Date.now();
+  // Rooms: only sweep rooms in waiting/game_over (don't kill live matches).
+  let droppedRooms = 0;
+  for (const r of getAllRooms()) {
+    if (r.phase !== "waiting" && r.phase !== "game_over") continue;
+    const lastActive = Math.max(r.lastActiveAt[0] ?? 0, r.lastActiveAt[1] ?? 0);
+    if (now - lastActive > STALE_ROOM_IDLE_MS) {
+      cleanupRoom(r.roomCode);
+      droppedRooms++;
+    }
+  }
+  // Tournaments: clear long-complete + stalled-lobby.
+  let droppedTourneys = 0;
+  for (const t of getAllTournaments()) {
+    if (t.status === "complete" && now - (t.completedAt ?? t.createdAt) > STALE_TOURNEY_COMPLETE_MS) {
+      deleteTournament(t.code);
+      droppedTourneys++;
+    } else if (t.status === "lobby" && now - t.createdAt > STALE_TOURNEY_LOBBY_MS) {
+      deleteTournament(t.code);
+      droppedTourneys++;
+    }
+  }
+  if (droppedRooms || droppedTourneys) {
+    logger.info({ droppedRooms, droppedTourneys }, "Swept stale entities");
+  }
+}
+let sweepHandle: NodeJS.Timeout | null = null;
 
 function sanitizeStateForPlayer(
   state: GameState,
@@ -196,7 +267,7 @@ function armTurnTimer(io: SocketIOServer, state: GameState): void {
 }
 
 function autoBidFor(io: SocketIOServer, state: GameState, playerIndex: 0 | 1): void {
-  const amount = pickAutoBid();
+  const amount = pickAutoBid(state, playerIndex);
   try {
     const { state: newState, bothBid } = placeBid(state, playerIndex, amount);
     updateRoom(newState);
@@ -705,6 +776,13 @@ function broadcastState(
 }
 
 export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
+  // Start the periodic stale-entity sweep once per process. Idempotent in
+  // case setupSocketIO is ever called more than once.
+  if (!sweepHandle) {
+    sweepHandle = setInterval(sweepStaleEntities, SWEEP_INTERVAL_MS);
+    // Don't keep the event loop alive just for the sweeper.
+    sweepHandle.unref?.();
+  }
   const io = new SocketIOServer(httpServer, {
     cors: {
       origin: "*",
@@ -723,6 +801,9 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         callback: (res: { ok: boolean; roomCode?: string; playerIndex?: number; error?: string }) => void
       ) => {
         try {
+          if (!checkRate(socket.id, "create_room", 5, 30_000)) {
+            return callback({ ok: false, error: "Slow down — too many rooms created. Try again in a moment." });
+          }
           // Accept any positive integer match target. Default to 250.
           // UI restricts to 250/500; lower values are allowed for tests.
           const rawTarget = Number(data.matchTarget);
@@ -735,7 +816,8 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           const mode: "quick" | "king" = data.mode === "king" ? "king" : "quick";
           const state = createRoom(data.playerName, socket.id, target, label, mode);
           socket.join(state.roomCode);
-          logger.info({ roomCode: state.roomCode, playerName: data.playerName }, "Room created");
+          (socket.data as { playerName?: string }).playerName = data.playerName;
+          logger.info({ roomCode: state.roomCode, playerName: data.playerName, socketId: socket.id }, "Room created");
           callback({ ok: true, roomCode: state.roomCode, playerIndex: 0 });
           broadcastState(io, state);
         } catch (err: unknown) {
@@ -752,10 +834,14 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         callback: (res: { ok: boolean; playerIndex?: number; error?: string }) => void
       ) => {
         try {
+          if (!checkRate(socket.id, "join_room", 10, 30_000)) {
+            return callback({ ok: false, error: "Slow down — too many join attempts." });
+          }
           const code = data.roomCode.toUpperCase().trim();
           const { state, playerIndex } = joinRoom(code, data.playerName, socket.id);
           socket.join(code);
-          logger.info({ roomCode: code, playerName: data.playerName }, "Player joined room");
+          (socket.data as { playerName?: string }).playerName = data.playerName;
+          logger.info({ roomCode: code, playerName: data.playerName, socketId: socket.id }, "Player joined room");
 
           callback({ ok: true, playerIndex });
 
@@ -811,6 +897,9 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         callback: (res: { ok: boolean; error?: string }) => void
       ) => {
         try {
+          if (!checkRate(socket.id, "place_bid", 20, 5_000)) {
+            return callback({ ok: false, error: "Slow down." });
+          }
           const state = getRoom(data.roomCode);
           if (!state) throw new Error("Room not found");
 
@@ -852,6 +941,9 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         callback: (res: { ok: boolean; error?: string }) => void
       ) => {
         try {
+          if (!checkRate(socket.id, "play_card", 30, 5_000)) {
+            return callback({ ok: false, error: "Slow down." });
+          }
           const state = getRoom(data.roomCode);
           if (!state) throw new Error("Room not found");
 
@@ -898,7 +990,11 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           const code = data.roomCode.toUpperCase().trim();
           const state = reconnectPlayer(code, data.playerIndex, socket.id, data.playerName);
           socket.join(code);
-          logger.info({ roomCode: code, playerIndex: data.playerIndex }, "Player reconnected");
+          socket.data.playerName = data.playerName;
+          logger.info(
+            { roomCode: code, playerIndex: data.playerIndex, playerName: data.playerName },
+            "Player reconnected"
+          );
           // Reconnect cancels any pending auto-forfeit for this seat.
           cancelAutoForfeit(code, data.playerIndex);
 
@@ -964,7 +1060,8 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           const name = (data.spectatorName || "Spectator").slice(0, 24);
           const state = addSpectator(code, name, socket.id);
           socket.join(code);
-          logger.info({ roomCode: code, name }, "Spectator joined");
+          socket.data.playerName = name;
+          logger.info({ roomCode: code, playerName: name }, "Spectator joined");
 
           callback({ ok: true });
           // Send the spectator their view
@@ -989,7 +1086,8 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           const name = (data.spectatorName || "Spectator").slice(0, 24);
           const state = reconnectSpectator(code, name, socket.id);
           socket.join(code);
-          logger.info({ roomCode: code, name }, "Spectator reconnected");
+          socket.data.playerName = name;
+          logger.info({ roomCode: code, playerName: name }, "Spectator reconnected");
 
           callback({ ok: true });
           socket.emit("game_state", sanitizeStateForSpectator(state));
@@ -1073,6 +1171,9 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         callback?: (res: { ok: boolean; code?: string; token?: string; error?: string }) => void
       ) => {
         try {
+          if (!checkRate(socket.id, "create_tournament", 3, 60_000)) {
+            return callback?.({ ok: false, error: "Slow down — too many tournaments created." });
+          }
           const host = (data.hostName || "Host").slice(0, 24);
           const { tournament: t, hostToken } = createTournamentEntity(host, socket.id, {
             name: data.name,
@@ -1080,7 +1181,8 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
             matchTarget: data.matchTarget,
           });
           socket.join(`tournament:${t.code}`);
-          logger.info({ code: t.code, host, size: t.size }, "Tournament created");
+          (socket.data as { playerName?: string }).playerName = host;
+          logger.info({ code: t.code, host, size: t.size, socketId: socket.id }, "Tournament created");
           callback?.({ ok: true, code: t.code, token: hostToken });
           io.to(`tournament:${t.code}`).emit("tournament_state", sanitizeTournament(t));
         } catch (err: unknown) {
@@ -1097,11 +1199,15 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         callback?: (res: { ok: boolean; error?: string; state?: unknown; token?: string }) => void
       ) => {
         try {
+          if (!checkRate(socket.id, "join_tournament", 10, 30_000)) {
+            return callback?.({ ok: false, error: "Slow down — too many join attempts." });
+          }
           const code = (data.code || "").toUpperCase().trim();
           const name = (data.name || "").slice(0, 24);
           const { tournament: t, token, joinedFresh } = joinTournamentEntity(code, name, socket.id, data.token);
           socket.join(`tournament:${code}`);
-          logger.info({ code, name, joinedFresh }, "Tournament joined");
+          (socket.data as { playerName?: string }).playerName = name;
+          logger.info({ code, name, joinedFresh, socketId: socket.id }, "Tournament joined");
           callback?.({ ok: true, state: sanitizeTournament(t), token });
           io.to(`tournament:${code}`).emit("tournament_state", sanitizeTournament(t));
         } catch (err: unknown) {
@@ -1253,7 +1359,9 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
     );
 
     socket.on("disconnect", () => {
-      logger.info({ socketId: socket.id }, "Socket disconnected");
+      clearRateForSocket(socket.id);
+      const playerName = (socket.data as { playerName?: string }).playerName;
+      logger.info({ socketId: socket.id, playerName }, "Socket disconnected");
       // Snapshot which tournament-match seat this socket occupied (if any)
       // BEFORE removePlayerFromRoom nulls it, so we can arm an auto-forfeit.
       const before = getRoomBySocketId(socket.id);

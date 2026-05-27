@@ -193,12 +193,37 @@ export function createGame(
 }
 
 /**
- * Sensible default bid used by the turn-timer auto-bidder. Held to a
- * conservative 3 — close to the long-run average of a random hand and
- * unlikely to wreck either side. Could be made smarter later.
+ * Heuristic auto-bid for a timed-out player. Counts likely tricks from the
+ * actual hand instead of always bidding 3 (which can ruin a player who
+ * really held a strong or a nil-worthy hand).
+ *
+ * Trick contribution per card:
+ *   - Ace of any suit: 1.0
+ *   - King of any suit: 0.6 (drops to 0.4 if no queen of that suit in hand,
+ *     i.e. K alone is more loseable)
+ *   - Queen of spades: 0.3
+ *   - Every spade beyond the 4th: +0.5 each (long-suit tricks)
+ *
+ * Result is rounded and clamped to [1, 6] — never auto-nil (too risky to
+ * commit a player to nil without their consent) and never an absurdly
+ * high bid.
  */
-export function pickAutoBid(): number {
-  return 3;
+export function pickAutoBid(state?: GameState, playerIndex?: 0 | 1): number {
+  if (!state || playerIndex === undefined) return 3;
+  const hand = state.hands[playerIndex];
+  if (!hand || hand.length === 0) return 3;
+  let score = 0;
+  const spadeCount = hand.filter((c) => c.suit === "spades").length;
+  for (const c of hand) {
+    if (c.rank === "A") score += 1.0;
+    else if (c.rank === "K") {
+      const hasQ = hand.some((x) => x.suit === c.suit && x.rank === "Q");
+      score += hasQ ? 0.6 : 0.4;
+    } else if (c.rank === "Q" && c.suit === "spades") score += 0.3;
+  }
+  if (spadeCount > 4) score += (spadeCount - 4) * 0.5;
+  const rounded = Math.round(score);
+  return Math.max(1, Math.min(6, rounded));
 }
 
 /**
@@ -909,6 +934,11 @@ export function getRoomBySocketId(socketId: string): GameState | null {
 
 export function cleanupRoom(roomCode: string): void {
   rooms.delete(roomCode);
+}
+
+/** Iterate all live rooms (used by the stale-room sweeper). */
+export function getAllRooms(): GameState[] {
+  return Array.from(rooms.values());
 }
 
 export function reconnectPlayer(

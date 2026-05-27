@@ -72,6 +72,8 @@ export interface Tournament {
   /** Names of eliminated players, in elimination order. */
   eliminated: string[];
   createdAt: number;
+  /** Set when status transitions to "complete" — used by the stale sweeper. */
+  completedAt: number | null;
 }
 
 const tournaments = new Map<string, Tournament>();
@@ -99,6 +101,15 @@ function makeTournamentCode(): string {
 
 export function getTournament(code: string): Tournament | undefined {
   return tournaments.get(code);
+}
+
+/** Iterate all live tournaments (used by the stale-tournament sweeper). */
+export function getAllTournaments(): Tournament[] {
+  return Array.from(tournaments.values());
+}
+
+export function deleteTournament(code: string): void {
+  tournaments.delete(code);
 }
 
 export function getTournamentByMatchRoom(roomCode: string): { tournament: Tournament; match: TournamentMatch } | null {
@@ -149,6 +160,7 @@ export function createTournament(
     champion: null,
     eliminated: [],
     createdAt: Date.now(),
+    completedAt: null,
   };
   tournaments.set(code, t);
   return { tournament: t, hostToken };
@@ -389,6 +401,7 @@ export function recordMatchResult(
   const isFinal = resolvedRoundIdx === t.rounds.length - 1;
   if (isFinal) {
     t.status = "complete";
+    t.completedAt = Date.now();
     t.champion = winnerName;
     return {
       tournament: t,

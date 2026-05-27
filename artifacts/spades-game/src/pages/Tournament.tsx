@@ -7,6 +7,17 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { ConnectionPill } from "@/components/ConnectionPill";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { TournamentMatch, TournamentState } from "@/lib/game";
 
 function MatchCell({
@@ -80,6 +91,11 @@ function BracketView({
     return `Round ${roundIdx + 1}`;
   };
 
+  // Pending forfeit state — drives the AlertDialog. `null` = closed.
+  const [pendingForfeit, setPendingForfeit] = useState<
+    { matchId: string; seat: "A" | "B"; playerName: string } | null
+  >(null);
+
   return (
     <div className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2" data-testid="bracket">
       {t.rounds.map((round, ri) => (
@@ -98,9 +114,9 @@ function BracketView({
                       <button
                         type="button"
                         className="flex-1 text-[9px] uppercase tracking-wider px-1.5 py-1 rounded border border-destructive/40 text-destructive/80 hover-elevate active-elevate-2"
-                        onClick={() => {
-                          if (confirm(`Forfeit ${m.playerA?.name} (Seat A)?`)) onForfeit(m.id, "A");
-                        }}
+                        onClick={() =>
+                          setPendingForfeit({ matchId: m.id, seat: "A", playerName: m.playerA?.name ?? "Seat A" })
+                        }
                         data-testid={`forfeit-${m.id}-A`}
                       >
                         Forfeit A
@@ -108,9 +124,9 @@ function BracketView({
                       <button
                         type="button"
                         className="flex-1 text-[9px] uppercase tracking-wider px-1.5 py-1 rounded border border-destructive/40 text-destructive/80 hover-elevate active-elevate-2"
-                        onClick={() => {
-                          if (confirm(`Forfeit ${m.playerB?.name} (Seat B)?`)) onForfeit(m.id, "B");
-                        }}
+                        onClick={() =>
+                          setPendingForfeit({ matchId: m.id, seat: "B", playerName: m.playerB?.name ?? "Seat B" })
+                        }
                         data-testid={`forfeit-${m.id}-B`}
                       >
                         Forfeit B
@@ -123,6 +139,32 @@ function BracketView({
           </div>
         </div>
       ))}
+
+      <AlertDialog open={!!pendingForfeit} onOpenChange={(open) => { if (!open) setPendingForfeit(null); }}>
+        <AlertDialogContent data-testid="forfeit-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Forfeit {pendingForfeit?.playerName}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The opposing player will advance immediately. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="forfeit-dialog-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="forfeit-dialog-confirm"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (pendingForfeit && onForfeit) {
+                  onForfeit(pendingForfeit.matchId, pendingForfeit.seat);
+                }
+                setPendingForfeit(null);
+              }}
+            >
+              Forfeit
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -283,6 +325,7 @@ export default function Tournament() {
   if (!t) {
     return (
       <div className="min-h-[100dvh] flex items-center justify-center p-4">
+        <ConnectionPill />
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="font-mono">{code}</CardTitle>
@@ -300,6 +343,7 @@ export default function Tournament() {
 
   return (
     <div className="min-h-[100dvh] p-4 pt-[max(1rem,env(safe-area-inset-top))]">
+      <ConnectionPill />
       <div className="mx-auto max-w-5xl space-y-4">
         <Card className="border-primary/30 bg-card/80 backdrop-blur-sm">
           <CardHeader className="space-y-2 pb-3">

@@ -1,1 +1,3 @@
-- [Tournament turn timers](tournament-turn-timers.md) — arm-before-broadcast pattern, deadline-equality stale-callback guard, why state preservation works.
+- [Spades stale-sweep semantics](spades-sweep-semantics.md) — sweep "complete" entities by completion timestamp, not createdAt, or long matches get nuked seconds after finishing.
+- [Spades socket observability](spades-socket-observability.md) — playerName tagging must cover reconnect + spectator paths, not just create/join, or disconnect logs lose identity.
+- [Spades shuffle timing budget](spades-shuffle-timing.md) — client deal+discard animation must fit inside server SHUFFLE_ANIMATION_MS (2600ms) or the deal arrives mid-animation.
