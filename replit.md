@@ -73,6 +73,24 @@ Single-elimination bracket of 4, 8, 16, or 32 players, random seeding, every mat
 - `createMatchRoomAndAssign` writes a `pendingAssignment` onto each player record. On an authenticated `subscribe_tournament`, if a pending assignment exists, the server re-emits `match_assigned` (and re-joins the game room) — so a refresh on the tournament page during a live match lands the player back into their seat. `recordMatchResult` clears `pendingAssignment` for both players of the resolved match.
 - Fresh-join path rejects duplicate names (case-insensitive, trimmed). Reconnecting from the same browser works because the cached token is passed through `joinTournament`.
 
+## Host admin tools (Phase 6)
+
+Token-gated dashboard the tournament host uses to recover from disconnects, AFK, and room glitches without abandoning the bracket.
+
+- Page: `artifacts/spades-game/src/pages/HostDashboard.tsx` at `/tournament/:code/host`. Only reachable if `spades_tournament_token_${CODE}` exists in localStorage — otherwise bounces back to `/tournament/:code`. Tournament page shows a "Host tools" button to the host only.
+- Server helpers in `tournament.ts`: `requireTournamentHost(t, token)` (token-only, no socketId fallback), `appendAdminAudit` / `getAdminAuditLog` (bounded 500-entry ring buffer, in-memory), `findMatchById`, `detachMatchRoom`.
+- Socket events (all in `socket.ts`, all gated by `requireTournamentHost`, all write an `AdminAuditEntry` and emit `admin_audit_appended` to the tournament room):
+  - `admin_dashboard` — returns per-match snapshot incl. live phase/scores/turn/paused/last-activity + per-seat connected flag.
+  - `admin_audit_log` — returns audit tail, most-recent-first.
+  - `admin_pause_match` / `admin_resume_match` — sets `GameState.isPaused`; `place_bid` / `play_card` reject while paused; `armTurnTimer` no-ops while paused.
+  - `admin_reset_timer` — re-arms the current actor's turn timer.
+  - `admin_remake_room` — detaches old room (cleanupRoom + deleteRoomState best-effort), spins up a fresh one via `createMatchRoomAndAssign`. Players get a new `match_assigned`.
+  - `admin_mark_winner` — bracket-level advance. If a live room exists, routes through `forfeitTournamentMatch` (loser = opposite seat). If no room exists, calls `recordMatchResult` directly. Idempotent on replay of same winner; rejects conflict on different winner.
+  - `admin_force_forfeit` (canonical) / `tournament_force_forfeit` (legacy alias kept for back-compat) — both delegate to the same `runAdminForceForfeit` helper, both write audit.
+- `GameState.isPaused?: boolean` flag is broadcast in both player and spectator sanitized views.
+- Bracket-repair safety: `recordMatchResult` is already idempotent (returns `"replay"` for same winner, `"rejected"` for conflict) — `admin_mark_winner` reuses that, so a host can safely retry on flaky connections without double-advancing.
+- Audit log content (in-memory): action, actor name, matchId, roomCode, free-form payload (winner seat, forfeit seat, old room code, etc.). Bracket advancements ALSO write to the DB-backed `game_audit_log` via `recordMatchResultTx`.
+
 ## Match labels (auto-set for tournament matches)
 
 - Server auto-sets `GameState.matchLabel` for tournament rooms to `"${tournamentName} · ${roundLabel}"`. Round labels: `Finals`, `Semifinal N`, `Quarterfinal N`, `Round of 16 · M{n}`, `Round of 32 · M{n}` (`roundLabelForMatch` in socket.ts; mirrored in Tournament.tsx bracket headers).

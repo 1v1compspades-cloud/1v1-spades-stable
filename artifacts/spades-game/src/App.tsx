@@ -8,6 +8,7 @@ import NotFound from "@/pages/not-found";
 import Lobby from "@/pages/Lobby";
 import Room from "@/pages/Room";
 import Tournament from "@/pages/Tournament";
+import HostDashboard from "@/pages/HostDashboard";
 
 const queryClient = new QueryClient();
 
@@ -16,6 +17,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Lobby} />
       <Route path="/room/:roomCode" component={Room} />
+      <Route path="/tournament/:code/host" component={HostDashboard} />
       <Route path="/tournament/:code" component={Tournament} />
       <Route component={NotFound} />
     </Switch>

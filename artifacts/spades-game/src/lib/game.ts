@@ -67,6 +67,57 @@ export interface GameState {
   turnTimeoutMs?: number | null;
   /** Epoch ms by which the current actor must act before auto-play kicks in. */
   turnDeadline?: number | null;
+  /** Host has paused this tournament match — bidding/playing rejected until resumed. */
+  isPaused?: boolean;
+}
+
+// ── Host admin tools (tournament) ────────────────────────────────────────────
+
+export type AdminAuditAction =
+  | "pause_match"
+  | "resume_match"
+  | "reset_timer"
+  | "remake_room"
+  | "mark_winner"
+  | "force_forfeit"
+  | "force_start";
+
+export interface AdminAuditEntry {
+  ts: number;
+  action: AdminAuditAction;
+  actorName: string;
+  matchId?: string;
+  roomCode?: string;
+  payload?: Record<string, unknown>;
+}
+
+export interface AdminMatchSnapshot {
+  matchId: string;
+  round: number;
+  position: number;
+  roomCode: string | null;
+  playerA: { name: string; connected: boolean } | null;
+  playerB: { name: string; connected: boolean } | null;
+  winner: "A" | "B" | null;
+  winnerName: string | null;
+  /** Live game state summary (null when room not yet started). */
+  live: {
+    phase: string;
+    scores: [number, number];
+    roundNumber: number;
+    currentTurnIndex: 0 | 1 | null;
+    currentBidder: 0 | 1 | null;
+    turnDeadline: number | null;
+    isPaused: boolean;
+    lastActiveAt: [number, number] | null;
+  } | null;
+}
+
+export interface AdminDashboardSnapshot {
+  code: string;
+  name: string;
+  status: TournamentStatus;
+  matches: AdminMatchSnapshot[];
 }
 
 // ── Custom Tournament shared types ──────────────────────────────────────────

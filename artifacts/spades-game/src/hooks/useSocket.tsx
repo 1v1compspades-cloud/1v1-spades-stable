@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { io, Socket } from "socket.io-client";
-import { GameState, Card, TournamentState, MatchAssignedPayload } from "@/lib/game";
+import { GameState, Card, TournamentState, MatchAssignedPayload, AdminAuditEntry, AdminDashboardSnapshot } from "@/lib/game";
 
 export type SocketStatus = "connecting" | "online" | "reconnecting" | "offline";
 
@@ -38,6 +38,15 @@ interface SocketContextType {
   forceForfeitMatch: (code: string, matchId: string, forfeitSeat: "A" | "B", token?: string) => Promise<void>;
   clearMatchAssignment: () => void;
   clearTournamentEliminated: () => void;
+  // ── Host admin tools ──────────────────────────────────────────────────
+  adminDashboard: (code: string, token: string) => Promise<AdminDashboardSnapshot>;
+  adminAuditLog: (code: string, token: string, limit?: number) => Promise<AdminAuditEntry[]>;
+  adminPauseMatch: (code: string, matchId: string, token: string) => Promise<unknown>;
+  adminResumeMatch: (code: string, matchId: string, token: string) => Promise<unknown>;
+  adminResetTimer: (code: string, matchId: string, token: string) => Promise<unknown>;
+  adminRemakeRoom: (code: string, matchId: string, token: string) => Promise<{ ok: true; newRoomCode?: string }>;
+  adminMarkWinner: (code: string, matchId: string, winnerSeat: "A" | "B", token: string) => Promise<{ ok: true; replay?: boolean }>;
+  adminForceForfeit: (code: string, matchId: string, forfeitSeat: "A" | "B", token: string) => Promise<unknown>;
 }
 
 const SocketContext = createContext<SocketContextType | null>(null);
@@ -314,6 +323,38 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  // ── Host admin tools (tournament) ───────────────────────────────────────
+  // Every admin action takes the host token (stored in localStorage as
+  // spades_tournament_token_${CODE}). The token is NEVER broadcast — it
+  // travels only in these per-call socket payloads, and the server's
+  // requireTournamentHost throws if it doesn't match the host's record.
+
+  function adminCall<T = void>(event: string, payload: Record<string, unknown>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      if (!socket) return reject("No socket");
+      socket.emit(event, payload, (res: { ok: boolean; error?: string } & Record<string, unknown>) => {
+        if (res?.ok) resolve(res as unknown as T);
+        else reject(res?.error || `${event} failed`);
+      });
+    });
+  }
+  const adminDashboard = (code: string, token: string) =>
+    adminCall<{ ok: true; snapshot: AdminDashboardSnapshot }>("admin_dashboard", { code, token }).then((r) => r.snapshot);
+  const adminAuditLog = (code: string, token: string, limit = 100) =>
+    adminCall<{ ok: true; entries: AdminAuditEntry[] }>("admin_audit_log", { code, token, limit }).then((r) => r.entries);
+  const adminPauseMatch = (code: string, matchId: string, token: string) =>
+    adminCall("admin_pause_match", { code, matchId, token });
+  const adminResumeMatch = (code: string, matchId: string, token: string) =>
+    adminCall("admin_resume_match", { code, matchId, token });
+  const adminResetTimer = (code: string, matchId: string, token: string) =>
+    adminCall("admin_reset_timer", { code, matchId, token });
+  const adminRemakeRoom = (code: string, matchId: string, token: string) =>
+    adminCall<{ ok: true; newRoomCode?: string }>("admin_remake_room", { code, matchId, token });
+  const adminMarkWinner = (code: string, matchId: string, winnerSeat: "A" | "B", token: string) =>
+    adminCall<{ ok: true; replay?: boolean }>("admin_mark_winner", { code, matchId, winnerSeat, token });
+  const adminForceForfeit = (code: string, matchId: string, forfeitSeat: "A" | "B", token: string) =>
+    adminCall("admin_force_forfeit", { code, matchId, forfeitSeat, token });
+
   const reconnectAsSpectator = (roomCode: string, spectatorName: string) => {
     return new Promise<void>((resolve, reject) => {
       if (!socket) return reject("No socket");
@@ -362,6 +403,14 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       forceForfeitMatch,
       clearMatchAssignment,
       clearTournamentEliminated,
+      adminDashboard,
+      adminAuditLog,
+      adminPauseMatch,
+      adminResumeMatch,
+      adminResetTimer,
+      adminRemakeRoom,
+      adminMarkWinner,
+      adminForceForfeit,
     }}>
       {children}
     </SocketContext.Provider>

@@ -57,6 +57,39 @@ export interface TournamentMatch {
   winnerName: string | null;
 }
 
+/**
+ * Host admin audit entry — appended every time the tournament host takes
+ * an administrative action (pause, resume, mark winner, force forfeit,
+ * remake room, reset timer). The audit log is HOST-ONLY: it is never
+ * included in `sanitizeTournament` and only reachable via the
+ * `admin_audit_log` socket event, which itself requires the host token.
+ *
+ * In-memory only (bounded ring buffer, see TOURNAMENT_AUDIT_CAP). Bracket
+ * advancements written by `recordMatchResult` are ALSO persisted to the
+ * `game_audit_log` DB table by `recordMatchResultTx`, which is separate.
+ */
+export type AdminAuditAction =
+  | "pause_match"
+  | "resume_match"
+  | "reset_timer"
+  | "remake_room"
+  | "mark_winner"
+  | "force_forfeit"
+  | "force_start";
+
+export interface AdminAuditEntry {
+  ts: number;
+  action: AdminAuditAction;
+  /** Display name of the host who performed the action. */
+  actorName: string;
+  matchId?: string;
+  roomCode?: string;
+  /** Free-form per-action payload (winner seat, target seat, etc.). */
+  payload?: Record<string, unknown>;
+}
+
+const TOURNAMENT_AUDIT_CAP = 500;
+
 export interface Tournament {
   code: string;
   name: string;
@@ -74,6 +107,8 @@ export interface Tournament {
   createdAt: number;
   /** Set when status transitions to "complete" — used by the stale sweeper. */
   completedAt: number | null;
+  /** Bounded ring buffer of host admin actions. Host-only via admin_audit_log. */
+  adminAuditLog: AdminAuditEntry[];
 }
 
 const tournaments = new Map<string, Tournament>();
@@ -161,6 +196,7 @@ export function createTournament(
     eliminated: [],
     createdAt: Date.now(),
     completedAt: null,
+    adminAuditLog: [],
   };
   tournaments.set(code, t);
   return { tournament: t, hostToken };
@@ -646,6 +682,87 @@ export function clearPendingAssignment(t: Tournament, playerName: string): void 
   const n = playerName.trim().toLowerCase();
   const p = t.players.find((p) => p.name.trim().toLowerCase() === n);
   if (p) p.pendingAssignment = undefined;
+}
+
+/**
+ * Permission gate for host-only admin actions. Returns the host player
+ * record on success, throws "Only the tournament host can …" on failure.
+ *
+ * Why token-only (no socketId fallback like start_tournament):
+ *   - Admin actions are higher-stakes than start (force-forfeit, mark
+ *     winner, remake room) and must NEVER be triggerable just because
+ *     the host's old socketId hasn't been recycled yet.
+ *   - The token is the canonical durable identity; the host's browser
+ *     stores it in localStorage and presents it on every admin event.
+ */
+export function requireTournamentHost(
+  t: Tournament,
+  providedToken: string | undefined,
+): TournamentPlayer {
+  if (!providedToken) {
+    throw new Error("Only the tournament host can perform this action");
+  }
+  const hostPlayer = t.players.find(
+    (p) => p.name.trim().toLowerCase() === t.hostName.trim().toLowerCase(),
+  );
+  if (!hostPlayer || hostPlayer.token !== providedToken) {
+    throw new Error("Only the tournament host can perform this action");
+  }
+  return hostPlayer;
+}
+
+/**
+ * Append an admin audit entry. Bounded — the oldest entries are dropped
+ * once the cap is hit so a long-running tournament cannot leak memory.
+ */
+export function appendAdminAudit(
+  t: Tournament,
+  entry: Omit<AdminAuditEntry, "ts">,
+): AdminAuditEntry {
+  const full: AdminAuditEntry = { ...entry, ts: Date.now() };
+  t.adminAuditLog.push(full);
+  if (t.adminAuditLog.length > TOURNAMENT_AUDIT_CAP) {
+    t.adminAuditLog.splice(0, t.adminAuditLog.length - TOURNAMENT_AUDIT_CAP);
+  }
+  return full;
+}
+
+/** Return the audit log tail (most recent first). Host-only by convention. */
+export function getAdminAuditLog(
+  t: Tournament,
+  limit = 50,
+): AdminAuditEntry[] {
+  const out = t.adminAuditLog.slice(-limit).reverse();
+  return out;
+}
+
+/**
+ * Look up a bracket match by id without scanning callers. Returns null
+ * (no throw) so callers can produce their own error messages.
+ */
+export function findMatchById(
+  t: Tournament,
+  matchId: string,
+): TournamentMatch | null {
+  for (const round of t.rounds) {
+    for (const m of round) {
+      if (m.id === matchId) return m;
+    }
+  }
+  return null;
+}
+
+/**
+ * Detach a bracket match from its current game room — clears `roomCode`
+ * so a fresh `createMatchRoomAndAssign` call will spin up a new room.
+ * Returns the old room code (if any) for the caller's audit/cleanup.
+ */
+export function detachMatchRoom(t: Tournament, matchId: string): string | null {
+  const m = findMatchById(t, matchId);
+  if (!m) return null;
+  const old = m.roomCode;
+  m.roomCode = null;
+  return old;
 }
 
 export function getPlayerSocketIdByName(

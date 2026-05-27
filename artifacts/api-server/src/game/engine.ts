@@ -125,6 +125,12 @@ export interface GameState {
    */
   tournamentRef?: { code: string; matchId: string };
   /**
+   * Host admin pause flag (tournament rooms). When true, place_bid /
+   * play_card are rejected and the turn timer is not armed. Cleared by
+   * admin_resume_match. Players still see the room state but cannot act.
+   */
+  isPaused?: boolean;
+  /**
    * Per-turn budget in ms. When set (tournament rooms), the socket layer
    * arms a setTimeout for each turn and auto-bids / auto-plays on expiry.
    * Null / undefined → no timer (Quick Match, KotT).

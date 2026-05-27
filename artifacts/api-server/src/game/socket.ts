@@ -56,10 +56,17 @@ import {
   clearPendingAssignment,
   getAllTournaments,
   deleteTournament,
+  requireTournamentHost,
+  appendAdminAudit,
+  getAdminAuditLog,
+  findMatchById,
+  detachMatchRoom,
   type Tournament,
   type TournamentMatch,
   type PendingAssignment,
+  type AdminAuditEntry,
 } from "./tournament.js";
+import { deleteRoomState } from "./persistence.js";
 
 // ── Per-socket rate limiting ────────────────────────────────────────────
 // Token-bucket-ish: a sliding window of recent timestamps per (socketId, kind).
@@ -170,6 +177,7 @@ function sanitizeStateForPlayer(
     tournamentRef: state.tournamentRef,
     turnTimeoutMs: state.turnTimeoutMs ?? null,
     turnDeadline: state.turnDeadline ?? null,
+    isPaused: state.isPaused ?? false,
   };
 }
 
@@ -211,6 +219,7 @@ function sanitizeStateForSpectator(state: GameState): Record<string, unknown> {
     tournamentRef: state.tournamentRef,
     turnTimeoutMs: state.turnTimeoutMs ?? null,
     turnDeadline: state.turnDeadline ?? null,
+    isPaused: state.isPaused ?? false,
   };
 }
 
@@ -241,6 +250,12 @@ function clearTurnTimer(roomCode: string): void {
  */
 function armTurnTimer(io: SocketIOServer, state: GameState): void {
   clearTurnTimer(state.roomCode);
+  // Host-paused match: do not arm a timer. turnDeadline cleared so clients
+  // can render "Paused" without a stale countdown.
+  if (state.isPaused) {
+    state.turnDeadline = null;
+    return;
+  }
   const budget = state.turnTimeoutMs;
   if (!budget || budget <= 0) {
     state.turnDeadline = null;
@@ -373,6 +388,11 @@ async function handlePlayResult(
             // Reconnect during the reveal bumps lastActiveAt on `current`;
             // don't regress it from the stale snapshot.
             lastActiveAt: current.lastActiveAt,
+            // Admin pause toggled during the 700ms reveal lives on `current`;
+            // carrying it forward keeps the pause intact and prevents
+            // armTurnTimer from re-arming. Without this, host can pause
+            // mid-trick and have it silently undone on trick resolve.
+            isPaused: current.isPaused,
           };
           armTurnTimer(io, merged);
           const action =
@@ -473,8 +493,8 @@ function forfeitTournamentMatch(
   roomCode: string,
   forfeitSeat: 0 | 1,
   reason: "disconnect" | "host_forced",
-): void {
-  void withRoomLock(roomCode, async () => {
+): Promise<void> {
+  return withRoomLock(roomCode, async () => {
     const state = getRoom(roomCode);
     if (!state) return;
     if (!state.tournamentRef) return;
@@ -513,6 +533,132 @@ function forfeitTournamentMatch(
     broadcastState(io, finalState);
     await advanceTournamentOnGameOver(io, finalState);
   });
+}
+
+/**
+ * Shared body for `admin_force_forfeit` (canonical) and
+ * `tournament_force_forfeit` (legacy alias). Validates host token,
+ * delegates to `forfeitTournamentMatch`, and appends an audit row.
+ */
+async function runAdminForceForfeit(
+  io: SocketIOServer,
+  data: { code: string; matchId: string; forfeitSeat: "A" | "B"; token?: string },
+  callback?: (res: { ok: boolean; error?: string }) => void,
+): Promise<void> {
+  try {
+    const code = (data.code || "").toUpperCase().trim();
+    const t = getTournament(code);
+    if (!t) throw new Error("Tournament not found");
+    const host = requireTournamentHost(t, data.token);
+    const match = findMatchById(t, data.matchId);
+    if (!match) throw new Error("Match not found");
+    if (!match.roomCode) throw new Error("Match has not started yet");
+    if (match.winner) throw new Error("Match already resolved");
+    const roomCode = match.roomCode;
+    const seatIdx: 0 | 1 = data.forfeitSeat === "A" ? 0 : 1;
+    const forfeitedName =
+      data.forfeitSeat === "A"
+        ? match.playerA?.name ?? null
+        : match.playerB?.name ?? null;
+    // Await — so the callback honestly reports whether the forfeit
+    // landed (room still exists, lock acquired, commit succeeded) before
+    // we audit + ack. Otherwise a stale room could no-op and we'd still
+    // tell the host "done".
+    await forfeitTournamentMatch(io, roomCode, seatIdx, "host_forced");
+    // Re-check post-await: the match should now have a winner.
+    if (!match.winner) {
+      throw new Error("Forfeit did not advance the match — room may have been removed");
+    }
+    appendAdminAudit(t, {
+      action: "force_forfeit",
+      actorName: host.name,
+      matchId: match.id,
+      roomCode,
+      payload: { forfeitSeat: data.forfeitSeat, forfeitedName },
+    });
+    io.to(`tournament:${code}`).emit("admin_audit_appended", { code });
+    callback?.({ ok: true });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    callback?.({ ok: false, error: msg });
+  }
+}
+
+/**
+ * Build the host-only dashboard snapshot. Returns one entry per bracket
+ * match including live game-state fields (scores, current turn, paused,
+ * last activity) and per-seat connection status.
+ *
+ * Caller MUST gate this with `requireTournamentHost` — this function does
+ * NOT itself check permissions because it has no token argument.
+ */
+function buildAdminDashboard(
+  io: SocketIOServer,
+  t: Tournament,
+): {
+  code: string;
+  name: string;
+  status: Tournament["status"];
+  matches: Array<{
+    matchId: string;
+    round: number;
+    position: number;
+    roomCode: string | null;
+    playerA: { name: string; connected: boolean } | null;
+    playerB: { name: string; connected: boolean } | null;
+    winner: "A" | "B" | null;
+    winnerName: string | null;
+    live: {
+      phase: string;
+      scores: [number, number];
+      roundNumber: number;
+      currentTurnIndex: 0 | 1 | null;
+      currentBidder: 0 | 1 | null;
+      turnDeadline: number | null;
+      isPaused: boolean;
+      lastActiveAt: [number, number] | null;
+    } | null;
+  }>;
+} {
+  const matches = t.rounds.flat().map((m) => {
+    const sidA = m.playerA ? getPlayerSocketIdByName(t, m.playerA.name) : null;
+    const sidB = m.playerB ? getPlayerSocketIdByName(t, m.playerB.name) : null;
+    const connected = (sid: string | null): boolean =>
+      !!sid && !!io.sockets.sockets.get(sid)?.connected;
+    const live = m.roomCode ? getRoom(m.roomCode) : null;
+    return {
+      matchId: m.id,
+      round: m.round,
+      position: m.position,
+      roomCode: m.roomCode,
+      playerA: m.playerA
+        ? { name: m.playerA.name, connected: connected(sidA) }
+        : null,
+      playerB: m.playerB
+        ? { name: m.playerB.name, connected: connected(sidB) }
+        : null,
+      winner: m.winner,
+      winnerName: m.winnerName,
+      live: live
+        ? {
+            phase: live.phase,
+            scores: live.scores,
+            roundNumber: live.roundNumber,
+            currentTurnIndex: live.currentTurnIndex,
+            currentBidder: live.currentBidder,
+            turnDeadline: live.turnDeadline ?? null,
+            isPaused: live.isPaused ?? false,
+            lastActiveAt: live.lastActiveAt ?? null,
+          }
+        : null,
+    };
+  });
+  return {
+    code: t.code,
+    name: t.name,
+    status: t.status,
+    matches,
+  };
 }
 
 /** Duration of the visual shuffle + deal animation between phases. */
@@ -1139,6 +1285,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
             ) as 0 | 1;
             if (playerIndex < 0) throw new Error("Player not found");
             if (state.phase !== "bidding") throw new Error("Not in bidding phase");
+            if (state.isPaused) throw new Error("Match is paused by host");
 
             const { state: newState, bothBid } = placeBid(state, playerIndex, data.amount);
             armTurnTimer(io, newState);
@@ -1186,6 +1333,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
               (p) => p?.socketId === socket.id
             ) as 0 | 1;
             if (playerIndex < 0) throw new Error("Player not found");
+            if (state.isPaused) throw new Error("Match is paused by host");
 
             const result = playCard(state, playerIndex, data.card);
 
@@ -1626,31 +1774,391 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
       }
     );
 
+    // Legacy event preserved for back-compat with existing Tournament.tsx
+    // forfeit controls. Identical to admin_force_forfeit; writes the same
+    // audit row. Prefer admin_force_forfeit in new code.
     socket.on(
       "tournament_force_forfeit",
       (
         data: { code: string; matchId: string; forfeitSeat: "A" | "B"; token?: string },
         callback?: (res: { ok: boolean; error?: string }) => void
       ) => {
+        void runAdminForceForfeit(io, data, callback);
+      }
+    );
+
+    // ── Host admin tools ──────────────────────────────────────────────────
+    //
+    // Every event below is gated by `requireTournamentHost(t, token)` —
+    // there is NO socketId fallback (unlike start_tournament) because
+    // these actions are higher-stakes than starting and must not be
+    // triggerable just because the host's old socketId hasn't recycled.
+    //
+    // Every successful action appends an `AdminAuditEntry` to the
+    // tournament's bounded in-memory audit log. Bracket advancements
+    // additionally hit the DB-backed game_audit_log via
+    // recordMatchResultTx.
+
+    socket.on(
+      "admin_force_forfeit",
+      (
+        data: { code: string; matchId: string; forfeitSeat: "A" | "B"; token?: string },
+        callback?: (res: { ok: boolean; error?: string }) => void
+      ) => {
+        void runAdminForceForfeit(io, data, callback);
+      }
+    );
+
+    socket.on(
+      "admin_pause_match",
+      (
+        data: { code: string; matchId: string; token?: string },
+        callback?: (res: { ok: boolean; error?: string }) => void
+      ) => {
         try {
           const code = (data.code || "").toUpperCase().trim();
           const t = getTournament(code);
           if (!t) throw new Error("Tournament not found");
-          // Host token is stored on the host's player record (stable across
-          // socket refreshes), matched by hostName.
-          const hostPlayer = t.players.find(
-            (p) => p.name.trim().toLowerCase() === t.hostName.trim().toLowerCase()
-          );
-          if (!hostPlayer || !data.token || data.token !== hostPlayer.token) {
-            throw new Error("Only the tournament host can force a forfeit");
-          }
-          const match = t.rounds.flat().find((m) => m.id === data.matchId);
+          const host = requireTournamentHost(t, data.token);
+          const match = findMatchById(t, data.matchId);
           if (!match) throw new Error("Match not found");
-          if (!match.roomCode) throw new Error("Match has not started yet");
+          if (!match.roomCode) throw new Error("Match has no room yet");
           if (match.winner) throw new Error("Match already resolved");
-          const seatIdx: 0 | 1 = data.forfeitSeat === "A" ? 0 : 1;
-          forfeitTournamentMatch(io, match.roomCode, seatIdx, "host_forced");
+          const roomCode = match.roomCode;
+          void withRoomLock(roomCode, async () => {
+            const state = getRoom(roomCode);
+            if (!state) return;
+            if (state.isPaused) return; // idempotent
+            const paused: GameState = { ...state, isPaused: true };
+            clearTurnTimer(roomCode);
+            paused.turnDeadline = null;
+            await commit(paused, {
+              action: "admin_pause",
+              payload: { matchId: match.id, actor: host.name },
+            });
+            appendAdminAudit(t, {
+              action: "pause_match",
+              actorName: host.name,
+              matchId: match.id,
+              roomCode,
+            });
+            broadcastState(io, paused);
+            io.to(`tournament:${code}`).emit("admin_audit_appended", { code });
+          });
           callback?.({ ok: true });
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+        }
+      }
+    );
+
+    socket.on(
+      "admin_resume_match",
+      (
+        data: { code: string; matchId: string; token?: string },
+        callback?: (res: { ok: boolean; error?: string }) => void
+      ) => {
+        try {
+          const code = (data.code || "").toUpperCase().trim();
+          const t = getTournament(code);
+          if (!t) throw new Error("Tournament not found");
+          const host = requireTournamentHost(t, data.token);
+          const match = findMatchById(t, data.matchId);
+          if (!match) throw new Error("Match not found");
+          if (!match.roomCode) throw new Error("Match has no room yet");
+          const roomCode = match.roomCode;
+          void withRoomLock(roomCode, async () => {
+            const state = getRoom(roomCode);
+            if (!state) return;
+            if (!state.isPaused) return; // idempotent
+            const resumed: GameState = { ...state, isPaused: false };
+            armTurnTimer(io, resumed);
+            await commit(resumed, {
+              action: "admin_resume",
+              payload: { matchId: match.id, actor: host.name },
+            });
+            appendAdminAudit(t, {
+              action: "resume_match",
+              actorName: host.name,
+              matchId: match.id,
+              roomCode,
+            });
+            broadcastState(io, resumed);
+            io.to(`tournament:${code}`).emit("admin_audit_appended", { code });
+          });
+          callback?.({ ok: true });
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+        }
+      }
+    );
+
+    socket.on(
+      "admin_reset_timer",
+      (
+        data: { code: string; matchId: string; token?: string },
+        callback?: (res: { ok: boolean; error?: string }) => void
+      ) => {
+        try {
+          const code = (data.code || "").toUpperCase().trim();
+          const t = getTournament(code);
+          if (!t) throw new Error("Tournament not found");
+          const host = requireTournamentHost(t, data.token);
+          const match = findMatchById(t, data.matchId);
+          if (!match) throw new Error("Match not found");
+          if (!match.roomCode) throw new Error("Match has no room yet");
+          if (match.winner) throw new Error("Match already resolved");
+          const roomCode = match.roomCode;
+          void withRoomLock(roomCode, async () => {
+            const state = getRoom(roomCode);
+            if (!state) return;
+            if (state.isPaused) {
+              // Reset while paused = pointless and confusing.
+              return;
+            }
+            armTurnTimer(io, state);
+            appendAdminAudit(t, {
+              action: "reset_timer",
+              actorName: host.name,
+              matchId: match.id,
+              roomCode,
+              payload: { newDeadline: state.turnDeadline },
+            });
+            broadcastState(io, state);
+            io.to(`tournament:${code}`).emit("admin_audit_appended", { code });
+          });
+          callback?.({ ok: true });
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+        }
+      }
+    );
+
+    socket.on(
+      "admin_remake_room",
+      async (
+        data: { code: string; matchId: string; token?: string },
+        callback?: (res: { ok: boolean; error?: string; newRoomCode?: string }) => void
+      ) => {
+        try {
+          const code = (data.code || "").toUpperCase().trim();
+          const t = getTournament(code);
+          if (!t) throw new Error("Tournament not found");
+          const host = requireTournamentHost(t, data.token);
+          const match = findMatchById(t, data.matchId);
+          if (!match) throw new Error("Match not found");
+          if (match.winner) throw new Error("Match already resolved — cannot remake");
+          if (!match.playerA || !match.playerB) {
+            throw new Error("Match has no player pair yet");
+          }
+          // Tear down the old room (if any). Critically, this MUST happen
+          // under the old room's lock so any in-flight play_card /
+          // trick-resolve / timer commit has fully drained before we
+          // delete state — otherwise a stale commit in updateRoom can
+          // resurrect the room AFTER cleanup and create split-brain
+          // (bracket points to new room, ghost room still emits events).
+          const oldRoomCode = match.roomCode;
+          if (oldRoomCode) {
+            await withRoomLock(oldRoomCode, async () => {
+              clearTurnTimer(oldRoomCode);
+              try {
+                cleanupRoom(oldRoomCode);
+              } catch {
+                /* best-effort */
+              }
+              // Persistent room state — best-effort DB cleanup.
+              await deleteRoomState(oldRoomCode).catch(() => {});
+              // Notify any still-attached clients that the room is gone
+              // so their UI doesn't sit on a dead state.
+              io.to(oldRoomCode).emit("room_remade", {
+                oldRoomCode,
+                reason: "host_remake",
+              });
+            });
+            // Only detach AFTER drain — bracket pointer stays consistent
+            // until the old room is fully gone.
+            detachMatchRoom(t, match.id);
+          }
+          await createMatchRoomAndAssign(io, t, match);
+          appendAdminAudit(t, {
+            action: "remake_room",
+            actorName: host.name,
+            matchId: match.id,
+            roomCode: match.roomCode ?? undefined,
+            payload: { oldRoomCode: oldRoomCode ?? null },
+          });
+          io.to(`tournament:${code}`).emit(
+            "tournament_state",
+            sanitizeTournament(t),
+          );
+          io.to(`tournament:${code}`).emit("admin_audit_appended", { code });
+          callback?.({ ok: true, newRoomCode: match.roomCode ?? undefined });
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+        }
+      }
+    );
+
+    socket.on(
+      "admin_mark_winner",
+      async (
+        data: { code: string; matchId: string; winnerSeat: "A" | "B"; token?: string },
+        callback?: (res: { ok: boolean; error?: string; replay?: boolean }) => void
+      ) => {
+        try {
+          const code = (data.code || "").toUpperCase().trim();
+          const t = getTournament(code);
+          if (!t) throw new Error("Tournament not found");
+          const host = requireTournamentHost(t, data.token);
+          const match = findMatchById(t, data.matchId);
+          if (!match) throw new Error("Match not found");
+          if (!match.playerA || !match.playerB) {
+            throw new Error("Match has no player pair yet");
+          }
+          // If there's a live room, flip it to game_over via the existing
+          // forfeit pipeline — that path handles state cleanup, broadcasts,
+          // AND calls advanceTournamentOnGameOver (which goes through
+          // recordMatchResult and gets idempotency / rollback for free).
+          if (match.roomCode && !match.winner) {
+            const forfeitSeat: 0 | 1 = data.winnerSeat === "A" ? 1 : 0;
+            const liveRoomCode = match.roomCode;
+            // Await so the callback truthfully reports completion (lock
+            // acquired, commit landed, bracket advanced). Otherwise a
+            // stale/missing room could silently no-op and we'd still
+            // audit + ack a non-event.
+            await forfeitTournamentMatch(io, liveRoomCode, forfeitSeat, "host_forced");
+            if (!match.winner) {
+              throw new Error("Mark winner did not advance — room may have been removed");
+            }
+            appendAdminAudit(t, {
+              action: "mark_winner",
+              actorName: host.name,
+              matchId: match.id,
+              roomCode: match.roomCode,
+              payload: { winnerSeat: data.winnerSeat, via: "forfeit" },
+            });
+            io.to(`tournament:${code}`).emit("admin_audit_appended", { code });
+            callback?.({ ok: true });
+            return;
+          }
+          // No live room (e.g. future-round slot with both feeders resolved
+          // but the room creator hasn't yet spun it up, or a replay of an
+          // already-decided match). recordMatchResult handles idempotency.
+          const resolution = await recordMatchResult(
+            code,
+            match.id,
+            data.winnerSeat,
+            { roomCodeForAudit: match.roomCode },
+          );
+          if (resolution.kind === "rejected") {
+            throw new Error(resolution.message);
+          }
+          const isReplay = resolution.kind === "replay";
+          appendAdminAudit(t, {
+            action: "mark_winner",
+            actorName: host.name,
+            matchId: match.id,
+            roomCode: match.roomCode ?? undefined,
+            payload: {
+              winnerSeat: data.winnerSeat,
+              via: "direct",
+              replay: isReplay,
+            },
+          });
+          // First-time direct advance: trigger the same downstream effects
+          // (eliminate loser, create next-round rooms, broadcast).
+          if (!isReplay) {
+            const effect = resolution.effect;
+            const a = effect.resolvedMatch.playerA?.name;
+            const b = effect.resolvedMatch.playerB?.name;
+            if (a) clearPendingAssignment(effect.tournament, a);
+            if (b) clearPendingAssignment(effect.tournament, b);
+            if (effect.loserName) {
+              const loserSid = getPlayerSocketIdByName(
+                effect.tournament,
+                effect.loserName,
+              );
+              if (loserSid) {
+                io.to(loserSid).emit("tournament_eliminated", {
+                  tournamentCode: code,
+                  round: effect.resolvedMatch.round,
+                  finishedRound: effect.resolvedMatch.round,
+                });
+              }
+            }
+            io.to(`tournament:${code}`).emit(
+              "tournament_state",
+              sanitizeTournament(effect.tournament),
+            );
+            void (async () => {
+              for (const next of effect.newlyReadyMatches) {
+                await createMatchRoomAndAssign(io, effect.tournament, next);
+              }
+              if (effect.newlyReadyMatches.length > 0) {
+                io.to(`tournament:${code}`).emit(
+                  "tournament_state",
+                  sanitizeTournament(effect.tournament),
+                );
+              }
+            })();
+            if (effect.isFinal && effect.championName) {
+              io.to(`tournament:${code}`).emit("tournament_complete", {
+                tournamentCode: code,
+                champion: effect.championName,
+              });
+            }
+          }
+          io.to(`tournament:${code}`).emit("admin_audit_appended", { code });
+          callback?.({ ok: true, replay: isReplay });
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+        }
+      }
+    );
+
+    socket.on(
+      "admin_audit_log",
+      (
+        data: { code: string; token?: string; limit?: number },
+        callback?: (res: { ok: boolean; error?: string; entries?: AdminAuditEntry[] }) => void
+      ) => {
+        try {
+          const code = (data.code || "").toUpperCase().trim();
+          const t = getTournament(code);
+          if (!t) throw new Error("Tournament not found");
+          requireTournamentHost(t, data.token);
+          const limit = Math.max(1, Math.min(500, data.limit ?? 100));
+          callback?.({ ok: true, entries: getAdminAuditLog(t, limit) });
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+        }
+      }
+    );
+
+    socket.on(
+      "admin_dashboard",
+      (
+        data: { code: string; token?: string },
+        callback?: (
+          res: {
+            ok: boolean;
+            error?: string;
+            snapshot?: ReturnType<typeof buildAdminDashboard>;
+          },
+        ) => void
+      ) => {
+        try {
+          const code = (data.code || "").toUpperCase().trim();
+          const t = getTournament(code);
+          if (!t) throw new Error("Tournament not found");
+          requireTournamentHost(t, data.token);
+          callback?.({ ok: true, snapshot: buildAdminDashboard(io, t) });
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           callback?.({ ok: false, error: msg });

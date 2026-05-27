@@ -1,8 +1,4 @@
-- [Per-room serial lock pattern](room-lock-pattern.md) — JS Promise-chain lock cleanup must use sync identity check on the stored handle, never `await` inside `finally`.
-- [Async closure narrowing trap](ts-async-closure-narrow.md) — `let x: T | null = null` assigned inside an awaited closure narrows to `never` after a `!x` throw guard; assert via `as T` at the destructure, not `x!` at every use.
-- [Sync-mutate-then-lock-commit](sync-mutate-lock-commit.md) — when the room key is unknown up front, do the sync atomic mutation first, then lock that room only for the durable persist+broadcast.
-- [Stale snapshot merge across delays](stale-snapshot-merge.md) — any state computed before a `setTimeout` reveal must overlay the post-delay roster/activity fields from the freshly-locked current state before committing.
-- [Anchor reconnect gating on in-memory flag, not DB lookup](reconnect-flag-anchor.md) — gating "is this seat tokenized?" on a live DB query fails-open under DB outage and re-enables name-only hijack; persist the flag in the state instead.
-- [Atomic bracket advancement](tournament-tx-atomic.md) — snapshot in-memory + per-key lock + `ON CONFLICT DO UPDATE … setWhere=isNull(winner)` with audit row in the same tx; return advanced/replay/rejected so callers skip duplicate broadcasts.
-- [Spades 1v1 Competitive scoring rules](spades-scoring-rules.md) — bag tier locked at pre-round score (5/−50 sub-250, 10/−100 at 250+); bags never reset.
-- [Scripted-round helper gotchas](scripted-round-helper.md) — `tricks0` is a hint not a guarantee; even round numbers flip leader via `getFirstBidderForRound`.
+- [Spades tournament host token model](spades-tournament-host-token.md) — token-only host gating + per-player tokens never go in sanitizers; admin actions higher-stakes than start_tournament so no socketId fallback.
+- [Spades room-lock teardown](spades-room-lock-teardown.md) — destructive room teardown (remake/forfeit) MUST run inside `withRoomLock(roomCode)` or stale in-flight commits resurrect the room post-cleanup.
+- [Spades delayed-merge state preservation](spades-delayed-merge-fields.md) — handlePlayResult's 700ms reveal merge must carry forward every "transient" field set during the delay (lastActiveAt, isPaused, roster) or admin/connectivity state silently regresses.
+- [Spades engine tests run with tsx](spades-engine-tests-tsx.md) — `.test.mts` files import `../tournament.js` ESM-style; only `npx tsx` resolves `.js`→`.ts`, `node --experimental-strip-types` does not.

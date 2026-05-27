@@ -364,6 +364,16 @@ export default function Tournament() {
                 }`}>
                   {isLobby ? "Lobby" : isComplete ? "Complete" : "In Progress"}
                 </span>
+                {iAmHost && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setLocation(`/tournament/${t.code}/host`)}
+                    data-testid="open-host-dashboard"
+                  >
+                    Host tools
+                  </Button>
+                )}
                 <Button size="sm" variant="ghost" onClick={() => setLocation("/")}>
                   Home
                 </Button>
