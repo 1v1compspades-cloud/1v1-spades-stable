@@ -1,0 +1,60 @@
+Scope persistent game state next, but do not implement until the plan is reviewed.
+
+Goal:
+Make active games and tournament matches survive refreshes, disconnects, server restarts, and short outages.
+
+Use Redis first if fastest for live game state. Use Postgres if the project already has database setup and match history/tournaments need to be permanently saved. Prefer a hybrid plan if needed:
+- Redis for live in-progress game state
+- Postgres for users, tournaments, match results, completed hands, and audit logs
+
+Scope requirements:
+1. Save every active room/game state after each important action:
+   - room created
+   - players join
+   - coin flip/dealer assigned
+   - cards dealt
+   - bids submitted/changed
+   - card played
+   - book completed
+   - round completed
+   - score updated
+   - forfeit/disconnect
+   - match completed
+
+2. On reconnect or refresh:
+   - restore the player to their same seat
+   - restore current hand/cards/bids/score/turn
+   - restore spectator state without exposing hidden hands
+   - prevent duplicate seats from the same token
+
+3. Add a server restart recovery flow:
+   - reload active rooms from persistent storage
+   - expire abandoned rooms after a safe TTL
+   - keep tournament matches recoverable until manually completed or expired
+
+4. Add audit/debug logs:
+   - action type
+   - player ID/token
+   - room ID
+   - timestamp
+   - previous state hash
+   - new state hash
+   - error if action failed
+
+5. Add anti-cheat protection:
+   - never persist or send opponent hands to the wrong client
+   - spectators must not receive hidden player hands
+   - discard hands remain hidden unless reveal mode is enabled
+   - server must validate every card played against the saved hand state
+
+6. Add migration/backup plan:
+   - define schema/key format
+   - define TTLs
+   - define how old rooms are cleaned up
+   - define what gets saved permanently after a match
+
+Return:
+- recommended Redis/Postgres architecture
+- schema/key design
+- step-by-step implementation plan
+- risk list
