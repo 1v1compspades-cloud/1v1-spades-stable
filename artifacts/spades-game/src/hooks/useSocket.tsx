@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback, ReactNode } from "react";
 import { io, Socket } from "socket.io-client";
 import { GameState, Card, TournamentState, MatchAssignedPayload, AdminAuditEntry, AdminDashboardSnapshot } from "@/lib/game";
 
@@ -22,6 +22,13 @@ interface SocketContextType {
   resetRoom: (code: string) => Promise<void>;
   setReady: (code: string, ready: boolean) => Promise<void>;
   clearGameState: () => void;
+  /**
+   * Tell the socket layer which room URL the user is currently viewing.
+   * Foreign-room `game_state` broadcasts (e.g., a completed tournament match
+   * still pushing updates to a socket that was joined to two rooms at once)
+   * are dropped instead of clobbering the visible state.
+   */
+  setActiveRoom: (roomCode: string | null) => void;
   joinAsSpectator: (code: string, name: string) => Promise<void>;
   reconnectAsSpectator: (code: string, name: string) => Promise<void>;
   joinQueue: (code: string, name: string) => Promise<void>;
@@ -62,6 +69,30 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [matchAssignment, setMatchAssignment] = useState<MatchAssignedPayload | null>(null);
   const [tournamentEliminated, setTournamentEliminated] = useState<{ code: string; round: number } | null>(null);
 
+  // Pre-June-1 fix: after a tournament match finishes, the winner's socket is
+  // joined to BOTH the completed match room AND the freshly-created next-round
+  // room (server-side `socket.join(newRoomCode)` in createMatchRoomAndAssign).
+  // Any subsequent broadcast to either room would clobber the visible state,
+  // causing the "flash to Ready Up, then back to Game Over" symptom users hit
+  // during the SF2 → Finals transition. We track the URL room the user is
+  // viewing and drop foreign-room game_state events at the boundary.
+  const activeRoomRef = useRef<string | null>(null);
+
+  const setActiveRoom = useCallback((roomCode: string | null) => {
+    const next = roomCode ? roomCode.toUpperCase() : null;
+    if (activeRoomRef.current === next) return;
+    activeRoomRef.current = next;
+    // Wipe stale state from the previous room so the Room component's
+    // re-attach effect (which gates on `!gameState`) fires for the new room
+    // instead of rendering the old room's last frame.
+    setGameState((prev) => {
+      if (!prev) return prev;
+      if (!next) return null;
+      const prevCode = (prev.roomCode || "").toUpperCase();
+      return prevCode === next ? prev : null;
+    });
+  }, []);
+
   useEffect(() => {
     const s = io({
       path: "/socket.io",
@@ -94,6 +125,15 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     s.io.on("reconnect_failed", () => setStatus("offline"));
 
     s.on("game_state", (state: GameState) => {
+      const active = activeRoomRef.current;
+      const incoming = (state.roomCode || "").toUpperCase();
+      // Defense-in-depth: if the component layer has declared an active room
+      // and this broadcast is for a different room, drop it. This prevents
+      // a completed tournament match (whose socket.io membership we never
+      // tore down) from overwriting the Finals room view.
+      if (active && incoming && incoming !== active) {
+        return;
+      }
       setGameState(state);
       setError(null);
     });
@@ -394,6 +434,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       resetRoom,
       setReady,
       clearGameState,
+      setActiveRoom,
       joinAsSpectator,
       reconnectAsSpectator,
       joinQueue,

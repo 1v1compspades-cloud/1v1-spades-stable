@@ -1,51 +1,65 @@
-# june-1-stable-host-tools-safe-slice
+# june-1-stable-finals-transition-fix
 
-Pre-deploy checkpoint marker for the Host Dashboard "safe slice"
-visibility additions.
+Pre-deploy checkpoint marker. Fixes the "flash to Ready Up, then back
+to Game Over" symptom that the host hit during a 4-player test run
+between Semifinal 2 and Finals.
 
-## What's in this checkpoint
+## What was wrong
 
-Pure additive improvements to the existing Host Dashboard. No server,
-no socket, no schema changes. No changes to gameplay, scoring,
-bidding, tricks, timers, Quick Match, or King of the Table.
+When a tournament match ended and the server spun up the next round's
+room, the winners' browsers would:
 
-- **Overview counts in header** — "Round X of Y · N active ·
-  M/Total completed" so the host sees bracket progress at a glance.
-- **Share & export panel**:
-  - "Copy invite" — drops the lobby URL on the clipboard.
-  - "Copy bracket for Discord" — produces a code-block-formatted
-    snapshot of every match with current state (winner, in-progress
-    score, not started, waiting for feeder).
-- **Player status panel** — consolidated list of every player with:
-  - online / offline / eliminated dot,
-  - current match label + room code,
-  - live score line if in match,
-  - status pill: In match · Waiting · Eliminated.
-  Status is derived purely from the existing `admin_dashboard`
-  snapshot — no new server data needed.
+1. Show the Game Over screen for the just-finished match (correct).
+2. Briefly flash the next room's "Ready Up / Start Match" screen (bug).
+3. Snap back to the old Game Over screen (bug).
 
-## What was intentionally NOT built (per host's instruction)
+## Root cause
 
-- Reset Match Result — high blast radius, low realistic use.
-- Manual Advance — duplicates existing Mark Winner.
-- Validate Bracket / health-check warnings — false-alarm risk during
-  live event; existing bracket logic verified correct.
-- Send Player to Correct Match — players already have a self-recovery
-  path via "Back to Tournament Bracket".
+When `createMatchRoomAndAssign` runs for the next round, it calls
+`socket.join(newRoomCode)` for both winners — but their socket is
+still joined to the OLD completed match room. So broadcasts to
+either room reach the client, and the `game_state` handler in
+`useSocket` was unconditionally overwriting state, causing it to
+ping-pong between the two rooms.
 
-## Pre-deploy verification
+## Fix (client-only, no server change)
 
-- Typecheck: 4/4 packages clean.
+`useSocket` now tracks which room URL the user is actually viewing
+(`activeRoomRef`) and drops `game_state` events whose `roomCode`
+doesn't match. `Room.tsx` registers its current room on mount and
+clears it on unmount. The same hook also wipes stale state when the
+active room changes, so the existing re-attach effect fires cleanly
+for the new room instead of rendering the old room's last frame.
+
+Why client-only:
+- Server change (`socket.leave(oldRoom)` on game-over) was considered
+  but rejected: it would break spectator views of completed matches
+  and adds risk to the broadcast plumbing. The client filter is
+  comprehensive (catches foreign-room events from any source) and
+  touches zero socket / engine code.
+
+## What was NOT touched (per pre-event freeze)
+
+- No engine, scoring, bidding, dealing, trick-taking changes
+- No socket protocol or server-side broadcast changes
+- No tournament bracket / advancement logic changes
+- No DB schema changes
+- No new tests for already-tested behavior
+
+## Verification
+
+- Typecheck: 4/4 packages clean
 - Test sweep: 190/190 pass
   (finals-seating 10, rules 84, tournament-tx 45, admin 16,
-  replace-player 18, bracket-score 15, tournament-no-rematch 2).
-- Dev API healthz: 200.
-- Host Dashboard renders without runtime errors.
+  replace-player 18, bracket-score 15, tournament-no-rematch 2)
+- Dev API healthz: 200
 
 ## Rollback ladder (newest → oldest)
 
-- **THIS** — host tools safe slice
-- `8b3c285` — tournament ghost-rematch fix (server + client)
+- **THIS** — finals transition flash fix (useSocket room filter)
+- `c57d775` — host tools safe slice (overview + share & export +
+  player status)
+- `8b3c285` — tournament ghost-rematch fix
 - `8e7f114` — finals-seating reclaim fix
 - `65968275` — mobile bid-scroll fix
 - `e7cb6ad` — invite-link 404 fix
@@ -53,7 +67,7 @@ bidding, tricks, timers, Quick Match, or King of the Table.
 
 ## Operational reminders
 
-- Room state is in-memory; **do not redeploy during the live event**
+- Room state is in-memory. **Do not redeploy during the live event**
   or in-progress brackets will be wiped.
-- Host can now post a Discord bracket update after each round using
-  the "Copy bracket for Discord" button.
+- The filter is a no-op outside `/room/<CODE>` pages (Tournament,
+  HostDashboard, Lobby don't render gameState).

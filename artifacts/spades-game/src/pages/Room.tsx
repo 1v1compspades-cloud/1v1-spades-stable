@@ -86,6 +86,7 @@ export default function Room() {
     joinAsSpectator,
     reconnectAsSpectator,
     joinQueue, leaveQueue,
+    setActiveRoom,
   } = useSocket();
   const {
     playerName,
@@ -142,6 +143,17 @@ export default function Room() {
     if (!roomCode) { setLocation("/"); return; }
     if (!connected) connect();
   }, [roomCode, connected, connect, setLocation]);
+
+  // Pre-June-1 fix: declare which room URL we're viewing so useSocket can
+  // drop foreign-room game_state broadcasts. Without this, a completed
+  // tournament match room (whose socket.io membership we never tore down)
+  // can clobber the new room's state — causing the "flash to Ready Up,
+  // then back to Game Over" symptom during the SF2 → Finals transition.
+  useEffect(() => {
+    if (!roomCode) return;
+    setActiveRoom(roomCode);
+    return () => setActiveRoom(null);
+  }, [roomCode, setActiveRoom]);
 
   // Pre-June-1 bugfix #1: remember which tournament this room belongs to,
   // so the "Back" button on the reconnecting screen (where gameState is null)

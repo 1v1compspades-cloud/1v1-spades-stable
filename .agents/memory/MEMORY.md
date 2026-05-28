@@ -5,3 +5,4 @@
 - [Spades engine tests run with tsx](spades-engine-tests-tsx.md) — `.test.mts` files import `../tournament.js` ESM-style; only `npx tsx` resolves `.js`→`.ts`, `node --experimental-strip-types` does not.
 - [Spades tournament finals-seating reclaim](spades-tournament-finals-seating.md) — tournament-room seats are reclaimable by name from `join_room` (createMatchRoomAndAssign bakes stale socketIds); reclaim path MUST refuse tokenized seats to avoid bypassing reconnect_player's token gate.
 - [Spades client roster membership must trust server auth](spades-roster-membership-auth.md) — never gate `iAmInRoster`-style UI on a localStorage name compare; combine with the server-confirmed `authenticated` flag or invitees collide.
+- [Spades multi-room socket membership](spades-multi-room-socket.md) — winner's socket stays in completed match room after advancement; client must filter game_state by roomCode or UI flip-flops.
