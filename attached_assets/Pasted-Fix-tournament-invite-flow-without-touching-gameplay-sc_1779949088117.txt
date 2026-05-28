@@ -1,0 +1,45 @@
+Fix tournament invite flow without touching gameplay, scoring, bidding, card logic, trick resolution, or King of the Table state.
+
+Current issue:
+Tournament invite does not work reliably. Host cannot properly invite/share tournament with players, or invite only works for one person / does not let additional players join correctly.
+
+Goal:
+Tournament host should be able to invite multiple players cleanly before tournament start.
+
+Tasks:
+1. Inspect the tournament lobby invite/share flow.
+2. Find why tournament invite link/code is not working or not allowing multiple invitees.
+3. Make sure tournament invite uses the tournament lobby code/id, not a match room code unless the tournament has already started.
+4. Make sure every invited player lands in the correct tournament lobby.
+5. Make sure joining from invite works on mobile browser.
+6. Make sure invite/share/copy button copies the correct tournament lobby URL.
+7. Make sure host can invite/share with multiple players before start.
+8. Make sure players who join by invite show up in the tournament roster/lobby.
+9. Do not auto-start tournament unless that behavior already existed.
+10. Do not modify tournament advancement logic unless absolutely necessary.
+
+Important:
+- Tournament lobby invite link should be separate from individual match room links.
+- Before tournament starts, players should join the tournament lobby.
+- After tournament starts, match assignments can send players to match rooms.
+- Spectator/watch links should not be confused with player invite links.
+
+Add or update tests if there are existing tournament lobby/invite tests:
+- Host creates tournament.
+- Host copies invite link.
+- Player A joins from invite.
+- Player B joins from same invite.
+- Both appear in roster.
+- Tournament can start with valid player count.
+- Invite link does not route players to wrong page/room.
+
+After fixing:
+Run:
+npm run typecheck && npm test
+
+Then report:
+- Exact files changed
+- Root cause of invite bug
+- Whether tournament invite now supports multiple players
+- Whether mobile invite URL was checked
+- Confirmation no gameplay, bidding, scoring, trick/card, socket, or King of the Table state logic was changed unless explicitly listed
