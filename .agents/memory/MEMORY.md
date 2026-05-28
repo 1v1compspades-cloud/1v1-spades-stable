@@ -1,4 +1,5 @@
 - [Spades tournament host token model](spades-tournament-host-token.md) — token-only host gating + per-player tokens never go in sanitizers; admin actions higher-stakes than start_tournament so no socketId fallback.
+- [Spades room-host vs tournament-host](spades-tournament-room-vs-host.md) — two distinct "host" concepts; perceived "host transferred" bugs are almost always about the per-room Start button, not real auth movement.
 - [Spades room-lock teardown](spades-room-lock-teardown.md) — destructive room teardown (remake/forfeit) MUST run inside `withRoomLock(roomCode)` or stale in-flight commits resurrect the room post-cleanup.
 - [Spades delayed-merge state preservation](spades-delayed-merge-fields.md) — handlePlayResult's 700ms reveal merge must carry forward every "transient" field set during the delay (lastActiveAt, isPaused, roster) or admin/connectivity state silently regresses.
 - [Spades engine tests run with tsx](spades-engine-tests-tsx.md) — `.test.mts` files import `../tournament.js` ESM-style; only `npx tsx` resolves `.js`→`.ts`, `node --experimental-strip-types` does not.

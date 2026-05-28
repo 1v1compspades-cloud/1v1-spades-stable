@@ -143,6 +143,25 @@ export default function Room() {
     if (!connected) connect();
   }, [roomCode, connected, connect, setLocation]);
 
+  // Pre-June-1 bugfix #1: remember which tournament this room belongs to,
+  // so the "Back" button on the reconnecting screen (where gameState is null)
+  // can still route back to the bracket page instead of dumping the user at
+  // the public lobby. Written every time we observe a tournamentRef on
+  // gameState; never cleared until a brand-new (non-tournament) room is
+  // entered (the stale-room guard above handles that case implicitly).
+  useEffect(() => {
+    if (!roomCode || typeof window === "undefined") return;
+    const tCode = gameState?.tournamentRef?.code;
+    const key = `spades_room_tournament_${roomCode}`;
+    if (tCode) {
+      window.localStorage.setItem(key, tCode);
+    } else if (gameState && !gameState.tournamentRef) {
+      // We have a confirmed non-tournament state for this room — clear any
+      // stale mapping so room-code reuse can't misroute a future Back press.
+      window.localStorage.removeItem(key);
+    }
+  }, [roomCode, gameState, gameState?.tournamentRef?.code]);
+
   // Stale-room-code guard: if the URL room differs from the last room we
   // stored, drop the cached seat / spectator flag so we don't blindly call
   // reconnect() with someone else's seat index for a room we've never been in.
@@ -210,6 +229,16 @@ export default function Room() {
       status === "reconnecting" ? "Reconnecting to table…" :
       status === "offline"      ? "Connection lost. Trying to reconnect…" :
       "Connecting to table…";
+    // Pre-June-1 bugfix #1: route Back to the active tournament if this is a
+    // tournament match room (so a disconnected player lands on their bracket
+    // page, not the public lobby). Falls back to "/" for non-tournament rooms.
+    const tournamentCode =
+      (gameState?.tournamentRef?.code) ||
+      (typeof window !== "undefined" && roomCode
+        ? window.localStorage.getItem(`spades_room_tournament_${roomCode}`) || null
+        : null);
+    const backHref = tournamentCode ? `/tournament/${tournamentCode}` : "/";
+    const backLabel = tournamentCode ? "Back to tournament" : "Back to lobby";
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-6 text-muted-foreground relative px-4 text-center">
         <div className="absolute top-2 right-2">
@@ -219,10 +248,10 @@ export default function Room() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setLocation("/")}
+          onClick={() => setLocation(backHref)}
           data-testid="button-bail-to-lobby"
         >
-          Back to lobby
+          {backLabel}
         </Button>
       </div>
     );
@@ -829,24 +858,33 @@ export default function Room() {
                 >
                   {myReady ? "✓ Ready (Tap to Cancel)" : "Ready Up"}
                 </Button>
-                {isHost ? (
-                  <Button
-                    onClick={handleStartGame}
-                    disabled={!canStart}
-                    data-testid="button-start-match"
-                    variant="default"
-                    className="min-h-[48px] text-base font-bold tracking-wide bg-amber-500 hover:bg-amber-500/90 text-black disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed active:scale-[0.98] transition-transform"
-                  >
-                    Start Match
-                  </Button>
-                ) : (
-                  <div
-                    className="min-h-[48px] flex items-center justify-center text-xs text-muted-foreground italic border border-dashed border-border rounded-md"
-                    data-testid="lobby-host-only-hint"
-                  >
-                    Host controls the start
-                  </div>
-                )}
+                {(() => {
+                  // Pre-June-1 bugfix #6: in tournament match rooms, BOTH
+                  // players see the Start button (server now accepts start_game
+                  // from either seat in a tournament room). Non-tournament
+                  // rooms keep the room-host-only gating.
+                  const isTournamentMatch = !!gameState.tournamentRef;
+                  const canIStart = isTournamentMatch ? bothReady : canStart;
+                  const showStart = isTournamentMatch || isHost;
+                  return showStart ? (
+                    <Button
+                      onClick={handleStartGame}
+                      disabled={!canIStart}
+                      data-testid="button-start-match"
+                      variant="default"
+                      className="min-h-[48px] text-base font-bold tracking-wide bg-amber-500 hover:bg-amber-500/90 text-black disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed active:scale-[0.98] transition-transform"
+                    >
+                      Start Match
+                    </Button>
+                  ) : (
+                    <div
+                      className="min-h-[48px] flex items-center justify-center text-xs text-muted-foreground italic border border-dashed border-border rounded-md"
+                      data-testid="lobby-host-only-hint"
+                    >
+                      Host controls the start
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
@@ -1071,9 +1109,23 @@ export default function Room() {
         })()}
 
         {/* Bidding overlay (players only) */}
+        {/* Pre-June-1 bugfix #3: use `fixed inset-0` (not absolute) so the
+            overlay covers the WHOLE viewport on mobile — the absolute parent
+            doesn't include the hand-fan area, so on small screens the centered
+            dialog was being clipped/pushed behind the hand. Adding safe-area
+            padding keeps the Confirm button above the iOS home indicator. */}
         {!spectator && gameState.phase === "bidding" && gameState.currentBidder === playerIndex && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="bg-card border border-border p-6 rounded-xl shadow-2xl space-y-4 max-w-sm w-full mx-4 text-center">
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm overflow-y-auto"
+            style={{
+              paddingTop: "max(1rem, env(safe-area-inset-top))",
+              paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
+              paddingLeft: "max(1rem, env(safe-area-inset-left))",
+              paddingRight: "max(1rem, env(safe-area-inset-right))",
+            }}
+            data-testid="bidding-overlay"
+          >
+            <div className="bg-card border border-border p-6 rounded-xl shadow-2xl space-y-4 max-w-sm w-full text-center my-auto">
               <h3 className="text-xl font-serif text-primary">Place your bid</h3>
               {gameState.bids[0] === null && gameState.bids[1] === null && (
                 <p className="text-xs uppercase tracking-widest text-primary/80">

@@ -62,9 +62,19 @@ function MatchCell({
       </div>
       <div className={cellClass(!!match.playerA, aWon, isMine(match.playerA?.name))}>
         <span className="truncate">{aName}</span>
+        {match.scoreA !== null && (
+          <span className="ml-1 tabular-nums" data-testid={`match-${match.id}-score-a`}>
+            {match.scoreA}
+          </span>
+        )}
       </div>
       <div className={cellClass(!!match.playerB, bWon, isMine(match.playerB?.name))}>
         <span className="truncate">{bName}</span>
+        {match.scoreB !== null && (
+          <span className="ml-1 tabular-nums" data-testid={`match-${match.id}-score-b`}>
+            {match.scoreB}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -326,7 +336,16 @@ export default function Tournament() {
     }
   };
 
+  // Pre-June-1 bugfix #2: Leave permanently removes the player from the
+  // roster (server-side splice). To prevent accidental slot loss from a
+  // misclick, require an explicit confirmation. Refresh / Home / Back all
+  // preserve the slot via the per-player token rejoin path; only this
+  // button actually leaves.
   const handleLeave = async () => {
+    const ok = typeof window !== "undefined"
+      ? window.confirm("Leave this tournament? You'll give up your slot and the host will have to add you back.")
+      : true;
+    if (!ok) return;
     try {
       await leaveTournament(code);
       setLocation("/");
@@ -654,6 +673,27 @@ export default function Tournament() {
               >
                 Go to your match →
               </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Pre-June-1 bugfix #5: when the bracket has paired the player into
+            their next match but the server hasn't finished spinning up the
+            room yet (createMatchRoomAndAssign is async, gated by withRoomLock
+            and the DB commit), show a clear "preparing" state so the user
+            knows their seat is queued and stops refreshing the tab. */}
+        {!isLobby && myMatch && !myMatch.roomCode && (
+          <Card className="border-amber-500/40 bg-amber-500/5" data-testid="match-queuing-card">
+            <CardContent className="py-4 flex items-center justify-between gap-3 flex-wrap">
+              <div className="text-sm">
+                <span className="font-bold text-amber-300">Your next match is being set up…</span>{" "}
+                <span className="text-muted-foreground">
+                  {myMatch.playerA?.name ?? "TBD"} vs {myMatch.playerB?.name ?? "TBD"}
+                </span>
+              </div>
+              <span className="text-xs text-muted-foreground italic">
+                You'll be auto-routed when it's ready.
+              </span>
             </CardContent>
           </Card>
         )}

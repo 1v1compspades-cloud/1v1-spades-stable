@@ -136,6 +136,8 @@ export interface TournamentMatch {
   roomCode: string | null;
   winner: BracketSeat | null;
   winnerName: string | null;
+  scoreA: number | null;
+  scoreB: number | null;
 }
 
 export interface TournamentState {

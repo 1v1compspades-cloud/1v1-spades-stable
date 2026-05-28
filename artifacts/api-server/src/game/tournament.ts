@@ -55,6 +55,10 @@ export interface TournamentMatch {
   winner: BracketSeat | null;
   /** Winner display name (denormalized for spectators). */
   winnerName: string | null;
+  /** Final scores from the underlying game state, recorded on resolve.
+   *  Display-only — never used for bracket logic. */
+  scoreA: number | null;
+  scoreB: number | null;
 }
 
 /**
@@ -343,6 +347,8 @@ function buildEmptyBracket(size: TournamentSize): TournamentMatch[][] {
         roomCode: null,
         winner: null,
         winnerName: null,
+        scoreA: null,
+        scoreB: null,
       });
     }
     rounds.push(row);
@@ -520,7 +526,7 @@ export async function recordMatchResult(
   code: string,
   matchId: string,
   winnerSeat: BracketSeat,
-  opts: { roomCodeForAudit?: string | null } = {},
+  opts: { roomCodeForAudit?: string | null; finalScores?: [number, number] } = {},
 ): Promise<RecordMatchResolution> {
   // Import lazily to avoid a circular dep with persistence.ts (which
   // imports from engine.ts which is in the same package).
@@ -609,6 +615,10 @@ export async function recordMatchResult(
     // ── Apply in-memory mutation ────────────────────────────────────
     resolved.winner = winnerSeat;
     resolved.winnerName = winnerName;
+    if (opts.finalScores) {
+      resolved.scoreA = opts.finalScores[0];
+      resolved.scoreB = opts.finalScores[1];
+    }
     if (loserName) t.eliminated.push(loserName);
 
     let newlyReady: TournamentMatch[] = [];

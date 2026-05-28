@@ -852,7 +852,9 @@ async function advanceTournamentOnGameOver(io: SocketIOServer, state: GameState)
   }
   const winnerSeat: "A" | "B" = s0 > s1 ? "A" : "B";
 
-  const resolution = await recordMatchResult(code, matchId, winnerSeat);
+  const resolution = await recordMatchResult(code, matchId, winnerSeat, {
+    finalScores: [s0, s1],
+  });
   if (resolution.kind === "rejected") {
     logger.error(
       { code, matchId, reason: resolution.reason, message: resolution.message },
@@ -1240,7 +1242,19 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         try {
           const state = getRoom(data.roomCode);
           if (!state) return;
-          if (state.players[0]?.socketId !== socket.id) return;
+          // In tournament match rooms, EITHER seated player can press Start —
+          // there is no semantic "host" between the two bracket opponents.
+          // (Pre-June-1 bugfix: avoid the perception that "host transferred"
+          // when the next-round room's playerIndex-0 sees a Start button no
+          // one else does.) In non-tournament rooms, keep the room-host-only
+          // gating: playerIndex 0 (creator) controls start.
+          const inTournament = !!state.tournamentRef;
+          if (inTournament) {
+            const callerSeat = state.players.findIndex((p) => p?.socketId === socket.id);
+            if (callerSeat < 0) return;
+          } else {
+            if (state.players[0]?.socketId !== socket.id) return;
+          }
           if (!state.players[1]) return;
           if (state.phase !== "waiting") return;
           if (!state.ready[0] || !state.ready[1]) return;
