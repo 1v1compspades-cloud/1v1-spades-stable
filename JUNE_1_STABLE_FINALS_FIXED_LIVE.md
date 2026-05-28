@@ -1,36 +1,52 @@
-# june-1-stable-tournament-no-rematch
+# june-1-stable-host-tools-safe-slice
 
-Pre-deploy checkpoint marker for the tournament "ghost rematch" fix.
+Pre-deploy checkpoint marker for the Host Dashboard "safe slice"
+visibility additions.
 
 ## What's in this checkpoint
 
-- **Tournament ghost-rematch bug fixed.** The host of a finished
-  tournament semifinal could click "Start New Match" on the game-over
-  screen and spin up a rematch in the same room, in parallel with the
-  real next match. That's what produced the dry-run symptom:
-  "Grace vs Kinzie rematch happened in the SF2 slot while Shaw beat me."
-- Server now rejects `new_match` and `reset_room` for any room with
-  `tournamentRef` set. Audit-logged via `logger.warn`.
-- Client hides the "Start New Match" button entirely when in a
-  tournament room. Players go through "Back to Tournament Bracket"
-  instead.
-- Host admin tools (`admin_remake_room`, `admin_mark_winner`,
-  `admin_force_forfeit`) are **unchanged** — those are the legitimate
-  ways to destroy/recreate a tournament room.
+Pure additive improvements to the existing Host Dashboard. No server,
+no socket, no schema changes. No changes to gameplay, scoring,
+bidding, tricks, timers, Quick Match, or King of the Table.
+
+- **Overview counts in header** — "Round X of Y · N active ·
+  M/Total completed" so the host sees bracket progress at a glance.
+- **Share & export panel**:
+  - "Copy invite" — drops the lobby URL on the clipboard.
+  - "Copy bracket for Discord" — produces a code-block-formatted
+    snapshot of every match with current state (winner, in-progress
+    score, not started, waiting for feeder).
+- **Player status panel** — consolidated list of every player with:
+  - online / offline / eliminated dot,
+  - current match label + room code,
+  - live score line if in match,
+  - status pill: In match · Waiting · Eliminated.
+  Status is derived purely from the existing `admin_dashboard`
+  snapshot — no new server data needed.
+
+## What was intentionally NOT built (per host's instruction)
+
+- Reset Match Result — high blast radius, low realistic use.
+- Manual Advance — duplicates existing Mark Winner.
+- Validate Bracket / health-check warnings — false-alarm risk during
+  live event; existing bracket logic verified correct.
+- Send Player to Correct Match — players already have a self-recovery
+  path via "Back to Tournament Bracket".
 
 ## Pre-deploy verification
 
-- Typecheck: 4/4 packages clean (api-server, spades-game,
-  mockup-sandbox, scripts).
+- Typecheck: 4/4 packages clean.
 - Test sweep: 190/190 pass
   (finals-seating 10, rules 84, tournament-tx 45, admin 16,
   replace-player 18, bracket-score 15, tournament-no-rematch 2).
 - Dev API healthz: 200.
+- Host Dashboard renders without runtime errors.
 
 ## Rollback ladder (newest → oldest)
 
-- **THIS** — tournament ghost-rematch fix
-- `8e7f114` — finals-seating reclaim fix (server + 10 tests)
+- **THIS** — host tools safe slice
+- `8b3c285` — tournament ghost-rematch fix (server + client)
+- `8e7f114` — finals-seating reclaim fix
 - `65968275` — mobile bid-scroll fix
 - `e7cb6ad` — invite-link 404 fix
 - `e937b50` — king-table-june-1-stable anchor
@@ -39,8 +55,5 @@ Pre-deploy checkpoint marker for the tournament "ghost rematch" fix.
 
 - Room state is in-memory; **do not redeploy during the live event**
   or in-progress brackets will be wiped.
-- This fix layers cleanly on top of all prior stable checkpoints.
-- Host operational note: if a tournament match room genuinely needs to
-  be reset (player disconnect, room glitch), use the **Host Tools
-  Dashboard** → "Remake Current Match Room" — NOT the in-room reset
-  button (which now correctly refuses for tournament rooms).
+- Host can now post a Discord bracket update after each round using
+  the "Copy bracket for Discord" button.

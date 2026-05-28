@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { useSocket } from "@/hooks/useSocket";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +33,120 @@ function roundLabel(round: number, position: number, totalRounds: number): strin
   return `R${round} M${position + 1}`;
 }
 
+// ── Derived helpers (pure, read-only, no server contract changes) ──────────
+type PlayerStatus = {
+  name: string;
+  state: "in_match" | "waiting" | "eliminated";
+  matchLabel: string | null;
+  roomCode: string | null;
+  connected: boolean | null;
+  scoreLine: string | null;
+};
+
+function derivePlayerStatuses(
+  snapshot: AdminDashboardSnapshot,
+  totalRounds: number,
+): PlayerStatus[] {
+  // Collect every player who ever appears in the bracket, dedup by name.
+  const byName = new Map<string, PlayerStatus>();
+  // Walk matches in round order so later assignments overwrite earlier ones
+  // (a winner who has advanced should reflect their NEW match, not the old).
+  const sorted = [...snapshot.matches].sort(
+    (a, b) => a.round - b.round || a.position - b.position,
+  );
+  // First, mark everyone as eliminated who lost a completed match.
+  for (const m of sorted) {
+    if (m.winner && m.playerA && m.playerB) {
+      const loser = m.winner === "A" ? m.playerB : m.playerA;
+      byName.set(loser.name, {
+        name: loser.name,
+        state: "eliminated",
+        matchLabel: roundLabel(m.round, m.position, totalRounds),
+        roomCode: null,
+        connected: null,
+        scoreLine: null,
+      });
+    }
+  }
+  // Then, overwrite with current assignment for anyone in an unfinished match.
+  for (const m of sorted) {
+    if (m.winner) continue;
+    const label = roundLabel(m.round, m.position, totalRounds);
+    const scoreLine = m.live?.scores
+      ? `${m.live.scores[0]} – ${m.live.scores[1]}`
+      : null;
+    const inMatch = !!m.live;
+    if (m.playerA) {
+      byName.set(m.playerA.name, {
+        name: m.playerA.name,
+        state: inMatch ? "in_match" : "waiting",
+        matchLabel: label,
+        roomCode: m.roomCode,
+        connected: m.playerA.connected,
+        scoreLine,
+      });
+    }
+    if (m.playerB) {
+      byName.set(m.playerB.name, {
+        name: m.playerB.name,
+        state: inMatch ? "in_match" : "waiting",
+        matchLabel: label,
+        roomCode: m.roomCode,
+        connected: m.playerB.connected,
+        scoreLine,
+      });
+    }
+  }
+  return Array.from(byName.values()).sort((a, b) => {
+    const order = { in_match: 0, waiting: 1, eliminated: 2 } as const;
+    if (order[a.state] !== order[b.state]) return order[a.state] - order[b.state];
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function buildBracketDiscord(
+  snapshot: AdminDashboardSnapshot,
+  totalRounds: number,
+): string {
+  const lines: string[] = [];
+  lines.push("```");
+  lines.push(`${snapshot.name}  ·  code ${snapshot.code}  ·  ${snapshot.status}`);
+  for (let r = 1; r <= totalRounds; r++) {
+    const rMatches = snapshot.matches
+      .filter((m) => m.round === r)
+      .sort((a, b) => a.position - b.position);
+    if (rMatches.length === 0) continue;
+    lines.push("");
+    lines.push(`-- Round ${r} --`);
+    for (const m of rMatches) {
+      const label = roundLabel(m.round, m.position, totalRounds);
+      const a = m.playerA?.name ?? "TBD";
+      const b = m.playerB?.name ?? "TBD";
+      let status: string;
+      if (m.winner && m.winnerName) {
+        const aScore = m.live?.scores?.[0];
+        const bScore = m.live?.scores?.[1];
+        const score =
+          aScore !== undefined && bScore !== undefined
+            ? `  (${aScore}-${bScore})`
+            : "";
+        status = `→ ${m.winnerName} wins${score}`;
+      } else if (m.live) {
+        const aScore = m.live.scores?.[0] ?? 0;
+        const bScore = m.live.scores?.[1] ?? 0;
+        status = `… in progress  (${aScore}-${bScore})`;
+      } else if (m.playerA && m.playerB) {
+        status = "… not started";
+      } else {
+        status = "… waiting for feeder";
+      }
+      lines.push(`  ${label}: ${a} vs ${b}  ${status}`);
+    }
+  }
+  lines.push("```");
+  return lines.join("\n");
+}
+
 type Confirm = {
   title: string;
   description: string;
@@ -55,12 +171,35 @@ export default function HostDashboard() {
     adminForceForfeit,
   } = useSocket();
 
+  const { toast } = useToast();
   const [token, setToken] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<AdminDashboardSnapshot | null>(null);
   const [audit, setAudit] = useState<AdminAuditEntry[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<Confirm>(null);
+
+  const inviteUrl = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    const origin = window.location.origin;
+    const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+    return `${origin}${base}/tournament/${code}`;
+  }, [code]);
+
+  const copyText = useCallback(
+    async (text: string, label: string) => {
+      try {
+        await navigator.clipboard.writeText(text);
+        toast({ description: `${label} copied` });
+      } catch {
+        toast({
+          description: "Could not copy — long-press to copy manually",
+          variant: "destructive",
+        });
+      }
+    },
+    [toast],
+  );
 
   // Token-gated: if no localStorage token exists, this is not the host
   // (or they cleared cache). Bounce back to the tournament page.
@@ -136,6 +275,28 @@ export default function HostDashboard() {
     return Math.max(0, ...snapshot.matches.map((m) => m.round));
   }, [snapshot]);
 
+  const counts = useMemo(() => {
+    if (!snapshot) {
+      return { active: 0, completed: 0, total: 0, currentRound: 0 };
+    }
+    const completed = snapshot.matches.filter((m) => m.winner).length;
+    const active = snapshot.matches.filter((m) => m.live && !m.winner).length;
+    const total = snapshot.matches.length;
+    // Current round = lowest round number with at least one unresolved match.
+    // Falls back to totalRounds when everything is done.
+    const unresolved = snapshot.matches
+      .filter((m) => !m.winner)
+      .map((m) => m.round);
+    const currentRound =
+      unresolved.length > 0 ? Math.min(...unresolved) : totalRounds;
+    return { active, completed, total, currentRound };
+  }, [snapshot, totalRounds]);
+
+  const playerStatuses = useMemo(() => {
+    if (!snapshot) return [];
+    return derivePlayerStatuses(snapshot, totalRounds);
+  }, [snapshot, totalRounds]);
+
   if (!token) {
     return (
       <div className="min-h-screen flex items-center justify-center text-muted-foreground">
@@ -159,9 +320,18 @@ export default function HostDashboard() {
       <div className="flex items-center justify-between gap-2">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold">Host dashboard</h1>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground" data-testid="overview-subtitle">
             {snapshot.name} · <span className="font-mono">{snapshot.code}</span> · {snapshot.status}
           </p>
+          {totalRounds > 0 && (
+            <p className="text-xs text-muted-foreground mt-0.5" data-testid="overview-counts">
+              Round {Math.min(counts.currentRound, totalRounds)} of {totalRounds}
+              {" · "}
+              <span className="text-green-500">{counts.active} active</span>
+              {" · "}
+              <span>{counts.completed}/{counts.total} completed</span>
+            </p>
+          )}
         </div>
         <Button
           variant="outline"
@@ -178,6 +348,105 @@ export default function HostDashboard() {
           {err}
         </div>
       )}
+
+      {/* Tournament Overview · share & export panel ─────────────────────── */}
+      <section className="space-y-2" data-testid="overview-panel">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Share &amp; export</h2>
+        <Card className="p-3 space-y-2">
+          <div className="flex gap-2">
+            <Input
+              readOnly
+              value={inviteUrl}
+              onFocus={(e) => e.currentTarget.select()}
+              className="font-mono text-xs"
+              data-testid="host-invite-link-input"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => copyText(inviteUrl, "Invite link")}
+              data-testid="host-copy-invite"
+            >
+              Copy invite
+            </Button>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                copyText(buildBracketDiscord(snapshot, totalRounds), "Bracket")
+              }
+              data-testid="host-copy-bracket"
+            >
+              Copy bracket for Discord
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Invite link drops new players in the lobby. Bracket export is a
+            Discord-ready code block showing every match and its current state.
+          </p>
+        </Card>
+      </section>
+
+      {/* Player status panel ───────────────────────────────────────────── */}
+      <section className="space-y-2" data-testid="player-status-panel">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          Player status ({playerStatuses.length})
+        </h2>
+        {playerStatuses.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No players seeded yet.</p>
+        ) : (
+          <Card className="p-2 space-y-1">
+            {playerStatuses.map((p) => {
+              const dot =
+                p.state === "eliminated"
+                  ? "bg-muted-foreground/40"
+                  : p.connected
+                  ? "bg-green-500"
+                  : "bg-red-500";
+              const stateLabel =
+                p.state === "in_match"
+                  ? "In match"
+                  : p.state === "waiting"
+                  ? "Waiting"
+                  : "Eliminated";
+              const stateClass =
+                p.state === "in_match"
+                  ? "text-green-500"
+                  : p.state === "waiting"
+                  ? "text-yellow-500"
+                  : "text-muted-foreground";
+              return (
+                <div
+                  key={p.name}
+                  className="flex items-center justify-between gap-2 px-2 py-1 rounded hover:bg-muted/30 text-sm"
+                  data-testid={`player-status-${p.name}`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
+                    <span className="truncate font-medium">{p.name}</span>
+                    {p.matchLabel && (
+                      <span className="text-xs text-muted-foreground truncate">
+                        · {p.matchLabel}
+                        {p.roomCode && (
+                          <span className="font-mono ml-1">{p.roomCode}</span>
+                        )}
+                        {p.scoreLine && <span className="ml-1">· {p.scoreLine}</span>}
+                      </span>
+                    )}
+                  </div>
+                  <span className={`text-xs whitespace-nowrap ${stateClass}`}>
+                    {stateLabel}
+                  </span>
+                </div>
+              );
+            })}
+          </Card>
+        )}
+      </section>
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Live matches ({liveMatches.length})</h2>
