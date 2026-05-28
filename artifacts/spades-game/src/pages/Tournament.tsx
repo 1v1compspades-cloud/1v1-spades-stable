@@ -221,6 +221,12 @@ export default function Tournament() {
   const [joining, setJoining] = useState(false);
   const [starting, setStarting] = useState(false);
   const [hostSnapshot, setHostSnapshot] = useState<string | null>(null); // remembered host on join
+  // Server-confirmed authentication: true only after subscribe_tournament
+  // (or a fresh joinTournament call) verifies our token actually matches a
+  // roster entry. Used by `iAmInRoster` to prevent a stale localStorage
+  // `playerName` from making a non-member look like they're already in the
+  // lobby (which previously hid the join form for additional invitees).
+  const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => { connect(); }, [connect]);
 
@@ -249,9 +255,12 @@ export default function Tournament() {
   useEffect(() => {
     if (!connected || !code) return;
     const token = getTournamentToken(code) || undefined;
-    subscribeTournament(code, playerName || undefined, token).catch((err) => {
-      toast({ description: typeof err === "string" ? err : "Tournament not found", variant: "destructive" });
-    });
+    subscribeTournament(code, playerName || undefined, token)
+      .then((res) => setAuthenticated(res.authenticated))
+      .catch((err) => {
+        setAuthenticated(false);
+        toast({ description: typeof err === "string" ? err : "Tournament not found", variant: "destructive" });
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connected, code]);
 
@@ -302,10 +311,15 @@ export default function Tournament() {
   };
 
   const t = tournament && tournament.code === code ? tournament : null;
+  // iAmInRoster requires server-confirmed authentication AND a name match.
+  // Without the `authenticated` gate, a fresh invitee whose localStorage
+  // happens to hold a name already in the roster (e.g. a recycled device
+  // or a common name) would have the join form hidden — which is the root
+  // cause of "invite only works for one person."
   const iAmInRoster = useMemo(() => {
-    if (!t || !playerName) return false;
+    if (!t || !playerName || !authenticated) return false;
     return t.players.some((p) => p.name.trim().toLowerCase() === playerName.trim().toLowerCase());
-  }, [t, playerName]);
+  }, [t, playerName, authenticated]);
 
   // Track who looks like the host for THIS browser (we can't get socketId from
   // the sanitized state, so we trust the user's view: host is whoever's name
@@ -328,6 +342,10 @@ export default function Tournament() {
       const existing = getTournamentToken(code) || undefined;
       const res = await joinTournament(code, nameInput.trim(), existing);
       saveTournamentToken(code, res.token);
+      // Server just issued (or reattached) our token — we are now provably
+      // in the roster. Flip the gate immediately so the UI swaps from the
+      // join form to the invite panel without waiting for a re-subscribe.
+      setAuthenticated(true);
       toast({ description: "Joined tournament" });
     } catch (err: unknown) {
       toast({ description: typeof err === "string" ? err : "Failed to join", variant: "destructive" });

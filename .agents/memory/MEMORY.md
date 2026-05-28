@@ -3,3 +3,4 @@
 - [Spades room-lock teardown](spades-room-lock-teardown.md) — destructive room teardown (remake/forfeit) MUST run inside `withRoomLock(roomCode)` or stale in-flight commits resurrect the room post-cleanup.
 - [Spades delayed-merge state preservation](spades-delayed-merge-fields.md) — handlePlayResult's 700ms reveal merge must carry forward every "transient" field set during the delay (lastActiveAt, isPaused, roster) or admin/connectivity state silently regresses.
 - [Spades engine tests run with tsx](spades-engine-tests-tsx.md) — `.test.mts` files import `../tournament.js` ESM-style; only `npx tsx` resolves `.js`→`.ts`, `node --experimental-strip-types` does not.
+- [Spades client roster membership must trust server auth](spades-roster-membership-auth.md) — never gate `iAmInRoster`-style UI on a localStorage name compare; combine with the server-confirmed `authenticated` flag or invitees collide.
