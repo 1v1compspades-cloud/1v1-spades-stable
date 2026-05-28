@@ -1116,7 +1116,7 @@ export default function Room() {
             padding keeps the Confirm button above the iOS home indicator. */}
         {!spectator && gameState.phase === "bidding" && gameState.currentBidder === playerIndex && (
           <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 overflow-y-auto"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 overflow-y-auto pointer-events-none"
             style={{
               paddingTop: "max(1rem, env(safe-area-inset-top))",
               paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
@@ -1125,7 +1125,11 @@ export default function Room() {
             }}
             data-testid="bidding-overlay"
           >
-            <div className="bg-card border border-border p-6 rounded-xl shadow-2xl space-y-4 max-w-sm w-full text-center my-auto">
+            {/* pointer-events-auto on the card re-enables clicks/taps on the
+                modal itself, while pointer-events-none on the backdrop lets
+                touch/swipe pass through to the hand below — so mobile players
+                can scroll their 13 cards horizontally before bidding. */}
+            <div className="bg-card border border-border p-6 rounded-xl shadow-2xl space-y-4 max-w-sm w-full text-center my-auto pointer-events-auto">
               <h3 className="text-xl font-serif text-primary">Place your bid</h3>
               {gameState.bids[0] === null && gameState.bids[1] === null && (
                 <p className="text-xs uppercase tracking-widest text-primary/80">
