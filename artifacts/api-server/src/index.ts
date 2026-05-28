@@ -20,6 +20,10 @@ if (Number.isNaN(port) || port <= 0) {
 const httpServer = createServer(app);
 const io = setupSocketIO(httpServer);
 
+// Expose io to HTTP routes (read-only) so /api/admin/stats can report live
+// socket counts without importing the socket module directly.
+app.locals["io"] = io;
+
 // Rehydrate persisted rooms in the background. Don't block listen() — if
 // the DB is slow or down, the server should still accept new connections;
 // new rooms simply won't have the older sessions available until the
