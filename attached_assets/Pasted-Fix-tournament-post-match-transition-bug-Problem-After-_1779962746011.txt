@@ -1,0 +1,50 @@
+Fix tournament post-match transition bug.
+
+Problem:
+After a tournament match ends, the app briefly flashes the normal Start Match / Ready Up screen, then returns to the completed Game Over screen or old Ready Up room. This happened after TEST · SEMIFINAL 2 where OgSoloSpader beat Grace 283-71. The bracket result is correct, but the room lifecycle is reusing or rehydrating the completed room state.
+
+Important:
+Do NOT rewrite the tournament bracket engine.
+Do NOT change the safe/idempotent winner advancement logic unless a test proves it is broken.
+The issue appears to be stale completed-room state and post-match navigation/state hydration.
+
+Fix requirements:
+
+1. When a tournament match reaches game over and winner advancement succeeds:
+   - mark the current match room as completed/finalized
+   - prevent Start New Match, Reset Room, Ready Up, or auto-rematch behavior from reusing that same room for tournament play
+   - clear or block stale ready/game state from completed tournament rooms
+
+2. For tournament rooms only:
+   - if room.gameOver === true and match.status === completed, the client should not show normal Ready Up / Start Match as if the room can continue
+   - show Tournament Match Complete state instead
+   - include buttons:
+     - Back to Tournament Bracket
+     - Go to Next Match if the next assigned match exists
+     - Spectate Finals if user is host/spectator and finals exists
+
+3. On client load / reconnect:
+   - if player opens a completed tournament match room, do not hydrate into old game-over loop
+   - fetch latest tournament state by tournamentId/tournamentCode
+   - redirect or offer navigation to the active assigned match if one exists
+   - otherwise show bracket waiting state
+
+4. Add guard:
+   - Start Match should be disabled for completed tournament match rooms
+   - Reset Room should not revive a completed tournament match unless host explicitly uses Remake Current Match Room
+   - Remake Current Match Room must create a fresh roomCode and fresh game state for the same matchId, not reuse old completed game state
+
+5. Add logging:
+   - log when tournament match completes
+   - log matchId, old roomCode, winner, loser, score
+   - log when next round match is created
+   - log player redirect target after match completion
+   - warn if client tries to ready/start inside a completed tournament room
+
+Acceptance test:
+Run a 4-player tournament.
+Finish semifinal 1.
+Finish semifinal 2.
+After semifinal 2, both winners should be able to reach Finals without seeing the old Game Over loop.
+Completed semifinal rooms should remain viewable as results only, not reusable lobbies.
+Finals should have a fresh roomCode and clean ready state.
