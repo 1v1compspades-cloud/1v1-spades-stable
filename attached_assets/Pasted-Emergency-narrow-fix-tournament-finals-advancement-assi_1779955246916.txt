@@ -1,0 +1,62 @@
+Emergency narrow fix: tournament finals advancement + assigned finalist seating.
+
+Observed in live 4-player tournament dry run:
+- Semifinal gameplay worked.
+- Tournament advanced toward finals.
+- Finals room existed with code 5TYJT5.
+- Host/player saw Grace listed as Player 2 but NOT READY.
+- Grace was sent the PLAYER invite, not spectator link.
+- Grace still landed in WATCHING/SPECTATOR mode or saw:
+  “Table is full — you’re in the challenger queue.”
+- Finals could not start.
+- After publish/reload, tournament page showed “Tournament not found.”
+
+Fix only the tournament finals flow. Do not do unrelated UI or gameplay work.
+
+Primary goal:
+After both semifinals complete or host marks winners, the tournament must create a finals match where both assigned finalists can join as Player 1 and Player 2, ready up, and start the finals. Assigned finalists must never be sent to spectator/challenger queue.
+
+Tasks:
+1. Inspect tournament advancement from semifinals to finals.
+2. Inspect finals room creation.
+3. Inspect assigned player seat mapping for next-round/finals rooms.
+4. Inspect player invite links for tournament match rooms.
+5. Inspect reconnect/localStorage identity between semifinal room and finals room.
+6. Fix stale seat occupancy so prior room/player identity does not block finals seating.
+7. If a player is assigned to the finals match, allow them to claim their assigned seat even if generic room logic thinks the table is full.
+8. Make sure Player 1 and Player 2 finalists both get valid player-seat access.
+9. Keep spectator links separate and never route assigned finalists into spectator mode.
+10. Make the host dashboard clearly show tournament code vs match room code if that confusion exists.
+11. Do not change gameplay rules, scoring, bidding rules, card dealing, trick logic, King of the Table state, or unrelated UI.
+12. Do not add broad persistence/schema changes right now unless absolutely required. If tournament state loss after deploy is due to in-memory state, report it clearly and add a warning, but prioritize fixing finals seating.
+
+Expected result:
+- Create 4-player tournament.
+- Complete semifinal 1.
+- Complete semifinal 2.
+- Finals match is created.
+- Finalist A joins as Player 1.
+- Finalist B joins as Player 2.
+- Neither finalist sees “table full” or challenger queue.
+- Neither finalist is stuck in spectator/watching mode.
+- Both finalists can tap Ready.
+- Finals starts normally.
+- Champion is recorded after finals.
+
+Add/update the smallest automated test possible:
+- Simulate a 4-player tournament.
+- Record/complete both semifinal winners.
+- Verify finals match is created.
+- Verify both assigned finalists can join their assigned seats.
+- Verify no assigned finalist is treated as spectator/challenger.
+- Verify both can ready and finals can start.
+
+After fixing, run:
+npm run typecheck && npm test
+
+Then report:
+- Exact files changed
+- Root cause
+- Whether the cause was stale seat state, token mismatch, wrong room code, match/tournament code confusion, or reconnect identity
+- Confirmation no gameplay/scoring/bidding/card/KotT logic changed unless explicitly listed
+- New test coverage added

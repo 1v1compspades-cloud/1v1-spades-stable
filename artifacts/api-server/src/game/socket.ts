@@ -1197,6 +1197,50 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           let joinErr: Error | null = null;
           await withRoomLock(code, async () => {
             try {
+              // Tournament finals-seating defensive path.
+              // `createMatchRoomAndAssign` pre-seats both bracket opponents
+              // using their CURRENT socketId at room-creation time. If a
+              // player's socket drops/reconnects between that moment and
+              // their navigation to /room/<code> (or if the client's
+              // stale-room-code guard wiped their cached playerIndex so they
+              // fall into the fresh-join branch instead of the reconnect
+              // branch), the engine sees the seat already filled and rejects
+              // with "Room is full". For tournament rooms only, if the
+              // joining name matches a pre-seated slot, treat it as a
+              // reconnect: swap the new socketId into the existing seat.
+              // Quick Match and KotT rooms are unaffected — they fall
+              // through to the normal engine.joinRoom path.
+              const pre = getRoom(code);
+              if (pre?.tournamentRef) {
+                const norm = (s: string) => s.trim().toLowerCase();
+                const seat = pre.players.findIndex(
+                  (p) => p && norm(p.name) === norm(data.playerName)
+                );
+                if (seat >= 0) {
+                  // Security: if this seat has already been tokenized by a
+                  // prior join, refuse to reclaim via join_room (which carries
+                  // no token). The client MUST use reconnect_player with the
+                  // token they were issued. This closes the bypass where an
+                  // attacker who knew the room code + a participant's display
+                  // name could hijack a tokenized seat through join_room.
+                  if (pre.tokenizedSeats?.[seat as 0 | 1] === true) {
+                    joinErr = new Error("Reconnect token required for this seat");
+                    return;
+                  }
+                  // Use the canonical seat name (avoid user-supplied drift in
+                  // case/whitespace propagating into audit + token issuance).
+                  const canonicalName = pre.players[seat]!.name;
+                  const s = reconnectPlayer(code, seat as 0 | 1, socket.id, canonicalName);
+                  result = { state: s, playerIndex: seat };
+                  data.playerName = canonicalName;
+                  await commit(s, {
+                    action: "reconnect",
+                    actorSeat: seat,
+                    payload: { playerName: canonicalName, role: "player", via: "join_room_tournament_reclaim" },
+                  });
+                  return;
+                }
+              }
               const r = joinRoom(code, data.playerName, socket.id);
               result = r;
               await commit(r.state, {
