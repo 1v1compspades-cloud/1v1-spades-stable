@@ -388,8 +388,11 @@ export default function Tournament() {
     try {
       const res = await hostReplacePlayer(code, replaceTarget, newName, token);
       // Build the backup's auto-join URL with the freshly-issued token.
+      // Use the build-time BASE_URL, NOT document.baseURI. baseURI falls
+      // back to document.URL when no <base> tag is present, so if the host
+      // is on /tournament/<CODE> we'd get /tournament/<CODE>/tournament/<CODE>.
       const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const base = typeof window !== "undefined" ? window.document.baseURI.replace(origin, "").replace(/\/$/, "") : "";
+      const base = import.meta.env.BASE_URL.replace(/\/$/, "");
       const joinUrl = `${origin}${base}/tournament/${code}?join_name=${encodeURIComponent(res.replacementName)}&join_token=${encodeURIComponent(res.newPlayerToken)}`;
       setReplaceResult({ replacementName: res.replacementName, joinUrl });
       setReplaceTarget(null);
@@ -551,8 +554,12 @@ export default function Tournament() {
               {iAmInRoster && (() => {
                 const slotsOpen = Math.max(0, t.size - t.players.length);
                 const isFull = slotsOpen === 0;
+                // Use the build-time BASE_URL, NOT document.baseURI. baseURI
+                // falls back to document.URL when no <base> tag is present, so
+                // copying from /tournament/<CODE> would produce
+                // /tournament/<CODE>/tournament/<CODE> → 404 on the invitee.
                 const origin = typeof window !== "undefined" ? window.location.origin : "";
-                const base = typeof window !== "undefined" ? window.document.baseURI.replace(origin, "").replace(/\/$/, "") : "";
+                const base = import.meta.env.BASE_URL.replace(/\/$/, "");
                 const inviteUrl = `${origin}${base}/tournament/${t.code}`;
                 const handleCopyInvite = async () => {
                   try {

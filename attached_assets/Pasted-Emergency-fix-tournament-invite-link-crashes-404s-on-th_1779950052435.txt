@@ -1,0 +1,46 @@
+Emergency fix: tournament invite link crashes / 404s on the live website too.
+
+Current issue:
+Tournament invite link was tested on the real live site, not just developer mode, and it crashes or routes to 404 instead of opening the tournament lobby.
+
+Do NOT do a broad rewrite. Fix only the tournament invite route/link mismatch.
+
+Tasks:
+1. Inspect the frontend router and list all registered tournament-related routes.
+2. Inspect the tournament invite/share/copy-link code.
+3. Identify the exact URL currently being generated.
+4. Identify why that URL crashes or 404s on the live domain.
+5. Change the invite URL to use the correct registered tournament lobby route.
+6. If no route exists for the generated invite path, add the smallest possible frontend route that loads the existing tournament lobby by code/id.
+7. Do not create a new tournament system.
+8. Do not touch gameplay, scoring, bidding, card logic, trick logic, sockets, tournament advancement, admin tools, reconnect model, or King of the Table state unless absolutely required.
+9. The same invite link must allow multiple players to join the same tournament lobby before start.
+10. The invite link must not send players to a match room or spectator page.
+
+Expected working flow:
+- Host creates tournament on 1v1spades.com.
+- Host copies invite link.
+- Link starts with https://1v1spades.com or https://www.1v1spades.com.
+- Player opens link from Messages/Safari.
+- Player lands in the correct tournament lobby.
+- Player enters name / joins.
+- Player appears in roster.
+- Same link works for multiple players.
+- No crash.
+- No 404.
+
+Add or update the smallest test possible:
+- Generated tournament invite URL matches a registered frontend route.
+- Visiting that route renders tournament lobby, not 404.
+
+After fixing, run:
+npm run typecheck && npm test
+
+Then report:
+- Exact files changed
+- Root cause
+- Old broken URL format
+- New working URL format
+- Whether this was router mismatch, wrong base URL, wrong tournament code, or missing route
+- Confirmation multiple players can join from the same invite
+- Confirmation no gameplay/scoring/bidding/socket/tournament advancement/KotT state logic changed
