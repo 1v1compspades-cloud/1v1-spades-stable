@@ -1514,6 +1514,13 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           if (state.phase !== "game_over") return;
           if (state.players[0]?.socketId !== socket.id) return;
           if (!state.players[0] || !state.players[1]) return;
+          if (state.tournamentRef) {
+            logger.warn(
+              { roomCode: data.roomCode, tournamentRef: state.tournamentRef },
+              "Rejected new_match on tournament room (rematches not allowed in bracket play)"
+            );
+            return;
+          }
 
           const reset  = resetMatch(state);
           const tossed = performCoinToss(reset);
@@ -2319,6 +2326,12 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           let rErr: Error | null = null;
           await withRoomLock(code, async () => {
             try {
+              const existing = getRoom(code);
+              if (existing?.tournamentRef) {
+                throw new Error(
+                  "Cannot reset a tournament match room. Use Back to Tournament Bracket instead."
+                );
+              }
               state = resetRoom(code, socket.id);
               await commit(state, {
                 action: "room_reset",

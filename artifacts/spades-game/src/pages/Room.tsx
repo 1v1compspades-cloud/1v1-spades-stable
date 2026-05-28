@@ -1399,7 +1399,7 @@ export default function Room() {
                       Waiting for a challenger to join the line…
                     </p>
                   )
-                ) : spectator ? (
+                ) : gameState.tournamentRef ? null : spectator ? (
                   <p className="text-center text-muted-foreground italic text-sm">Waiting for host to start a new match…</p>
                 ) : playerIndex === 0 ? (
                   <Button onClick={handleNewMatch} className="w-full h-11 text-base">
