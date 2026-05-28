@@ -1,0 +1,69 @@
+Fix the music/mute icon overlap issue before June 1.
+
+Observed bug:
+On PC/desktop layout, the music/mute icon is overlapping or sitting too close to the bid/tricks entry/control area. It can visually block gameplay information and may interfere with clicking/tapping controls.
+
+Scope:
+- This is a layout/CSS fix only.
+- Do not change game logic.
+- Do not change tournament logic.
+- Do not redesign the whole game screen.
+- Do not touch scoring, bidding rules, room logic, reconnect logic, or host permissions.
+
+Requirements:
+1. Move the music/mute button into a dedicated safe UI zone.
+2. The music/mute button must never overlap:
+   - bid controls
+   - tricks display
+   - player hand/cards
+   - action buttons
+   - room labels
+   - tournament labels
+   - game-over overlay
+   - invite/code entry areas
+
+3. Desktop / PC layout:
+   - Place the music/mute control in a safe fixed position.
+   - Preferred: top-right corner with padding, or bottom-left corner if top-right conflicts with existing UI.
+   - Keep it away from the bid/tricks area.
+   - Confirm it does not cover inputs or labels on common desktop widths.
+
+4. Mobile layout:
+   - Keep the music/mute control away from:
+     - bottom browser bar
+     - player hand
+     - bid button
+     - trick controls
+     - game action buttons
+   - Make sure it remains tappable but not in the gameplay path.
+
+5. Z-index / pointer behavior:
+   - Gameplay controls must always have priority over music UI.
+   - The music button should not sit above bid/action controls in a way that blocks clicks.
+   - Only the visible music button should receive pointer events.
+   - Avoid oversized invisible wrappers blocking gameplay clicks.
+
+6. Responsive testing:
+   Test at minimum:
+   - Desktop width
+   - Tablet width
+   - Mobile portrait
+   - Mobile landscape if supported
+
+7. Regression check:
+   Confirm these still work after the layout fix:
+   - bidding
+   - tricks display
+   - player hand visibility
+   - game-over overlay
+   - tournament match screen
+   - Quick Match screen
+   - King of the Table / King of the Hill screen if it shares the same music icon
+
+After fixing, report:
+A) files changed
+B) where the music icon now appears on desktop
+C) where it appears on mobile
+D) confirmation it no longer overlaps bid/tricks/input areas
+E) tests or viewport checks performed
+F) any remaining layout risks

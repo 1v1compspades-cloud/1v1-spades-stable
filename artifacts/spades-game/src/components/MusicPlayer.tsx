@@ -58,10 +58,10 @@ export function MusicPlayer() {
         aria-label={muted ? "Unmute background music" : "Mute background music"}
         data-testid="button-music-toggle"
         style={{
+          top: "calc(env(safe-area-inset-top) + 3.25rem)",
           right: "calc(env(safe-area-inset-right) + 12px)",
-          bottom: "calc(env(safe-area-inset-bottom) + 11rem)",
         }}
-        className="fixed z-[35] h-[38px] w-[38px] sm:h-10 sm:w-10 flex items-center justify-center rounded-full border border-amber-500/40 bg-black/80 text-primary backdrop-blur-sm shadow-[0_4px_14px_rgba(0,0,0,0.35)] hover:bg-primary/15 active:scale-95 transition"
+        className="fixed z-[30] pointer-events-auto h-[38px] w-[38px] sm:h-10 sm:w-10 flex items-center justify-center rounded-full border border-amber-500/40 bg-black/80 text-primary backdrop-blur-sm shadow-[0_4px_14px_rgba(0,0,0,0.35)] hover:bg-primary/15 active:scale-95 transition"
       >
         <span className="text-base sm:text-lg leading-none" aria-hidden="true">
           {muted ? "🔇" : "🎵"}
