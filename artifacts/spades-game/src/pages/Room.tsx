@@ -596,7 +596,10 @@ export default function Room() {
       <div
         data-testid={`player-info-seat-${idx + 1}`}
         className={cn(
-          "flex items-center justify-between px-4 py-3 bg-black/40 border-y backdrop-blur-sm transition-shadow",
+          // relative + z-[110] keeps the score row above the bidding modal
+          // backdrop (z-[100]) so the bottom-player score stays visible while
+          // bidding. The modal itself stays centered between the two rows.
+          "relative z-[110] flex items-center justify-between px-4 py-3 bg-black/40 border-y backdrop-blur-sm transition-shadow",
           isActive
             ? "border-primary/60 shadow-[inset_0_0_0_1px_hsla(35,90%,55%,0.5),0_0_12px_-2px_hsla(35,90%,55%,0.35)]"
             : "border-border",
