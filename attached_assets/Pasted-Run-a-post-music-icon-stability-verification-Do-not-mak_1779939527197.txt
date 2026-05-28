@@ -1,0 +1,116 @@
+Run a post-music-icon stability verification. Do not make broad new changes unless a critical issue is found.
+
+Goal:
+Confirm the music/mute icon layout fix did not break gameplay, tournament flow, Quick Match, or King of the Table.
+
+1. Checkpoint / rollback
+- Confirm the latest checkpoint exists after the music icon fix.
+- Confirm the previous June 1 stable checkpoint still exists.
+- Confirm no backup, rollback checkpoint, or stable build was deleted or overwritten.
+
+2. Automated tests
+- Run all existing tests.
+- Run typecheck.
+- Report total passing/failing tests.
+- If any test fails, identify the exact file, test name, and likely cause.
+
+3. Music icon layout verification
+Test these viewports:
+- desktop / PC
+- tablet
+- mobile portrait
+- mobile landscape if supported
+
+Confirm:
+- music/mute icon does not overlap bid controls
+- music/mute icon does not overlap tricks display
+- music/mute icon does not overlap player hand/cards
+- music/mute icon does not overlap game action buttons
+- music/mute icon does not overlap room/tournament labels
+- music/mute icon does not overlap invite/code entry
+- music/mute icon does not block clicks/taps due to invisible wrapper
+- gameplay controls have priority over the music icon
+
+4. Quick Match regression
+Create a normal Custom 1v1 / Quick Match.
+
+Verify:
+- room creation works
+- player 1 joins
+- player 2 joins
+- spectator can join
+- bidding works
+- bid button is visible and clickable
+- tricks display is visible
+- music icon does not cover controls
+- game can complete
+- game-over overlay displays correctly
+- Copy for Discord still works if available
+
+5. Tournament regression
+Run a 4-player tournament smoke test.
+
+Verify:
+- tournament lobby opens
+- invite/code works
+- 4 players join
+- host starts tournament
+- Round 1 rooms open
+- bidding works in tournament matches
+- music icon does not overlap tournament game UI
+- winners advance correctly
+- next-round Join button works
+- finals open correctly
+- champion screen appears
+- original tournament host remains host
+- non-hosts do not get tournament admin tools
+
+6. Reconnect/back regression
+During both Quick Match and tournament match:
+
+- refresh player page
+- disconnect/reconnect if possible
+- press Back from reconnect/disconnect screen
+- confirm it returns to active game, not generic lobby
+- confirm player identity/seat stays correct
+- confirm “YOU” label does not swap
+- confirm host controls stay with original host only
+
+7. King of the Table / King of the Hill regression
+If KOTH/KOTT uses the same game screen or music icon, test:
+
+- create King lobby
+- invite challenger
+- start match
+- verify music icon does not overlap controls
+- refresh/reconnect king
+- refresh/reconnect challenger
+- confirm identities do not swap
+- king wins: king remains king and streak updates
+- challenger wins: challenger becomes king
+- no tournament admin tools appear in KOTH/KOTT
+
+8. Final report format
+
+Report:
+
+A) build/checkpoint tested  
+B) files changed by music icon fix  
+C) typecheck result  
+D) automated test result  
+E) desktop layout result  
+F) mobile layout result  
+G) Quick Match result  
+H) tournament result  
+I) reconnect/back result  
+J) KOTH/KOTT result  
+K) remaining risks  
+L) Go / No-Go recommendation for June 1  
+
+Do not deploy or call this June 1 stable unless:
+- tests pass
+- music icon no longer overlaps controls
+- Quick Match still works
+- 4-player tournament still reaches champion screen
+- reconnect identity remains correct
+- host permissions remain correct
