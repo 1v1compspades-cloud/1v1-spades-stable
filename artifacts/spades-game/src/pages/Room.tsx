@@ -1043,7 +1043,7 @@ export default function Room() {
         )}
 
         {/* Center trick area */}
-        <div className="w-64 h-64 rounded-full border border-white/5 bg-white/5 flex items-center justify-center relative backdrop-blur-sm">
+        <div className="w-64 h-64 rounded-full border border-white/5 bg-white/5 flex items-center justify-center relative">
           {gameState.spadesBroken && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 text-[10px] text-muted-foreground uppercase tracking-widest opacity-60 whitespace-nowrap">
               ♠ Spades Broken
