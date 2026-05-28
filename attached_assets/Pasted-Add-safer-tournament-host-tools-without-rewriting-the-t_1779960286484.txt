@@ -1,0 +1,117 @@
+Add safer tournament host tools without rewriting the tournament bracket engine.
+
+Important:
+Do not rewrite the core bracket advancement system unless a test proves it is broken.
+The recent “wrong semifinal” issue was caused by Start New Match/reset behavior inside tournament rooms, not actual bracket corruption.
+Keep the existing safe/idempotent bracket logic intact.
+
+Goal:
+Improve host tournament recovery and visibility for June 1.
+
+Add a host-only tournament control panel with these sections:
+
+1. Tournament Overview
+Show:
+- tournament name
+- tournament code
+- current round
+- tournament status
+- active matches count
+- completed matches count
+- bracket health status
+- warning if bracket state mismatch is detected
+
+2. Current Match Controls
+For the match the host is viewing, show:
+- match name
+- matchId
+- roomCode
+- player 1
+- player 2
+- status
+- winner if completed
+
+Add buttons:
+- Pause Timer
+- Resume Timer
+- Reset Timer
+- Remake Current Match Room
+- Forfeit Player
+- Mark Winner
+
+Rules:
+- Mark Winner must call the same existing safe advancement path as natural game-over.
+- Remake Current Match Room must preserve the same matchId and same assigned players.
+- Remake must not create a duplicate match or alter bracket position.
+
+3. Bracket Recovery Tools
+Add:
+- Validate Bracket
+- Export Bracket Backup / Copy Bracket for Discord
+- Reset Match Result, host-token only and confirmation required
+- Advance Winner Manually, host-token only and confirmation required
+
+Validate Bracket should detect:
+- completed match with invalid winner
+- loser appearing in later round
+- duplicate room for same matchId
+- finals room created before both semifinal winners exist
+- room players do not match bracket match players
+- player assigned to a match they are not listed in
+
+If validation fails:
+- show a visible warning in host dashboard
+- do not silently auto-fix
+- show expected state vs current state
+- recommend host action
+
+4. Player Status Panel
+Show every tournament player:
+- display name
+- online/offline if available
+- current assigned match
+- eliminated/waiting/in match status
+- room code if active
+
+Add buttons:
+- Copy Player Invite
+- Copy Spectator Link
+- Send to Correct Match if safe/current match exists
+- Kick/Remove only before tournament start
+
+5. Match List
+Show all tournament matches:
+- match name
+- matchId
+- player 1
+- player 2
+- status
+- winner
+- room code
+- buttons: View, Remake, Mark Winner, Reset Result
+
+Important implementation rules:
+- Host tools must be token/admin gated.
+- Do not expose host tools to regular players or spectators.
+- Do not rewrite scoring, bidding, tricks, timers, card logic, or gameplay.
+- Do not create duplicate rooms for the same matchId.
+- Do not allow eliminated players to be reassigned into later rounds.
+- If bracket and room disagree, show a warning instead of silently assigning players.
+- Keep Quick Match and King of the Table unaffected.
+- Add tests only around host tools, validation, and recovery behavior.
+
+Minimum tests:
+1. Host panel does not show to normal players or spectators.
+2. Mark Winner advances through the same path as game-over.
+3. Remake Current Match Room keeps same players and matchId.
+4. Validate Bracket passes for normal 4-player tournament.
+5. Validate Bracket warns if a loser appears in finals.
+6. Export Bracket Backup includes tournament code, players, matches, rooms, winners, current round, and timestamp.
+7. Quick Match still works.
+8. King of the Table still works.
+
+After implementation:
+- run full tests
+- run typecheck
+- run health check
+- create checkpoint named june-1-stable-host-tools
