@@ -1116,7 +1116,7 @@ export default function Room() {
             padding keeps the Confirm button above the iOS home indicator. */}
         {!spectator && gameState.phase === "bidding" && gameState.currentBidder === playerIndex && (
           <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm overflow-y-auto"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 overflow-y-auto"
             style={{
               paddingTop: "max(1rem, env(safe-area-inset-top))",
               paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
