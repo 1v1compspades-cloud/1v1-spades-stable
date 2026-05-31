@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback, ReactNode } from "react";
 import { io, Socket } from "socket.io-client";
-import { GameState, Card, TournamentState, MatchAssignedPayload, AdminAuditEntry, AdminDashboardSnapshot } from "@/lib/game";
+import { GameState, Card, TournamentState, MatchAssignedPayload, TournamentDisconnectNotice, AdminAuditEntry, AdminDashboardSnapshot } from "@/lib/game";
 
 export type SocketStatus = "connecting" | "online" | "reconnecting" | "offline";
 
@@ -37,6 +37,7 @@ interface SocketContextType {
   tournament: TournamentState | null;
   matchAssignment: MatchAssignedPayload | null;
   tournamentEliminated: { code: string; round: number } | null;
+  tournamentNotice: TournamentDisconnectNotice | null;
   createTournament: (opts: { hostName: string; name?: string; size: 4 | 8 | 16 | 32; matchTarget: number }) => Promise<{ code: string; token: string }>;
   joinTournament: (code: string, name: string, token?: string) => Promise<{ token: string }>;
   leaveTournament: (code: string) => Promise<void>;
@@ -45,6 +46,7 @@ interface SocketContextType {
   forceForfeitMatch: (code: string, matchId: string, forfeitSeat: "A" | "B", token?: string) => Promise<void>;
   clearMatchAssignment: () => void;
   clearTournamentEliminated: () => void;
+  clearTournamentNotice: () => void;
   // ── Host admin tools ──────────────────────────────────────────────────
   adminDashboard: (code: string, token: string) => Promise<AdminDashboardSnapshot>;
   adminAuditLog: (code: string, token: string, limit?: number) => Promise<AdminAuditEntry[]>;
@@ -68,6 +70,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [tournament, setTournament] = useState<TournamentState | null>(null);
   const [matchAssignment, setMatchAssignment] = useState<MatchAssignedPayload | null>(null);
   const [tournamentEliminated, setTournamentEliminated] = useState<{ code: string; round: number } | null>(null);
+  const [tournamentNotice, setTournamentNotice] = useState<TournamentDisconnectNotice | null>(null);
 
   // Pre-June-1 fix: after a tournament match finishes, the winner's socket is
   // joined to BOTH the completed match room AND the freshly-created next-round
@@ -159,6 +162,9 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     });
     s.on("tournament_eliminated", (payload: { tournamentCode: string; round: number }) => {
       setTournamentEliminated({ code: payload.tournamentCode, round: payload.round });
+    });
+    s.on("tournament_player_disconnected", (payload: TournamentDisconnectNotice) => {
+      setTournamentNotice(payload);
     });
     s.on("tournament_complete", () => {
       // tournament_state will follow with status=complete
@@ -349,6 +355,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   };
   const clearMatchAssignment = () => setMatchAssignment(null);
   const clearTournamentEliminated = () => setTournamentEliminated(null);
+  const clearTournamentNotice = () => setTournamentNotice(null);
 
   const joinAsSpectator = (roomCode: string, spectatorName: string) => {
     return new Promise<void>((resolve, reject) => {
@@ -442,6 +449,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       tournament,
       matchAssignment,
       tournamentEliminated,
+      tournamentNotice,
       createTournament,
       joinTournament,
       leaveTournament,
@@ -450,6 +458,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       forceForfeitMatch,
       clearMatchAssignment,
       clearTournamentEliminated,
+      clearTournamentNotice,
       adminDashboard,
       adminAuditLog,
       adminPauseMatch,

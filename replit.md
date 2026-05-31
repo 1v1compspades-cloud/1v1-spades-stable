@@ -136,6 +136,13 @@ When a third+ player clicks Join Match on a King-of-the-Table room (mode=`king`)
 - Host pause/resume/reset admin tools remain functional — they're no-ops on rooms without a timer armed, which is the expected behavior.
 - Deferred (post-June-1) — per-room "Turn Timer" dropdown (Off / 30 / 60 / 90), tournament-create selector defaulting to 60, 10-second-remaining client warning, expanded auto-action policy. Plan in conversation history; do NOT ship before the June 1 event.
 
+## Disconnect grace, auto-forfeit & reconnect self-heal
+
+- When a seated tournament-match player disconnects, `scheduleAutoForfeit` (socket.ts) arms a **5-minute** grace timer (`TOURNAMENT_AUTO_FORFEIT_MS = 300_000`) and immediately emits `tournament_player_disconnected` to the `tournament:${code}` room. The Tournament page shows a host-only toast (`tournamentNotice` in useSocket); other roles ignore it.
+- If the player reconnects within the window, the timer is cancelled (`cancelAutoForfeit`). If it fires: when the match `isPaused`, the forfeit is **deferred** (re-arms with `notify=false`) so the host can pause to hold a disconnected player's slot indefinitely; otherwise the match auto-forfeits so the bracket keeps moving.
+- **Reconnect self-heal (client):** a player's cached room code can go stale after a round ends (old room cleaned up → server throws "Room not found"). On that error, Room.tsx routes to `/tournament/<code>` (looked up via `spades_room_tournament_<roomCode>`) instead of dumping to `/`. The tournament page re-subscribes and the server re-emits `match_assigned` from the still-live `pendingAssignment`, landing the player back in their CURRENT match. The player reconnect token is preserved on stale-room/retryable errors and only cleared on a genuine seat/token rejection.
+- The reconnecting screen also shows a **Host tools** shortcut when this browser holds `spades_tournament_token_<code>`, so a dropped host never loses access to pause/forfeit/remake.
+
 ## Gotchas
 
 - Always restart the API Server workflow after backend changes; the frontend is hot-reloaded by Vite.

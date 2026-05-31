@@ -201,6 +201,7 @@ export default function Tournament() {
     tournament, subscribeTournament, joinTournament, leaveTournament, startTournament,
     matchAssignment, clearMatchAssignment, forceForfeitMatch,
     tournamentEliminated, clearTournamentEliminated,
+    tournamentNotice, clearTournamentNotice,
     hostReplacePlayer,
   } = useSocket();
 
@@ -292,6 +293,23 @@ export default function Tournament() {
     return () => clearTimeout(h);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchReadyCountdown]);
+
+  // Host-only: surface a toast when a seated player drops, so the host can act
+  // during the grace window (the player is auto-routed back if they reconnect;
+  // otherwise the host can pause to hold the slot, remake, or forfeit).
+  useEffect(() => {
+    if (!tournamentNotice) return;
+    if (tournamentNotice.tournamentCode !== code) return;
+    if (iAmHost) {
+      const mins = Math.round(tournamentNotice.graceMs / 60000);
+      toast({
+        description: `${tournamentNotice.playerName ?? "A player"} disconnected. They have ${mins} min to reconnect before auto-forfeit — open Host tools to pause the match and hold their slot.`,
+        variant: "destructive",
+      });
+    }
+    clearTournamentNotice();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tournamentNotice]);
 
   const acceptMatchReady = () => {
     const target = matchAssignment?.roomCode;

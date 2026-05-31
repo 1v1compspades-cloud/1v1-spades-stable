@@ -217,11 +217,29 @@ export default function Room() {
     } else if (playerIndex !== null) {
       const token = getPlayerToken(roomCode, playerIndex) || undefined;
       reconnect(roomCode, playerIndex, playerName, token).catch(err => {
+        const msg = typeof err === "string" ? err : (err?.message ?? "");
+        const tournamentCode =
+          typeof window !== "undefined"
+            ? window.localStorage.getItem(`spades_room_tournament_${roomCode}`)
+            : null;
+        // Self-heal: "Room not found" means our cached room code is from a
+        // finished round that's already been cleaned up. Instead of dumping the
+        // player at the public lobby, route back through the tournament page —
+        // it re-subscribes and the server re-emits match_assigned for our
+        // CURRENT match, landing us back in our live seat. Keep the token: it's
+        // still valid for the live room.
+        if (/room not found/i.test(msg) && tournamentCode) {
+          setLocation(`/tournament/${tournamentCode}`);
+          return;
+        }
         toast({ description: err || "Session expired. Please rejoin.", variant: "destructive" });
-        // A token mismatch / missing-token error is terminal for this browser —
+        // Only a genuine seat/token rejection is terminal for this browser —
         // drop the stale token so the next visit to this code starts clean.
-        clearPlayerToken(roomCode, playerIndex);
-        setLocation("/");
+        // Retryable (db) and stale-room errors keep the token intact.
+        if (/seat|token/i.test(msg)) {
+          clearPlayerToken(roomCode, playerIndex);
+        }
+        setLocation(tournamentCode ? `/tournament/${tournamentCode}` : "/");
       });
     } else {
       joinRoom(roomCode, playerName).then((res) => {
@@ -251,20 +269,39 @@ export default function Room() {
         : null);
     const backHref = tournamentCode ? `/tournament/${tournamentCode}` : "/";
     const backLabel = tournamentCode ? "Back to tournament" : "Back to lobby";
+    // If this browser holds the tournament host token, surface a shortcut to
+    // Host tools right here — a disconnected host should never lose access to
+    // pause/forfeit/remake while stuck on the reconnecting screen.
+    const isTournamentHost =
+      !!tournamentCode &&
+      typeof window !== "undefined" &&
+      !!window.localStorage.getItem(`spades_tournament_token_${tournamentCode}`);
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-6 text-muted-foreground relative px-4 text-center">
         <div className="absolute top-2 right-2">
           {renderStatusPill()}
         </div>
         <div className="animate-pulse">{label}</div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setLocation(backHref)}
-          data-testid="button-bail-to-lobby"
-        >
-          {backLabel}
-        </Button>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setLocation(backHref)}
+            data-testid="button-bail-to-lobby"
+          >
+            {backLabel}
+          </Button>
+          {isTournamentHost && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setLocation(`/tournament/${tournamentCode}/host`)}
+              data-testid="button-host-tools"
+            >
+              Host tools
+            </Button>
+          )}
+        </div>
       </div>
     );
   }

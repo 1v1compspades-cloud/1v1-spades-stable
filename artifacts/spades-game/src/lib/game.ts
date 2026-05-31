@@ -163,6 +163,15 @@ export interface MatchAssignedPayload {
   opponentName: string;
 }
 
+export interface TournamentDisconnectNotice {
+  tournamentCode: string;
+  matchId: string;
+  roomCode: string;
+  playerIndex: 0 | 1;
+  playerName: string | null;
+  graceMs: number;
+}
+
 export const SUIT_SYMBOLS: Record<Suit, string> = {
   spades: "♠",
   hearts: "♥",

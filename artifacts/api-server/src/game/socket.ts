@@ -230,7 +230,7 @@ function sanitizeStateForSpectator(state: GameState): Record<string, unknown> {
 // Quick Match and KotT rooms set turnTimeoutMs = null and never arm a timer.
 
 const TOURNAMENT_TURN_TIMEOUT_MS = 30_000;
-const TOURNAMENT_AUTO_FORFEIT_MS = 120_000; // disconnect grace before auto-forfeit
+const TOURNAMENT_AUTO_FORFEIT_MS = 300_000; // 5-min disconnect grace before auto-forfeit
 const turnTimers = new Map<string, NodeJS.Timeout>();
 
 function clearTurnTimer(roomCode: string): void {
@@ -447,16 +447,44 @@ async function handlePlayResult(
 }
 
 // ── Tournament auto-forfeit on disconnect ───────────────────────────────────
-// When a seated tournament-match player disconnects, give them a 2-minute
-// grace window to reconnect. If the window expires, forfeit the match so the
-// bracket can keep advancing.
+// When a seated tournament-match player disconnects, give them a 5-minute
+// grace window to reconnect. The tournament host is notified immediately so
+// they can intervene. If the window expires the match is forfeited so the
+// bracket can keep advancing — UNLESS the host has paused the match, in which
+// case the slot is held open until the host resumes or forfeits manually.
 
 const disconnectForfeitTimers = new Map<string, NodeJS.Timeout>();
 
-function scheduleAutoForfeit(io: SocketIOServer, roomCode: string, playerIndex: 0 | 1): void {
+function scheduleAutoForfeit(
+  io: SocketIOServer,
+  roomCode: string,
+  playerIndex: 0 | 1,
+  notify = true,
+): void {
   const key = `${roomCode}:${playerIndex}`;
   const existing = disconnectForfeitTimers.get(key);
   if (existing) clearTimeout(existing);
+  // Notify the tournament host immediately so they can act during the grace
+  // window (pause to hold the slot, remake the room, or forfeit manually).
+  // Skipped on internal re-arms (paused-match deferrals) to avoid spamming.
+  if (notify) {
+    try {
+      const cur = getRoom(roomCode);
+      const tref = cur?.tournamentRef;
+      if (cur && tref) {
+        io.to(`tournament:${tref.code}`).emit("tournament_player_disconnected", {
+          tournamentCode: tref.code,
+          matchId: tref.matchId,
+          roomCode,
+          playerIndex,
+          playerName: cur.players[playerIndex]?.name ?? null,
+          graceMs: TOURNAMENT_AUTO_FORFEIT_MS,
+        });
+      }
+    } catch (err) {
+      logger.error({ err, roomCode, playerIndex }, "Disconnect notice emit failed");
+    }
+  }
   const handle = setTimeout(() => {
     disconnectForfeitTimers.delete(key);
     try {
@@ -465,6 +493,14 @@ function scheduleAutoForfeit(io: SocketIOServer, roomCode: string, playerIndex: 
       if (cur.players[playerIndex] !== null) return; // reconnected
       if (cur.phase === "game_over") return;
       if (!cur.tournamentRef) return;
+      if (cur.isPaused) {
+        // Host paused the match to hold the slot open for the disconnected
+        // player. Defer the forfeit and keep waiting — re-arm (without a fresh
+        // host notice) so we re-check after another grace window. The host
+        // resumes or forfeits manually when ready.
+        scheduleAutoForfeit(io, roomCode, playerIndex, false);
+        return;
+      }
       logger.info({ roomCode, playerIndex }, "Auto-forfeiting disconnected tournament player");
       forfeitTournamentMatch(io, roomCode, playerIndex, "disconnect");
     } catch (err) {
