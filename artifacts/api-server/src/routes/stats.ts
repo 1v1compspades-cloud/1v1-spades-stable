@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import type { Server as SocketIOServer } from "socket.io";
 import { getAllRooms } from "../game/engine.js";
 import { getAllTournaments } from "../game/tournament.js";
+import { getConnectionStats } from "../game/socket.js";
 
 const router: IRouter = Router();
 
@@ -57,10 +58,17 @@ router.get("/stats", (req, res) => {
       tournamentsByStatus[t.status] = (tournamentsByStatus[t.status] ?? 0) + 1;
     }
 
+    const conn = getConnectionStats();
+
     res.json({
       timestamp: new Date().toISOString(),
       uptimeSec: Math.floor((Date.now() - SERVER_STARTED_AT) / 1000),
       serverStartedAt: new Date(SERVER_STARTED_AT).toISOString(),
+      sinceLastReset: {
+        totalConnections: conn.totalConnectionsSinceStart,
+        uniqueVisitors: conn.uniqueVisitors,
+        peakConcurrentSockets: conn.peakConcurrentSockets,
+      },
       live: {
         connectedSockets: io?.engine?.clientsCount ?? 0,
         activePlayersInRooms: activePlayers,
@@ -79,7 +87,8 @@ router.get("/stats", (req, res) => {
       },
       notes: [
         "All numbers are in-memory only and reset on server restart.",
-        "Historical visitor / page-view analytics are not yet wired up.",
+        "sinceLastReset.uniqueVisitors counts distinct client IPs since the server last started; totalConnections counts every socket connection (refreshes/reconnects included).",
+        "Persistent cross-restart analytics are not yet wired up.",
       ],
     });
   } catch (err: unknown) {

@@ -1,4 +1,4 @@
-import { Server as SocketIOServer } from "socket.io";
+import { Server as SocketIOServer, type Socket } from "socket.io";
 import type { Server as HttpServer } from "node:http";
 import { logger } from "../lib/logger.js";
 import {
@@ -93,6 +93,33 @@ function checkRate(socketId: string, kind: string, limit: number, windowMs: numb
   rateBuckets.set(key, fresh);
   return true;
 }
+// ── Visitor counters (in-memory, reset on server restart) ───────────────────
+// Cumulative connection metrics since the server last started. Edge-only:
+// nothing here feeds the game engine — it's purely observational, surfaced via
+// GET /api/admin/stats. "Over the last reset" = since the process started.
+let totalConnectionsSinceStart = 0;
+const uniqueVisitorIps = new Set<string>();
+let peakConcurrentSockets = 0;
+
+function clientIpFromSocket(socket: Socket): string {
+  const fwd = socket.handshake.headers["x-forwarded-for"];
+  if (typeof fwd === "string" && fwd.length > 0) return fwd.split(",")[0]!.trim();
+  if (Array.isArray(fwd) && fwd.length > 0) return fwd[0]!.trim();
+  return socket.handshake.address || "unknown";
+}
+
+export function getConnectionStats(): {
+  totalConnectionsSinceStart: number;
+  uniqueVisitors: number;
+  peakConcurrentSockets: number;
+} {
+  return {
+    totalConnectionsSinceStart,
+    uniqueVisitors: uniqueVisitorIps.size,
+    peakConcurrentSockets,
+  };
+}
+
 function clearRateForSocket(socketId: string): void {
   for (const k of Array.from(rateBuckets.keys())) {
     if (k.startsWith(`${socketId}:`)) rateBuckets.delete(k);
@@ -1161,6 +1188,10 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
   });
 
   io.on("connection", (socket) => {
+    totalConnectionsSinceStart += 1;
+    uniqueVisitorIps.add(clientIpFromSocket(socket));
+    const concurrent = io.engine.clientsCount;
+    if (concurrent > peakConcurrentSockets) peakConcurrentSockets = concurrent;
     logger.info({ socketId: socket.id }, "Socket connected");
 
     socket.on(
