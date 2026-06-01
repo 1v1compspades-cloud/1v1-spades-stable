@@ -1224,7 +1224,7 @@ export default function Room() {
               <Button
                 onClick={handleBid}
                 disabled={!bidAmount || isSubmitting}
-                className="h-12 w-full text-base"
+                className="mx-auto block h-auto min-h-[44px] w-full max-w-[200px] px-6 py-2.5 text-base"
                 data-testid="button-confirm-bid"
               >
                 {bidAmount ? `Bid ${bidAmount === "0" ? "Nil" : bidAmount}` : "Select a bid first"}
