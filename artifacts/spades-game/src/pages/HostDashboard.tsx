@@ -187,6 +187,15 @@ export default function HostDashboard() {
     return `${origin}${base}/tournament/${code}`;
   }, [code]);
 
+  const hostUrl = useMemo(() => (inviteUrl ? `${inviteUrl}/host` : ""), [inviteUrl]);
+
+  const spectatorLink = useCallback((roomCode: string) => {
+    if (typeof window === "undefined") return "";
+    const origin = window.location.origin;
+    const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+    return `${origin}${base}/room/${roomCode}?spectator=1`;
+  }, []);
+
   const copyText = useCallback(
     async (text: string, label: string) => {
       try {
@@ -401,6 +410,55 @@ export default function HostDashboard() {
               Copy invite
             </Button>
           </div>
+          <div className="flex gap-2">
+            <Input
+              readOnly
+              value={hostUrl}
+              onFocus={(e) => e.currentTarget.select()}
+              className="font-mono text-xs"
+              data-testid="host-link-input"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => copyText(hostUrl, "Host link")}
+              data-testid="host-copy-host-link"
+            >
+              Copy host link
+            </Button>
+          </div>
+          <div className="space-y-1.5 pt-1" data-testid="host-spectator-links">
+            <p className="text-xs font-medium text-muted-foreground">Spectator links</p>
+            {liveMatches.length === 0 ? (
+              <p className="text-xs text-muted-foreground" data-testid="host-spectate-empty">
+                Spectator links appear when matches begin.
+              </p>
+            ) : (
+              liveMatches.map((m) => (
+                <div
+                  key={m.matchId}
+                  className="flex items-center justify-between gap-2 rounded border border-border/40 px-2 py-1"
+                  data-testid={`host-spectate-row-${m.matchId}`}
+                >
+                  <span className="text-xs truncate">
+                    {m.roomCode && <span className="font-mono mr-1">{m.roomCode}</span>}
+                    {m.playerA?.name ?? "TBD"} vs {m.playerB?.name ?? "TBD"}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!m.roomCode}
+                    onClick={() => m.roomCode && copyText(spectatorLink(m.roomCode), "Spectator link")}
+                    data-testid={`host-copy-spectate-${m.matchId}`}
+                  >
+                    Copy
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
           <div className="flex gap-2 flex-wrap">
             <Button
               type="button"
@@ -415,8 +473,9 @@ export default function HostDashboard() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Invite link drops new players in the lobby. Bracket export is a
-            Discord-ready code block showing every match and its current state.
+            Invite link drops new players in the lobby. Host link opens this
+            dashboard. Spectator links are public, hands-hidden views — safe to
+            share. Bracket export is a Discord-ready code block.
           </p>
         </Card>
       </section>

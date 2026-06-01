@@ -471,6 +471,23 @@ export default function Tournament() {
   const youWon = isComplete && !!playerName && t.champion?.trim().toLowerCase() === playerName.trim().toLowerCase();
   const youLost = isComplete && !!playerName && iAmInRoster && !youWon;
 
+  // Spectator links — one per live match (has a room, no winner yet). The URL
+  // carries NO tokens; spectators get a sanitized, hands-hidden view server-side.
+  const liveMatches = t.rounds.flat().filter((m) => m.roomCode && !m.winner && m.playerA && m.playerB);
+  const spectatorLink = (roomCode: string) => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+    return `${origin}${base}/room/${roomCode}?spectator=1`;
+  };
+  const copySpectatorLink = async (roomCode: string) => {
+    try {
+      await navigator.clipboard.writeText(spectatorLink(roomCode));
+      toast({ description: "Spectator link copied" });
+    } catch {
+      toast({ description: "Could not copy — long-press the link to copy manually", variant: "destructive" });
+    }
+  };
+
   return (
     <div className="min-h-[100dvh] p-4 pt-[max(1rem,env(safe-area-inset-top))]">
       <ConnectionPill />
@@ -692,6 +709,55 @@ export default function Tournament() {
             </CardContent>
           </Card>
         )}
+
+        {/* Spectate — public watch links, one per live match. No tokens. */}
+        <Card data-testid="spectate-panel">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Spectate</CardTitle>
+            <CardDescription className="text-xs">
+              Watch live — hands stay hidden. Share these links freely; they contain no tokens.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {liveMatches.length === 0 ? (
+              <p className="text-sm text-muted-foreground" data-testid="spectate-empty">
+                Spectator links appear when matches begin.
+              </p>
+            ) : (
+              liveMatches.map((m) => (
+                <div
+                  key={m.id}
+                  className="flex items-center justify-between gap-2 flex-wrap rounded-md border border-border/50 bg-white/[0.02] px-3 py-2"
+                  data-testid={`spectate-row-${m.id}`}
+                >
+                  <span className="text-sm truncate">
+                    <span className="font-mono text-xs text-primary/70 mr-2">{m.roomCode}</span>
+                    {m.playerA?.name ?? "TBD"} <span className="text-muted-foreground">vs</span> {m.playerB?.name ?? "TBD"}
+                  </span>
+                  <div className="flex gap-2 shrink-0">
+                    <a
+                      href={spectatorLink(m.roomCode!)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center rounded-md border border-primary/40 text-primary/90 text-xs font-medium px-3 py-1.5 hover-elevate active-elevate-2"
+                      data-testid={`spectate-watch-${m.id}`}
+                    >
+                      Watch Live
+                    </a>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => void copySpectatorLink(m.roomCode!)}
+                      data-testid={`copy-spectate-${m.id}`}
+                    >
+                      Copy link
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
 
         {/* Your match CTA */}
         {!isLobby && myMatch && myMatch.roomCode && (

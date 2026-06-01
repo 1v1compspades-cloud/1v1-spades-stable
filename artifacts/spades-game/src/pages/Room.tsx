@@ -6,6 +6,7 @@ import { CardComponent } from "@/components/Card";
 import { ShuffleOverlay } from "@/components/ShuffleOverlay";
 import { isCardPlayable, sortHandBySuit, SUIT_SYMBOLS, SUIT_COLORS } from "@/lib/game";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Card as CardType, Suit } from "@/lib/game";
 import { cn } from "@/lib/utils";
@@ -92,6 +93,7 @@ export default function Room() {
     playerName,
     roomCode: storedRoomCode,
     playerIndex, isSpectator,
+    savePlayerName,
     saveRoomCode, savePlayerIndex, saveIsSpectator,
     getPlayerToken, savePlayerToken, clearPlayerToken,
   } = useGameStorage();
@@ -100,6 +102,7 @@ export default function Room() {
   const [bidAmount, setBidAmount] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [spectatorNameInput, setSpectatorNameInput] = useState<string>("");
 
   // Tick every 15s so AFK indicators re-render without depending on socket events.
   const [now, setNow] = useState<number>(() => Date.now());
@@ -253,6 +256,40 @@ export default function Room() {
       });
     }
   }, [connected, roomCode, storedRoomCode, playerName, gameState, playerIndex, isSpectator, wantsSpectate, reconnect, reconnectAsSpectator, joinAsSpectator, joinRoom, setLocation, savePlayerIndex, saveIsSpectator, toast, getPlayerToken, savePlayerToken, clearPlayerToken]);
+
+  // Spectator arriving via a shared "?spectator=1" link may have no stored
+  // name yet. Prompt for a display name so the join effect can fire — without
+  // this, the join guard (which requires playerName) silently leaves the viewer
+  // on a perpetual "Connecting…" screen. UI-only; no socket/server change.
+  if (wantsSpectate && !playerName) {
+    const submit = () => {
+      const n = spectatorNameInput.trim();
+      if (n) savePlayerName(n);
+    };
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4 text-center">
+        <div className="space-y-1">
+          <h1 className="text-lg font-semibold">Watch this match</h1>
+          <p className="text-sm text-muted-foreground max-w-xs">
+            Enter a name to spectate. You'll see scores, bids, and tricks live — never the players' hidden hands.
+          </p>
+        </div>
+        <div className="flex w-full max-w-xs flex-col gap-2">
+          <Input
+            value={spectatorNameInput}
+            onChange={(e) => setSpectatorNameInput(e.target.value.slice(0, 24))}
+            onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+            placeholder="Your name"
+            autoFocus
+            data-testid="spectator-name-input"
+          />
+          <Button disabled={!spectatorNameInput.trim()} onClick={submit} data-testid="spectator-name-submit">
+            Watch match
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (!gameState || (!isSpectator && playerIndex === null)) {
     const label =
