@@ -20,6 +20,14 @@ export interface PendingAssignment {
   playerIndex: 0 | 1;
   matchLabel: string;
   opponentName: string;
+  /**
+   * Per-seat reconnect token issued when the tournament match room is created.
+   * Stored in the pendingAssignment so a refresh on the tournament page
+   * re-delivers it via subscribe_tournament → match_assigned re-emit.
+   * The client saves this to localStorage and presents it on reconnect_player,
+   * closing the name-based seat-hijack path through join_room.
+   */
+  roomToken?: string;
 }
 
 export interface TournamentPlayer {

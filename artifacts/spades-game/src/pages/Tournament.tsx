@@ -196,7 +196,7 @@ export default function Tournament() {
   const [, setLocation] = useLocation();
   const code = (params?.code || "").toUpperCase();
   const { toast } = useToast();
-  const { playerName, savePlayerName, saveRoomCode, savePlayerIndex, saveIsSpectator, saveTournamentToken, getTournamentToken } = useGameStorage();
+  const { playerName, savePlayerName, saveRoomCode, savePlayerIndex, saveIsSpectator, saveTournamentToken, getTournamentToken, savePlayerToken } = useGameStorage();
   const {
     connect, connected,
     tournament, subscribeTournament, joinTournament, leaveTournament, startTournament,
@@ -277,6 +277,14 @@ export default function Tournament() {
     saveIsSpectator(false);
     saveRoomCode(matchAssignment.roomCode);
     savePlayerIndex(matchAssignment.playerIndex as 0 | 1);
+    // Persist the per-seat reconnect token so Room.tsx can present it to
+    // reconnect_player. Without this, a refresh between match_assigned and
+    // navigating to the room would leave the seat untokenized on the client,
+    // forcing the player through join_room which is now blocked for
+    // tournament seats once tokens are issued.
+    if (matchAssignment.roomToken) {
+      savePlayerToken(matchAssignment.roomCode, matchAssignment.playerIndex as 0 | 1, matchAssignment.roomToken);
+    }
     setMatchReadyCountdown(Math.ceil(MATCH_READY_AUTO_NAV_MS / 1000));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchAssignment]);

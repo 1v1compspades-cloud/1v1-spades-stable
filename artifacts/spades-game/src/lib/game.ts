@@ -161,6 +161,8 @@ export interface MatchAssignedPayload {
   playerIndex: 0 | 1;
   matchLabel: string;
   opponentName: string;
+  /** Per-seat reconnect token for the assigned match room. Save to localStorage and present on reconnect_player. */
+  roomToken?: string;
 }
 
 export interface TournamentDisconnectNotice {

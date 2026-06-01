@@ -850,9 +850,18 @@ async function createMatchRoomAndAssign(
   // The TOURNAMENT_TURN_TIMEOUT_MS constant above is retained so re-enabling
   // is a one-line change.
   room.turnTimeoutMs = null;
-  // AWAIT the commits inside the lock so `match_assigned` is never emitted
-  // before the room is durable + audited. Clients refresh-recovering via
-  // pendingAssignment must not see a room code the DB doesn't yet know about.
+  // Issue reconnect tokens for both seats inside the room lock so they are
+  // committed atomically with room creation. This tokenizes both seats
+  // immediately, causing the join_room tournament-reclaim branch to refuse
+  // any name-only claim (guard: tokenizedSeats[seat] === true).
+  //
+  // Fail-closed: if token issuance fails we MUST NOT emit match_assigned.
+  // Sending players to a room whose seats are not tokenized would leave
+  // the original name-based hijack path open. On failure we tear down the
+  // in-memory room and abort — the host can use admin_remake_room to retry.
+  let tokenA: string;
+  let tokenB: string;
+  let tokenizationFailed = false;
   await withRoomLock(room.roomCode, async () => {
     await commit(room, {
       action: "room_created",
@@ -864,7 +873,41 @@ async function createMatchRoomAndAssign(
       actorSeat: 1,
       payload: { name: match.playerB?.name, tournamentMatch: match.id },
     });
+    // Tokenize both seats. joined.state === room (same Map object).
+    // Any error here sets tokenizationFailed and skips assignment emit.
+    try {
+      [tokenA, tokenB] = await Promise.all([
+        issueReconnectToken(room.roomCode, 0, match.playerA!.name),
+        issueReconnectToken(room.roomCode, 1, match.playerB!.name),
+      ]);
+      joined.state.tokenizedSeats = [true, true];
+      await commit(joined.state, { action: "token_issued", actorSeat: 0, payload: { seat: 0 } });
+      await commit(joined.state, { action: "token_issued", actorSeat: 1, payload: { seat: 1 } });
+    } catch (err) {
+      logger.error(
+        { err, roomCode: room.roomCode, tournament: t.code, matchId: match.id },
+        "issueReconnectToken failed — aborting tournament match room assignment to stay fail-closed"
+      );
+      tokenizationFailed = true;
+    }
   });
+
+  // Abort the assignment if seats could not be tokenized. Tear down the
+  // in-memory room so it cannot be joined by anyone. The DB row was already
+  // written (room_created / player_joined), so also attempt a best-effort
+  // DB cleanup. The host can use admin_remake_room to retry.
+  if (tokenizationFailed) {
+    cleanupRoom(room.roomCode);
+    await deleteRoomState(room.roomCode).catch((err) => {
+      logger.warn({ err, roomCode: room.roomCode }, "deleteRoomState failed during tokenization-abort cleanup");
+    });
+    logger.error(
+      { tournament: t.code, matchId: match.id, roomCode: room.roomCode },
+      "Tournament match room aborted — seat tokenization failed; use admin_remake_room to retry"
+    );
+    return;
+  }
+
   attachRoomToMatch(t.code, match.id, room.roomCode);
 
   // Make both player sockets join the game-room channel so they get
@@ -874,14 +917,17 @@ async function createMatchRoomAndAssign(
     if (sock) sock.join(room.roomCode);
   }
 
-  // Record + emit assignments. Store as pending so a refresh on the tournament
-  // page can re-deliver them via subscribe_tournament.
+  // Record + emit assignments. Include the per-seat reconnect token so the
+  // client saves it to localStorage before navigating to the room.
+  // The token is also stored in pendingAssignment so subscribe_tournament
+  // can re-deliver it on page refresh (via the match_assigned re-emit path).
   const pendingA: PendingAssignment = {
     matchId: match.id,
     roomCode: room.roomCode,
     playerIndex: 0,
     matchLabel: label,
     opponentName: match.playerB.name,
+    roomToken: tokenA!,
   };
   const pendingB: PendingAssignment = {
     matchId: match.id,
@@ -889,6 +935,7 @@ async function createMatchRoomAndAssign(
     playerIndex: 1,
     matchLabel: label,
     opponentName: match.playerA.name,
+    roomToken: tokenB!,
   };
   setPendingAssignment(t, match.playerA.name, pendingA);
   setPendingAssignment(t, match.playerB.name, pendingB);
