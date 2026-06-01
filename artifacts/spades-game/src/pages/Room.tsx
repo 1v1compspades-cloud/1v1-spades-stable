@@ -1387,6 +1387,14 @@ export default function Room() {
                 <p className="text-xs text-muted-foreground mt-1">
                   First to {gameState.matchTarget} points
                 </p>
+                {gameState.gameOverReason && (
+                  <p
+                    data-testid="game-over-reason"
+                    className="text-sm font-semibold text-red-300 mt-2"
+                  >
+                    {gameState.gameOverReason}
+                  </p>
+                )}
               </div>
               <div className="bg-white/5 rounded-lg p-4 space-y-2">
                 <div className="flex justify-between text-sm text-muted-foreground">

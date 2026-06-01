@@ -215,6 +215,7 @@ function sanitizeStateForPlayer(
     turnTimeoutMs: state.turnTimeoutMs ?? null,
     turnDeadline: state.turnDeadline ?? null,
     isPaused: state.isPaused ?? false,
+    gameOverReason: state.gameOverReason ?? null,
   };
 }
 
@@ -257,6 +258,7 @@ function sanitizeStateForSpectator(state: GameState): Record<string, unknown> {
     turnTimeoutMs: state.turnTimeoutMs ?? null,
     turnDeadline: state.turnDeadline ?? null,
     isPaused: state.isPaused ?? false,
+    gameOverReason: state.gameOverReason ?? null,
   };
 }
 

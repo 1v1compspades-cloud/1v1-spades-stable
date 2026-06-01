@@ -28,6 +28,14 @@ import {
   winsTrick,
   cardValue,
 } from "../deck.js";
+import {
+  createTournament,
+  joinTournament,
+  startTournament,
+  recordMatchResult,
+  getTournament,
+  flushTournamentLocks,
+} from "../tournament.js";
 
 let pass = 0;
 let fail = 0;
@@ -852,6 +860,175 @@ group("Test 9 — Auto-bid / auto-play");
   ok("Auto-play respects spades-not-broken rule (does not lead spade when non-spades available)",
     ap !== null && ap.suit !== "spades", { card: ap });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TEST 10 — Bust-out floor (-250 immediate-loss house rule)
+// ═══════════════════════════════════════════════════════════════════════════
+group("Test 10 — Bust-out floor (-250)");
+{
+  // (1) Score exactly -250 triggers the loss.
+  //   seat0: bid 8, took 4 -> -80; pre-score -170 => final -250 (no bags, no
+  //   bag penalty). seat1 stays well above the floor.
+  const exact = forceRoundOutcome({
+    bid0: 8, bid1: 4, tricks0: 4, firstBidder: 1, preScores: [-170, 100],
+  });
+  ok("Exactly -250 — seat 0 final score is -250",
+    exact.scores[0] === -250, { got: exact.scores[0] });
+  ok("Exactly -250 — phase = game_over",
+    exact.phase === "game_over", { phase: exact.phase });
+  ok("Exactly -250 — reason names the losing player",
+    exact.gameOverReason === "Alice loses by reaching -250.", { got: exact.gameOverReason });
+  ok("Exactly -250 — opponent (seat 1) is the higher score (wins via normal flow)",
+    exact.scores[1] > exact.scores[0], { s: exact.scores });
+  ok("Exactly -250 — no tiebreaker is started by a bust",
+    exact.tiebreakerActive === false);
+
+  // (2) Score below -250 triggers the loss.
+  //   seat0: bid 8, took 4 -> -80; pre-score -180 => final -260.
+  const below = forceRoundOutcome({
+    bid0: 8, bid1: 4, tricks0: 4, firstBidder: 1, preScores: [-180, 100],
+  });
+  ok("Below -250 — seat 0 final score is -260",
+    below.scores[0] === -260, { got: below.scores[0] });
+  ok("Below -250 — phase = game_over",
+    below.phase === "game_over", { phase: below.phase });
+  ok("Below -250 — reason names the losing player",
+    below.gameOverReason === "Alice loses by reaching -250.", { got: below.gameOverReason });
+
+  // (3) Normal win by reaching the target still works — and is NOT flagged as
+  //   a bust. seat0: bid 5, took 5 -> +50; pre-score 210 => final 260 >= 250.
+  const normal = forceRoundOutcome({
+    bid0: 5, bid1: 4, tricks0: 5, firstBidder: 1, preScores: [210, 0],
+  });
+  ok("Normal target win — seat 0 reaches target",
+    normal.scores[0] === 260, { got: normal.scores[0] });
+  ok("Normal target win — phase = game_over",
+    normal.phase === "game_over", { phase: normal.phase });
+  ok("Normal target win — NOT attributed to the bust rule (no reason)",
+    normal.gameOverReason == null, { got: normal.gameOverReason });
+
+  // (5) The rule is evaluated only AFTER a hand is fully scored — never
+  //   mid-hand. Start a round with a total already at/below the floor and
+  //   confirm bidding + a partial trick do NOT end the game.
+  const h0 = hand("AS KS QS JS 10S 9S 8S 7S 6S 5S 4S 3C 2C"); // no hearts
+  const h1 = hand("2H 3H 4H 5H 6H 7H 8H 9H 10H JH QH KH AH"); // all hearts
+  let mid = mkGameForBidding(h0, h1, { firstBidder: 1, preScores: [-260, 50] });
+  ok("Mid-hand — sub-floor pre-score does not end the game during bidding",
+    mid.phase === "bidding" && mid.gameOverReason == null, { phase: mid.phase });
+  mid = bothBid(mid, 3, 3);
+  ok("Mid-hand — still playing after bids (not game_over) despite sub-floor total",
+    mid.phase === "playing" && mid.gameOverReason == null, { phase: mid.phase });
+  // Play exactly one trick (seat 1 leads a heart, seat 0 discards a club).
+  const oneTrick = playSequence(mid, [
+    [1, C("2", "hearts")],
+    [0, C("2", "clubs")],
+  ]).state;
+  ok("Mid-hand — one trick resolved, round not complete -> still playing",
+    oneTrick.phase === "playing" && oneTrick.gameOverReason == null, { phase: oneTrick.phase });
+  // Now complete a full round from the same sub-floor start: the rule fires
+  // ONLY here, once scoring is finalized. seat0 bid1/took1 -> +10 => -250.
+  const afterScored = forceRoundOutcome({
+    bid0: 1, bid1: 1, tricks0: 1, firstBidder: 1, preScores: [-260, 50],
+  });
+  ok("Post-scoring — same sub-floor start ends as game_over once the hand is scored",
+    afterScored.phase === "game_over" && afterScored.gameOverReason === "Alice loses by reaching -250.",
+    { phase: afterScored.phase, reason: afterScored.gameOverReason });
+
+  // (6) Both players bust with DIFFERENT scores — the LOWER score loses, and
+  //   the named loser must be consistent with the downstream higher-score
+  //   winner derivation. Both fail their bids: seat0 bid8/took6 -> -80;
+  //   seat1 bid8/took7 -> -80. pre [-200, -180] => [-280, -260].
+  const bothDiff = forceRoundOutcome({
+    bid0: 8, bid1: 8, tricks0: 6, firstBidder: 1, preScores: [-200, -180],
+  });
+  ok("Both bust (different) — both totals are at/below the floor",
+    bothDiff.scores[0] <= -250 && bothDiff.scores[1] <= -250, { s: bothDiff.scores });
+  ok("Both bust (different) — phase = game_over",
+    bothDiff.phase === "game_over", { phase: bothDiff.phase });
+  ok("Both bust (different) — LOWER score (seat 0) is named as the loser",
+    bothDiff.gameOverReason === "Alice loses by reaching -250.", { got: bothDiff.gameOverReason, s: bothDiff.scores });
+  ok("Both bust (different) — named loser is consistent with higher-score winner",
+    (bothDiff.scores[0] > bothDiff.scores[1] ? "seat0" : "seat1") === "seat1", { s: bothDiff.scores });
+
+  // (7) Both players bust to the EXACT same score — there is no deterministic
+  //   loser, so the engine must NOT produce a tied game_over (the advancement
+  //   code relies on game_over never being tied). The match continues.
+  const bothTie = forceRoundOutcome({
+    bid0: 8, bid1: 8, tricks0: 6, firstBidder: 1, preScores: [-170, -170],
+  });
+  ok("Both bust (equal) — both totals are exactly -250",
+    bothTie.scores[0] === -250 && bothTie.scores[1] === -250, { s: bothTie.scores });
+  ok("Both bust (equal) — does NOT force a tied game_over",
+    bothTie.phase !== "game_over", { phase: bothTie.phase });
+  ok("Both bust (equal) — no loser reason is recorded (match continues)",
+    bothTie.gameOverReason == null, { got: bothTie.gameOverReason });
+
+  // Invariant: every game_over the bust rule produces has a strict winner
+  // (non-tied scores). The tournament/KotT advancement code relies on this.
+  for (const s of [exact, below, normal, bothDiff]) {
+    ok("Invariant — game_over scores are never tied",
+      !(s.phase === "game_over" && s.scores[0] === s.scores[1]),
+      { phase: s.phase, scores: s.scores });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TEST 11 — A -250 bust advances the OPPONENT in a tournament bracket.
+// Touches the tournament store + DB-backed advancement (recordMatchResult),
+// mirroring exactly the winner derivation the socket layer uses on game_over:
+//   winnerSeat = finalScores[0] > finalScores[1] ? "A" : "B"
+// ═══════════════════════════════════════════════════════════════════════════
+group("Test 11 — Tournament opponent advances on a -250 loss");
+await (async () => {
+  const { tournament, hostToken } = createTournament(
+    "lf_host", "sock-lf-host", { name: "LossFloor", size: 4, matchTarget: 250 },
+  );
+  const code = tournament.code;
+  joinTournament(code, "lf_p2", "sock-lf-2");
+  joinTournament(code, "lf_p3", "sock-lf-3");
+  joinTournament(code, "lf_p4", "sock-lf-4");
+  startTournament(code, "sock-lf-host", hostToken);
+  const t0 = getTournament(code)!;
+  // Stamp roomCodes so the audit insert has a non-null FK (mirrors other tests).
+  for (const m of t0.rounds[0]) m.roomCode = `R-lf-${m.position}`;
+
+  const match = t0.rounds[0][0];
+  const seatAName = match.playerA!.name;
+  const seatBName = match.playerB!.name;
+
+  // Drive a REAL game where seat 0 (= bracket seat "A") busts to -260.
+  const busted = forceRoundOutcome({
+    bid0: 8, bid1: 4, tricks0: 4, firstBidder: 1, preScores: [-180, 100],
+  });
+  ok("Bracket bust — engine produced a game_over by the floor rule",
+    busted.phase === "game_over" && busted.scores[0] <= -250, { s: busted.scores });
+
+  // Derive winner exactly as the socket layer does on game_over.
+  const winnerSeat: "A" | "B" =
+    busted.scores[0] > busted.scores[1] ? "A" : "B";
+  ok("Bracket bust — derived winner is the opponent (seat B)",
+    winnerSeat === "B", { winnerSeat });
+
+  const res = await recordMatchResult(code, match.id, winnerSeat, {
+    finalScores: [busted.scores[0], busted.scores[1]],
+  });
+  ok("Bracket bust — recordMatchResult advanced the bracket",
+    res.kind === "advanced", res);
+
+  const after = getTournament(code)!;
+  const round1 = after.rounds[1] ?? [];
+  const advancedNames = round1.flatMap((m) =>
+    [m.playerA?.name, m.playerB?.name].filter(Boolean) as string[],
+  );
+  ok("Bracket bust — opponent (seat B player) advanced to round 2",
+    advancedNames.includes(seatBName), { advancedNames, seatBName });
+  ok("Bracket bust — busted player (seat A player) did NOT advance",
+    !advancedNames.includes(seatAName), { advancedNames, seatAName });
+  ok("Bracket bust — busted player is recorded as eliminated",
+    after.eliminated.includes(seatAName), { eliminated: after.eliminated });
+
+  await flushTournamentLocks();
+})();
 
 // ═══════════════════════════════════════════════════════════════════════════
 console.log("\n──────────────────────────────────────");

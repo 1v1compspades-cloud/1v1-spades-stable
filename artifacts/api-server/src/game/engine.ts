@@ -153,10 +153,26 @@ export interface GameState {
    * name-match path.
    */
   tokenizedSeats?: [boolean, boolean];
+  /**
+   * Human-readable game-over reason, set ONLY when the match ended via the
+   * bust-out floor rule (a running total reached LOSS_FLOOR or below after a
+   * hand was fully scored), e.g. "Alice loses by reaching -250." Null /
+   * undefined for normal target-reached or tiebreaker wins. Surfaced to the
+   * game-over UI for both players and spectators.
+   */
+  gameOverReason?: string | null;
 }
 
 /** Max challengers waiting in the KotT queue. */
 export const KING_QUEUE_MAX = 20;
+
+/**
+ * House rule: when a player's running total reaches this value or below AFTER
+ * a hand has been fully scored (round deltas + bag penalties applied), that
+ * player immediately loses the match and the opponent wins. Evaluated only
+ * post-scoring in the round-complete path — never mid-hand.
+ */
+export const LOSS_FLOOR = -250;
 
 function makeRoomCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -313,6 +329,7 @@ export function startRound(state: GameState): GameState {
     currentTurnIndex: null,
     roundNumber: nextRoundNumber,
     tiebreakerRound: state.tiebreakerActive ? state.tiebreakerRound + 1 : 0,
+    gameOverReason: null,
   };
   return newState;
 }
@@ -346,6 +363,7 @@ export function resetMatch(state: GameState): GameState {
     firstBidderRound1: null,
     lastActiveAt: [Date.now(), Date.now()],
     ready: [false, false],
+    gameOverReason: null,
   };
 }
 
@@ -623,6 +641,44 @@ export function playCard(
       }
     }
 
+    // ── House rule: bust-out floor (low-risk, post-scoring only) ──────────
+    // Evaluated ONLY here — after the hand is fully scored (round deltas AND
+    // bag penalties already folded into finalScores) — never mid-hand. A
+    // player whose running total has fallen to LOSS_FLOOR (-250) or below
+    // immediately loses; the opponent wins. This overrides any tiebreaker
+    // continuation so a bust ends the match outright. The winner is the
+    // higher-scoring opponent, which the existing game_over flow (socket
+    // advanceTournamentOnGameOver / KotT rotation) already selects. We record a
+    // human-readable reason for the game-over UI. The only excluded case is a
+    // both-bust EXACT tie (handled below) which must not produce a tied
+    // game_over.
+    let gameOverReason: string | null = null;
+    const seat0Busted = finalScores[0] <= LOSS_FLOOR;
+    const seat1Busted = finalScores[1] <= LOSS_FLOOR;
+    if (seat0Busted || seat1Busted) {
+      if (finalScores[0] !== finalScores[1]) {
+        // Normal case: the loser is the LOWER-scoring seat. This is consistent
+        // with the downstream higher-score winner selection used by both the
+        // tournament advancement (advanceTournamentOnGameOver) and KotT
+        // rotation, so the named loser always matches the seat those flows
+        // eliminate. In the single-bust case the busted seat necessarily trails
+        // (the other seat is > LOSS_FLOOR), so it is also the lower score.
+        isGameOver = true;
+        nextTiebreakerActive = false;
+        nextTiebreakerRound = 0;
+        const loserSeat: 0 | 1 = finalScores[0] < finalScores[1] ? 0 : 1;
+        const loserName = state.players[loserSeat]?.name ?? `Seat ${loserSeat + 1}`;
+        gameOverReason = `${loserName} loses by reaching ${LOSS_FLOOR}.`;
+      }
+      // else: both seats busted to the EXACT same score — there is no
+      // deterministic loser. We deliberately do NOT force game_over here, to
+      // preserve the engine invariant that game_over never carries a tied
+      // score (the tournament/KotT advancement code relies on this to pick a
+      // winner). The hand falls through to normal end-of-round handling and the
+      // match continues until a non-tied outcome occurs. This is astronomically
+      // rare and never stalls a bracket.
+    }
+
     const finalState: GameState = {
       ...intermediateState,
       currentTrick: [],
@@ -633,6 +689,7 @@ export function playCard(
       roundHistory: [...state.roundHistory, roundHistory],
       tiebreakerActive: nextTiebreakerActive,
       tiebreakerRound:  nextTiebreakerRound,
+      gameOverReason,
     };
 
     return {

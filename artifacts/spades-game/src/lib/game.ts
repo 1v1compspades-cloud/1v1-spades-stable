@@ -69,6 +69,12 @@ export interface GameState {
   turnDeadline?: number | null;
   /** Host has paused this tournament match — bidding/playing rejected until resumed. */
   isPaused?: boolean;
+  /**
+   * Set only when the match ended via the bust-out floor rule (a total reached
+   * -250 or below), e.g. "Alice loses by reaching -250." Null/undefined for
+   * normal target or tiebreaker wins. Shown on the game-over overlay.
+   */
+  gameOverReason?: string | null;
 }
 
 // ── Host admin tools (tournament) ────────────────────────────────────────────
