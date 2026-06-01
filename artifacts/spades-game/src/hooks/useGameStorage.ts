@@ -87,48 +87,6 @@ export function useGameStorage() {
     localStorage.removeItem(tournamentTokenKey(code));
   };
 
-  // ── Host token (creator-only secret) ─────────────────────────────────────
-  // SECURITY: the host token MUST live under a dedicated key, never the shared
-  // `spades_tournament_token_` key. Players store their per-player reconnect
-  // token under that shared key, so if host detection keyed off it, every
-  // joined player would inherit Host Tools. Only the original creating browser
-  // ever writes this key (Lobby create flow). It is never written by any join,
-  // backup-join, or reconnect path, so the host token can never be copied to a
-  // player. Same TTL-wrapped JSON shape as the other tokens.
-  const hostTokenKey = (code: string) => `spades_tournament_host_token_${code.toUpperCase()}`;
-  const saveHostToken = (code: string, token: string) => {
-    localStorage.setItem(
-      hostTokenKey(code),
-      JSON.stringify({ token, savedAt: Date.now() })
-    );
-  };
-  const getHostToken = (code: string): string | null => {
-    const raw = localStorage.getItem(hostTokenKey(code));
-    if (!raw) return null;
-    if (!raw.startsWith("{")) {
-      saveHostToken(code, raw);
-      return raw;
-    }
-    try {
-      const parsed = JSON.parse(raw) as { token?: string; savedAt?: number };
-      if (!parsed?.token || !parsed?.savedAt) {
-        localStorage.removeItem(hostTokenKey(code));
-        return null;
-      }
-      if (Date.now() - parsed.savedAt > TOKEN_TTL_MS) {
-        localStorage.removeItem(hostTokenKey(code));
-        return null;
-      }
-      return parsed.token;
-    } catch {
-      localStorage.removeItem(hostTokenKey(code));
-      return null;
-    }
-  };
-  const clearHostToken = (code: string) => {
-    localStorage.removeItem(hostTokenKey(code));
-  };
-
   // ── Per-room player tokens (per-seat secret) ─────────────────────────────
   // Keyed by (roomCode, seat). Same TTL-wrapped JSON shape as tournament
   // tokens so the sweep below catches both. The server is auth-of-record:
@@ -169,7 +127,9 @@ export function useGameStorage() {
   };
 
   // One-time sweep on mount: drop any expired tournament/player tokens left
-  // behind from past sessions, so localStorage doesn't grow unbounded.
+  // behind from past sessions, so localStorage doesn't grow unbounded. The
+  // legacy `spades_tournament_host_token_` prefix is kept here ONLY to purge
+  // stale keys from before tournaments became admin-only — nothing writes it now.
   useEffect(() => {
     try {
       const prefixes = ["spades_tournament_token_", "spades_tournament_host_token_", "spades_player_token_"];
@@ -206,9 +166,6 @@ export function useGameStorage() {
     saveTournamentToken,
     getTournamentToken,
     clearTournamentToken,
-    saveHostToken,
-    getHostToken,
-    clearHostToken,
     savePlayerToken,
     getPlayerToken,
     clearPlayerToken,

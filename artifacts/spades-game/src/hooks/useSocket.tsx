@@ -153,6 +153,12 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       // Drop cached gameState so the Room's auto re-attach effect fires once
       // the socket comes back (server has a fresh socketId for us).
       setGameState(null);
+      // SECURITY: a disconnected socket is no longer bound as admin server-side.
+      // Drop isAdmin AND reset adminChecked so no admin-only UI renders during
+      // the reconnect window — the connect handler re-runs admin_resume and only
+      // re-grants admin once the server re-validates the opaque session token.
+      setIsAdmin(false);
+      setAdminChecked(false);
     });
     s.io.on("reconnect_attempt", () => setStatus("reconnecting"));
     s.io.on("reconnect", () => setStatus("online"));

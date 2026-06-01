@@ -1,4 +1,5 @@
-- [Spades tournament host token model](spades-tournament-host-token.md) — token-only host gating + per-player tokens never go in sanitizers; admin actions higher-stakes than start_tournament so no socketId fallback.
+- [Spades tournaments are admin-only](spades-tournament-admin-only.md) — ALL tournament mgmt + Host Tools gated by secret ADMIN_HOST_KEY (requireAdmin on socket); SUPERSEDES the host-token model. Resume token lives only in sessionStorage.
+- [Spades tournament host token model](spades-tournament-host-token.md) — (LEGACY, superseded by admin-only) token-only host gating + per-player tokens never go in sanitizers.
 - [Spades room-host vs tournament-host](spades-tournament-room-vs-host.md) — two distinct "host" concepts; perceived "host transferred" bugs are almost always about the per-room Start button, not real auth movement.
 - [Spades room-lock teardown](spades-room-lock-teardown.md) — destructive room teardown (remake/forfeit) MUST run inside `withRoomLock(roomCode)` or stale in-flight commits resurrect the room post-cleanup.
 - [Spades delayed-merge state preservation](spades-delayed-merge-fields.md) — handlePlayResult's 700ms reveal merge must carry forward every "transient" field set during the delay (lastActiveAt, isPaused, roster) or admin/connectivity state silently regresses.

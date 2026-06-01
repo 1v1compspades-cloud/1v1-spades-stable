@@ -88,6 +88,7 @@ export default function Room() {
     reconnectAsSpectator,
     joinQueue, leaveQueue,
     setActiveRoom,
+    isAdmin,
   } = useSocket();
   const {
     playerName,
@@ -306,16 +307,13 @@ export default function Room() {
         : null);
     const backHref = tournamentCode ? `/tournament/${tournamentCode}` : "/";
     const backLabel = tournamentCode ? "Back to tournament" : "Back to lobby";
-    // If this browser holds the tournament host token, surface a shortcut to
-    // Host tools right here — a disconnected host should never lose access to
+    // If this browser is the unlocked admin, surface a shortcut to Host tools
+    // right here — a disconnected admin should never lose access to
     // pause/forfeit/remake while stuck on the reconnecting screen.
-    const isTournamentHost =
-      !!tournamentCode &&
-      typeof window !== "undefined" &&
-      // SECURITY: gate the Host-tools shortcut on the dedicated host token key
-      // only — never the shared `spades_tournament_token_` key that players also
-      // write, or every seated player would see a host shortcut here.
-      !!window.localStorage.getItem(`spades_tournament_host_token_${tournamentCode}`);
+    // SECURITY: gated on the admin-unlocked socket (isAdmin), never on any
+    // localStorage artifact. Tournaments are admin-only; there is no host-token
+    // path anymore. The server re-validates admin on every admin_* event.
+    const isTournamentHost = !!tournamentCode && isAdmin;
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-6 text-muted-foreground relative px-4 text-center">
         <div className="absolute top-2 right-2">
