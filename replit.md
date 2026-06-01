@@ -109,6 +109,13 @@ Token-gated dashboard the tournament host uses to recover from disconnects, AFK,
 - Capacity rule is purely `t.size` (4/8/16/32 from `TournamentSize`); the 1v1 `maxPlayers=2` rule belongs to `engine.ts` rooms and is not used here.
 - Duplicate-name guard lives in `joinTournament` (case-insensitive, trimmed) and surfaces to the user as toast `"Name already taken in this tournament"`.
 
+## Tournament lobby start control
+
+- The lobby's Start button is driven by a pure helper `computeStartControl(...)` in `artifacts/spades-game/src/lib/hostControls.ts` (unit-tested via `hostControls.test.mts`, run with the spades-game tsx binary). The component renders whatever the helper returns; it makes no gating decisions itself.
+- States: not in roster → nothing; non-host → Leave only; host with token, not full → disabled `Need X more`; host with token, full → enabled `Start Tournament`; host whose token is missing/invalid → an amber **warning** ("Host controls unavailable on this device. Reopen using the original host link.") instead of a hidden/broken button.
+- "Invalid token" is detected at runtime: `handleStart` flips `hostAuthFailed` when the server rejects start with a `…host…` message, which feeds `hasHostToken && !hostAuthFailed` into the helper. The server (`start_tournament`, token-or-host-socketId) remains the real authority.
+- Mobile layout: the control row is `flex-col` on mobile / `sm:flex-row`, and the button/warning is `w-full sm:w-auto sm:ml-auto`, so the Start button stays visible directly under the player list on small screens.
+
 ## Match labels (auto-set for tournament matches)
 
 - Server auto-sets `GameState.matchLabel` for tournament rooms to `"${tournamentName} · ${roundLabel}"`. Round labels: `Finals`, `Semifinal N`, `Quarterfinal N`, `Round of 16 · M{n}`, `Round of 32 · M{n}` (`roundLabelForMatch` in socket.ts; mirrored in Tournament.tsx bracket headers).

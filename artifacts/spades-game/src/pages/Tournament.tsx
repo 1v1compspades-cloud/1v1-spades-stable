@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { TournamentMatch, TournamentState } from "@/lib/game";
+import { computeStartControl } from "@/lib/hostControls";
 
 function MatchCell({
   match,
@@ -221,6 +222,7 @@ export default function Tournament() {
   const [nameInput, setNameInput] = useState(playerName);
   const [joining, setJoining] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [hostAuthFailed, setHostAuthFailed] = useState(false); // set when the server rejects our host token
   const [hostSnapshot, setHostSnapshot] = useState<string | null>(null); // remembered host on join
   // Server-confirmed authentication: true only after subscribe_tournament
   // (or a fresh joinTournament call) verifies our token actually matches a
@@ -351,6 +353,7 @@ export default function Tournament() {
   }, [t, playerName]);
 
   const iAmHost = !!hostSnapshot && t?.hostName.trim().toLowerCase() === hostSnapshot.trim().toLowerCase();
+  const hasHostToken = !!getTournamentToken(code);
 
   const handleJoin = async () => {
     if (!nameInput.trim()) { toast({ description: "Please enter your name", variant: "destructive" }); return; }
@@ -429,8 +432,14 @@ export default function Tournament() {
     try {
       const token = getTournamentToken(code) || undefined;
       await startTournament(code, token);
+      setHostAuthFailed(false);
     } catch (err: unknown) {
-      toast({ description: typeof err === "string" ? err : "Failed to start", variant: "destructive" });
+      const msg = typeof err === "string" ? err : "Failed to start";
+      // The server rejects start with a "…host…" message when our token is
+      // missing/invalid. Surface the host-controls warning instead of just a
+      // transient toast so the host knows to reopen via the original host link.
+      if (typeof err === "string" && /host/i.test(err)) setHostAuthFailed(true);
+      toast({ description: msg, variant: "destructive" });
     } finally {
       setStarting(false);
     }
@@ -674,26 +683,44 @@ export default function Tournament() {
                 </div>
               )}
 
-              {iAmInRoster && (
-                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
-                  <span className="text-sm">You're in as <span className="font-semibold text-primary">{playerName}</span>.</span>
-                  {iAmHost && (
-                    <Button
-                      onClick={handleStart}
-                      disabled={starting || t.players.length !== t.size}
-                      className="ml-auto"
-                      data-testid="button-start-tournament"
-                    >
-                      {starting ? "Starting…" : t.players.length === t.size ? "Start tournament" : `Need ${t.size - t.players.length} more`}
-                    </Button>
-                  )}
-                  {!iAmHost && (
-                    <Button variant="ghost" onClick={handleLeave} className="ml-auto">
-                      Leave
-                    </Button>
-                  )}
-                </div>
-              )}
+              {iAmInRoster && (() => {
+                const control = computeStartControl({
+                  iAmInRoster,
+                  iAmHost,
+                  hasHostToken: hasHostToken && !hostAuthFailed,
+                  playerCount: t.players.length,
+                  size: t.size,
+                  starting,
+                });
+                return (
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-2 border-t border-border/50">
+                    <span className="text-sm">You're in as <span className="font-semibold text-primary">{playerName}</span>.</span>
+                    {control.kind === "start" && (
+                      <Button
+                        onClick={handleStart}
+                        disabled={!control.enabled}
+                        className="w-full sm:w-auto sm:ml-auto"
+                        data-testid="button-start-tournament"
+                      >
+                        {control.label}
+                      </Button>
+                    )}
+                    {control.kind === "warning" && (
+                      <div
+                        className="w-full sm:w-auto sm:ml-auto rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200"
+                        data-testid="host-token-warning"
+                      >
+                        {control.message}
+                      </div>
+                    )}
+                    {control.kind === "leave" && (
+                      <Button variant="ghost" onClick={handleLeave} className="w-full sm:w-auto sm:ml-auto">
+                        Leave
+                      </Button>
+                    )}
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         )}
