@@ -1,0 +1,40 @@
+Fix host/admin permissions so creating a lobby does NOT automatically grant admin host tools.
+
+Current bug:
+The app is making the tournament/lobby creator the admin host. This is wrong. A normal player who creates a lobby should NOT receive Host Tools, admin controls, host token, force winner, remake room, pause/resume, or any tournament admin functions.
+
+Required behavior:
+1. Separate “lobby creator” from “admin host”.
+2. Only the approved site admin/official host account can access Host Tools.
+3. A player creating a lobby/tournament should only be treated as a normal player unless they are the approved admin account.
+4. Do not pass hostToken/adminToken to players through invite links, lobby state, sockets, localStorage, or player assignment.
+5. Host Tools should render only if the current session is verified as official admin/host.
+6. If the user is not official admin/host, hide the Host Tools tab and block all host/admin API/socket actions server-side.
+7. Existing invite links must be player invite links only, never admin links.
+8. Spectator links must contain no admin/player token.
+9. Add server-side validation to every admin action, not just client-side hiding.
+
+Admin identity rule for now:
+Use an environment variable or server config for the official host/admin identity, such as:
+OFFICIAL_HOST_NAME="Mehdi Zerrad"
+or preferably:
+OFFICIAL_HOST_ID / OFFICIAL_HOST_EMAIL once accounts exist.
+
+Until accounts are finished, do the safest temporary version:
+- Only the original browser/session that created the tournament from the private admin route can receive admin permissions.
+- Do not give admin permissions to random lobby creators from public player flows.
+- Never transfer admin status to another player on join, refresh, reconnect, invite, or King of the Table.
+
+Please audit:
+- tournament creation
+- lobby creation
+- invite link generation
+- join lobby flow
+- reconnect flow
+- localStorage/sessionStorage token handling
+- socket room assignment
+- Host Tools rendering
+- all host/admin endpoints and socket events
+
+Goal:
+Normal players can create/join lobbies without getting Host Tools. Only Mehdi/admin account can run the tournament as admin host.
