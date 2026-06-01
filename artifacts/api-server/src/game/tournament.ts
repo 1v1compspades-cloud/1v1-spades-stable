@@ -180,7 +180,7 @@ export interface CreateTournamentResult {
 export function createTournament(
   hostName: string,
   hostSocketId: string,
-  opts: { name?: string; size?: number; matchTarget?: number } = {}
+  opts: { name?: string; size?: number; matchTarget?: number; seedHost?: boolean } = {}
 ): CreateTournamentResult {
   const size: TournamentSize =
     opts.size === 32 ? 32 :
@@ -189,7 +189,13 @@ export function createTournament(
   const target = Number.isFinite(opts.matchTarget) && opts.matchTarget! > 0 && opts.matchTarget! <= 5000
     ? Math.floor(opts.matchTarget!)
     : 250;
-  const name = (opts.name || "").trim().slice(0, 40) || `${hostName}'s Tournament`;
+  // When seedHost is false (admin-created tournaments), the creator is NOT a
+  // player and there is no "host" roster slot — every slot must be filled by an
+  // explicit join. The tournament is gated entirely by the admin socket guard
+  // server-side, never by an in-roster host identity.
+  const seedHost = opts.seedHost !== false;
+  const fallbackName = seedHost && hostName ? `${hostName}'s Tournament` : "Tournament";
+  const name = (opts.name || "").trim().slice(0, 40) || fallbackName;
 
   let code: string;
   do { code = makeTournamentCode(); } while (tournaments.has(code));
@@ -198,12 +204,14 @@ export function createTournament(
   const t: Tournament = {
     code,
     name,
-    hostName,
-    hostSocketId,
+    hostName: seedHost ? hostName : "",
+    hostSocketId: seedHost ? hostSocketId : "",
     size,
     matchTarget: target,
     status: "lobby",
-    players: [{ id: hostSocketId, name: hostName, socketId: hostSocketId, token: hostToken }],
+    players: seedHost
+      ? [{ id: hostSocketId, name: hostName, socketId: hostSocketId, token: hostToken }]
+      : [],
     rounds: [],
     champion: null,
     eliminated: [],
@@ -391,15 +399,19 @@ export function startTournament(
   const t = tournaments.get(code);
   if (!t) throw new Error("Tournament not found");
   if (t.status !== "lobby") throw new Error("Tournament already started");
-  // Auth: either the caller's current socket matches the recorded host socket,
-  // OR they present the host's secret token. Token wins because it survives
-  // host refresh/reconnect (socketId can change).
-  const hostPlayer = t.players.find(
-    (p) => p.name.trim().toLowerCase() === t.hostName.trim().toLowerCase()
-  );
-  const tokenMatches = !!hostToken && !!hostPlayer && hostPlayer.token === hostToken;
-  if (!tokenMatches && t.hostSocketId !== callerSocketId) {
-    throw new Error("Only the host can start the tournament");
+  // Auth: for legacy/in-roster-host tournaments (hostName set), require either
+  // the caller's current socket to match the recorded host socket OR the host's
+  // secret token. Admin-created tournaments have NO host roster slot
+  // (hostName === "") and are authorized entirely by the admin socket guard at
+  // the call site, so this in-roster host check is skipped for them.
+  if (t.hostName.trim() !== "") {
+    const hostPlayer = t.players.find(
+      (p) => p.name.trim().toLowerCase() === t.hostName.trim().toLowerCase()
+    );
+    const tokenMatches = !!hostToken && !!hostPlayer && hostPlayer.token === hostToken;
+    if (!tokenMatches && t.hostSocketId !== callerSocketId) {
+      throw new Error("Only the host can start the tournament");
+    }
   }
   if (t.players.length !== t.size) {
     throw new Error(`Need ${t.size} players to start (currently ${t.players.length})`);

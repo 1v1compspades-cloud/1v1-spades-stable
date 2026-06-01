@@ -4,6 +4,11 @@ import { GameState, Card, TournamentState, MatchAssignedPayload, TournamentDisco
 
 export type SocketStatus = "connecting" | "online" | "reconnecting" | "offline";
 
+// SECURITY: the admin unlock lives ONLY in sessionStorage (cleared when the tab
+// closes), never localStorage, links, or shared state. It holds an opaque,
+// server-issued resume token — NEVER the secret admin key itself.
+const ADMIN_SESSION_KEY = "spades_admin_session";
+
 interface SocketContextType {
   socket: Socket | null;
   connected: boolean;
@@ -38,25 +43,34 @@ interface SocketContextType {
   matchAssignment: MatchAssignedPayload | null;
   tournamentEliminated: { code: string; round: number } | null;
   tournamentNotice: TournamentDisconnectNotice | null;
-  createTournament: (opts: { hostName: string; name?: string; size: 4 | 8 | 16 | 32; matchTarget: number }) => Promise<{ code: string; token: string }>;
+  createTournament: (opts: { name?: string; size: 4 | 8 | 16 | 32; matchTarget: number }) => Promise<{ code: string }>;
   joinTournament: (code: string, name: string, token?: string) => Promise<{ token: string }>;
   leaveTournament: (code: string) => Promise<void>;
-  startTournament: (code: string, token?: string) => Promise<void>;
+  startTournament: (code: string) => Promise<void>;
   subscribeTournament: (code: string, playerName?: string, token?: string) => Promise<{ state: TournamentState; yourMatch: { roomCode: string | null; matchId: string } | null; authenticated: boolean }>;
-  forceForfeitMatch: (code: string, matchId: string, forfeitSeat: "A" | "B", token?: string) => Promise<void>;
+  forceForfeitMatch: (code: string, matchId: string, forfeitSeat: "A" | "B") => Promise<void>;
   clearMatchAssignment: () => void;
   clearTournamentEliminated: () => void;
   clearTournamentNotice: () => void;
+  // ── Admin identity (tournaments are admin-only) ───────────────────────
+  // `isAdmin` is true only after this socket proved the secret key (or resumed
+  // a valid session token). `adminChecked` flips true once the initial resume
+  // attempt resolves, so UI can avoid bouncing before the check completes.
+  isAdmin: boolean;
+  adminChecked: boolean;
+  unlockAdmin: (key: string) => Promise<void>;
   // ── Host admin tools ──────────────────────────────────────────────────
-  adminDashboard: (code: string, token: string) => Promise<AdminDashboardSnapshot>;
-  adminAuditLog: (code: string, token: string, limit?: number) => Promise<AdminAuditEntry[]>;
-  adminPauseMatch: (code: string, matchId: string, token: string) => Promise<unknown>;
-  adminResumeMatch: (code: string, matchId: string, token: string) => Promise<unknown>;
-  adminResetTimer: (code: string, matchId: string, token: string) => Promise<unknown>;
-  adminRemakeRoom: (code: string, matchId: string, token: string) => Promise<{ ok: true; newRoomCode?: string }>;
-  adminMarkWinner: (code: string, matchId: string, winnerSeat: "A" | "B", token: string) => Promise<{ ok: true; replay?: boolean }>;
-  adminForceForfeit: (code: string, matchId: string, forfeitSeat: "A" | "B", token: string) => Promise<unknown>;
-  hostReplacePlayer: (code: string, oldName: string, newName: string, token: string) => Promise<{ ok: true; newPlayerToken: string; removedName: string; replacementName: string }>;
+  // No token args: admin actions are authorized server-side by the unlocked
+  // socket (requireAdmin), never by a client-passed token.
+  adminDashboard: (code: string) => Promise<AdminDashboardSnapshot>;
+  adminAuditLog: (code: string, limit?: number) => Promise<AdminAuditEntry[]>;
+  adminPauseMatch: (code: string, matchId: string) => Promise<unknown>;
+  adminResumeMatch: (code: string, matchId: string) => Promise<unknown>;
+  adminResetTimer: (code: string, matchId: string) => Promise<unknown>;
+  adminRemakeRoom: (code: string, matchId: string) => Promise<{ ok: true; newRoomCode?: string }>;
+  adminMarkWinner: (code: string, matchId: string, winnerSeat: "A" | "B") => Promise<{ ok: true; replay?: boolean }>;
+  adminForceForfeit: (code: string, matchId: string, forfeitSeat: "A" | "B") => Promise<unknown>;
+  hostReplacePlayer: (code: string, oldName: string, newName: string) => Promise<{ ok: true; newPlayerToken: string; removedName: string; replacementName: string }>;
 }
 
 const SocketContext = createContext<SocketContextType | null>(null);
@@ -71,6 +85,8 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [matchAssignment, setMatchAssignment] = useState<MatchAssignedPayload | null>(null);
   const [tournamentEliminated, setTournamentEliminated] = useState<{ code: string; round: number } | null>(null);
   const [tournamentNotice, setTournamentNotice] = useState<TournamentDisconnectNotice | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminChecked, setAdminChecked] = useState(false);
 
   // Pre-June-1 fix: after a tournament match finishes, the winner's socket is
   // joined to BOTH the completed match room AND the freshly-created next-round
@@ -114,6 +130,22 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       setConnected(true);
       setStatus("online");
       setError(null);
+      // Re-assert admin status on every (re)connect. A new socket id means a
+      // fresh server-side admin binding, so we resume from the opaque session
+      // token kept in sessionStorage. The secret key is NEVER stored or resent.
+      let adminToken: string | null = null;
+      try { adminToken = sessionStorage.getItem(ADMIN_SESSION_KEY); } catch { /* ignore */ }
+      if (adminToken) {
+        s.emit("admin_resume", { sessionToken: adminToken }, (res: { ok?: boolean }) => {
+          const ok = !!res?.ok;
+          setIsAdmin(ok);
+          if (!ok) { try { sessionStorage.removeItem(ADMIN_SESSION_KEY); } catch { /* ignore */ } }
+          setAdminChecked(true);
+        });
+      } else {
+        setIsAdmin(false);
+        setAdminChecked(true);
+      }
     });
     s.on("disconnect", () => {
       setConnected(false);
@@ -289,11 +321,11 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const clearGameState = () => setGameState(null);
 
   // ── Tournament actions ───────────────────────────────────────────────────
-  const createTournament = (opts: { hostName: string; name?: string; size: 4 | 8 | 16 | 32; matchTarget: number }) => {
-    return new Promise<{ code: string; token: string }>((resolve, reject) => {
+  const createTournament = (opts: { name?: string; size: 4 | 8 | 16 | 32; matchTarget: number }) => {
+    return new Promise<{ code: string }>((resolve, reject) => {
       if (!socket) return reject("No socket");
-      socket.emit("create_tournament", opts, (res: { ok: boolean; code?: string; token?: string; error?: string }) => {
-        if (res.ok && res.code && res.token) resolve({ code: res.code, token: res.token });
+      socket.emit("create_tournament", opts, (res: { ok: boolean; code?: string; error?: string }) => {
+        if (res.ok && res.code) resolve({ code: res.code });
         else reject(res.error || "Could not create tournament");
       });
     });
@@ -316,10 +348,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       });
     });
   };
-  const startTournament = (code: string, token?: string) => {
+  const startTournament = (code: string) => {
     return new Promise<void>((resolve, reject) => {
       if (!socket) return reject("No socket");
-      socket.emit("start_tournament", { code, token }, (res: { ok: boolean; error?: string }) => {
+      socket.emit("start_tournament", { code }, (res: { ok: boolean; error?: string }) => {
         if (res.ok) resolve();
         else reject(res.error || "Could not start tournament");
       });
@@ -340,12 +372,12 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       );
     });
   };
-  const forceForfeitMatch = (code: string, matchId: string, forfeitSeat: "A" | "B", token?: string) => {
+  const forceForfeitMatch = (code: string, matchId: string, forfeitSeat: "A" | "B") => {
     return new Promise<void>((resolve, reject) => {
       if (!socket) return reject("No socket");
       socket.emit(
         "tournament_force_forfeit",
-        { code, matchId, forfeitSeat, token },
+        { code, matchId, forfeitSeat },
         (res: { ok: boolean; error?: string }) => {
           if (res.ok) resolve();
           else reject(res.error || "Could not force forfeit");
@@ -371,12 +403,31 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  // ── Host admin tools (tournament) ───────────────────────────────────────
-  // Every admin action takes the host token (stored in localStorage as
-  // spades_tournament_token_${CODE}). The token is NEVER broadcast — it
-  // travels only in these per-call socket payloads, and the server's
-  // requireTournamentHost throws if it doesn't match the host's record.
+  // ── Admin unlock ────────────────────────────────────────────────────────
+  // Proves the secret admin key to the server ONCE. The key is sent only in
+  // this call and never persisted. On success the server returns an opaque
+  // resume token, which we stash in sessionStorage (tab-scoped). isAdmin flips
+  // true; the server is the auth-of-record for every subsequent admin action.
+  const unlockAdmin = (key: string) => {
+    return new Promise<void>((resolve, reject) => {
+      if (!socket) return reject("No socket");
+      socket.emit("admin_unlock", { key }, (res: { ok: boolean; sessionToken?: string; error?: string }) => {
+        if (res?.ok && res.sessionToken) {
+          try { sessionStorage.setItem(ADMIN_SESSION_KEY, res.sessionToken); } catch { /* ignore */ }
+          setIsAdmin(true);
+          setAdminChecked(true);
+          resolve();
+        } else {
+          reject(res?.error || "Invalid admin key");
+        }
+      });
+    });
+  };
 
+  // ── Host admin tools (tournament) ───────────────────────────────────────
+  // No token args: the server authorizes these by the unlocked socket
+  // (requireAdmin), never by a client-passed token. An un-unlocked socket is
+  // rejected server-side regardless of payload.
   function adminCall<T = void>(event: string, payload: Record<string, unknown>): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       if (!socket) return reject("No socket");
@@ -386,26 +437,26 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       });
     });
   }
-  const adminDashboard = (code: string, token: string) =>
-    adminCall<{ ok: true; snapshot: AdminDashboardSnapshot }>("admin_dashboard", { code, token }).then((r) => r.snapshot);
-  const adminAuditLog = (code: string, token: string, limit = 100) =>
-    adminCall<{ ok: true; entries: AdminAuditEntry[] }>("admin_audit_log", { code, token, limit }).then((r) => r.entries);
-  const adminPauseMatch = (code: string, matchId: string, token: string) =>
-    adminCall("admin_pause_match", { code, matchId, token });
-  const adminResumeMatch = (code: string, matchId: string, token: string) =>
-    adminCall("admin_resume_match", { code, matchId, token });
-  const adminResetTimer = (code: string, matchId: string, token: string) =>
-    adminCall("admin_reset_timer", { code, matchId, token });
-  const adminRemakeRoom = (code: string, matchId: string, token: string) =>
-    adminCall<{ ok: true; newRoomCode?: string }>("admin_remake_room", { code, matchId, token });
-  const adminMarkWinner = (code: string, matchId: string, winnerSeat: "A" | "B", token: string) =>
-    adminCall<{ ok: true; replay?: boolean }>("admin_mark_winner", { code, matchId, winnerSeat, token });
-  const adminForceForfeit = (code: string, matchId: string, forfeitSeat: "A" | "B", token: string) =>
-    adminCall("admin_force_forfeit", { code, matchId, forfeitSeat, token });
-  const hostReplacePlayer = (code: string, oldName: string, newName: string, token: string) =>
+  const adminDashboard = (code: string) =>
+    adminCall<{ ok: true; snapshot: AdminDashboardSnapshot }>("admin_dashboard", { code }).then((r) => r.snapshot);
+  const adminAuditLog = (code: string, limit = 100) =>
+    adminCall<{ ok: true; entries: AdminAuditEntry[] }>("admin_audit_log", { code, limit }).then((r) => r.entries);
+  const adminPauseMatch = (code: string, matchId: string) =>
+    adminCall("admin_pause_match", { code, matchId });
+  const adminResumeMatch = (code: string, matchId: string) =>
+    adminCall("admin_resume_match", { code, matchId });
+  const adminResetTimer = (code: string, matchId: string) =>
+    adminCall("admin_reset_timer", { code, matchId });
+  const adminRemakeRoom = (code: string, matchId: string) =>
+    adminCall<{ ok: true; newRoomCode?: string }>("admin_remake_room", { code, matchId });
+  const adminMarkWinner = (code: string, matchId: string, winnerSeat: "A" | "B") =>
+    adminCall<{ ok: true; replay?: boolean }>("admin_mark_winner", { code, matchId, winnerSeat });
+  const adminForceForfeit = (code: string, matchId: string, forfeitSeat: "A" | "B") =>
+    adminCall("admin_force_forfeit", { code, matchId, forfeitSeat });
+  const hostReplacePlayer = (code: string, oldName: string, newName: string) =>
     adminCall<{ ok: true; newPlayerToken: string; removedName: string; replacementName: string }>(
       "host_replace_player",
-      { code, oldName, newName, token },
+      { code, oldName, newName },
     );
 
   const reconnectAsSpectator = (roomCode: string, spectatorName: string) => {
@@ -459,6 +510,9 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       clearMatchAssignment,
       clearTournamentEliminated,
       clearTournamentNotice,
+      isAdmin,
+      adminChecked,
+      unlockAdmin,
       adminDashboard,
       adminAuditLog,
       adminPauseMatch,

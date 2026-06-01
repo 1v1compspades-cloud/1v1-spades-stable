@@ -1,5 +1,6 @@
 import { Server as SocketIOServer, type Socket } from "socket.io";
 import type { Server as HttpServer } from "node:http";
+import { timingSafeEqual, randomUUID } from "node:crypto";
 import { logger } from "../lib/logger.js";
 import {
   createRoom,
@@ -56,7 +57,6 @@ import {
   clearPendingAssignment,
   getAllTournaments,
   deleteTournament,
-  requireTournamentHost,
   appendAdminAudit,
   getAdminAuditLog,
   findMatchById,
@@ -101,6 +101,82 @@ function checkRate(socketId: string, kind: string, limit: number, windowMs: numb
 // or per-IP limits (e.g. via many IPs or many reconnects).
 const MAX_TOTAL_ROOMS = 500;
 const MAX_TOTAL_TOURNAMENTS = 100;
+
+// ── Admin authentication ────────────────────────────────────────────────────
+// Tournaments are an admin-only feature, gated entirely server-side by a secret
+// key (ADMIN_HOST_KEY) — NEVER by display name or any client-claimed identity.
+//
+// Flow:
+//  - A browser proves it's the admin by sending the secret key via `admin_unlock`.
+//    On success the server marks THIS socket as admin and issues a random,
+//    opaque session token (NOT the key) that the admin browser keeps in
+//    sessionStorage. The key itself never round-trips back to any client.
+//  - On reconnect, the admin browser presents that session token via
+//    `admin_resume` to re-mark its (new) socket as admin, without re-entering
+//    the key.
+//  - Every tournament-management action calls `requireAdmin(socket)`, which
+//    throws unless that exact socket has been unlocked in this process.
+//
+// Admin status is per-socket and per-process: it is never persisted to disk,
+// never written to localStorage, never placed in links, lobby/bracket state, or
+// any socket payload broadcast to other clients.
+const ADMIN_SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12h
+/** Socket ids that have been unlocked as admin in this process. */
+const adminSockets = new Set<string>();
+/** Opaque resume tokens → issued-at timestamp. Pruned lazily on use. */
+const adminSessions = new Map<string, number>();
+
+/** True only if the admin key is configured. Fail-closed when unset. */
+function adminKeyConfigured(): boolean {
+  return typeof process.env.ADMIN_HOST_KEY === "string" && process.env.ADMIN_HOST_KEY.length > 0;
+}
+
+/** Constant-time string compare that never short-circuits on length. */
+function constantTimeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a, "utf8");
+  const bb = Buffer.from(b, "utf8");
+  if (ab.length !== bb.length) {
+    // Still run a compare against a same-length buffer to avoid leaking length
+    // via timing, then return false.
+    timingSafeEqual(ab, ab);
+    return false;
+  }
+  return timingSafeEqual(ab, bb);
+}
+
+/** Drop expired admin session tokens. */
+function pruneAdminSessions(): void {
+  const now = Date.now();
+  for (const [tok, created] of adminSessions) {
+    if (now - created > ADMIN_SESSION_TTL_MS) adminSessions.delete(tok);
+  }
+}
+
+/** Mint a fresh opaque admin session token and remember it. */
+function newAdminSessionToken(): string {
+  pruneAdminSessions();
+  const tok = randomUUID();
+  adminSessions.set(tok, Date.now());
+  return tok;
+}
+
+/** Validate a resume token (and that it hasn't expired). */
+function adminSessionValid(token: string): boolean {
+  pruneAdminSessions();
+  const created = adminSessions.get(token);
+  if (created === undefined) return false;
+  return Date.now() - created <= ADMIN_SESSION_TTL_MS;
+}
+
+/**
+ * Authorize an admin-only socket action. Throws (fails closed) unless this
+ * exact socket has been unlocked as admin in the current process. Returns the
+ * actor label used in audit entries.
+ */
+function requireAdmin(socket: Socket): string {
+  if (!adminSockets.has(socket.id)) throw new Error("Admin authentication required");
+  return "Admin";
+}
 
 // ── Visitor counters (in-memory, reset on server restart) ───────────────────
 // Cumulative connection metrics since the server last started. Edge-only:
@@ -624,7 +700,6 @@ async function runAdminForceForfeit(
     const code = (data.code || "").toUpperCase().trim();
     const t = getTournament(code);
     if (!t) throw new Error("Tournament not found");
-    const host = requireTournamentHost(t, data.token);
     const match = findMatchById(t, data.matchId);
     if (!match) throw new Error("Match not found");
     if (!match.roomCode) throw new Error("Match has not started yet");
@@ -646,7 +721,7 @@ async function runAdminForceForfeit(
     }
     appendAdminAudit(t, {
       action: "force_forfeit",
-      actorName: host.name,
+      actorName: "Admin",
       matchId: match.id,
       roomCode,
       payload: { forfeitSeat: data.forfeitSeat, forfeitedName },
@@ -664,7 +739,7 @@ async function runAdminForceForfeit(
  * match including live game-state fields (scores, current turn, paused,
  * last activity) and per-seat connection status.
  *
- * Caller MUST gate this with `requireTournamentHost` — this function does
+ * Caller MUST gate this with `requireAdmin(socket)` — this function does
  * NOT itself check permissions because it has no token argument.
  */
 function buildAdminDashboard(
@@ -1864,12 +1939,66 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
     // ── Custom Tournament events ───────────────────────────────────────────
 
     socket.on(
-      "create_tournament",
+      "admin_unlock",
       (
-        data: { hostName: string; name?: string; size?: number; matchTarget?: number },
-        callback?: (res: { ok: boolean; code?: string; token?: string; error?: string }) => void
+        data: { key?: string },
+        callback?: (res: { ok: boolean; sessionToken?: string; error?: string }) => void
       ) => {
         try {
+          // Rate-limit (per-socket AND per-IP) to blunt brute-forcing the key.
+          if (!checkRate(socket.id, "admin_unlock", 5, 60_000)) {
+            return callback?.({ ok: false, error: "Too many attempts — slow down." });
+          }
+          if (!checkIpRate(socket.handshake.address, "admin_unlock", 20, 10 * 60_000)) {
+            return callback?.({ ok: false, error: "Too many attempts from this network — try later." });
+          }
+          // Fail closed when the key isn't configured at all.
+          if (!adminKeyConfigured()) {
+            return callback?.({ ok: false, error: "Admin access is not configured." });
+          }
+          const provided = typeof data.key === "string" ? data.key : "";
+          if (!constantTimeEqual(provided, process.env.ADMIN_HOST_KEY as string)) {
+            return callback?.({ ok: false, error: "Invalid admin key." });
+          }
+          adminSockets.add(socket.id);
+          const sessionToken = newAdminSessionToken();
+          logger.info({ socketId: socket.id }, "Admin unlocked");
+          callback?.({ ok: true, sessionToken });
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+        }
+      }
+    );
+
+    socket.on(
+      "admin_resume",
+      (
+        data: { sessionToken?: string },
+        callback?: (res: { ok: boolean; error?: string }) => void
+      ) => {
+        try {
+          const token = typeof data.sessionToken === "string" ? data.sessionToken : "";
+          if (!token || !adminSessionValid(token)) {
+            return callback?.({ ok: false, error: "Admin session expired." });
+          }
+          adminSockets.add(socket.id);
+          callback?.({ ok: true });
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+        }
+      }
+    );
+
+    socket.on(
+      "create_tournament",
+      (
+        data: { name?: string; size?: number; matchTarget?: number },
+        callback?: (res: { ok: boolean; code?: string; error?: string }) => void
+      ) => {
+        try {
+          requireAdmin(socket);
           if (!checkRate(socket.id, "create_tournament", 3, 60_000)) {
             return callback?.({ ok: false, error: "Slow down — too many tournaments created." });
           }
@@ -1880,16 +2009,18 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           if (!checkIpRate(socket.handshake.address, "create_tournament", 10, 10 * 60_000)) {
             return callback?.({ ok: false, error: "Too many tournaments created from this network. Try again later." });
           }
-          const host = (data.hostName || "Host").slice(0, 24);
-          const { tournament: t, hostToken } = createTournamentEntity(host, socket.id, {
+          // Admin-created: the admin is NOT seeded as a player and there is no
+          // in-roster host. Every slot is filled by an explicit join, and all
+          // management is gated by the admin socket guard above.
+          const { tournament: t } = createTournamentEntity("", "", {
             name: data.name,
             size: data.size,
             matchTarget: data.matchTarget,
+            seedHost: false,
           });
           socket.join(`tournament:${t.code}`);
-          (socket.data as { playerName?: string }).playerName = host;
-          logger.info({ code: t.code, host, size: t.size, socketId: socket.id }, "Tournament created");
-          callback?.({ ok: true, code: t.code, token: hostToken });
+          logger.info({ code: t.code, size: t.size, socketId: socket.id }, "Tournament created (admin)");
+          callback?.({ ok: true, code: t.code });
           io.to(`tournament:${t.code}`).emit("tournament_state", sanitizeTournament(t));
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
@@ -1999,16 +2130,23 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         data: { code: string; matchId: string; forfeitSeat: "A" | "B"; token?: string },
         callback?: (res: { ok: boolean; error?: string }) => void
       ) => {
+        try {
+          requireAdmin(socket);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+          return;
+        }
         void runAdminForceForfeit(io, data, callback);
       }
     );
 
     // ── Host admin tools ──────────────────────────────────────────────────
     //
-    // Every event below is gated by `requireTournamentHost(t, token)` —
-    // there is NO socketId fallback (unlike start_tournament) because
-    // these actions are higher-stakes than starting and must not be
-    // triggerable just because the host's old socketId hasn't recycled.
+    // Every event below is gated by `requireAdmin(socket)` — the socket must
+    // have been unlocked with the secret ADMIN_HOST_KEY. There is NO name- or
+    // token-in-payload fallback; admin status is bound to the live socket and
+    // never derived from client-claimed identity.
     //
     // Every successful action appends an `AdminAuditEntry` to the
     // tournament's bounded in-memory audit log. Bracket advancements
@@ -2021,6 +2159,13 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         data: { code: string; matchId: string; forfeitSeat: "A" | "B"; token?: string },
         callback?: (res: { ok: boolean; error?: string }) => void
       ) => {
+        try {
+          requireAdmin(socket);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+          return;
+        }
         void runAdminForceForfeit(io, data, callback);
       }
     );
@@ -2035,7 +2180,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           const code = (data.code || "").toUpperCase().trim();
           const t = getTournament(code);
           if (!t) throw new Error("Tournament not found");
-          const host = requireTournamentHost(t, data.token);
+          const actorName = requireAdmin(socket);
           const match = findMatchById(t, data.matchId);
           if (!match) throw new Error("Match not found");
           if (!match.roomCode) throw new Error("Match has no room yet");
@@ -2050,11 +2195,11 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
             paused.turnDeadline = null;
             await commit(paused, {
               action: "admin_pause",
-              payload: { matchId: match.id, actor: host.name },
+              payload: { matchId: match.id, actor: actorName },
             });
             appendAdminAudit(t, {
               action: "pause_match",
-              actorName: host.name,
+              actorName: actorName,
               matchId: match.id,
               roomCode,
             });
@@ -2079,7 +2224,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           const code = (data.code || "").toUpperCase().trim();
           const t = getTournament(code);
           if (!t) throw new Error("Tournament not found");
-          const host = requireTournamentHost(t, data.token);
+          const actorName = requireAdmin(socket);
           const match = findMatchById(t, data.matchId);
           if (!match) throw new Error("Match not found");
           if (!match.roomCode) throw new Error("Match has no room yet");
@@ -2092,11 +2237,11 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
             armTurnTimer(io, resumed);
             await commit(resumed, {
               action: "admin_resume",
-              payload: { matchId: match.id, actor: host.name },
+              payload: { matchId: match.id, actor: actorName },
             });
             appendAdminAudit(t, {
               action: "resume_match",
-              actorName: host.name,
+              actorName: actorName,
               matchId: match.id,
               roomCode,
             });
@@ -2121,7 +2266,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           const code = (data.code || "").toUpperCase().trim();
           const t = getTournament(code);
           if (!t) throw new Error("Tournament not found");
-          const host = requireTournamentHost(t, data.token);
+          const actorName = requireAdmin(socket);
           const match = findMatchById(t, data.matchId);
           if (!match) throw new Error("Match not found");
           if (!match.roomCode) throw new Error("Match has no room yet");
@@ -2137,7 +2282,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
             armTurnTimer(io, state);
             appendAdminAudit(t, {
               action: "reset_timer",
-              actorName: host.name,
+              actorName: actorName,
               matchId: match.id,
               roomCode,
               payload: { newDeadline: state.turnDeadline },
@@ -2163,7 +2308,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           const code = (data.code || "").toUpperCase().trim();
           const t = getTournament(code);
           if (!t) throw new Error("Tournament not found");
-          const host = requireTournamentHost(t, data.token);
+          const actorName = requireAdmin(socket);
           const match = findMatchById(t, data.matchId);
           if (!match) throw new Error("Match not found");
           if (match.winner) throw new Error("Match already resolved — cannot remake");
@@ -2201,7 +2346,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           await createMatchRoomAndAssign(io, t, match);
           appendAdminAudit(t, {
             action: "remake_room",
-            actorName: host.name,
+            actorName: actorName,
             matchId: match.id,
             roomCode: match.roomCode ?? undefined,
             payload: { oldRoomCode: oldRoomCode ?? null },
@@ -2229,7 +2374,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           const code = (data.code || "").toUpperCase().trim();
           const t = getTournament(code);
           if (!t) throw new Error("Tournament not found");
-          const host = requireTournamentHost(t, data.token);
+          const actorName = requireAdmin(socket);
           const match = findMatchById(t, data.matchId);
           if (!match) throw new Error("Match not found");
           if (!match.playerA || !match.playerB) {
@@ -2252,7 +2397,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
             }
             appendAdminAudit(t, {
               action: "mark_winner",
-              actorName: host.name,
+              actorName: actorName,
               matchId: match.id,
               roomCode: match.roomCode,
               payload: { winnerSeat: data.winnerSeat, via: "forfeit" },
@@ -2276,7 +2421,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           const isReplay = resolution.kind === "replay";
           appendAdminAudit(t, {
             action: "mark_winner",
-            actorName: host.name,
+            actorName: actorName,
             matchId: match.id,
             roomCode: match.roomCode ?? undefined,
             payload: {
@@ -2354,7 +2499,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           const code = (data.code || "").toUpperCase().trim();
           const t = getTournament(code);
           if (!t) throw new Error("Tournament not found");
-          const host = requireTournamentHost(t, data.token);
+          const actorName = requireAdmin(socket);
           if (t.status !== "lobby") {
             // Explicit message: spec requirement #9.
             throw new Error("Cannot replace players after the tournament has started");
@@ -2362,7 +2507,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           const result = replacePlayer(code, data.oldName || "", data.newName || "");
           appendAdminAudit(t, {
             action: "replace_player",
-            actorName: host.name,
+            actorName: actorName,
             payload: {
               removedName: result.removedName,
               replacementName: result.replacementName,
@@ -2400,7 +2545,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           const code = (data.code || "").toUpperCase().trim();
           const t = getTournament(code);
           if (!t) throw new Error("Tournament not found");
-          requireTournamentHost(t, data.token);
+          requireAdmin(socket);
           const limit = Math.max(1, Math.min(500, data.limit ?? 100));
           callback?.({ ok: true, entries: getAdminAuditLog(t, limit) });
         } catch (err: unknown) {
@@ -2426,7 +2571,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           const code = (data.code || "").toUpperCase().trim();
           const t = getTournament(code);
           if (!t) throw new Error("Tournament not found");
-          requireTournamentHost(t, data.token);
+          requireAdmin(socket);
           callback?.({ ok: true, snapshot: buildAdminDashboard(io, t) });
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
@@ -2442,9 +2587,10 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         callback?: (res: { ok: boolean; error?: string }) => void
       ) => {
         try {
+          requireAdmin(socket);
           const code = (data.code || "").toUpperCase().trim();
           const t = startTournamentEntity(code, socket.id, data.token);
-          logger.info({ code, size: t.size }, "Tournament started by host");
+          logger.info({ code, size: t.size }, "Tournament started by admin");
           callback?.({ ok: true });
           // Spin up Round 1 rooms for each match, in order. Await so each
           // room is durable + announced before the next starts (and before
@@ -2501,6 +2647,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
 
     socket.on("disconnect", () => {
       clearRateForSocket(socket.id);
+      adminSockets.delete(socket.id);
       const playerName = (socket.data as { playerName?: string }).playerName;
       logger.info({ socketId: socket.id, playerName }, "Socket disconnected");
       // Snapshot which tournament-match seat this socket occupied (if any)

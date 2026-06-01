@@ -11,8 +11,8 @@ import { ConnectionPill } from "@/components/ConnectionPill";
 
 export default function Lobby() {
   const [, setLocation] = useLocation();
-  const { connect, connected, socket, createRoom, joinRoom, joinAsSpectator, createTournament, joinTournament } = useSocket();
-  const { playerName, savePlayerName, saveRoomCode, savePlayerIndex, saveIsSpectator, saveTournamentToken, getTournamentToken, savePlayerToken, saveHostToken } = useGameStorage();
+  const { connect, connected, socket, createRoom, joinRoom, joinAsSpectator, createTournament, joinTournament, isAdmin, unlockAdmin } = useSocket();
+  const { playerName, savePlayerName, saveRoomCode, savePlayerIndex, saveIsSpectator, saveTournamentToken, getTournamentToken, savePlayerToken } = useGameStorage();
   const { toast } = useToast();
 
   // Parse ?room=XXX&mode=spectator from the URL (once on mount)
@@ -29,22 +29,52 @@ export default function Lobby() {
   const [matchTarget, setMatchTarget] = useState<250 | 500>(250);
   const [tournamentSize, setTournamentSize] = useState<4 | 8 | 16 | 32>(4);
   const [tournamentName, setTournamentName] = useState<string>("");
-  const MATCH_MODES = [
+  const ALL_MATCH_MODES = [
     { id: "quick",     label: "Quick Match",          blurb: "Single head-to-head match" },
     { id: "king",      label: "King of the Table",    blurb: "Winner stays, queue challengers" },
     { id: "custom",    label: "Custom Tournament",    blurb: "Single-elimination bracket" },
   ] as const;
-  type MatchMode = typeof MATCH_MODES[number]["id"];
+  type MatchMode = typeof ALL_MATCH_MODES[number]["id"];
+  // Tournaments are admin-only: the Custom Tournament tile is hidden from
+  // normal players entirely. The server also rejects create/join/manage from
+  // non-admin sockets, so this is purely a UX gate.
+  const MATCH_MODES = ALL_MATCH_MODES.filter((m) => m.id !== "custom" || isAdmin);
   const [matchMode, setMatchMode] = useState<MatchMode>("quick");
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [isSpectating, setIsSpectating] = useState(false);
   const [invitedAsSpectator] = useState(initialParams.spectate && !!initialParams.code);
   const [autoSpectateTried, setAutoSpectateTried] = useState(false);
+  const [adminDialogOpen, setAdminDialogOpen] = useState(false);
+  const [adminKeyInput, setAdminKeyInput] = useState("");
+  const [adminUnlocking, setAdminUnlocking] = useState(false);
 
   useEffect(() => {
     connect();
   }, [connect]);
+
+  // If admin access is lost (e.g. session token rejected on reconnect) while
+  // the Custom Tournament tile is selected, fall back to Quick Match so the
+  // user isn't stuck on a hidden mode.
+  useEffect(() => {
+    if (!isAdmin && matchMode === "custom") setMatchMode("quick");
+  }, [isAdmin, matchMode]);
+
+  const handleAdminUnlock = async (): Promise<void> => {
+    const key = adminKeyInput.trim();
+    if (!key) return;
+    setAdminUnlocking(true);
+    try {
+      await unlockAdmin(key);
+      setAdminKeyInput("");
+      setAdminDialogOpen(false);
+      toast({ description: "Admin access unlocked." });
+    } catch (err: any) {
+      toast({ description: typeof err === "string" ? err : "Invalid admin key", variant: "destructive" });
+    } finally {
+      setAdminUnlocking(false);
+    }
+  };
 
   const handleCreate = async (): Promise<void> => {
     if (!nameInput.trim()) { toast({ description: "Please enter your name", variant: "destructive" }); return; }
@@ -53,19 +83,15 @@ export default function Lobby() {
       savePlayerName(nameInput);
       saveIsSpectator(false);
       if (matchMode === "custom") {
+        // SECURITY: tournaments are admin-only and the admin is NOT seeded as a
+        // player. No host token is stored — admin authority is the unlocked
+        // socket (sessionStorage), validated server-side on every action. The
+        // admin lands in the tournament lobby and can optionally Join as Player.
         const res = await createTournament({
-          hostName: nameInput.trim(),
           name: tournamentName.trim() || undefined,
           size: tournamentSize,
           matchTarget,
         });
-        // SECURITY: the creator's secret is the HOST token. Store it ONLY
-        // under the dedicated host key — never the shared tournament-token key
-        // that players also write to. Host detection / Host Tools access keys
-        // exclusively off this host key, so a joined player can never inherit
-        // host controls. (createTournament also makes the host a player whose
-        // per-player token equals this host token, so reconnect still works.)
-        saveHostToken(res.code, res.token);
         setLocation(`/tournament/${res.code}`);
         return;
       }
@@ -357,6 +383,65 @@ export default function Lobby() {
             <p className="text-xs text-muted-foreground text-center">
               Spectators can watch without seeing hidden hands.
             </p>
+          </div>
+
+          {/* Admin access — discreet entry. Tournaments are admin-only; this
+              unlocks the Custom Tournament tile + host tools. The secret key is
+              sent once and never stored; only an opaque session token lives in
+              this tab's sessionStorage. */}
+          <div className="pt-3 border-t border-border/40 text-center">
+            {isAdmin ? (
+              <span
+                className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-primary"
+                data-testid="admin-mode-badge"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                Admin mode
+              </span>
+            ) : !adminDialogOpen ? (
+              <button
+                type="button"
+                onClick={() => setAdminDialogOpen(true)}
+                className="text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                data-testid="button-admin-access"
+              >
+                Admin access
+              </button>
+            ) : (
+              <div className="space-y-2 text-left">
+                <Label htmlFor="admin-key" className="text-xs">Admin key</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="admin-key"
+                    type="password"
+                    autoComplete="off"
+                    placeholder="Enter admin key"
+                    value={adminKeyInput}
+                    onChange={(e) => setAdminKeyInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") void handleAdminUnlock(); }}
+                    disabled={adminUnlocking}
+                    className="font-mono text-sm"
+                    data-testid="input-admin-key"
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => void handleAdminUnlock()}
+                    disabled={adminUnlocking || !adminKeyInput.trim()}
+                    data-testid="button-admin-unlock"
+                  >
+                    {adminUnlocking ? "…" : "Unlock"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => { setAdminDialogOpen(false); setAdminKeyInput(""); }}
+                    disabled={adminUnlocking}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

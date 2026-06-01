@@ -17,33 +17,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { AdminAuditEntry, AdminDashboardSnapshot, AdminMatchSnapshot } from "@/lib/game";
 
-// SECURITY: Host Tools is gated EXCLUSIVELY on the dedicated host token key.
-// Players write their per-player reconnect token under `spades_tournament_token_`,
-// so keying off that shared prefix would let any joined player open this
-// dashboard. The host token lives under its own key, written only by the
-// tournament creator's browser. The server is still the auth-of-record — every
-// admin_* call below revalidates this token against the tournament's stored
-// host token and rejects a non-host (see the host-rejection bounce in refresh()).
-function tokenKey(code: string): string {
-  return `spades_tournament_host_token_${code}`;
-}
-
-// Host tokens are stored TTL-wrapped as JSON ({ token, savedAt }) by
-// useGameStorage.saveHostToken. Read+unwrap here so we send the bare token to
-// admin_* events — sending the JSON wrapper would fail host validation and
-// lock the real host out of their own dashboard. Back-compat: older entries
-// were stored as the bare token string.
-function readHostToken(code: string): string | null {
-  const raw = localStorage.getItem(tokenKey(code));
-  if (!raw) return null;
-  if (!raw.startsWith("{")) return raw;
-  try {
-    const parsed = JSON.parse(raw) as { token?: string };
-    return parsed?.token ?? null;
-  } catch {
-    return null;
-  }
-}
+// SECURITY: Host Tools is gated EXCLUSIVELY on admin identity. `isAdmin` flips
+// true only after this browser proved the secret ADMIN_HOST_KEY (or resumed a
+// valid server-issued session token from sessionStorage). There is NO
+// localStorage host-token path anymore — tournaments are admin-only. The server
+// is still the auth-of-record: every admin_* event below calls requireAdmin on
+// the socket and rejects any non-admin caller regardless of client-side state.
 
 function formatTs(ts: number): string {
   const d = new Date(ts);
@@ -186,6 +165,8 @@ export default function HostDashboard() {
     socket,
     connected,
     connect,
+    isAdmin,
+    adminChecked,
     adminDashboard,
     adminAuditLog,
     adminPauseMatch,
@@ -197,7 +178,6 @@ export default function HostDashboard() {
   } = useSocket();
 
   const { toast } = useToast();
-  const [token, setToken] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<AdminDashboardSnapshot | null>(null);
   const [audit, setAudit] = useState<AdminAuditEntry[]>([]);
   const [err, setErr] = useState<string | null>(null);
@@ -244,23 +224,27 @@ export default function HostDashboard() {
     connect();
   }, [connect]);
 
-  // Token-gated: if no localStorage token exists, this is not the host
-  // (or they cleared cache). Bounce back to the tournament page.
+  // Admin-gated: once the initial admin-resume check has resolved, a non-admin
+  // browser is bounced back to the tournament page. We wait for `adminChecked`
+  // so a legit admin who is still resuming their session isn't kicked out on
+  // the first render before the resume round-trip completes.
   useEffect(() => {
-    const t = readHostToken(code);
-    if (!t) {
+    if (!adminChecked) return;
+    if (!isAdmin) {
+      toast({
+        description: "Host tools are admin-only.",
+        variant: "destructive",
+      });
       setLocation(`/tournament/${code}`);
-      return;
     }
-    setToken(t);
-  }, [code, setLocation]);
+  }, [adminChecked, isAdmin, code, setLocation, toast]);
 
   const refresh = useCallback(async () => {
-    if (!token || !connected) return;
+    if (!isAdmin || !connected) return;
     try {
       const [snap, log] = await Promise.all([
-        adminDashboard(code, token),
-        adminAuditLog(code, token, 50),
+        adminDashboard(code),
+        adminAuditLog(code, 50),
       ]);
       setSnapshot(snap);
       setAudit(log);
@@ -268,23 +252,20 @@ export default function HostDashboard() {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setErr(msg);
-      // Server-authoritative host validation: admin_dashboard rejects any token
-      // that is not the tournament's stored host token. On rejection, this
-      // browser is NOT the host — clear the stale host claim from localStorage
-      // so it can't keep re-entering, show the denial message, and bounce out.
-      if (msg.toLowerCase().includes("host")) {
-        try { localStorage.removeItem(tokenKey(code)); } catch { /* ignore */ }
+      // Server-authoritative admin validation: admin_dashboard rejects any
+      // socket that is not unlocked as admin. On rejection, bounce out.
+      if (msg.toLowerCase().includes("admin")) {
         toast({
-          description: "Host access denied. This browser is not the tournament host.",
+          description: "Host access denied. This browser is not an admin.",
           variant: "destructive",
         });
         setLocation(`/tournament/${code}`);
       }
     }
-  }, [token, connected, code, adminDashboard, adminAuditLog, setLocation]);
+  }, [isAdmin, connected, code, adminDashboard, adminAuditLog, setLocation, toast]);
 
   useEffect(() => {
-    if (!token || !connected) return;
+    if (!isAdmin || !connected) return;
     refresh();
     const tick = setInterval(refresh, 3000);
     if (socket) {
@@ -303,7 +284,7 @@ export default function HostDashboard() {
       };
     }
     return () => clearInterval(tick);
-  }, [token, connected, refresh, socket, code]);
+  }, [isAdmin, connected, refresh, socket, code]);
 
   const runWithBusy = useCallback(
     async (matchId: string, fn: () => Promise<unknown>) => {
@@ -348,7 +329,7 @@ export default function HostDashboard() {
     return derivePlayerStatuses(snapshot, totalRounds);
   }, [snapshot, totalRounds]);
 
-  if (!token) {
+  if (!adminChecked || !isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center text-muted-foreground">
         Loading host dashboard…
@@ -580,16 +561,16 @@ export default function HostDashboard() {
             m={m}
             totalRounds={totalRounds}
             busy={busyId === m.matchId}
-            onPause={() => runWithBusy(m.matchId, () => adminPauseMatch(code, m.matchId, token))}
-            onResume={() => runWithBusy(m.matchId, () => adminResumeMatch(code, m.matchId, token))}
-            onResetTimer={() => runWithBusy(m.matchId, () => adminResetTimer(code, m.matchId, token))}
+            onPause={() => runWithBusy(m.matchId, () => adminPauseMatch(code, m.matchId))}
+            onResume={() => runWithBusy(m.matchId, () => adminResumeMatch(code, m.matchId))}
+            onResetTimer={() => runWithBusy(m.matchId, () => adminResetTimer(code, m.matchId))}
             onRemake={() =>
               setConfirm({
                 title: "Remake match room?",
                 description: "This abandons the current room and creates a fresh one with the same players. In-progress scores will be lost.",
                 destructive: true,
                 onConfirm: () =>
-                  runWithBusy(m.matchId, () => adminRemakeRoom(code, m.matchId, token)),
+                  runWithBusy(m.matchId, () => adminRemakeRoom(code, m.matchId)),
               })
             }
             onMarkWinner={(seat) =>
@@ -598,7 +579,7 @@ export default function HostDashboard() {
                 description: "This ends the match immediately and advances the bracket. Use only when a normal finish is impossible.",
                 destructive: true,
                 onConfirm: () =>
-                  runWithBusy(m.matchId, () => adminMarkWinner(code, m.matchId, seat, token)),
+                  runWithBusy(m.matchId, () => adminMarkWinner(code, m.matchId, seat)),
               })
             }
             onForfeit={(seat) =>
@@ -607,7 +588,7 @@ export default function HostDashboard() {
                 description: "This ends the match with the other player advancing. The forfeited player is eliminated.",
                 destructive: true,
                 onConfirm: () =>
-                  runWithBusy(m.matchId, () => adminForceForfeit(code, m.matchId, seat, token)),
+                  runWithBusy(m.matchId, () => adminForceForfeit(code, m.matchId, seat)),
               })
             }
           />
@@ -631,7 +612,7 @@ export default function HostDashboard() {
                       description: "This advances the bracket without playing the match. Use only when a normal finish is impossible.",
                       destructive: true,
                       onConfirm: () =>
-                        runWithBusy(m.matchId, () => adminMarkWinner(code, m.matchId, seat, token)),
+                        runWithBusy(m.matchId, () => adminMarkWinner(code, m.matchId, seat)),
                     })
                 : undefined
             }

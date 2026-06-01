@@ -19,7 +19,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { TournamentMatch, TournamentState } from "@/lib/game";
-import { computeStartControl } from "@/lib/hostControls";
 
 function MatchCell({
   match,
@@ -196,7 +195,7 @@ export default function Tournament() {
   const [, setLocation] = useLocation();
   const code = (params?.code || "").toUpperCase();
   const { toast } = useToast();
-  const { playerName, savePlayerName, saveRoomCode, savePlayerIndex, saveIsSpectator, saveTournamentToken, getTournamentToken, savePlayerToken, getHostToken } = useGameStorage();
+  const { playerName, savePlayerName, saveRoomCode, savePlayerIndex, saveIsSpectator, saveTournamentToken, getTournamentToken, savePlayerToken } = useGameStorage();
   const {
     connect, connected,
     tournament, subscribeTournament, joinTournament, leaveTournament, startTournament,
@@ -204,6 +203,7 @@ export default function Tournament() {
     tournamentEliminated, clearTournamentEliminated,
     tournamentNotice, clearTournamentNotice,
     hostReplacePlayer,
+    isAdmin,
   } = useSocket();
 
   // Host-side "replace player" dialog state.
@@ -222,8 +222,6 @@ export default function Tournament() {
   const [nameInput, setNameInput] = useState(playerName);
   const [joining, setJoining] = useState(false);
   const [starting, setStarting] = useState(false);
-  const [hostAuthFailed, setHostAuthFailed] = useState(false); // set when the server rejects our host token
-  const [hostSnapshot, setHostSnapshot] = useState<string | null>(null); // remembered host on join
   // Server-confirmed authentication: true only after subscribe_tournament
   // (or a fresh joinTournament call) verifies our token actually matches a
   // roster entry. Used by `iAmInRoster` to prevent a stale localStorage
@@ -257,10 +255,11 @@ export default function Tournament() {
   // Subscribe / resubscribe whenever socket reconnects.
   useEffect(() => {
     if (!connected || !code) return;
-    // Send the host token if this browser is the host (host token === host's
-    // own per-player token), otherwise the player's reconnect token. Never the
-    // other way around — a player has no host token to send.
-    const token = getHostToken(code) || getTournamentToken(code) || undefined;
+    // Tournaments are admin-only; admin authority rides on the unlocked socket,
+    // never a token in this payload. The only token sent here is the player's
+    // own per-seat reconnect token (present only if this browser joined as a
+    // player), so a refreshing player reclaims their roster slot.
+    const token = getTournamentToken(code) || undefined;
     subscribeTournament(code, playerName || undefined, token)
       .then((res) => setAuthenticated(res.authenticated))
       .catch((err) => {
@@ -313,7 +312,7 @@ export default function Tournament() {
   useEffect(() => {
     if (!tournamentNotice) return;
     if (tournamentNotice.tournamentCode !== code) return;
-    if (iAmHost) {
+    if (isAdmin) {
       const mins = Math.round(tournamentNotice.graceMs / 60000);
       toast({
         description: `${tournamentNotice.playerName ?? "A player"} disconnected. They have ${mins} min to reconnect before auto-forfeit — open Host tools to pause the match and hold their slot.`,
@@ -333,8 +332,7 @@ export default function Tournament() {
 
   const handleHostForfeit = async (matchId: string, seat: "A" | "B") => {
     try {
-      const token = getHostToken(code) || undefined;
-      await forceForfeitMatch(code, matchId, seat, token);
+      await forceForfeitMatch(code, matchId, seat);
       toast({ description: `Forfeited seat ${seat}` });
     } catch (err: unknown) {
       toast({ description: typeof err === "string" ? err : "Could not force forfeit", variant: "destructive" });
@@ -351,23 +349,6 @@ export default function Tournament() {
     if (!t || !playerName || !authenticated) return false;
     return t.players.some((p) => p.name.trim().toLowerCase() === playerName.trim().toLowerCase());
   }, [t, playerName, authenticated]);
-
-  // Track who looks like the host for THIS browser (we can't get socketId from
-  // the sanitized state, so we trust the user's view: host is whoever's name
-  // matches t.hostName + is in the roster + is us).
-  useEffect(() => {
-    if (!t) return;
-    if (!playerName) return;
-    if (t.hostName.trim().toLowerCase() === playerName.trim().toLowerCase()) {
-      setHostSnapshot(playerName);
-    }
-  }, [t, playerName]);
-
-  const iAmHost = !!hostSnapshot && t?.hostName.trim().toLowerCase() === hostSnapshot.trim().toLowerCase();
-  // SECURITY: host-only UI keys off the dedicated host token, NOT the shared
-  // tournament-token key (which every joined player also writes). This is the
-  // single source of truth for "this browser is the tournament host".
-  const hasHostToken = !!getHostToken(code);
 
   const handleJoin = async () => {
     if (!nameInput.trim()) { toast({ description: "Please enter your name", variant: "destructive" }); return; }
@@ -414,14 +395,9 @@ export default function Tournament() {
       toast({ description: "Enter a backup player name", variant: "destructive" });
       return;
     }
-    const token = getHostToken(code);
-    if (!token) {
-      toast({ description: "Host token missing — refresh and try again", variant: "destructive" });
-      return;
-    }
     setReplaceBusy(true);
     try {
-      const res = await hostReplacePlayer(code, replaceTarget, newName, token);
+      const res = await hostReplacePlayer(code, replaceTarget, newName);
       // Build the backup's auto-join URL with the freshly-issued token.
       // Use the build-time BASE_URL, NOT document.baseURI. baseURI falls
       // back to document.URL when no <base> tag is present, so if the host
@@ -444,15 +420,9 @@ export default function Tournament() {
     if (!t) return;
     setStarting(true);
     try {
-      const token = getHostToken(code) || undefined;
-      await startTournament(code, token);
-      setHostAuthFailed(false);
+      await startTournament(code);
     } catch (err: unknown) {
       const msg = typeof err === "string" ? err : "Failed to start";
-      // The server rejects start with a "…host…" message when our token is
-      // missing/invalid. Surface the host-controls warning instead of just a
-      // transient toast so the host knows to reopen via the original host link.
-      if (typeof err === "string" && /host/i.test(err)) setHostAuthFailed(true);
       toast({ description: msg, variant: "destructive" });
     } finally {
       setStarting(false);
@@ -523,7 +493,7 @@ export default function Tournament() {
                   {t.name}
                 </CardTitle>
                 <CardDescription className="text-xs mt-1">
-                  Code <span className="font-mono text-primary">{t.code}</span> · {t.size}-player single-elimination · {t.matchTarget} pts per match · Host <span className="font-semibold">{t.hostName}</span>
+                  Code <span className="font-mono text-primary">{t.code}</span> · {t.size}-player single-elimination · {t.matchTarget} pts per match
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
@@ -534,7 +504,7 @@ export default function Tournament() {
                 }`}>
                   {isLobby ? "Lobby" : isComplete ? "Complete" : "In Progress"}
                 </span>
-                {hasHostToken && (
+                {isAdmin && (
                   <Button
                     size="sm"
                     variant="outline"
@@ -574,8 +544,7 @@ export default function Tournament() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {Array.from({ length: t.size }).map((_, i) => {
                   const p = t.players[i];
-                  const isHostSlot = !!p && p.name.trim().toLowerCase() === t.hostName.trim().toLowerCase();
-                  const canReplace = !!p && !isHostSlot && hasHostToken;
+                  const canReplace = !!p && isAdmin;
                   return (
                     <div
                       key={i}
@@ -586,7 +555,6 @@ export default function Tournament() {
                     >
                       <span className="truncate">
                         {p ? p.name : "Empty"}
-                        {isHostSlot && <span className="ml-1 text-xs text-primary/80">(host)</span>}
                       </span>
                       {canReplace && (
                         <button
@@ -609,7 +577,7 @@ export default function Tournament() {
               {/* Invite link — visible to every roster member, always shown.
                   Points to /tournament/<CODE> (the lobby), NOT a 1v1 room.
                   Copy button disables when the lobby is full. */}
-              {iAmInRoster && (() => {
+              {(iAmInRoster || isAdmin) && (() => {
                 const slotsOpen = Math.max(0, t.size - t.players.length);
                 const isFull = slotsOpen === 0;
                 // Use the build-time BASE_URL, NOT document.baseURI. baseURI
@@ -697,37 +665,32 @@ export default function Tournament() {
                 </div>
               )}
 
-              {iAmInRoster && (() => {
-                const control = computeStartControl({
-                  iAmInRoster,
-                  iAmHost,
-                  hasHostToken: hasHostToken && !hostAuthFailed,
-                  playerCount: t.players.length,
-                  size: t.size,
-                  starting,
-                });
+              {/* Lobby controls. Tournaments are admin-only: only the unlocked
+                  admin sees the Start button (server also enforces requireAdmin
+                  on start_tournament). Admin can start WITHOUT being seated as a
+                  player. Non-admin roster members only get a Leave button. */}
+              {(isAdmin || iAmInRoster) && (() => {
+                const slotsOpen = Math.max(0, t.size - t.players.length);
+                const canStart = t.players.length >= t.size;
                 return (
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-2 border-t border-border/50">
-                    <span className="text-sm">You're in as <span className="font-semibold text-primary">{playerName}</span>.</span>
-                    {control.kind === "start" && (
+                    {iAmInRoster ? (
+                      <span className="text-sm">You're in as <span className="font-semibold text-primary">{playerName}</span>.</span>
+                    ) : isAdmin ? (
+                      <span className="text-sm text-muted-foreground" data-testid="admin-not-seated">
+                        Admin controls — you are not seated as a player.
+                      </span>
+                    ) : null}
+                    {isAdmin ? (
                       <Button
                         onClick={handleStart}
-                        disabled={!control.enabled}
+                        disabled={!canStart || starting}
                         className="w-full sm:w-auto sm:ml-auto"
                         data-testid="button-start-tournament"
                       >
-                        {control.label}
+                        {starting ? "Starting…" : canStart ? "Start Tournament" : `Need ${slotsOpen} more`}
                       </Button>
-                    )}
-                    {control.kind === "warning" && (
-                      <div
-                        className="w-full sm:w-auto sm:ml-auto rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200"
-                        data-testid="host-token-warning"
-                      >
-                        {control.message}
-                      </div>
-                    )}
-                    {control.kind === "leave" && (
+                    ) : (
                       <Button variant="ghost" onClick={handleLeave} className="w-full sm:w-auto sm:ml-auto">
                         Leave
                       </Button>
@@ -746,7 +709,7 @@ export default function Tournament() {
               <CardTitle className="text-base">Bracket</CardTitle>
             </CardHeader>
             <CardContent>
-              <BracketView t={t} myName={playerName || ""} iAmHost={hasHostToken} onForfeit={handleHostForfeit} />
+              <BracketView t={t} myName={playerName || ""} iAmHost={isAdmin} onForfeit={handleHostForfeit} />
             </CardContent>
           </Card>
         )}
