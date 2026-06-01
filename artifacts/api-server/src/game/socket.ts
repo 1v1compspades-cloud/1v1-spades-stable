@@ -68,6 +68,7 @@ import {
   type AdminAuditEntry,
 } from "./tournament.js";
 import { deleteRoomState } from "./persistence.js";
+import { checkIpRate } from "../lib/ipRateLimit.js";
 
 // ── Per-socket rate limiting ────────────────────────────────────────────
 // Token-bucket-ish: a sliding window of recent timestamps per (socketId, kind).
@@ -93,6 +94,14 @@ function checkRate(socketId: string, kind: string, limit: number, windowMs: numb
   rateBuckets.set(key, fresh);
   return true;
 }
+
+// ── Global in-memory caps ────────────────────────────────────────────────
+// Hard upper bounds on how many rooms/tournaments can exist at once.
+// These prevent an attacker from filling RAM even after bypassing per-socket
+// or per-IP limits (e.g. via many IPs or many reconnects).
+const MAX_TOTAL_ROOMS = 500;
+const MAX_TOTAL_TOURNAMENTS = 100;
+
 // ── Visitor counters (in-memory, reset on server restart) ───────────────────
 // Cumulative connection metrics since the server last started. Edge-only:
 // nothing here feeds the game engine — it's purely observational, surfaced via
@@ -1204,6 +1213,17 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           if (!checkRate(socket.id, "create_room", 5, 30_000)) {
             return callback({ ok: false, error: "Slow down — too many rooms created. Try again in a moment." });
           }
+          // Hard cap checked BEFORE ip-rate mutation so a full server cannot
+          // be used to inflate the ip-bucket map with novel spoofed keys.
+          if (getAllRooms().length >= MAX_TOTAL_ROOMS) {
+            return callback({ ok: false, error: "Server is at capacity. Please try again later." });
+          }
+          // Use the TCP-level transport address (socket.handshake.address) as
+          // the rate-limit key — this is the address the server observes at the
+          // connection layer and cannot be forged by the client via headers.
+          if (!checkIpRate(socket.handshake.address, "create_room", 20, 10 * 60_000)) {
+            return callback({ ok: false, error: "Too many rooms created from this network. Try again later." });
+          }
           const rawTarget = Number(data.matchTarget);
           const target = Number.isFinite(rawTarget) && rawTarget > 0 && rawTarget <= 5000
             ? Math.floor(rawTarget)
@@ -1661,6 +1681,9 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         callback: (res: { ok: boolean; error?: string }) => void
       ) => {
         try {
+          if (!checkRate(socket.id, "reconnect_spectator", 5, 30_000)) {
+            return callback({ ok: false, error: "Slow down — too many reconnect attempts." });
+          }
           const code = data.roomCode.toUpperCase().trim();
           const name = (data.spectatorName || "Spectator").slice(0, 24);
           let state: GameState | null = null;
@@ -1800,6 +1823,13 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         try {
           if (!checkRate(socket.id, "create_tournament", 3, 60_000)) {
             return callback?.({ ok: false, error: "Slow down — too many tournaments created." });
+          }
+          // Hard cap checked BEFORE ip-rate mutation (same reasoning as create_room).
+          if (getAllTournaments().length >= MAX_TOTAL_TOURNAMENTS) {
+            return callback?.({ ok: false, error: "Server is at capacity. Please try again later." });
+          }
+          if (!checkIpRate(socket.handshake.address, "create_tournament", 10, 10 * 60_000)) {
+            return callback?.({ ok: false, error: "Too many tournaments created from this network. Try again later." });
           }
           const host = (data.hostName || "Host").slice(0, 24);
           const { tournament: t, hostToken } = createTournamentEntity(host, socket.id, {

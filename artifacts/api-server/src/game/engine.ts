@@ -921,6 +921,9 @@ export function promoteNextChallenger(
   };
 }
 
+/** Hard cap on watchers per room — prevents broadcast fan-out amplification. */
+export const MAX_SPECTATORS_PER_ROOM = 50;
+
 export function addSpectator(
   roomCode: string,
   name: string,
@@ -933,6 +936,9 @@ export function addSpectator(
   if (existing >= 0) {
     state.spectators[existing] = { id: socketId, name, socketId };
   } else {
+    if (state.spectators.length >= MAX_SPECTATORS_PER_ROOM) {
+      throw new Error("Room is full — spectator limit reached");
+    }
     state.spectators.push({ id: socketId, name, socketId });
   }
   rooms.set(roomCode, state);
@@ -946,8 +952,25 @@ export function reconnectSpectator(
 ): GameState {
   const state = rooms.get(roomCode);
   if (!state) throw new Error("Room not found");
-  // Just (re)add — same as a fresh spectator join
-  state.spectators.push({ id: newSocketId, name, socketId: newSocketId });
+  // Deduplicate: if this socket is already registered as a spectator, update
+  // in place (same path as addSpectator). If not found by socketId, remove any
+  // stale entry with the same name (the previous connection's record) and then
+  // add the new one — but never create duplicates or grow unboundedly.
+  const bySocket = state.spectators.findIndex((s) => s.socketId === newSocketId);
+  if (bySocket >= 0) {
+    state.spectators[bySocket] = { id: newSocketId, name, socketId: newSocketId };
+  } else {
+    // Remove the old-socketId entry for this name, if present
+    const byName = state.spectators.findIndex((s) => s.name === name);
+    if (byName >= 0) {
+      state.spectators[byName] = { id: newSocketId, name, socketId: newSocketId };
+    } else {
+      if (state.spectators.length >= MAX_SPECTATORS_PER_ROOM) {
+        throw new Error("Room is full — spectator limit reached");
+      }
+      state.spectators.push({ id: newSocketId, name, socketId: newSocketId });
+    }
+  }
   rooms.set(roomCode, state);
   return state;
 }

@@ -1,13 +1,32 @@
-import { Router } from "express";
-import { createRoom, getRoom } from "../game/engine.js";
+import { Router, type Request } from "express";
+import { createRoom, getRoom, getAllRooms } from "../game/engine.js";
+import { checkIpRate } from "../lib/ipRateLimit.js";
 
 const router = Router();
+
+const MAX_TOTAL_ROOMS = 500;
+
+function clientIpFromReq(req: Request): string {
+  // With app.set("trust proxy", 1) Express resolves req.ip from the proxy's
+  // X-Forwarded-For in a standards-compliant, non-spoofable way.
+  return req.ip ?? "unknown";
+}
 
 router.post("/", (req, res) => {
   try {
     const { playerName } = req.body as { playerName?: string };
     if (!playerName || typeof playerName !== "string") {
       res.status(400).json({ error: "playerName is required" });
+      return;
+    }
+    // Hard cap first — no bucket mutation needed when server is full.
+    if (getAllRooms().length >= MAX_TOTAL_ROOMS) {
+      res.status(503).json({ error: "Server is at capacity. Please try again later." });
+      return;
+    }
+    const ip = clientIpFromReq(req);
+    if (!checkIpRate(ip, "create_room", 20, 10 * 60_000)) {
+      res.status(429).json({ error: "Too many rooms created from this network. Try again later." });
       return;
     }
     const state = createRoom(playerName.trim(), `http-${Date.now()}`);
