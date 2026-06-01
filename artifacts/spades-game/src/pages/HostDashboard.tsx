@@ -161,6 +161,7 @@ export default function HostDashboard() {
   const {
     socket,
     connected,
+    connect,
     adminDashboard,
     adminAuditLog,
     adminPauseMatch,
@@ -200,6 +201,15 @@ export default function HostDashboard() {
     },
     [toast],
   );
+
+  // The shared socket is created with autoConnect:false, so every entry page
+  // must trigger the connection itself. Lobby and Tournament already do this;
+  // without it, a host who refreshes or opens /tournament/:code/host directly
+  // never connects and the dashboard hangs on "Loading tournament state…".
+  // connect() is idempotent (no-op if already connected).
+  useEffect(() => {
+    connect();
+  }, [connect]);
 
   // Token-gated: if no localStorage token exists, this is not the host
   // (or they cleared cache). Bounce back to the tournament page.
@@ -306,8 +316,28 @@ export default function HostDashboard() {
   }
   if (!snapshot) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-muted-foreground">
-        {err ?? "Loading tournament state…"}
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3 text-muted-foreground px-6 text-center">
+        <p data-testid="dashboard-loading-status">
+          {err
+            ? err
+            : !connected
+            ? "Connecting to server…"
+            : "Loading tournament state…"}
+        </p>
+        {err && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setErr(null);
+              connect();
+              void refresh();
+            }}
+            data-testid="dashboard-retry"
+          >
+            Retry
+          </Button>
+        )}
       </div>
     );
   }
