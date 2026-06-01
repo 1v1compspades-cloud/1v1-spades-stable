@@ -12,7 +12,7 @@ import { ConnectionPill } from "@/components/ConnectionPill";
 export default function Lobby() {
   const [, setLocation] = useLocation();
   const { connect, connected, socket, createRoom, joinRoom, joinAsSpectator, createTournament, joinTournament } = useSocket();
-  const { playerName, savePlayerName, saveRoomCode, savePlayerIndex, saveIsSpectator, saveTournamentToken, getTournamentToken, savePlayerToken } = useGameStorage();
+  const { playerName, savePlayerName, saveRoomCode, savePlayerIndex, saveIsSpectator, saveTournamentToken, getTournamentToken, savePlayerToken, saveHostToken } = useGameStorage();
   const { toast } = useToast();
 
   // Parse ?room=XXX&mode=spectator from the URL (once on mount)
@@ -59,7 +59,13 @@ export default function Lobby() {
           size: tournamentSize,
           matchTarget,
         });
-        saveTournamentToken(res.code, res.token);
+        // SECURITY: the creator's secret is the HOST token. Store it ONLY
+        // under the dedicated host key — never the shared tournament-token key
+        // that players also write to. Host detection / Host Tools access keys
+        // exclusively off this host key, so a joined player can never inherit
+        // host controls. (createTournament also makes the host a player whose
+        // per-player token equals this host token, so reconnect still works.)
+        saveHostToken(res.code, res.token);
         setLocation(`/tournament/${res.code}`);
         return;
       }

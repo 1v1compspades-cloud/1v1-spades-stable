@@ -17,8 +17,32 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { AdminAuditEntry, AdminDashboardSnapshot, AdminMatchSnapshot } from "@/lib/game";
 
+// SECURITY: Host Tools is gated EXCLUSIVELY on the dedicated host token key.
+// Players write their per-player reconnect token under `spades_tournament_token_`,
+// so keying off that shared prefix would let any joined player open this
+// dashboard. The host token lives under its own key, written only by the
+// tournament creator's browser. The server is still the auth-of-record — every
+// admin_* call below revalidates this token against the tournament's stored
+// host token and rejects a non-host (see the host-rejection bounce in refresh()).
 function tokenKey(code: string): string {
-  return `spades_tournament_token_${code}`;
+  return `spades_tournament_host_token_${code}`;
+}
+
+// Host tokens are stored TTL-wrapped as JSON ({ token, savedAt }) by
+// useGameStorage.saveHostToken. Read+unwrap here so we send the bare token to
+// admin_* events — sending the JSON wrapper would fail host validation and
+// lock the real host out of their own dashboard. Back-compat: older entries
+// were stored as the bare token string.
+function readHostToken(code: string): string | null {
+  const raw = localStorage.getItem(tokenKey(code));
+  if (!raw) return null;
+  if (!raw.startsWith("{")) return raw;
+  try {
+    const parsed = JSON.parse(raw) as { token?: string };
+    return parsed?.token ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function formatTs(ts: number): string {
@@ -223,7 +247,7 @@ export default function HostDashboard() {
   // Token-gated: if no localStorage token exists, this is not the host
   // (or they cleared cache). Bounce back to the tournament page.
   useEffect(() => {
-    const t = localStorage.getItem(tokenKey(code));
+    const t = readHostToken(code);
     if (!t) {
       setLocation(`/tournament/${code}`);
       return;
@@ -244,8 +268,16 @@ export default function HostDashboard() {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setErr(msg);
-      // If host rejection (wrong token), bounce out.
+      // Server-authoritative host validation: admin_dashboard rejects any token
+      // that is not the tournament's stored host token. On rejection, this
+      // browser is NOT the host — clear the stale host claim from localStorage
+      // so it can't keep re-entering, show the denial message, and bounce out.
       if (msg.toLowerCase().includes("host")) {
+        try { localStorage.removeItem(tokenKey(code)); } catch { /* ignore */ }
+        toast({
+          description: "Host access denied. This browser is not the tournament host.",
+          variant: "destructive",
+        });
         setLocation(`/tournament/${code}`);
       }
     }

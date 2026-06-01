@@ -196,7 +196,7 @@ export default function Tournament() {
   const [, setLocation] = useLocation();
   const code = (params?.code || "").toUpperCase();
   const { toast } = useToast();
-  const { playerName, savePlayerName, saveRoomCode, savePlayerIndex, saveIsSpectator, saveTournamentToken, getTournamentToken, savePlayerToken } = useGameStorage();
+  const { playerName, savePlayerName, saveRoomCode, savePlayerIndex, saveIsSpectator, saveTournamentToken, getTournamentToken, savePlayerToken, getHostToken } = useGameStorage();
   const {
     connect, connected,
     tournament, subscribeTournament, joinTournament, leaveTournament, startTournament,
@@ -257,7 +257,10 @@ export default function Tournament() {
   // Subscribe / resubscribe whenever socket reconnects.
   useEffect(() => {
     if (!connected || !code) return;
-    const token = getTournamentToken(code) || undefined;
+    // Send the host token if this browser is the host (host token === host's
+    // own per-player token), otherwise the player's reconnect token. Never the
+    // other way around — a player has no host token to send.
+    const token = getHostToken(code) || getTournamentToken(code) || undefined;
     subscribeTournament(code, playerName || undefined, token)
       .then((res) => setAuthenticated(res.authenticated))
       .catch((err) => {
@@ -330,7 +333,7 @@ export default function Tournament() {
 
   const handleHostForfeit = async (matchId: string, seat: "A" | "B") => {
     try {
-      const token = getTournamentToken(code) || undefined;
+      const token = getHostToken(code) || undefined;
       await forceForfeitMatch(code, matchId, seat, token);
       toast({ description: `Forfeited seat ${seat}` });
     } catch (err: unknown) {
@@ -361,7 +364,10 @@ export default function Tournament() {
   }, [t, playerName]);
 
   const iAmHost = !!hostSnapshot && t?.hostName.trim().toLowerCase() === hostSnapshot.trim().toLowerCase();
-  const hasHostToken = !!getTournamentToken(code);
+  // SECURITY: host-only UI keys off the dedicated host token, NOT the shared
+  // tournament-token key (which every joined player also writes). This is the
+  // single source of truth for "this browser is the tournament host".
+  const hasHostToken = !!getHostToken(code);
 
   const handleJoin = async () => {
     if (!nameInput.trim()) { toast({ description: "Please enter your name", variant: "destructive" }); return; }
@@ -408,7 +414,7 @@ export default function Tournament() {
       toast({ description: "Enter a backup player name", variant: "destructive" });
       return;
     }
-    const token = getTournamentToken(code);
+    const token = getHostToken(code);
     if (!token) {
       toast({ description: "Host token missing — refresh and try again", variant: "destructive" });
       return;
@@ -438,7 +444,7 @@ export default function Tournament() {
     if (!t) return;
     setStarting(true);
     try {
-      const token = getTournamentToken(code) || undefined;
+      const token = getHostToken(code) || undefined;
       await startTournament(code, token);
       setHostAuthFailed(false);
     } catch (err: unknown) {
@@ -528,7 +534,7 @@ export default function Tournament() {
                 }`}>
                   {isLobby ? "Lobby" : isComplete ? "Complete" : "In Progress"}
                 </span>
-                {iAmHost && (
+                {hasHostToken && (
                   <Button
                     size="sm"
                     variant="outline"
@@ -569,7 +575,7 @@ export default function Tournament() {
                 {Array.from({ length: t.size }).map((_, i) => {
                   const p = t.players[i];
                   const isHostSlot = !!p && p.name.trim().toLowerCase() === t.hostName.trim().toLowerCase();
-                  const canReplace = !!p && !isHostSlot && iAmHost;
+                  const canReplace = !!p && !isHostSlot && hasHostToken;
                   return (
                     <div
                       key={i}
@@ -740,7 +746,7 @@ export default function Tournament() {
               <CardTitle className="text-base">Bracket</CardTitle>
             </CardHeader>
             <CardContent>
-              <BracketView t={t} myName={playerName || ""} iAmHost={iAmHost} onForfeit={handleHostForfeit} />
+              <BracketView t={t} myName={playerName || ""} iAmHost={hasHostToken} onForfeit={handleHostForfeit} />
             </CardContent>
           </Card>
         )}

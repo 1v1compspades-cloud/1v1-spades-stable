@@ -312,7 +312,10 @@ export default function Room() {
     const isTournamentHost =
       !!tournamentCode &&
       typeof window !== "undefined" &&
-      !!window.localStorage.getItem(`spades_tournament_token_${tournamentCode}`);
+      // SECURITY: gate the Host-tools shortcut on the dedicated host token key
+      // only — never the shared `spades_tournament_token_` key that players also
+      // write, or every seated player would see a host shortcut here.
+      !!window.localStorage.getItem(`spades_tournament_host_token_${tournamentCode}`);
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-6 text-muted-foreground relative px-4 text-center">
         <div className="absolute top-2 right-2">
