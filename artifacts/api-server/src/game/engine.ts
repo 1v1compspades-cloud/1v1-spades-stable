@@ -399,11 +399,16 @@ export function setPlayerReady(
  */
 export function resetRoom(
   roomCode: string,
-  requesterSocketId: string
+  requesterSocketId: string,
+  opts: { admin?: boolean } = {}
 ): GameState {
   const state = rooms.get(roomCode);
   if (!state) throw new Error("Room not found");
-  if (state.players[0]?.socketId !== requesterSocketId) {
+  // Reset Room is an admin/streamer-only destructive tool. The socket layer
+  // gates it with requireAdmin and passes { admin: true }; the seat-0 fallback
+  // remains only so the engine signature stays usable, but is never reachable
+  // from a non-admin caller in production.
+  if (!opts.admin && state.players[0]?.socketId !== requesterSocketId) {
     throw new Error("Only the host can reset the room");
   }
   const reset = resetMatch(state);

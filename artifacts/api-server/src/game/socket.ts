@@ -2998,6 +2998,17 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         data: { roomCode: string },
         callback?: (res: { ok: boolean; error?: string }) => void
       ) => {
+        // Reset Room is an ADMIN-ONLY destructive tool (streamer/host). Reject
+        // every non-admin caller server-side BEFORE any work — seated players,
+        // KotT Kings/challengers, tournament players, and spectators included.
+        // This is the real security boundary; hiding the button is defense in depth.
+        if (!adminSockets.has(socket.id)) {
+          logger.warn(
+            { socketId: socket.id, roomCode: data?.roomCode },
+            "Rejected unauthorized reset_room (admin only)"
+          );
+          return callback?.({ ok: false, error: "Admin authentication required" });
+        }
         try {
           const code = data.roomCode.toUpperCase().trim();
           let state: GameState | null = null;
@@ -3010,7 +3021,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
                   "Cannot reset a tournament match room. Use Back to Tournament Bracket instead."
                 );
               }
-              state = resetRoom(code, socket.id);
+              state = resetRoom(code, socket.id, { admin: true });
               await commit(state, {
                 action: "room_reset",
                 actorSeat: 0,
@@ -3021,7 +3032,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
             }
           });
           if (rErr || !state) throw rErr ?? new Error("reset_room failed");
-          logger.info({ roomCode: code }, "Room reset by host");
+          logger.info({ roomCode: code }, "Room reset by admin");
           callback?.({ ok: true });
           broadcastState(io, state!);
         } catch (err: unknown) {

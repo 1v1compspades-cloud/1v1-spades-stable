@@ -608,7 +608,7 @@ export default function Room() {
   };
 
   const handleResetRoom = async () => {
-    if (!isHost || !roomCode) return;
+    if (!isAdmin || !roomCode) return;
     const ok = typeof window !== "undefined"
       ? window.confirm("Reset this room? Scores and current hand will be cleared. Both players stay in the room.")
       : true;
@@ -1143,7 +1143,7 @@ export default function Room() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                {isHost && (
+                {isAdmin && (
                   <Button
                     variant="outline"
                     onClick={handleResetRoom}
@@ -1160,7 +1160,7 @@ export default function Room() {
                   data-testid="button-leave-room"
                   className={cn(
                     "min-h-[44px] text-muted-foreground hover:text-foreground",
-                    !isHost && "sm:col-span-2",
+                    !isAdmin && "sm:col-span-2",
                   )}
                 >
                   Leave Room
@@ -2077,10 +2077,11 @@ export default function Room() {
   // Spectator: never see the waiting screen as theirs — show a neutral version
   // Spectator that joined before host hits "Start" — show waiting screen.
   // (Coin toss and beyond render the normal table layout with overlay.)
-  // Host-only floating "Reset Room" — visible during play (not waiting/game_over,
-  // since those screens already have their own host actions).
+  // ADMIN-ONLY floating "Reset Room" — visible during play (not waiting/game_over,
+  // since those screens already have their own actions). Gated on isAdmin (the
+  // secret-key streamer/host), never on the seat-0 room host.
   const showHostResetFab =
-    isHost &&
+    isAdmin &&
     gameState.phase !== "waiting" &&
     gameState.phase !== "game_over";
 
