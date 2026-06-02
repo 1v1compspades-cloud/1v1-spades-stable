@@ -7,6 +7,7 @@
 - [Spades tournament finals-seating reclaim](spades-tournament-finals-seating.md) — tournament-room seats are reclaimable by name from `join_room` (createMatchRoomAndAssign bakes stale socketIds); reclaim path MUST refuse tokenized seats to avoid bypassing reconnect_player's token gate.
 - [Spades client roster membership must trust server auth](spades-roster-membership-auth.md) — never gate `iAmInRoster`-style UI on a localStorage name compare; combine with the server-confirmed `authenticated` flag or invitees collide.
 - [Spades multi-room socket membership](spades-multi-room-socket.md) — winner's socket stays in completed match room after advancement; client must filter game_state by roomCode or UI flip-flops.
+- [Spades socket-test driving](spades-socket-test-driving.md) — start_game has NO ack; never await it. Drive live match tests event-driven off game_state.phase leaving "waiting".
 - [Spades dev/preview tool authorization](spades-dev-tool-preview-auth.md) — env-gated ("dev OR admin") match-mutating tools must ALSO require seated-in-room for the non-admin dev path; shared preview URL = public.
 - [KotT step-down loser-only](spades-kott-stepdown-loser-only.md) — any game_over seat-vacate must be loser-only server-side; a winner vacating crowns the loser via promoteNextChallenger null-seat branch.
 - [KotT single-player lobby](spades-kott-single-player-lobby.md) — "lobby doesn't hold with one player" is a frontend UX gap; server already persists the room. Lone player = table-holder King-in-waiting.
