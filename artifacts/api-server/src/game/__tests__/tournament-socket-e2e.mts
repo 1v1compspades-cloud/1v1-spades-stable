@@ -158,7 +158,12 @@ async function main() {
       return;
     }
     const winnerSeat = winnerSeatFor(m.matchId);
-    const res = await emitAck<{ ok: boolean; error?: string }>(sock, "fast_finish_match", {
+    // fast_finish_match is ADMIN-ONLY — drive it from the unlocked admin socket,
+    // never a player socket. (Admins are exempt from the seated-in-room check
+    // and routinely finish bracket rooms from the side.) Every match in this
+    // test funnels through the single admin socket; the server's per-socket rate
+    // cap (60/60s) is sized to clear a full bracket, so no backoff is needed.
+    const res = await emitAck<{ ok: boolean; error?: string }>(admin, "fast_finish_match", {
       roomCode: m.roomCode,
       winnerSeat,
     }).catch((e) => ({ ok: false, error: String(e) }));

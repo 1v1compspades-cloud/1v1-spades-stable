@@ -2096,13 +2096,15 @@ export default function Room() {
     </button>
   );
 
-  // Dev/host Fast Finish test tool. Shown to an unlocked admin (the host/
-  // streamer, even when spectating a KotT/tournament table) OR, in dev/preview,
-  // to a SEATED player (never a regular spectator). The server independently
-  // re-checks authorization and rejects a dev spectator — this gate is purely
-  // to keep the button off normal players' and spectators' screens.
+  // Host Fast Finish / End Game test tool. ADMIN-ONLY: shown ONLY to a socket
+  // unlocked with the secret host key (the streamer/host, even when spectating
+  // a KotT/tournament table). There is deliberately NO dev/preview path —
+  // preview URLs are shareable, so an env-based grant leaked this match-ending
+  // tool to ordinary players and challengers. The server independently enforces
+  // the same admin-only rule; this gate just keeps the button off everyone
+  // else's screen.
   const canFastFinish =
-    (isAdmin || (import.meta.env.DEV && !spectator)) &&
+    isAdmin &&
     gameState.phase !== "waiting" &&
     gameState.phase !== "game_over";
 

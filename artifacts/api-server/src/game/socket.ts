@@ -181,21 +181,18 @@ function requireAdmin(socket: Socket): string {
   return "Admin";
 }
 
-/** True in dev/preview — anything that is NOT a production deployment. */
-function isDevEnvironment(): boolean {
-  return process.env.NODE_ENV !== "production";
-}
-
 /**
- * Authorize the dev/host "Fast Finish" test tool. Allowed when running in a
- * non-production (dev/preview) environment OR when this socket has been
- * unlocked as admin (ADMIN_HOST_KEY). Fails closed in production for
- * non-admin sockets. Returns the actor label used in audit/log entries.
+ * Authorize the host "Fast Finish" / End Game test tool. This is an
+ * ADMIN-ONLY control: the ONLY way to pass is a socket that proved the secret
+ * ADMIN_HOST_KEY via `admin_unlock`. There is deliberately NO dev/preview
+ * bypass — the preview environment is publicly shareable, so an
+ * environment-based grant would (and did) leak this match-ending tool to
+ * ordinary seated players and challengers. Fails closed for everyone else.
+ * Returns the actor label used in audit/log entries.
  */
 function requireFastFinishAuth(socket: Socket): string {
-  if (isDevEnvironment()) return "Dev";
   if (adminSockets.has(socket.id)) return "Admin";
-  throw new Error("Fast Finish is restricted to dev/preview or an unlocked host");
+  throw new Error("Fast Finish is restricted to the unlocked host/admin");
 }
 
 // ── Visitor counters (in-memory, reset on server restart) ───────────────────
@@ -764,7 +761,7 @@ function endMatchForTesting(
     });
     logger.info(
       { roomCode, winnerSeat, winnerName, loserName, mode: state.mode, actor },
-      "Match ended by Fast Finish dev/host test tool",
+      "Match ended by Fast Finish host/admin test tool",
     );
     broadcastState(io, finalState);
 
@@ -2110,13 +2107,14 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
     // tournament advancement, KotT winner/loser flow, game-over/champion
     // screens, and reconnect behavior without playing a full game.
     //
-    // Authorization (server-authoritative, fails closed):
-    //   - allowed in dev/preview (NODE_ENV !== "production"), OR
-    //   - allowed for a socket unlocked as admin (ADMIN_HOST_KEY).
-    // A normal player/spectator in production can NEVER trigger this — the
-    // client also hides the button, but this server gate is the real boundary.
-    // Routes through endMatchForTesting → the SAME game-over pipeline a natural
-    // completion uses (no bidding/scoring/bracket/KotT logic is altered).
+    // Authorization (server-authoritative, fails closed): ADMIN-ONLY. The only
+    // socket that may end a match this way is one unlocked with the secret
+    // ADMIN_HOST_KEY. A normal player, challenger, or spectator — in dev/preview
+    // OR production — can NEVER trigger this. The client also hides the button,
+    // but this server gate is the real boundary. Unauthorized attempts are
+    // logged below. Routes through endMatchForTesting → the SAME game-over
+    // pipeline a natural completion uses (no bidding/scoring/bracket/KotT logic
+    // is altered).
     socket.on(
       "fast_finish_match",
       async (
@@ -2125,22 +2123,15 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
       ) => {
         try {
           const actor = requireFastFinishAuth(socket);
-          if (!checkRate(socket.id, "fast_finish_match", 20, 60_000)) {
+          // Admin-only tool (the only caller that gets here is the unlocked
+          // host), so this cap is just a runaway-loop guard, not a trust
+          // boundary. Sized to let a host drive a full 32-player bracket (max 31
+          // matches) from the side without tripping when many resolve at once.
+          if (!checkRate(socket.id, "fast_finish_match", 60, 60_000)) {
             throw new Error("Slow down — too many Fast Finish requests");
           }
           const code = (data?.roomCode || "").toUpperCase().trim();
           if (!code) throw new Error("Missing room code");
-          // Dev/preview is permissive by environment, but a preview URL can be
-          // shared — so a non-admin "Dev" actor must still be a SEATED player in
-          // the target room. This blocks a spectator (or any random socket) from
-          // nuking a match they aren't playing. Admins (the streamer/host) are
-          // exempt: they routinely drive KotT/tournament rooms from the side.
-          if (actor === "Dev") {
-            const room = getRoom(code);
-            if (!room || !room.players.some((p) => p?.socketId === socket.id)) {
-              throw new Error("Fast Finish (dev) requires being seated in this room");
-            }
-          }
           const winnerSeat: 0 | 1 = data?.winnerSeat === 1 ? 1 : 0;
           if (data?.winnerSeat !== 0 && data?.winnerSeat !== 1) {
             throw new Error("winnerSeat must be 0 or 1");
@@ -2149,6 +2140,11 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           callback?.(res);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
+          // Surface unauthorized/blocked admin-tool attempts for monitoring.
+          logger.warn(
+            { event: "fast_finish_match", socketId: socket.id, roomCode: data?.roomCode, reason: msg },
+            "Blocked Fast Finish attempt",
+          );
           callback?.({ ok: false, error: msg });
         }
       }
