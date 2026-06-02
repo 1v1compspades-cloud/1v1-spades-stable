@@ -1242,76 +1242,93 @@ export default function Room() {
         })()}
 
         {/* Bidding overlay (players only) */}
-        {/* Pre-June-1 bugfix #3: use `fixed inset-0` (not absolute) so the
-            overlay covers the WHOLE viewport on mobile — the absolute parent
-            doesn't include the hand-fan area, so on small screens the centered
-            dialog was being clipped/pushed behind the hand. Adding safe-area
-            padding keeps the Confirm button above the iOS home indicator. */}
+        {/* Layout/stacking notes:
+            - The dim backdrop and the bid PANEL are split into two separate
+              `fixed` siblings on purpose. The bottom-player score row is
+              `relative z-[110]` so it stays visible during bidding; the backdrop
+              therefore sits BELOW it (z-[90]) so the score isn't dimmed, while
+              the bid panel sits ABOVE it (z-[120]) so the Confirm button is
+              never painted behind the score row / cards (the old single-layer
+              z-[100] modal lost this fight and the button became un-tappable).
+            - `fixed inset-0` covers the whole viewport (the absolute table
+              parent excludes the hand-fan area on mobile).
+            - Backdrop is `pointer-events-none` so swipes pass through to scroll
+              the 13-card hand; the panel is `pointer-events-auto` for taps.
+            - The panel is compact + `max-h`/internal scroll so it never grows
+              down into the bottom score row, and carries safe-area padding so
+              Confirm clears the iOS home indicator. */}
         {!spectator && gameState.phase === "bidding" && gameState.currentBidder === playerIndex && (
-          <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 overflow-y-auto pointer-events-none"
-            style={{
-              paddingTop: "max(1rem, env(safe-area-inset-top))",
-              paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
-              paddingLeft: "max(1rem, env(safe-area-inset-left))",
-              paddingRight: "max(1rem, env(safe-area-inset-right))",
-            }}
-            data-testid="bidding-overlay"
-          >
-            {/* pointer-events-auto on the card re-enables clicks/taps on the
-                modal itself, while pointer-events-none on the backdrop lets
-                touch/swipe pass through to the hand below — so mobile players
-                can scroll their 13 cards horizontally before bidding. */}
-            <div className="bg-card border border-border p-6 rounded-xl shadow-2xl space-y-4 max-w-sm w-full text-center my-auto pointer-events-auto">
-              <h3 className="text-xl font-serif text-primary">Place your bid</h3>
-              {gameState.bids[0] === null && gameState.bids[1] === null && (
-                <p className="text-xs uppercase tracking-widest text-primary/80">
-                  You bid first this round (Round {gameState.roundNumber})
+          <>
+            <div
+              className="fixed inset-0 z-[90] bg-black/75 pointer-events-none"
+              data-testid="bidding-backdrop"
+              aria-hidden="true"
+            />
+            <div
+              className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto pointer-events-none"
+              style={{
+                paddingTop: "max(1rem, env(safe-area-inset-top))",
+                paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
+                paddingLeft: "max(1rem, env(safe-area-inset-left))",
+                paddingRight: "max(1rem, env(safe-area-inset-right))",
+              }}
+              data-testid="bidding-overlay"
+            >
+              <div className="bg-card border border-border p-5 rounded-xl shadow-2xl space-y-3 max-w-sm w-full text-center my-auto max-h-[80vh] overflow-y-auto pointer-events-auto">
+                <h3 className="text-lg font-serif text-primary">Place your bid</h3>
+                {gameState.bids[0] === null && gameState.bids[1] === null && (
+                  <p className="text-[11px] uppercase tracking-widest text-primary/80">
+                    You bid first this round (Round {gameState.roundNumber})
+                  </p>
+                )}
+                {(gameState.bids[0] !== null || gameState.bids[1] !== null) && (
+                  <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
+                    You bid second this round
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  You have {gameState.hand.length} cards. Bid 0 for Nil (+/−125).
                 </p>
-              )}
-              {(gameState.bids[0] !== null || gameState.bids[1] !== null) && (
-                <p className="text-xs uppercase tracking-widest text-muted-foreground">
-                  You bid second this round
-                </p>
-              )}
-              <p className="text-sm text-muted-foreground">
-                You have {gameState.hand.length} cards. Bid 0 for Nil (+/−125).
-              </p>
-              <div
-                data-testid="bid-buttons"
-                className="grid grid-cols-4 sm:grid-cols-7 gap-2 w-full"
-              >
-                {Array.from({ length: 14 }).map((_, i) => {
-                  const val = i.toString();
-                  const selected = bidAmount === val;
-                  return (
-                    <button
-                      key={i}
-                      type="button"
-                      data-testid={`bid-btn-${i}`}
-                      onClick={() => setBidAmount(val)}
-                      className={cn(
-                        "min-h-[44px] rounded-lg border text-base font-bold tabular-nums transition-colors",
-                        selected
-                          ? "bg-primary text-primary-foreground border-primary shadow-md"
-                          : "bg-[#071f18] text-foreground border-white/20 hover:bg-white/5 active:bg-white/10"
-                      )}
-                    >
-                      {i === 0 ? "Nil" : i}
-                    </button>
-                  );
-                })}
+                <div
+                  data-testid="bid-buttons"
+                  className="grid grid-cols-5 sm:grid-cols-7 gap-1.5 w-full"
+                >
+                  {Array.from({ length: 14 }).map((_, i) => {
+                    const val = i.toString();
+                    const selected = bidAmount === val;
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        data-testid={`bid-btn-${i}`}
+                        onClick={() => setBidAmount(val)}
+                        className={cn(
+                          "min-h-[44px] rounded-lg border text-sm font-bold tabular-nums transition-colors",
+                          selected
+                            ? "bg-primary text-primary-foreground border-primary shadow-md"
+                            : "bg-[#071f18] text-foreground border-white/20 hover:bg-white/5 active:bg-white/10"
+                        )}
+                      >
+                        {i === 0 ? "Nil" : i}
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* Sticky so the Confirm button stays pinned and tappable even
+                    if the panel scrolls internally on very short screens. */}
+                <div className="sticky bottom-0 -mx-5 -mb-5 px-5 pt-2 pb-4 bg-card">
+                  <Button
+                    onClick={handleBid}
+                    disabled={!bidAmount || isSubmitting}
+                    className="mx-auto block h-auto min-h-[44px] w-full max-w-[200px] px-6 py-2.5 text-base"
+                    data-testid="button-confirm-bid"
+                  >
+                    {bidAmount ? `Bid ${bidAmount === "0" ? "Nil" : bidAmount}` : "Select a bid first"}
+                  </Button>
+                </div>
               </div>
-              <Button
-                onClick={handleBid}
-                disabled={!bidAmount || isSubmitting}
-                className="mx-auto block h-auto min-h-[44px] w-full max-w-[200px] px-6 py-2.5 text-base"
-                data-testid="button-confirm-bid"
-              >
-                {bidAmount ? `Bid ${bidAmount === "0" ? "Nil" : bidAmount}` : "Select a bid first"}
-              </Button>
             </div>
-          </div>
+          </>
         )}
 
         {/* Round over overlay (shown to everyone, including spectators) */}

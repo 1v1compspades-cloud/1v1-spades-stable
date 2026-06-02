@@ -1,0 +1,45 @@
+URGENT UI fix: bid button is still behind the cards and barely clickable.
+
+Issue:
+The bid/submit button is overlapping with or hidden behind the player cards, especially on mobile. It is hard to tap/click and this affects gameplay.
+
+Goal:
+Make the bid button clearly visible, centered, and fully clickable in all game modes.
+
+Apply to:
+- normal 1v1 games
+- tournament match rooms
+- King of the Table games
+- spectator/host-safe views if bidding UI appears anywhere
+- mobile Safari/iPhone layouts
+- desktop layouts
+
+Requirements:
+1. Do not change bidding logic.
+2. Do not change scoring, cards, dealing, sockets, room state, timers, tournament advancement, or King of the Table logic.
+3. CSS/layout/UI-only fix.
+4. Bid controls must appear above the player hand/cards, not behind them.
+5. Bid button must have a higher z-index than cards and overlays if needed.
+6. Bid button must be centered horizontally.
+7. Bid button should be smaller/cleaner but still easy to tap.
+8. Minimum tap height should stay around 44px for mobile.
+9. Add enough bottom padding/margin so the cards do not cover the bid controls.
+10. Make sure the bottom player score remains visible during bidding.
+11. Make sure the bid number/options remain clickable/scrollable on mobile.
+12. Test on mobile Safari and desktop.
+13. If there are multiple bidding components/classes, fix all of them, not just one route.
+
+Suggested fix:
+- Put bidding controls in their own fixed or sticky bidding panel above the hand area.
+- Add bottom spacing to the game table while bidding is active.
+- Increase z-index for the bidding panel.
+- Make the player hand/cards lower priority in stacking order than the bidding panel.
+- Avoid placing the bid button inside a container that can be hidden behind the card hand.
+
+Acceptance test:
+- Start a normal game and reach bidding screen.
+- Confirm bid button is fully visible and clickable.
+- Start a tournament match and confirm the same.
+- Start King of the Table match and confirm the same.
+- On iPhone/mobile Safari, confirm the cards do not cover the bid button.
+- Confirm bottom score is still visible.
