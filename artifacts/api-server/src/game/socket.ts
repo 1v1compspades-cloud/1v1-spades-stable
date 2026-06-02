@@ -62,6 +62,7 @@ import {
   findMatchById,
   detachMatchRoom,
   replacePlayer,
+  reissuePlayerToken,
   type Tournament,
   type TournamentMatch,
   type PendingAssignment,
@@ -2527,6 +2528,46 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
             newPlayerToken: result.newPlayerToken,
             removedName: result.removedName,
             replacementName: result.replacementName,
+          });
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+        }
+      }
+    );
+
+    // Mid-tournament reconnect recovery. Rotates an existing player's per-player
+    // token and hands the fresh token back to the admin ONLY (never broadcast),
+    // so they can build a one-time reconnect link for a player who lost their
+    // browser / switched devices. Allowed at any status (unlike replace).
+    socket.on(
+      "admin_reissue_token",
+      (
+        data: { code: string; playerName: string; token?: string },
+        callback?: (res: { ok: boolean; error?: string; playerToken?: string; playerName?: string }) => void
+      ) => {
+        if (!checkRate(socket.id, "admin_reissue_token", 10, 30_000)) {
+          callback?.({ ok: false, error: "Too many reconnect-link requests — slow down" });
+          return;
+        }
+        try {
+          const code = (data.code || "").toUpperCase().trim();
+          const t = getTournament(code);
+          if (!t) throw new Error("Tournament not found");
+          const actorName = requireAdmin(socket);
+          const result = reissuePlayerToken(code, data.playerName || "");
+          appendAdminAudit(t, {
+            action: "reissue_token",
+            actorName,
+            payload: { playerName: result.playerName },
+          });
+          io.to(`tournament:${code}`).emit("admin_audit_appended", { code });
+          // Fresh token returned ONLY to the calling admin. It does NOT enter
+          // `sanitizeTournament` or any broadcast.
+          callback?.({
+            ok: true,
+            playerToken: result.playerToken,
+            playerName: result.playerName,
           });
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";

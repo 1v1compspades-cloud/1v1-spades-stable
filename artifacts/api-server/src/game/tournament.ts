@@ -88,7 +88,8 @@ export type AdminAuditAction =
   | "mark_winner"
   | "force_forfeit"
   | "force_start"
-  | "replace_player";
+  | "replace_player"
+  | "reissue_token";
 
 export interface AdminAuditEntry {
   ts: number;
@@ -331,6 +332,50 @@ export function replacePlayer(
     token,
   };
   return { tournament: t, newPlayerToken: token, removedName, replacementName: newTrimmed };
+}
+
+export interface ReissueTokenResult {
+  tournament: Tournament;
+  /** Fresh per-player token. Returned to the admin ONLY so they can hand the
+   *  player a one-time reconnect link. NEVER enters sanitized state. */
+  playerToken: string;
+  /** Display name of the player whose token was rotated (post-trim). */
+  playerName: string;
+}
+
+/**
+ * Admin-only mid-tournament reconnect recovery. Rotates an existing player's
+ * per-player token (invalidating the old one) WITHOUT changing their name,
+ * roster index, or in-flight match assignment. Use when a player lost their
+ * browser / is on a new device and can no longer reattach to their seat.
+ *
+ * Unlike `replacePlayer`, this is allowed at ANY tournament status — the whole
+ * point is to rescue a player who dropped during a live bracket.
+ *
+ * Only the `token` field is mutated; `pendingAssignment` (and everything else)
+ * is preserved so the player's new link lands them back in their CURRENT match
+ * via the normal `subscribe_tournament` → pending re-emit path.
+ *
+ * Throws "Tournament not found" / "Player not found in tournament".
+ *
+ * Auth: the caller MUST gate this with `requireAdmin(socket)` — this function
+ * does NOT perform any authorization itself.
+ */
+export function reissuePlayerToken(
+  code: string,
+  playerName: string,
+): ReissueTokenResult {
+  const t = tournaments.get(code);
+  if (!t) throw new Error("Tournament not found");
+  const key = (playerName || "").trim().toLowerCase();
+  if (!key) throw new Error("Player name is required");
+  const p = t.players.find((p) => p.name.trim().toLowerCase() === key);
+  if (!p) throw new Error("Player not found in tournament");
+  const token = makeToken();
+  // Rotate ONLY the token — keep name, roster index, and pendingAssignment so
+  // the player's new reconnect link re-routes them into their live match.
+  p.token = token;
+  return { tournament: t, playerToken: token, playerName: p.name };
 }
 
 export function leaveTournament(code: string, socketId: string): Tournament | null {

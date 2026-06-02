@@ -87,7 +87,8 @@ export type AdminAuditAction =
   | "mark_winner"
   | "force_forfeit"
   | "force_start"
-  | "replace_player";
+  | "replace_player"
+  | "reissue_token";
 
 export interface AdminAuditEntry {
   ts: number;

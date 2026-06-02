@@ -27,6 +27,8 @@ import {
   getAdminAuditLog,
   findMatchById,
   detachMatchRoom,
+  reissuePlayerToken,
+  setPendingAssignment,
   flushTournamentLocks,
   type Tournament,
 } from "../tournament.js";
@@ -134,6 +136,50 @@ async function testMarkWinnerIdempotency() {
   ok("conflict on DIFFERENT winner is rejected", conflict.kind === "rejected");
 }
 
+async function testReissueToken() {
+  console.log("\n── reissuePlayerToken (mid-tournament reconnect recovery) ──");
+  const { t } = await seed("reissue");
+  const p2 = t.players.find((p) => p.name.endsWith("_p2"))!;
+  const oldToken = p2.token;
+
+  // Simulate an in-flight match assignment that must survive the rotation.
+  setPendingAssignment(t, p2.name, {
+    roomCode: "RM-REISSUE",
+    matchId: "m-reissue",
+    playerIndex: 0,
+    matchLabel: "reissue Admin · Semifinal 1",
+    opponentName: "reissue_p3",
+  });
+
+  const res = reissuePlayerToken(t.code, p2.name);
+  ok("returns a fresh token", typeof res.playerToken === "string" && res.playerToken.length > 0);
+  ok("token actually changed", res.playerToken !== oldToken);
+  ok("old token is invalidated on the record", p2.token !== oldToken);
+  ok("record holds the new token", p2.token === res.playerToken);
+  ok("returns the canonical player name", res.playerName === p2.name);
+  ok("roster index preserved (still 1 player matches)",
+    t.players.filter((p) => p.name === p2.name).length === 1);
+  ok("pendingAssignment preserved across rotation",
+    p2.pendingAssignment?.roomCode === "RM-REISSUE" && p2.pendingAssignment?.matchId === "m-reissue");
+
+  // Case-insensitive / whitespace-tolerant name match.
+  const upper = reissuePlayerToken(t.code, `  ${p2.name.toUpperCase()}  `);
+  ok("matches name case-insensitively + trimmed", upper.playerName === p2.name);
+  ok("each call rotates to a NEW token", upper.playerToken !== res.playerToken);
+  ok("record holds the latest token after second rotation", p2.token === upper.playerToken);
+
+  // Allowed at any status (in_progress here), unlike replacePlayer.
+  ok("tournament is past lobby (status in_progress)", t.status === "in_progress");
+
+  let threw = false;
+  try { reissuePlayerToken(t.code, "nobody-here"); } catch { threw = true; }
+  ok("rejects unknown player", threw);
+
+  threw = false;
+  try { reissuePlayerToken("ZZZZZZ", p2.name); } catch { threw = true; }
+  ok("rejects unknown tournament", threw);
+}
+
 async function main() {
   console.log("Phase 6 — Host admin tools tests\n");
   try {
@@ -141,6 +187,7 @@ async function main() {
     await testAuditBuffer();
     await testMatchLookup();
     await testMarkWinnerIdempotency();
+    await testReissueToken();
   } catch (err) {
     console.error("Unhandled error in admin tests:", err);
     fail++;

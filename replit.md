@@ -101,6 +101,14 @@ Token-gated dashboard the tournament host uses to recover from disconnects, AFK,
 - UI: lobby roster shows a small "Replace" button on each non-host filled slot (host-only). After confirm, a copy-link dialog appears with the backup's join URL.
 - Audit action union extended in BOTH `artifacts/api-server/src/game/tournament.ts` AND `artifacts/spades-game/src/lib/game.ts` (`"replace_player"`).
 
+## Mid-tournament reconnect link (admin recovery)
+
+- Admin-only rescue for a player who lost their browser / switched devices mid-event and can no longer reattach to their seat (their reconnect token only lives in server memory + their original browser's localStorage). Distinct from Phase 7 replacement: this keeps the SAME player and is allowed at ANY tournament status, not just lobby.
+- Server: `reissuePlayerToken(code, playerName)` in `tournament.ts` finds the player case-insensitively and rotates ONLY `player.token` (via `makeToken()`), preserving name, roster index, and `pendingAssignment` so the new link re-routes them into their CURRENT live match. Throws on unknown tournament/player. Audit action `"reissue_token"` added to the union in BOTH `tournament.ts` and `game.ts`.
+- Socket event `admin_reissue_token` (in `socket.ts`) is gated by `requireAdmin(socket)`, rate-limited (10/30s), writes `AdminAuditEntry { action: "reissue_token", payload: { playerName } }`, emits `admin_audit_appended`, and returns `{ playerToken, playerName }` to the calling admin via callback ONLY — never broadcast, never in `sanitizeTournament`.
+- Backup-join path reused: the link is `…/tournament/<CODE>?join_name=<NAME>&join_token=<TOKEN>` (same format Tournament.tsx already parses for replacement); opening it writes the fresh token to localStorage and the normal `subscribe_tournament` flow re-authenticates as a reconnect.
+- UI: `HostDashboard.tsx` "Player status" panel shows a per-player "Reconnect link" button (hidden for eliminated players) → copy-link dialog. Client method `adminReissueToken(code, playerName)` in `useSocket.tsx` (no token in payload; authorized by the unlocked admin socket).
+
 ## Tournament invite link
 
 - Tournament lobby (`/tournament/<CODE>`) shows an "Invite link" panel to every roster member with a copy-to-clipboard button. The link is `${origin}${BASE_URL}/tournament/<CODE>` — points to the **tournament lobby**, NOT a 1v1 `/room/<CODE>` route.

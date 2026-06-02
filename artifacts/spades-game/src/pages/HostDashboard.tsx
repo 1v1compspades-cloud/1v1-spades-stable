@@ -175,6 +175,7 @@ export default function HostDashboard() {
     adminRemakeRoom,
     adminMarkWinner,
     adminForceForfeit,
+    adminReissueToken,
   } = useSocket();
 
   const { toast } = useToast();
@@ -183,6 +184,9 @@ export default function HostDashboard() {
   const [err, setErr] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<Confirm>(null);
+  // Mid-tournament reconnect-link recovery (admin only).
+  const [reissueBusy, setReissueBusy] = useState<string | null>(null);
+  const [reissueResult, setReissueResult] = useState<{ playerName: string; url: string } | null>(null);
 
   const inviteUrl = useMemo(() => {
     if (typeof window === "undefined") return "";
@@ -192,6 +196,27 @@ export default function HostDashboard() {
   }, [code]);
 
   const hostUrl = useMemo(() => (inviteUrl ? `${inviteUrl}/host` : ""), [inviteUrl]);
+
+  const handleReissue = useCallback(
+    async (playerName: string) => {
+      setReissueBusy(playerName);
+      try {
+        const res = await adminReissueToken(code, playerName);
+        const origin = window.location.origin;
+        const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+        const url = `${origin}${base}/tournament/${code}?join_name=${encodeURIComponent(res.playerName)}&join_token=${encodeURIComponent(res.playerToken)}`;
+        setReissueResult({ playerName: res.playerName, url });
+      } catch (e) {
+        toast({
+          description: typeof e === "string" ? e : "Could not create reconnect link",
+          variant: "destructive",
+        });
+      } finally {
+        setReissueBusy(null);
+      }
+    },
+    [adminReissueToken, code, toast],
+  );
 
   const spectatorLink = useCallback((roomCode: string) => {
     if (typeof window === "undefined") return "";
@@ -540,9 +565,23 @@ export default function HostDashboard() {
                       </span>
                     )}
                   </div>
-                  <span className={`text-xs whitespace-nowrap ${stateClass}`}>
-                    {stateLabel}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`text-xs whitespace-nowrap ${stateClass}`}>
+                      {stateLabel}
+                    </span>
+                    {p.state !== "eliminated" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 px-2 text-xs"
+                        disabled={reissueBusy === p.name}
+                        onClick={() => void handleReissue(p.name)}
+                        data-testid={`reissue-token-${p.name}`}
+                      >
+                        {reissueBusy === p.name ? "…" : "Reconnect link"}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -656,6 +695,36 @@ export default function HostDashboard() {
               }}
             >
               Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!reissueResult} onOpenChange={(o) => { if (!o) setReissueResult(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reconnect link for {reissueResult?.playerName}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Send this one-time link to <span className="font-semibold text-foreground">{reissueResult?.playerName}</span>. Opening it on any device claims their seat (it contains a fresh reconnect token) and drops them back into their current match. Their old link stops working.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            readOnly
+            value={reissueResult?.url ?? ""}
+            className="font-mono text-xs"
+            onFocus={(e) => e.currentTarget.select()}
+            data-testid="reissue-link-input"
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="reissue-close">Close</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="reissue-copy"
+              onClick={(e) => {
+                e.preventDefault();
+                if (reissueResult) void copyText(reissueResult.url, "Reconnect link");
+              }}
+            >
+              Copy link
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

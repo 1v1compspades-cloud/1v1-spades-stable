@@ -71,6 +71,7 @@ interface SocketContextType {
   adminMarkWinner: (code: string, matchId: string, winnerSeat: "A" | "B") => Promise<{ ok: true; replay?: boolean }>;
   adminForceForfeit: (code: string, matchId: string, forfeitSeat: "A" | "B") => Promise<unknown>;
   hostReplacePlayer: (code: string, oldName: string, newName: string) => Promise<{ ok: true; newPlayerToken: string; removedName: string; replacementName: string }>;
+  adminReissueToken: (code: string, playerName: string) => Promise<{ ok: true; playerToken: string; playerName: string }>;
 }
 
 const SocketContext = createContext<SocketContextType | null>(null);
@@ -464,6 +465,11 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       "host_replace_player",
       { code, oldName, newName },
     );
+  const adminReissueToken = (code: string, playerName: string) =>
+    adminCall<{ ok: true; playerToken: string; playerName: string }>(
+      "admin_reissue_token",
+      { code, playerName },
+    );
 
   const reconnectAsSpectator = (roomCode: string, spectatorName: string) => {
     return new Promise<void>((resolve, reject) => {
@@ -528,6 +534,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       adminMarkWinner,
       adminForceForfeit,
       hostReplacePlayer,
+      adminReissueToken,
     }}>
       {children}
     </SocketContext.Provider>
