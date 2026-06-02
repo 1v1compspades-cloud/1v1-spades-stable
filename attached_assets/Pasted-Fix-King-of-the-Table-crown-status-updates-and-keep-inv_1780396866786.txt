@@ -1,0 +1,50 @@
+Fix King of the Table crown/status updates and keep invite link visible while waiting.
+
+Issues:
+1. Crowns/status are not updating clearly on the win screen and waiting screen after a King of the Table match.
+2. The invite/challenger link disappears when the King is waiting for people to join.
+
+Goal:
+King of the Table should clearly show who the current King is, show crown/winner status correctly after every match, and always keep a challenger invite link available while waiting.
+
+Requirements:
+1. Do not change normal 1v1 gameplay logic.
+2. Do not change bidding, scoring, cards, sockets, timers, tournament logic, or tournament advancement.
+3. Fix only King of the Table UI/state flow.
+4. After a KOTT match ends, winner should immediately become/stay King.
+5. Winner should see:
+   - Crown icon / King label
+   - “You are King”
+   - “Waiting for challenger”
+   - Copy Challenger Link button
+6. Loser should see:
+   - Rejoin Queue
+   - Back to King of the Table Lobby
+   - Leave Table / Home
+7. Waiting screen should always show:
+   - Current King name
+   - Crown/King status
+   - “Waiting for challenger”
+   - Copy Challenger Link button
+8. The challenger/invite link must remain visible and usable whenever the table is waiting for a challenger.
+9. The invite link must not disappear after a match completes.
+10. The invite/challenger link must stay token-free and must not include hostToken, adminToken, playerToken, or private session tokens.
+11. Spectator view should update to show the current King waiting for challenger.
+12. If there is no challenger in queue, do not close the lobby. Keep King waiting with invite link available.
+13. If challenger joins, update state to “Challenger joined” / “Match in progress.”
+14. Test both cases:
+   - King wins and remains King
+   - Challenger wins and becomes new King
+
+Acceptance test:
+- Create King of the Table lobby.
+- Player A joins as King.
+- Confirm waiting screen shows crown/King label and Copy Challenger Link.
+- Player B joins as challenger.
+- Finish match with Player A winning.
+- Confirm Player A sees crown + “You are King — waiting for challenger” + Copy Challenger Link.
+- Confirm Player B sees Rejoin Queue / Back to KOTT Lobby / Leave.
+- Finish another match with challenger winning.
+- Confirm challenger becomes King and sees crown + waiting screen + Copy Challenger Link.
+- Confirm spectator view shows the correct current King.
+- Confirm invite link never contains host/admin/private tokens.
