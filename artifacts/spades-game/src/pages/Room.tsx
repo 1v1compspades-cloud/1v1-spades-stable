@@ -87,6 +87,7 @@ export default function Room() {
     joinAsSpectator,
     reconnectAsSpectator,
     joinQueue, leaveQueue, kottStepDown,
+    fastFinishMatch,
     setActiveRoom,
     isAdmin,
     adminResetTable, adminRemoveFromQueue, adminSetNextChallenger,
@@ -105,6 +106,9 @@ export default function Room() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [spectatorNameInput, setSpectatorNameInput] = useState<string>("");
+  // Dev/host Fast Finish test tool: opens a confirm overlay with a winner pick.
+  const [fastFinishOpen, setFastFinishOpen] = useState(false);
+  const [fastFinishing, setFastFinishing] = useState(false);
 
   // Tick every 15s so AFK indicators re-render without depending on socket events.
   const [now, setNow] = useState<number>(() => Date.now());
@@ -431,6 +435,21 @@ export default function Room() {
       toast({ description: "You stepped down — the King is waiting for a challenger." });
     } catch (err: any) {
       toast({ description: typeof err === "string" ? err : "Couldn't return to the lobby.", variant: "destructive" });
+    }
+  };
+
+  // ── Dev/host Fast Finish test tool ──────────────────────────────────────
+  const handleFastFinish = async (winnerSeat: 0 | 1) => {
+    if (!roomCode) return;
+    setFastFinishing(true);
+    try {
+      await fastFinishMatch(roomCode, winnerSeat);
+      setFastFinishOpen(false);
+      toast({ description: `Match ended — Seat ${winnerSeat + 1} wins.` });
+    } catch (err: any) {
+      toast({ description: typeof err === "string" ? err : "Fast Finish failed.", variant: "destructive" });
+    } finally {
+      setFastFinishing(false);
     }
   };
 
@@ -2000,6 +2019,83 @@ export default function Room() {
     </button>
   );
 
+  // Dev/host Fast Finish test tool. Shown to an unlocked admin (the host/
+  // streamer, even when spectating a KotT/tournament table) OR, in dev/preview,
+  // to a SEATED player (never a regular spectator). The server independently
+  // re-checks authorization and rejects a dev spectator — this gate is purely
+  // to keep the button off normal players' and spectators' screens.
+  const canFastFinish =
+    (isAdmin || (import.meta.env.DEV && !spectator)) &&
+    gameState.phase !== "waiting" &&
+    gameState.phase !== "game_over";
+
+  const renderFastFinishTool = () => {
+    const seat1Name = gameState.players[0]?.name ?? "Seat 1";
+    const seat2Name = gameState.players[1]?.name ?? "Seat 2";
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setFastFinishOpen(true)}
+          data-testid="button-fast-finish"
+          className="absolute bottom-[calc(env(safe-area-inset-bottom)+9.5rem)] right-3 z-[55] px-3 py-1.5 rounded-full border border-amber-400/40 bg-black/70 text-amber-300 text-[10px] font-semibold uppercase tracking-widest backdrop-blur-sm shadow-lg hover:bg-amber-400/10 active:scale-95 transition"
+        >
+          ⏩ Fast Finish
+        </button>
+        {fastFinishOpen && (
+          <div
+            className="fixed inset-0 z-[130] flex items-center justify-center bg-black/75 p-4"
+            data-testid="fast-finish-overlay"
+            onClick={() => !fastFinishing && setFastFinishOpen(false)}
+          >
+            <div
+              className="bg-card border border-amber-400/30 rounded-xl shadow-2xl p-5 max-w-sm w-full space-y-4 text-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="space-y-1">
+                <p className="text-[10px] uppercase tracking-widest text-amber-300/80">
+                  Dev / Host testing tool
+                </p>
+                <h3 className="text-lg font-serif text-primary">End this match for testing?</h3>
+                <p className="text-xs text-muted-foreground">
+                  Pick the winner. This ends the match through the normal game-over
+                  flow (tournament bracket advances, King stays King).
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                <Button
+                  onClick={() => handleFastFinish(0)}
+                  disabled={fastFinishing}
+                  data-testid="button-fast-finish-seat1"
+                  className="w-full"
+                >
+                  {fastFinishing ? "Ending…" : `Seat 1 wins — ${seat1Name}`}
+                </Button>
+                <Button
+                  onClick={() => handleFastFinish(1)}
+                  disabled={fastFinishing}
+                  data-testid="button-fast-finish-seat2"
+                  className="w-full"
+                >
+                  {fastFinishing ? "Ending…" : `Seat 2 wins — ${seat2Name}`}
+                </Button>
+              </div>
+              <Button
+                variant="ghost"
+                onClick={() => setFastFinishOpen(false)}
+                disabled={fastFinishing}
+                data-testid="button-fast-finish-cancel"
+                className="w-full"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  };
+
   if (spectator && gameState.phase === "waiting") {
     return (
       <div className="h-[100dvh] flex flex-col bg-background overflow-hidden relative">
@@ -2028,6 +2124,7 @@ export default function Room() {
           {renderPlayerInfo(bottomIndex)}
           {spectator ? renderSpectatorFooter() : renderMyHand()}
           {showHostResetFab && renderHostResetFab()}
+          {canFastFinish && renderFastFinishTool()}
         </>
       )}
     </div>

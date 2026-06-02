@@ -101,6 +101,13 @@ Token-gated dashboard the tournament host uses to recover from disconnects, AFK,
 - UI: lobby roster shows a small "Replace" button on each non-host filled slot (host-only). After confirm, a copy-link dialog appears with the backup's join URL.
 - Audit action union extended in BOTH `artifacts/api-server/src/game/tournament.ts` AND `artifacts/spades-game/src/lib/game.ts` (`"replace_player"`).
 
+## Fast Finish / End Game (dev & host testing tool)
+
+- Dev/host-only tool to end a live match instantly and route it through the **normal game-over pipeline** — used to test tournament advancement, KotT rotation, and 1v1 game-over without playing 13 tricks.
+- Server (`socket.ts`): `isDevEnvironment()` = `NODE_ENV !== "production"`; `requireFastFinishAuth(socket)` returns `"Dev"` (non-prod) or `"Admin"` (unlocked `adminSockets`), else throws (fails closed in prod for non-admins). `endMatchForTesting(io, roomCode, winnerSeat, actor)` runs in `withRoomLock`, validates phase ≠ `waiting`/`game_over` and both seats filled, sets a decisive non-tied winner score (mirrors `forfeitTournamentMatch`), commits action `"fast_finish_test"` (DB-backed audit) + `logger.info`, `broadcastState`, then calls `advanceTournamentOnGameOver` (if `tournamentRef`) and `scheduleKingNextMatch` (if `king` + queued). **No bidding/scoring/cards/bracket/KotT logic is altered** — it only forces a score and reuses existing handlers.
+- Socket event `fast_finish_match {roomCode, winnerSeat}` is gated by `requireFastFinishAuth` + `checkRate(20/60s)` + `winnerSeat ∈ {0,1}`. **Defense in depth:** a `"Dev"` actor (non-admin, non-prod) must ALSO be a seated player in the target room — a shared preview URL means a spectator could otherwise emit it. Admins are exempt (streamer/host drives KotT/tournament rooms from the side).
+- Client: `fastFinishMatch(code, winnerSeat)` (plain emit + ack) in `useSocket.tsx`. `Room.tsx` gates visibility with `canFastFinish = (isAdmin || (import.meta.env.DEV && !spectator)) && phase ≠ waiting/game_over` — shown to admins (even when spectating) or, in dev, seated players only; never to regular players/spectators in production. Floating "⏩ Fast Finish" FAB → confirm overlay ("End this match for testing?") with Seat 1 / Seat 2 winner buttons (labeled with player names) + Cancel.
+
 ## Mid-tournament reconnect link (admin recovery)
 
 - Admin-only rescue for a player who lost their browser / switched devices mid-event and can no longer reattach to their seat (their reconnect token only lives in server memory + their original browser's localStorage). Distinct from Phase 7 replacement: this keeps the SAME player and is allowed at ANY tournament status, not just lobby.

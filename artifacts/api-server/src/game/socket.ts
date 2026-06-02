@@ -181,6 +181,23 @@ function requireAdmin(socket: Socket): string {
   return "Admin";
 }
 
+/** True in dev/preview — anything that is NOT a production deployment. */
+function isDevEnvironment(): boolean {
+  return process.env.NODE_ENV !== "production";
+}
+
+/**
+ * Authorize the dev/host "Fast Finish" test tool. Allowed when running in a
+ * non-production (dev/preview) environment OR when this socket has been
+ * unlocked as admin (ADMIN_HOST_KEY). Fails closed in production for
+ * non-admin sockets. Returns the actor label used in audit/log entries.
+ */
+function requireFastFinishAuth(socket: Socket): string {
+  if (isDevEnvironment()) return "Dev";
+  if (adminSockets.has(socket.id)) return "Admin";
+  throw new Error("Fast Finish is restricted to dev/preview or an unlocked host");
+}
+
 // ── Visitor counters (in-memory, reset on server restart) ───────────────────
 // Cumulative connection metrics since the server last started. Edge-only:
 // nothing here feeds the game engine — it's purely observational, surfaced via
@@ -686,6 +703,82 @@ function forfeitTournamentMatch(
     });
     broadcastState(io, finalState);
     await advanceTournamentOnGameOver(io, finalState);
+  });
+}
+
+/**
+ * DEV/HOST TEST TOOL: immediately end a live match with `winnerSeat` as the
+ * winner, routing through the SAME game-over pipeline a naturally-completed
+ * match uses (commit → broadcast → tournament advancement / KotT rotation).
+ *
+ * It does NOT touch bidding/scoring/card/bracket/KotT logic — it only sets a
+ * winning score and flips phase to game_over, then defers to the existing
+ * downstream handlers (`advanceTournamentOnGameOver`, `scheduleKingNextMatch`),
+ * exactly as `handlePlayResult` does on a real game_over. This keeps tournament
+ * advancement, KotT winner/loser flow, and the 1v1 Game Over screen all on
+ * their proven paths.
+ *
+ * Authorization is the caller's responsibility (`requireFastFinishAuth`).
+ * Idempotent-ish: no-op if the match is already over / not yet started.
+ */
+function endMatchForTesting(
+  io: SocketIOServer,
+  roomCode: string,
+  winnerSeat: 0 | 1,
+  actor: string,
+): Promise<{ ok: boolean; error?: string }> {
+  return withRoomLock(roomCode, async () => {
+    const state = getRoom(roomCode);
+    if (!state) return { ok: false, error: "Room not found" };
+    if (state.phase === "game_over") return { ok: false, error: "Match is already over" };
+    if (state.phase === "waiting") return { ok: false, error: "Match has not started yet" };
+    if (!state.players[0] || !state.players[1]) {
+      return { ok: false, error: "Both seats must be filled to end the match" };
+    }
+    const loserSeat: 0 | 1 = winnerSeat === 0 ? 1 : 0;
+
+    clearTurnTimer(roomCode);
+    // Give the winner a decisive, non-tied final score at/above target — the
+    // same shape forfeitTournamentMatch produces, so every downstream consumer
+    // (game-over screen, advanceTournamentOnGameOver, promoteNextChallenger)
+    // reads an unambiguous winner.
+    const finalScores: [number, number] = [state.scores[0], state.scores[1]];
+    finalScores[winnerSeat] = Math.max(finalScores[winnerSeat], state.matchTarget);
+    if (finalScores[winnerSeat] <= finalScores[loserSeat]) {
+      finalScores[winnerSeat] = finalScores[loserSeat] + 1;
+    }
+    const winnerName = state.players[winnerSeat]?.name ?? null;
+    const loserName = state.players[loserSeat]?.name ?? null;
+    const finalState: GameState = {
+      ...state,
+      phase: "game_over",
+      scores: finalScores,
+      currentBidder: null,
+      currentTurnIndex: null,
+      turnDeadline: null,
+    };
+    await commit(finalState, {
+      action: "fast_finish_test",
+      actorSeat: winnerSeat,
+      payload: { by: actor, winnerSeat, winnerName, loserName, finalScores, mode: state.mode },
+    });
+    logger.info(
+      { roomCode, winnerSeat, winnerName, loserName, mode: state.mode, actor },
+      "Match ended by Fast Finish dev/host test tool",
+    );
+    broadcastState(io, finalState);
+
+    // Tournament: advance the bracket via the normal pipeline (writes its own
+    // DB-backed audit row through recordMatchResultTx).
+    if (finalState.tournamentRef) {
+      await advanceTournamentOnGameOver(io, finalState);
+    }
+    // KotT: if a challenger is queued, rotate exactly like a natural game_over.
+    // With no challenger, the loser-flow UI takes over (Rejoin / Lobby / Leave).
+    if (finalState.mode === "king" && finalState.challengerQueue.length > 0) {
+      scheduleKingNextMatch(io, roomCode);
+    }
+    return { ok: true };
   });
 }
 
@@ -2005,6 +2098,55 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           socket.emit("you_are_unseated", { roomCode: code });
           broadcastState(io, s);
           if (rejoin) scheduleKingNextMatch(io, code);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+        }
+      }
+    );
+
+    // ── Dev/Host Fast Finish test tool ─────────────────────────────────────
+    // Immediately end a LIVE match with a chosen winner so testers can verify
+    // tournament advancement, KotT winner/loser flow, game-over/champion
+    // screens, and reconnect behavior without playing a full game.
+    //
+    // Authorization (server-authoritative, fails closed):
+    //   - allowed in dev/preview (NODE_ENV !== "production"), OR
+    //   - allowed for a socket unlocked as admin (ADMIN_HOST_KEY).
+    // A normal player/spectator in production can NEVER trigger this — the
+    // client also hides the button, but this server gate is the real boundary.
+    // Routes through endMatchForTesting → the SAME game-over pipeline a natural
+    // completion uses (no bidding/scoring/bracket/KotT logic is altered).
+    socket.on(
+      "fast_finish_match",
+      async (
+        data: { roomCode: string; winnerSeat: 0 | 1 },
+        callback?: (res: { ok: boolean; error?: string }) => void
+      ) => {
+        try {
+          const actor = requireFastFinishAuth(socket);
+          if (!checkRate(socket.id, "fast_finish_match", 20, 60_000)) {
+            throw new Error("Slow down — too many Fast Finish requests");
+          }
+          const code = (data?.roomCode || "").toUpperCase().trim();
+          if (!code) throw new Error("Missing room code");
+          // Dev/preview is permissive by environment, but a preview URL can be
+          // shared — so a non-admin "Dev" actor must still be a SEATED player in
+          // the target room. This blocks a spectator (or any random socket) from
+          // nuking a match they aren't playing. Admins (the streamer/host) are
+          // exempt: they routinely drive KotT/tournament rooms from the side.
+          if (actor === "Dev") {
+            const room = getRoom(code);
+            if (!room || !room.players.some((p) => p?.socketId === socket.id)) {
+              throw new Error("Fast Finish (dev) requires being seated in this room");
+            }
+          }
+          const winnerSeat: 0 | 1 = data?.winnerSeat === 1 ? 1 : 0;
+          if (data?.winnerSeat !== 0 && data?.winnerSeat !== 1) {
+            throw new Error("winnerSeat must be 0 or 1");
+          }
+          const res = await endMatchForTesting(io, code, winnerSeat, actor);
+          callback?.(res);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           callback?.({ ok: false, error: msg });
