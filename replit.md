@@ -135,6 +135,13 @@ Token-gated dashboard the tournament host uses to recover from disconnects, AFK,
 
 When a third+ player clicks Join Match on a King-of-the-Table room (mode=`king`) and both seats are filled, the Lobby catches "Room is full" and automatically retries as `join_as_spectator` + `join_queue`. The user lands in `/room/<code>` as a spectator + queued challenger and auto-rotates into the loser's seat when the next match ends (per the existing `scheduleKingNextMatch` flow). Quick Match rooms (mode=`quick`) still hard-cap at 2 seats and reject the third joiner.
 
+## KotT single-player lobby presentation (frontend-only)
+
+- The server already holds a one-player KotT room indefinitely (in-memory; seat nulled on leave, restored on reconnect, removed only by the idle-stale sweep) — verified by socket reproduction. The "lobby doesn't hold with one player" report was purely a **frontend UX** gap, so the fix is entirely in `Room.tsx` (no server/socket/timer/engine changes).
+- `Room.tsx` computes `seatedCount`, `loneSeat`, `tableHolderSeat = kingSeat ?? loneSeat`, `tableHolderName`, and a `kottLobbyState` label (`Waiting for King` / `King waiting for challenger` / `Challenger joined — ready up` / `Match in progress` / `Match complete — winner is King`).
+- The lone seated player is shown as the table-holder King (`King: <name> (holding the table)`) even at streak 0, since `kingStreak` is `[0,0]` until a win. The reigning-king crown (streak>0) display is unchanged.
+- Waiting screens are `isKingMode`-aware: queue panel shows a `kottLobbyState` badge (testid `kott-lobby-state`); player waiting screen shows KotT status messaging + the state in the header subtitle and relabels the invite CTA to "Copy Challenger Link"; spectator waiting copy is KotT-flavored. Non-KotT (1v1 / tournament) waiting UI is untouched (all guarded by `isKingMode` ternaries). Links remain token-free.
+
 ## KotT host controls (admin/streamer only)
 
 - KotT "host" controls are gated on the existing secret-key admin (`requireAdmin` / `isAdmin`, unlocked via `admin_unlock` + `ADMIN_HOST_KEY`) — the streamer. There is NO new per-room host token, so invite/watch links stay token-free (consistent with the threat model).

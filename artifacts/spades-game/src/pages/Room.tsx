@@ -454,6 +454,31 @@ export default function Room() {
   const kingName = kingSeat !== null ? gameState?.players?.[kingSeat]?.name ?? null : null;
   const kingStreakVal = kingSeat !== null ? gameState?.kingStreak?.[kingSeat] ?? 0 : 0;
 
+  // KotT "table holder": the seat that currently owns the table. Normally the
+  // reigning King (streak>0), but in a fresh lobby with a single seated player
+  // (no match played yet) that lone player holds the table as King-in-waiting,
+  // so a one-player KotT lobby still reads as a held table — not an empty room.
+  const seatedCount = isKingMode
+    ? (gameState?.players?.filter((p) => p != null).length ?? 0)
+    : 0;
+  const loneSeat: 0 | 1 | null =
+    isKingMode && seatedCount === 1 ? (gameState?.players?.[0] ? 0 : 1) : null;
+  const tableHolderSeat: 0 | 1 | null = kingSeat ?? loneSeat;
+  const tableHolderName =
+    tableHolderSeat !== null ? gameState?.players?.[tableHolderSeat]?.name ?? null : null;
+  // Clear, stream-friendly KotT lobby/session state label (requirement: surface
+  // Waiting for King / King waiting for challenger / Challenger joined /
+  // Match in progress / Match complete states).
+  const kottLobbyState: string = (() => {
+    if (!isKingMode) return "";
+    const phase = gameState?.phase;
+    if (phase === "game_over") return "Match complete — winner is King";
+    if (phase && phase !== "waiting") return "Match in progress";
+    if (seatedCount === 0) return "Waiting for King";
+    if (seatedCount === 1) return "King waiting for challenger";
+    return "Challenger joined — ready up";
+  })();
+
   const handleBid = async () => {
     if (!bidAmount || spectator) return;
     setIsSubmitting(true);
@@ -888,11 +913,17 @@ export default function Room() {
     const bothReady   = bothPresent && myReady && oppReady;
     const canStart    = isHost && bothReady;
 
-    const statusMsg = !opponent
-      ? "Waiting for opponent…"
-      : !bothReady
-        ? "Waiting for both players to ready up…"
-        : "Ready to start.";
+    const statusMsg = isKingMode
+      ? (!opponent
+          ? "👑 You're the King — waiting for a challenger to join."
+          : !bothReady
+            ? "Challenger joined — both players ready up to begin."
+            : "Ready to start.")
+      : (!opponent
+          ? "Waiting for opponent…"
+          : !bothReady
+            ? "Waiting for both players to ready up…"
+            : "Ready to start.");
     const statusTone = !opponent
       ? "text-muted-foreground"
       : !bothReady
@@ -912,10 +943,10 @@ export default function Room() {
                 <span className="text-emerald-500">♣</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-serif font-bold text-primary tracking-wider drop-shadow-[0_2px_8px_rgba(234,179,8,0.25)]">
-                1v1 Competitive Spades
+                {isKingMode ? "👑 King of the Table" : "1v1 Competitive Spades"}
               </h1>
               <p className="text-[11px] uppercase tracking-widest text-muted-foreground mt-1">
-                Pre-match lobby
+                {isKingMode ? (kottLobbyState || "Pre-match lobby") : "Pre-match lobby"}
               </p>
             </div>
 
@@ -933,11 +964,11 @@ export default function Room() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => copyToClipboard(buildLink(false), "Invite link")}
+                  onClick={() => copyToClipboard(buildLink(false), isKingMode ? "Challenger link" : "Invite link")}
                   data-testid="button-copy-invite-link"
                   className="min-h-[44px] border-primary/40 hover:bg-primary/10"
                 >
-                  🔗 Copy Invite Link
+                  {isKingMode ? "🔗 Copy Challenger Link" : "🔗 Copy Invite Link"}
                 </Button>
                 <Button
                   variant="outline"
@@ -1105,7 +1136,9 @@ export default function Room() {
 
           <div className="px-5 pt-4 pb-6 space-y-3">
             <p className="text-center text-sm text-muted-foreground">
-              Waiting for the players to start. Hands stay hidden — you'll see bids, tricks, and scores live.
+              {isKingMode
+                ? "Watching the table — the King defends their seat, challengers rotate in. Hands stay hidden; you'll see bids, tricks, and scores live."
+                : "Waiting for the players to start. Hands stay hidden — you'll see bids, tricks, and scores live."}
             </p>
             <Button
               variant="ghost"
@@ -1671,17 +1704,32 @@ export default function Room() {
           >
             👑 King of the Table
           </Badge>
-          {/* Current King — clearly surfaced for the stream. */}
-          {kingName ? (
+          {/* Clear session/lobby state for the stream. */}
+          {kottLobbyState && (
+            <Badge
+              variant="outline"
+              data-testid="kott-lobby-state"
+              className="border-primary/40 text-primary/90 uppercase tracking-wider text-[10px]"
+            >
+              {kottLobbyState}
+            </Badge>
+          )}
+          {/* Current King — clearly surfaced for the stream. The lone seated
+              player holds the table as King-in-waiting even before any win. */}
+          {tableHolderName ? (
             <span data-testid="kott-current-king" className="font-semibold text-yellow-300">
-              King: {kingName}
-              {kingStreakVal > 0 && (
+              King: {tableHolderName}
+              {kingStreakVal > 0 ? (
                 <span className="ml-1 font-mono text-[10px] align-top">×{kingStreakVal}</span>
+              ) : (
+                <span className="ml-1 text-[10px] font-normal normal-case tracking-normal text-yellow-300/70">
+                  (holding the table)
+                </span>
               )}
             </span>
           ) : (
             <span data-testid="kott-current-king" className="text-muted-foreground italic">
-              No reigning King yet
+              No King yet
             </span>
           )}
           {spectator && (
