@@ -482,31 +482,78 @@ export default function Room() {
     }
   };
 
-  // Current King = the seated player whose win streak is active (>0). Only one
-  // seat can have a streak at a time (the loser resets to 0). Null until the
-  // first match is won.
-  const kingSeat: 0 | 1 | null = isKingMode
+  // Reigning King DURING a live match = the seated player carrying an active
+  // win streak (>0). Only one seat can have a streak at a time (the loser
+  // resets to 0). Null until the first match is won.
+  const streakKingSeat: 0 | 1 | null = isKingMode
     ? ((gameState?.kingStreak?.[0] ?? 0) > 0
         ? 0
         : (gameState?.kingStreak?.[1] ?? 0) > 0
           ? 1
           : null)
     : null;
-  const kingName = kingSeat !== null ? gameState?.players?.[kingSeat]?.name ?? null : null;
-  const kingStreakVal = kingSeat !== null ? gameState?.kingStreak?.[kingSeat] ?? 0 : 0;
 
-  // KotT "table holder": the seat that currently owns the table. Normally the
-  // reigning King (streak>0), but in a fresh lobby with a single seated player
-  // (no match played yet) that lone player holds the table as King-in-waiting,
-  // so a one-player KotT lobby still reads as a held table — not an empty room.
   const seatedCount = isKingMode
     ? (gameState?.players?.filter((p) => p != null).length ?? 0)
     : 0;
   const loneSeat: 0 | 1 | null =
     isKingMode && seatedCount === 1 ? (gameState?.players?.[0] ? 0 : 1) : null;
-  const tableHolderSeat: 0 | 1 | null = kingSeat ?? loneSeat;
-  const tableHolderName =
-    tableHolderSeat !== null ? gameState?.players?.[tableHolderSeat]?.name ?? null : null;
+
+  // At game_over the server has NOT yet bumped kingStreak — that only happens
+  // during rotation (promoteNextChallenger), which requires a queued
+  // challenger. So when a match ends (especially with no one in line) the
+  // streak is stale: a fresh winner still reads as streak 0, and a dethroned
+  // King still reads as streak>0. Derive the King from the match RESULT here:
+  // higher score wins, or the sole remaining seat if the loser already stepped
+  // down. Keeps the crown correct for both "King wins again" and "challenger
+  // takes the crown", queue or no queue.
+  const gameOverKingSeat: 0 | 1 | null = (() => {
+    if (!isKingMode || gameState?.phase !== "game_over") return null;
+    const p0 = gameState?.players?.[0];
+    const p1 = gameState?.players?.[1];
+    if (p0 && !p1) return 0;
+    if (!p0 && p1) return 1;
+    if (!p0 && !p1) return null;
+    const s0 = gameState?.scores?.[0] ?? 0;
+    const s1 = gameState?.scores?.[1] ?? 0;
+    if (s0 === s1) return null;
+    return s0 > s1 ? 0 : 1;
+  })();
+
+  // Single source of truth for "who wears the crown right now", used by the
+  // player rows, the queue panel, and every KotT status line.
+  //  - At game_over the result is authoritative: gameOverKingSeat is the winner
+  //    (or the lone remaining seat), or null on a tie — we do NOT fall back to
+  //    the stale streak there, so a tie correctly shows no King.
+  //  - Otherwise: the live-match streak King, else the lone seated player (a
+  //    one-player KotT lobby reads as a held table, not an empty room).
+  const tableHolderSeat: 0 | 1 | null =
+    isKingMode && gameState?.phase === "game_over"
+      ? gameOverKingSeat
+      : (streakKingSeat ?? loneSeat);
+  const kingSeat = tableHolderSeat;
+  const kingName = tableHolderSeat !== null ? gameState?.players?.[tableHolderSeat]?.name ?? null : null;
+  const tableHolderName = kingName;
+
+  // Display win streak (×N). At game_over reconstruct the not-yet-committed
+  // value (mirrors promoteNextChallenger: a continuing King is prev+1, a fresh
+  // King is 1); otherwise use the live streak value from the server.
+  const tableHolderStreak: number = (() => {
+    if (tableHolderSeat === null) return 0;
+    if (gameOverKingSeat !== null) {
+      const prevKing =
+        (gameState?.kingStreak?.[0] ?? 0) > 0
+          ? 0
+          : (gameState?.kingStreak?.[1] ?? 0) > 0
+            ? 1
+            : null;
+      return gameOverKingSeat === prevKing
+        ? (gameState?.kingStreak?.[gameOverKingSeat] ?? 0) + 1
+        : 1;
+    }
+    return gameState?.kingStreak?.[tableHolderSeat] ?? 0;
+  })();
+  const kingStreakVal = tableHolderStreak;
   // Clear, stream-friendly KotT lobby/session state label (requirement: surface
   // Waiting for King / King waiting for challenger / Challenger joined /
   // Match in progress / Match complete states).
@@ -769,8 +816,11 @@ export default function Room() {
     const bid   = gameState.bids[idx];
     const tricks = gameState.tricks[idx];
     const seatLabel = `Seat ${idx + 1}`;
-    const streak = gameState.kingStreak?.[idx] ?? 0;
-    const showCrown = isKingMode && streak > 0;
+    // Crown follows the unified table-holder derivation so it stays correct at
+    // game_over (winner crowned immediately, dethroned King uncrowned) — not
+    // just the raw, possibly-stale, server streak.
+    const showCrown = isKingMode && tableHolderSeat === idx;
+    const streak = showCrown ? tableHolderStreak : 0;
     const isTurn  = gameState.phase === "playing" && gameState.currentTurnIndex === idx;
     const isBidding = gameState.phase === "bidding" && gameState.currentBidder === idx;
     const isActive = isTurn || isBidding;
@@ -1616,8 +1666,9 @@ export default function Room() {
                     const oppScore = gameState.scores[playerIndex === 0 ? 1 : 0];
                     const iWon = !spectator && myScore > oppScore;
                     const iLost = !spectator && myScore < oppScore;
-                    const winnerName =
-                      gameState.players[gameState.scores[0] >= gameState.scores[1] ? 0 : 1]?.name;
+                    // Use the unified table-holder (winner, or null on a tie)
+                    // rather than a raw score compare that would mislabel a tie.
+                    const winnerName = tableHolderName;
 
                     // A challenger is queued — automatic rotation is imminent for
                     // everyone (winner, loser, and spectators).
@@ -1638,16 +1689,27 @@ export default function Room() {
                     }
 
                     // No challenger queued. The winner holds the table as King.
+                    // Keep the challenger invite link right here so the King can
+                    // always recruit the next challenger without leaving the
+                    // game-over screen (the link must never disappear post-match).
                     if (iWon) {
                       return (
                         <div
                           data-testid="kott-king-waiting"
-                          className="text-center text-sm space-y-1 rounded-md border border-primary/40 bg-primary/10 p-3"
+                          className="text-center text-sm space-y-2 rounded-md border border-primary/40 bg-primary/10 p-3"
                         >
                           <p className="font-semibold text-primary">👑 You are the King</p>
                           <p className="text-xs text-muted-foreground">
                             Waiting for a challenger to join…
                           </p>
+                          <Button
+                            variant="outline"
+                            onClick={() => copyToClipboard(buildLink(false), "Challenger link")}
+                            data-testid="button-copy-challenger-link-gameover"
+                            className="w-full h-10 border-primary/40 hover:bg-primary/10"
+                          >
+                            🔗 Copy Challenger Link
+                          </Button>
                         </div>
                       );
                     }
@@ -1686,13 +1748,28 @@ export default function Room() {
                     }
 
                     // Spectator with no challenger queued — the King is waiting.
+                    // Surface the current King clearly and keep a token-free
+                    // challenger link handy so watchers can recruit a challenger.
                     return (
-                      <p
+                      <div
                         data-testid="kott-waiting-banner"
-                        className="text-center text-muted-foreground italic text-sm"
+                        className="text-center text-sm space-y-2 rounded-md border border-primary/40 bg-primary/10 p-3"
                       >
-                        👑 {winnerName ? `${winnerName} is King` : "King is on the table"} — waiting for a challenger…
-                      </p>
+                        <p className="font-semibold text-primary">
+                          👑 {winnerName ? `${winnerName} is King` : "King is on the table"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Waiting for a challenger to join…
+                        </p>
+                        <Button
+                          variant="outline"
+                          onClick={() => copyToClipboard(buildLink(false), "Challenger link")}
+                          data-testid="button-copy-challenger-link-spectator"
+                          className="w-full h-10 border-primary/40 hover:bg-primary/10"
+                        >
+                          🔗 Copy Challenger Link
+                        </Button>
+                      </div>
                     );
                   })()
                 ) : gameState.tournamentRef ? null : spectator ? (
