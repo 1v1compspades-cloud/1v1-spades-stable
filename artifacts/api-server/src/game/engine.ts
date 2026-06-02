@@ -997,6 +997,41 @@ export function promoteNextChallenger(
   };
 }
 
+/**
+ * KotT: decide whether `socketId` is allowed to "step down" from the table
+ * after a match (used by the loser's Rejoin Queue / Back to Lobby actions).
+ *
+ * ONLY the losing seat may step down. Allowing the winner to step down would
+ * let them vacate their seat so `promoteNextChallenger`'s null-seat branch
+ * crowns the loser instead — a KotT integrity break. The server is the sole
+ * authority here; the client merely hides the button for non-losers.
+ */
+export function canKottStepDown(
+  state: GameState,
+  socketId: string
+): { ok: true; loserSeat: 0 | 1 } | { ok: false; error: string } {
+  if (state.mode !== "king") {
+    return { ok: false, error: "Only available in King of the Table mode" };
+  }
+  if (state.phase !== "game_over") {
+    return { ok: false, error: "The match is not over yet" };
+  }
+  const seat = state.players.findIndex((p) => p?.socketId === socketId);
+  if (seat < 0) return { ok: false, error: "You are not seated at this table" };
+  const p0 = state.players[0];
+  const p1 = state.players[1];
+  if (!p0 || !p1) {
+    return { ok: false, error: "Both players must be seated to step down" };
+  }
+  const [s0, s1] = state.scores;
+  if (s0 === s1) return { ok: false, error: "The match was a draw" };
+  const loserSeat: 0 | 1 = s0 < s1 ? 0 : 1;
+  if (seat !== loserSeat) {
+    return { ok: false, error: "Only the losing player can step down" };
+  }
+  return { ok: true, loserSeat };
+}
+
 /** Hard cap on watchers per room — prevents broadcast fan-out amplification. */
 export const MAX_SPECTATORS_PER_ROOM = 50;
 

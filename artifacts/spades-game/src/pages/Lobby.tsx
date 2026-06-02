@@ -143,10 +143,11 @@ export default function Lobby() {
         }
       } catch (joinErr: any) {
         const msg = String(joinErr || "");
-        // King of the Table fallback: if both seats are full, slot the user
+        // King of the Table fallback: if both seats are full OR a match has
+        // already started / just ended (King alone at game_over), slot the user
         // into the challenger queue + spectator list so they can watch and
         // auto-rotate in when a seat opens.
-        if (matchMode === "king" && /full/i.test(msg)) {
+        if (matchMode === "king" && /(full|already started)/i.test(msg)) {
           await joinAsSpectator(code, nameInput);
           try { await new Promise<void>((resolve, reject) => {
             if (!socket) return reject("No socket");

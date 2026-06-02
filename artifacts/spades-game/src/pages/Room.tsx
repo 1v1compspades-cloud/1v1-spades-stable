@@ -86,7 +86,7 @@ export default function Room() {
     setReady: doSetReady,
     joinAsSpectator,
     reconnectAsSpectator,
-    joinQueue, leaveQueue,
+    joinQueue, leaveQueue, kottStepDown,
     setActiveRoom,
     isAdmin,
     adminResetTable, adminRemoveFromQueue, adminSetNextChallenger,
@@ -409,6 +409,28 @@ export default function Room() {
       toast({ description: "You left the challenger line." });
     } catch (err: any) {
       toast({ description: typeof err === "string" ? err : "Couldn't leave the queue.", variant: "destructive" });
+    }
+  };
+
+  // KotT losing player post-match actions (seated players only, at game_over).
+  // rejoin=true → step down + queue for an immediate rematch vs the King.
+  // rejoin=false → step down to a spectator and stay at the table to watch.
+  const handleKottRejoinQueue = async () => {
+    if (!roomCode) return;
+    try {
+      await kottStepDown(roomCode, true);
+      toast({ description: "You're back in line — rematch starting…" });
+    } catch (err: any) {
+      toast({ description: typeof err === "string" ? err : "Couldn't rejoin the queue.", variant: "destructive" });
+    }
+  };
+  const handleKottBackToLobby = async () => {
+    if (!roomCode) return;
+    try {
+      await kottStepDown(roomCode, false);
+      toast({ description: "You stepped down — the King is waiting for a challenger." });
+    } catch (err: any) {
+      toast({ description: typeof err === "string" ? err : "Couldn't return to the lobby.", variant: "destructive" });
     }
   };
 
@@ -1570,26 +1592,90 @@ export default function Room() {
 
               <div className="space-y-2">
                 {isKingMode ? (
-                  queue.length > 0 ? (
-                    <div
-                      data-testid="kott-next-banner"
-                      className="text-center text-sm space-y-1 rounded-md border border-primary/40 bg-primary/10 p-3"
-                    >
-                      <p className="font-semibold text-primary">
-                        Next challenger: {queue[0]?.name}
+                  (() => {
+                    const myScore = gameState.scores[playerIndex as 0 | 1];
+                    const oppScore = gameState.scores[playerIndex === 0 ? 1 : 0];
+                    const iWon = !spectator && myScore > oppScore;
+                    const iLost = !spectator && myScore < oppScore;
+                    const winnerName =
+                      gameState.players[gameState.scores[0] >= gameState.scores[1] ? 0 : 1]?.name;
+
+                    // A challenger is queued — automatic rotation is imminent for
+                    // everyone (winner, loser, and spectators).
+                    if (queue.length > 0) {
+                      return (
+                        <div
+                          data-testid="kott-next-banner"
+                          className="text-center text-sm space-y-1 rounded-md border border-primary/40 bg-primary/10 p-3"
+                        >
+                          <p className="font-semibold text-primary">
+                            Next challenger: {queue[0]?.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            New match starts in a few seconds…
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    // No challenger queued. The winner holds the table as King.
+                    if (iWon) {
+                      return (
+                        <div
+                          data-testid="kott-king-waiting"
+                          className="text-center text-sm space-y-1 rounded-md border border-primary/40 bg-primary/10 p-3"
+                        >
+                          <p className="font-semibold text-primary">👑 You are the King</p>
+                          <p className="text-xs text-muted-foreground">
+                            Waiting for a challenger to join…
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    // No challenger queued and I'm the seated LOSER — never strand
+                    // me. Offer a clear rematch, a step-down-to-spectate option,
+                    // plus the Leave Table button rendered below. (The server is
+                    // authoritative: only the losing seat may step down.)
+                    if (iLost) {
+                      return (
+                        <div className="space-y-2">
+                          <p
+                            data-testid="kott-loser-prompt"
+                            className="text-center text-sm text-muted-foreground"
+                          >
+                            {winnerName ? `${winnerName} holds the table.` : "The match is over."}{" "}
+                            What next?
+                          </p>
+                          <Button
+                            onClick={handleKottRejoinQueue}
+                            className="w-full h-11"
+                            data-testid="button-kott-rejoin-queue"
+                          >
+                            🔁 Rejoin Queue (Rematch)
+                          </Button>
+                          <Button
+                            onClick={handleKottBackToLobby}
+                            variant="outline"
+                            className="w-full h-11"
+                            data-testid="button-kott-back-to-lobby"
+                          >
+                            Back to King of the Table Lobby
+                          </Button>
+                        </div>
+                      );
+                    }
+
+                    // Spectator with no challenger queued — the King is waiting.
+                    return (
+                      <p
+                        data-testid="kott-waiting-banner"
+                        className="text-center text-muted-foreground italic text-sm"
+                      >
+                        👑 {winnerName ? `${winnerName} is King` : "King is on the table"} — waiting for a challenger…
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        New match starts in a few seconds…
-                      </p>
-                    </div>
-                  ) : (
-                    <p
-                      data-testid="kott-waiting-banner"
-                      className="text-center text-muted-foreground italic text-sm"
-                    >
-                      Waiting for a challenger to join the line…
-                    </p>
-                  )
+                    );
+                  })()
                 ) : gameState.tournamentRef ? null : spectator ? (
                   <p className="text-center text-muted-foreground italic text-sm">Waiting for host to start a new match…</p>
                 ) : playerIndex === 0 ? (
@@ -1632,8 +1718,9 @@ export default function Room() {
                   onClick={spectator ? handleLeaveSpectate : () => setLocation("/")}
                   variant="outline"
                   className="w-full h-11"
+                  data-testid="button-leave-gameover"
                 >
-                  {spectator ? "Leave" : "Return to Lobby"}
+                  {spectator ? "Leave" : isKingMode ? "Leave Table" : "Return to Lobby"}
                 </Button>
               </div>
             </div>

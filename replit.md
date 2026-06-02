@@ -154,6 +154,14 @@ When a third+ player clicks Join Match on a King-of-the-Table room (mode=`king`)
 - Client: `useSocket.tsx` exposes `adminResetTable` / `adminRemoveFromQueue` / `adminSetNextChallenger` via `adminCall` (no token in payload; authorized by the unlocked admin socket).
 - UI (`Room.tsx`): the queue panel shows the Current King (seat with `kingStreak > 0`, with 👑×N streak) and the queue. Buttons renamed for clarity: "Join as Challenger", "Leave Queue (#n)", "Watch Table link". Admin-only controls (behind `isAdmin`): per-queue-entry Remove (✕) and Set-next (↑next), a Reset Table button on the queue panel, and a Reset Table button on the game-over screen.
 
+## KotT losing-player post-match flow
+
+- After a KotT match ends, the **winner stays King** and the **loser** gets explicit choices on the game-over screen instead of being stranded: Rejoin Queue, Back to KotT Lobby (step down to spectate), and Leave Table (home). No challenger queued → winner sees "You are King — waiting for a challenger"; spectators see a King-waiting view.
+- Socket event `kott_step_down {roomCode, rejoin}` (`socket.ts`, runs in `withRoomLock`): demotes the caller to spectator + vacates the seat, keeps `phase=game_over` (so the queue→`promoteNextChallenger` null-seat branch still crowns a fresh challenger). If `rejoin=true` it also `addChallenger` + `scheduleKingNextMatch`.
+- **Server is the sole authority on who may step down.** Pure helper `canKottStepDown(state, socketId)` (`engine.ts`) authorizes ONLY the losing seat: requires `mode=king`, `phase=game_over`, caller seated, BOTH seats present, non-tied score, and caller seat === lower-score seat. Returns `{ok, loserSeat}` or `{ok:false, error}`. This blocks a winner from vacating their own seat (which would let the rotation crown the loser and bump their streak — a KotT integrity break) and blocks non-seated griefers. The client merely hides the buttons for non-losers (`iLost` gate in `Room.tsx`).
+- Client: `kottStepDown(code, rejoin)` in `useSocket.tsx`; handlers + game-over overlay branches (winner / loser / spectator) in `Room.tsx` (testids: `kott-king-waiting`, `kott-loser-prompt`, `button-kott-rejoin-queue`, `button-kott-back-to-lobby`, `button-leave-gameover`). Final game-over button relabeled "Leave Table" in KotT mode. Links stay token-free.
+- Engine tests: `artifacts/api-server/src/game/__tests__/kott-loser-flow.test.mts` (run via the spades-game `tsx` binary) cover the loser happy path (single rotation/streak bump) plus guard rejections (winner / non-seated / mid-match / tie / quick-mode).
+
 ## Bidding order (coin toss + alternation)
 
 - Coin toss happens ONCE per match (server-side `performCoinToss`, fired by `start_game`).

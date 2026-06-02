@@ -38,6 +38,7 @@ interface SocketContextType {
   reconnectAsSpectator: (code: string, name: string) => Promise<void>;
   joinQueue: (code: string, name: string) => Promise<void>;
   leaveQueue: (code: string) => Promise<void>;
+  kottStepDown: (code: string, rejoin: boolean) => Promise<void>;
   // ── Custom Tournament ──────────────────────────────────────────────────
   tournament: TournamentState | null;
   matchAssignment: MatchAssignedPayload | null;
@@ -250,6 +251,19 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       socket.emit("leave_queue", { roomCode }, (res: { ok: boolean; error?: string }) => {
         if (res.ok) resolve();
         else reject(res.error || "Could not leave queue");
+      });
+    });
+  };
+
+  // KotT losing player: step down from the seat after a match. rejoin=true also
+  // queues them for an immediate rematch; rejoin=false just demotes them to a
+  // spectator so they can watch / re-queue later.
+  const kottStepDown = (roomCode: string, rejoin: boolean) => {
+    return new Promise<void>((resolve, reject) => {
+      if (!socket) return reject("No socket");
+      socket.emit("kott_step_down", { roomCode, rejoin }, (res: { ok: boolean; error?: string }) => {
+        if (res.ok) resolve();
+        else reject(res.error || "Could not leave the table");
       });
     });
   };
@@ -520,6 +534,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       reconnectAsSpectator,
       joinQueue,
       leaveQueue,
+      kottStepDown,
       tournament,
       matchAssignment,
       tournamentEliminated,

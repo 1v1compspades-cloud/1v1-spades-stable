@@ -26,6 +26,7 @@ import {
   removeChallenger,
   setNextChallenger,
   promoteNextChallenger,
+  canKottStepDown,
   getAllRooms,
   cleanupRoom,
   type GameState,
@@ -1940,6 +1941,70 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           });
           callback?.({ ok: true });
           if (state) broadcastState(io, state);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+        }
+      }
+    );
+
+    // ── King of the Table: losing player post-match actions ────────────────
+    // After a KotT match ends with an EMPTY challenger queue, both players stay
+    // seated at phase=game_over (no rotation fires). This lets the LOSER choose
+    // what to do instead of being stranded:
+    //   rejoin=true  → step down to spectator, vacate the seat, join the queue,
+    //                  and trigger the normal rotation so they get re-seated for
+    //                  an immediate rematch against the King.
+    //   rejoin=false → step down to spectator and stay at the table to watch;
+    //                  the King is left alone at game_over ("waiting for a
+    //                  challenger"), and the loser can re-enter via the existing
+    //                  spectator "Join as Challenger" button whenever they like.
+    // The winner is never touched here — they stay seated as the King. Keeping
+    // phase=game_over preserves the proven queue→promoteNextChallenger path
+    // (its null-seat branch already handles "King alone at game_over").
+    socket.on(
+      "kott_step_down",
+      async (
+        data: { roomCode: string; rejoin?: boolean },
+        callback?: (res: { ok: boolean; error?: string }) => void
+      ) => {
+        try {
+          const code = (data?.roomCode || "").toUpperCase().trim();
+          const rejoin = !!data?.rejoin;
+          let result: GameState | null = null;
+          await withRoomLock(code, async () => {
+            const cur = getRoom(code);
+            if (!cur) throw new Error("Room not found");
+            // Server-authoritative: ONLY the losing seat may step down. This
+            // blocks a winner from vacating their seat (which would let the
+            // rotation crown the loser) and blocks non-seated griefers.
+            const guard = canKottStepDown(cur, socket.id);
+            if (!guard.ok) throw new Error(guard.error);
+            const seat = guard.loserSeat;
+            const myName = cur.players[seat]!.name;
+            // Demote to spectator + vacate the seat so the table reads as
+            // "King waiting for a challenger".
+            if (!cur.spectators.some((s) => s.socketId === socket.id)) {
+              cur.spectators.push({ id: socket.id, name: myName, socketId: socket.id });
+            }
+            cur.players[seat as 0 | 1] = null;
+            cur.ready[seat as 0 | 1] = false;
+            if (rejoin) {
+              addChallenger(code, myName, socket.id);
+            }
+            await commit(cur, {
+              action: rejoin ? "kott_rejoin_queue" : "kott_step_down",
+              payload: { seat },
+            });
+            result = cur;
+          });
+          if (!result) throw new Error("kott_step_down failed");
+          const s: GameState = result;
+          callback?.({ ok: true });
+          // Tell this client it is now a spectator (sync localStorage role).
+          socket.emit("you_are_unseated", { roomCode: code });
+          broadcastState(io, s);
+          if (rejoin) scheduleKingNextMatch(io, code);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           callback?.({ ok: false, error: msg });
