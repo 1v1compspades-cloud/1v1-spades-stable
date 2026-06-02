@@ -24,6 +24,7 @@ import {
   performCoinToss,
   addChallenger,
   removeChallenger,
+  setNextChallenger,
   promoteNextChallenger,
   getAllRooms,
   cleanupRoom,
@@ -1724,6 +1725,15 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           const state = getRoom(data.roomCode);
           if (!state) return;
           if (state.phase !== "game_over") return;
+          // KotT rotates automatically (winner stays, queue head is seated).
+          // A manual rematch here would conflict with that flow, so ignore it.
+          if (state.mode === "king") {
+            logger.warn(
+              { roomCode: data.roomCode },
+              "Rejected new_match on King of the Table room (rotation is automatic)"
+            );
+            return;
+          }
           if (state.players[0]?.socketId !== socket.id) return;
           if (!state.players[0] || !state.players[1]) return;
           if (state.tournamentRef) {
@@ -1925,6 +1935,138 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
               await commit(state, {
                 action: "challenger_left",
                 payload: { socketId: socket.id },
+              });
+            }
+          });
+          callback?.({ ok: true });
+          if (state) broadcastState(io, state);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+        }
+      }
+    );
+
+    // ── King of the Table host controls (ADMIN-only) ───────────────────────
+    // These operate on a single KotT room (not a tournament). They are gated by
+    // requireAdmin(socket) — the streamer who unlocked with ADMIN_HOST_KEY — so a
+    // copied invite link can never confer host powers. Each writes a DB-backed
+    // audit entry via commit() and rebroadcasts.
+
+    // Reset a stuck KotT table: cancel any pending rotation, zero the streaks,
+    // and either start a fresh match between the two seated players or fall back
+    // to the waiting screen if a seat is empty. The challenger queue is kept.
+    socket.on(
+      "admin_reset_table",
+      async (
+        data: { roomCode: string },
+        callback?: (res: { ok: boolean; error?: string }) => void
+      ) => {
+        try {
+          requireAdmin(socket);
+          const code = (data.roomCode || "").toUpperCase().trim();
+          kingRotationScheduled.delete(code);
+          let started = false;
+          let resetState: GameState | null = null;
+          await withRoomLock(code, async () => {
+            const cur = getRoom(code);
+            if (!cur) throw new Error("Room not found");
+            if (cur.mode !== "king") throw new Error("Reset Table is only available in King of the Table mode");
+            cur.kingStreak = [0, 0];
+            const bothSeated = !!cur.players[0] && !!cur.players[1];
+            if (bothSeated) {
+              const reset = resetMatch(cur);
+              const tossed = performCoinToss(reset);
+              await commit(tossed, {
+                action: "admin_reset_table",
+                payload: { restarted: true },
+              });
+              resetState = tossed;
+              started = true;
+            } else {
+              const reset = resetMatch(cur);
+              await commit(reset, {
+                action: "admin_reset_table",
+                payload: { restarted: false },
+              });
+              resetState = reset;
+            }
+          });
+          if (resetState) broadcastState(io, resetState);
+          // Deal the fresh round after the coin-toss reveal, mirroring new_match.
+          if (started) {
+            setTimeout(() => {
+              void withRoomLock(code, async () => {
+                try {
+                  const c = getRoom(code);
+                  if (!c || c.phase !== "coin_toss") return;
+                  if (!c.players[0] || !c.players[1]) return;
+                  const dealt = startRound(c);
+                  await dealWithShuffleAnimation(io, code, dealt);
+                } catch (err: unknown) {
+                  logger.error({ err, roomCode: code }, "Error dealing after admin_reset_table");
+                }
+              });
+            }, 3500);
+          }
+          callback?.({ ok: true });
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+        }
+      }
+    );
+
+    socket.on(
+      "admin_remove_from_queue",
+      async (
+        data: { roomCode: string; socketId: string },
+        callback?: (res: { ok: boolean; error?: string }) => void
+      ) => {
+        try {
+          requireAdmin(socket);
+          const code = (data.roomCode || "").toUpperCase().trim();
+          let state: GameState | null = null;
+          await withRoomLock(code, async () => {
+            const cur = getRoom(code);
+            if (!cur) throw new Error("Room not found");
+            if (cur.mode !== "king") throw new Error("Queue controls are only available in King of the Table mode");
+            state = removeChallenger(code, data.socketId);
+            if (state) {
+              await commit(state, {
+                action: "admin_remove_from_queue",
+                payload: { socketId: data.socketId },
+              });
+            }
+          });
+          callback?.({ ok: true });
+          if (state) broadcastState(io, state);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+        }
+      }
+    );
+
+    socket.on(
+      "admin_set_next_challenger",
+      async (
+        data: { roomCode: string; socketId: string },
+        callback?: (res: { ok: boolean; error?: string }) => void
+      ) => {
+        try {
+          requireAdmin(socket);
+          const code = (data.roomCode || "").toUpperCase().trim();
+          let state: GameState | null = null;
+          await withRoomLock(code, async () => {
+            const cur = getRoom(code);
+            if (!cur) throw new Error("Room not found");
+            if (cur.mode !== "king") throw new Error("Queue controls are only available in King of the Table mode");
+            state = setNextChallenger(code, data.socketId);
+            if (state) {
+              await commit(state, {
+                action: "admin_set_next_challenger",
+                payload: { socketId: data.socketId },
               });
             }
           });

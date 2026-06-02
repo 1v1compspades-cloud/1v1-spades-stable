@@ -72,6 +72,9 @@ interface SocketContextType {
   adminForceForfeit: (code: string, matchId: string, forfeitSeat: "A" | "B") => Promise<unknown>;
   hostReplacePlayer: (code: string, oldName: string, newName: string) => Promise<{ ok: true; newPlayerToken: string; removedName: string; replacementName: string }>;
   adminReissueToken: (code: string, playerName: string) => Promise<{ ok: true; playerToken: string; playerName: string }>;
+  adminResetTable: (roomCode: string) => Promise<void>;
+  adminRemoveFromQueue: (roomCode: string, socketId: string) => Promise<void>;
+  adminSetNextChallenger: (roomCode: string, socketId: string) => Promise<void>;
 }
 
 const SocketContext = createContext<SocketContextType | null>(null);
@@ -471,6 +474,14 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       { code, playerName },
     );
 
+  // King of the Table host controls (admin-only; authorized by the unlocked socket).
+  const adminResetTable = (roomCode: string) =>
+    adminCall("admin_reset_table", { roomCode });
+  const adminRemoveFromQueue = (roomCode: string, socketId: string) =>
+    adminCall("admin_remove_from_queue", { roomCode, socketId });
+  const adminSetNextChallenger = (roomCode: string, socketId: string) =>
+    adminCall("admin_set_next_challenger", { roomCode, socketId });
+
   const reconnectAsSpectator = (roomCode: string, spectatorName: string) => {
     return new Promise<void>((resolve, reject) => {
       if (!socket) return reject("No socket");
@@ -535,6 +546,9 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       adminForceForfeit,
       hostReplacePlayer,
       adminReissueToken,
+      adminResetTable,
+      adminRemoveFromQueue,
+      adminSetNextChallenger,
     }}>
       {children}
     </SocketContext.Provider>

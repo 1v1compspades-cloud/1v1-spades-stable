@@ -89,6 +89,7 @@ export default function Room() {
     joinQueue, leaveQueue,
     setActiveRoom,
     isAdmin,
+    adminResetTable, adminRemoveFromQueue, adminSetNextChallenger,
   } = useSocket();
   const {
     playerName,
@@ -132,7 +133,7 @@ export default function Room() {
       savePlayerIndex(null);
       saveIsSpectator(true);
       toast({
-        description: "Match over — you're now spectating. Tap 'Get in line' to play again.",
+        description: "Match over — you're now spectating. Tap 'Join as Challenger' to play again.",
       });
     };
     socket.on("you_are_seated", onSeated);
@@ -410,6 +411,48 @@ export default function Room() {
       toast({ description: typeof err === "string" ? err : "Couldn't leave the queue.", variant: "destructive" });
     }
   };
+
+  // ── King of the Table host controls (admin/streamer only) ───────────────
+  const handleResetTable = async () => {
+    if (!roomCode) return;
+    try {
+      await adminResetTable(roomCode);
+      toast({ description: "Table reset." });
+    } catch (err: any) {
+      toast({ description: typeof err === "string" ? err : "Couldn't reset the table.", variant: "destructive" });
+    }
+  };
+  const handleRemoveFromQueue = async (socketId: string) => {
+    if (!roomCode) return;
+    try {
+      await adminRemoveFromQueue(roomCode, socketId);
+      toast({ description: "Removed from queue." });
+    } catch (err: any) {
+      toast({ description: typeof err === "string" ? err : "Couldn't remove challenger.", variant: "destructive" });
+    }
+  };
+  const handleSetNextChallenger = async (socketId: string) => {
+    if (!roomCode) return;
+    try {
+      await adminSetNextChallenger(roomCode, socketId);
+      toast({ description: "Moved to front of the queue." });
+    } catch (err: any) {
+      toast({ description: typeof err === "string" ? err : "Couldn't reorder the queue.", variant: "destructive" });
+    }
+  };
+
+  // Current King = the seated player whose win streak is active (>0). Only one
+  // seat can have a streak at a time (the loser resets to 0). Null until the
+  // first match is won.
+  const kingSeat: 0 | 1 | null = isKingMode
+    ? ((gameState?.kingStreak?.[0] ?? 0) > 0
+        ? 0
+        : (gameState?.kingStreak?.[1] ?? 0) > 0
+          ? 1
+          : null)
+    : null;
+  const kingName = kingSeat !== null ? gameState?.players?.[kingSeat]?.name ?? null : null;
+  const kingStreakVal = kingSeat !== null ? gameState?.kingStreak?.[kingSeat] ?? 0 : 0;
 
   const handleBid = async () => {
     if (!bidAmount || spectator) return;
@@ -898,11 +941,11 @@ export default function Room() {
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => copyToClipboard(buildLink(true), "Spectator link")}
+                  onClick={() => copyToClipboard(buildLink(true), isKingMode ? "Watch Table link" : "Spectator link")}
                   data-testid="button-copy-spectator-link"
                   className="min-h-[44px]"
                 >
-                  👀 Copy Spectator Link
+                  👀 {isKingMode ? "Copy Watch Table Link" : "Copy Spectator Link"}
                 </Button>
               </div>
             </div>
@@ -1040,11 +1083,11 @@ export default function Room() {
             </div>
             <Button
               variant="outline"
-              onClick={() => copyToClipboard(buildLink(true), "Spectator link")}
+              onClick={() => copyToClipboard(buildLink(true), isKingMode ? "Watch Table link" : "Spectator link")}
               data-testid="button-copy-spectator-link"
               className="w-full min-h-[44px]"
             >
-              👀 Copy Spectator Link
+              👀 {isKingMode ? "Copy Watch Table Link" : "Copy Spectator Link"}
             </Button>
           </div>
 
@@ -1513,7 +1556,17 @@ export default function Room() {
                     className="w-full h-11"
                     data-testid="button-join-queue-gameover"
                   >
-                    Get in line
+                    Join as Challenger
+                  </Button>
+                )}
+                {isKingMode && isAdmin && (
+                  <Button
+                    onClick={handleResetTable}
+                    variant="destructive"
+                    className="w-full h-11"
+                    data-testid="button-reset-table-gameover"
+                  >
+                    Reset Table
                   </Button>
                 )}
                 {gameState.tournamentRef && (
@@ -1592,61 +1645,116 @@ export default function Room() {
     return (
       <div
         data-testid="kott-queue-panel"
-        className="px-4 py-2 bg-black/40 border-b border-primary/20 flex items-center gap-2 flex-wrap text-xs"
+        className="px-4 py-2 bg-black/40 border-b border-primary/20 flex flex-col gap-1.5 text-xs"
       >
-        <Badge
-          variant="outline"
-          className="border-yellow-500/50 text-yellow-300 uppercase tracking-widest"
-        >
-          👑 King of the Table
-        </Badge>
-        {queue.length === 0 ? (
-          <span className="text-muted-foreground italic">No challengers in line yet.</span>
-        ) : (
-          <>
-            <span className="text-muted-foreground">Next up:</span>
-            {queue.slice(0, 5).map((c, i) => (
-              <Badge
-                key={c.id}
-                variant="outline"
-                data-testid={`queue-slot-${i}`}
-                className={cn(
-                  "text-xs font-mono",
-                  i === 0
-                    ? "border-primary/60 text-primary"
-                    : "border-border text-muted-foreground"
-                )}
-              >
-                {i + 1}. {c.name}
-              </Badge>
-            ))}
-            {queue.length > 5 && (
-              <span className="text-muted-foreground">+{queue.length - 5} more</span>
-            )}
-          </>
-        )}
-        {spectator && (
-          inQueue ? (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleLeaveQueue}
-              data-testid="button-leave-queue"
-              className="h-7 text-xs ml-auto"
-            >
-              Leave line (#{queuePosition + 1})
-            </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge
+            variant="outline"
+            className="border-yellow-500/50 text-yellow-300 uppercase tracking-widest"
+          >
+            👑 King of the Table
+          </Badge>
+          {/* Current King — clearly surfaced for the stream. */}
+          {kingName ? (
+            <span data-testid="kott-current-king" className="font-semibold text-yellow-300">
+              King: {kingName}
+              {kingStreakVal > 0 && (
+                <span className="ml-1 font-mono text-[10px] align-top">×{kingStreakVal}</span>
+              )}
+            </span>
           ) : (
+            <span data-testid="kott-current-king" className="text-muted-foreground italic">
+              No reigning King yet
+            </span>
+          )}
+          {spectator && (
+            inQueue ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleLeaveQueue}
+                data-testid="button-leave-queue"
+                className="h-7 text-xs ml-auto"
+              >
+                Leave Queue (#{queuePosition + 1})
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                onClick={handleJoinQueue}
+                data-testid="button-join-queue"
+                className="h-7 text-xs ml-auto"
+              >
+                Join as Challenger
+              </Button>
+            )
+          )}
+          {/* Host-only: Reset Table (admin/streamer). */}
+          {isAdmin && (
             <Button
               size="sm"
-              onClick={handleJoinQueue}
-              data-testid="button-join-queue"
-              className="h-7 text-xs ml-auto"
+              variant="destructive"
+              onClick={handleResetTable}
+              data-testid="button-reset-table"
+              className={cn("h-7 text-xs", spectator ? "" : "ml-auto")}
             >
-              Get in line
+              Reset Table
             </Button>
-          )
-        )}
+          )}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {queue.length === 0 ? (
+            <span className="text-muted-foreground italic">No challengers in line yet.</span>
+          ) : (
+            <>
+              <span className="text-muted-foreground">Next up:</span>
+              {queue.slice(0, isAdmin ? 12 : 5).map((c, i) => (
+                <span key={c.id} className="inline-flex items-center gap-1">
+                  <Badge
+                    variant="outline"
+                    data-testid={`queue-slot-${i}`}
+                    className={cn(
+                      "text-xs font-mono",
+                      i === 0
+                        ? "border-primary/60 text-primary"
+                        : "border-border text-muted-foreground"
+                    )}
+                  >
+                    {i + 1}. {c.name}
+                  </Badge>
+                  {/* Host-only per-challenger controls. */}
+                  {isAdmin && (
+                    <>
+                      {i > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleSetNextChallenger(c.id)}
+                          data-testid={`button-set-next-${i}`}
+                          title="Move to front of queue"
+                          className="text-[10px] text-primary hover:underline"
+                        >
+                          ↑next
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFromQueue(c.id)}
+                        data-testid={`button-remove-queue-${i}`}
+                        title="Remove from queue"
+                        className="text-[10px] text-destructive hover:underline"
+                      >
+                        ✕
+                      </button>
+                    </>
+                  )}
+                </span>
+              ))}
+              {!isAdmin && queue.length > 5 && (
+                <span className="text-muted-foreground">+{queue.length - 5} more</span>
+              )}
+            </>
+          )}
+        </div>
       </div>
     );
   };

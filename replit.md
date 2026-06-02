@@ -135,6 +135,18 @@ Token-gated dashboard the tournament host uses to recover from disconnects, AFK,
 
 When a third+ player clicks Join Match on a King-of-the-Table room (mode=`king`) and both seats are filled, the Lobby catches "Room is full" and automatically retries as `join_as_spectator` + `join_queue`. The user lands in `/room/<code>` as a spectator + queued challenger and auto-rotates into the loser's seat when the next match ends (per the existing `scheduleKingNextMatch` flow). Quick Match rooms (mode=`quick`) still hard-cap at 2 seats and reject the third joiner.
 
+## KotT host controls (admin/streamer only)
+
+- KotT "host" controls are gated on the existing secret-key admin (`requireAdmin` / `isAdmin`, unlocked via `admin_unlock` + `ADMIN_HOST_KEY`) — the streamer. There is NO new per-room host token, so invite/watch links stay token-free (consistent with the threat model).
+- Engine helper `setNextChallenger(roomCode, socketId)` (`engine.ts`) splices the matching queue entry and unshifts it to the head; no-op if already head or not found.
+- Socket events (`socket.ts`, all `requireAdmin`-gated, run inside `withRoomLock`, guard `mode === "king"`, write an audit entry, then `broadcastState`):
+  - `admin_reset_table {roomCode}` — clears `kingRotationScheduled`, zeros `kingStreak`; if both seats filled → `resetMatch` + coin toss + deal after 3500ms (mirrors `new_match`), else falls back to the waiting screen. The challenger queue is preserved.
+  - `admin_remove_from_queue {roomCode, socketId}` — `removeChallenger`.
+  - `admin_set_next_challenger {roomCode, socketId}` — `setNextChallenger`.
+- `new_match` is a no-op when `state.mode === "king"` (rotation is automatic; manual rematch would conflict).
+- Client: `useSocket.tsx` exposes `adminResetTable` / `adminRemoveFromQueue` / `adminSetNextChallenger` via `adminCall` (no token in payload; authorized by the unlocked admin socket).
+- UI (`Room.tsx`): the queue panel shows the Current King (seat with `kingStreak > 0`, with 👑×N streak) and the queue. Buttons renamed for clarity: "Join as Challenger", "Leave Queue (#n)", "Watch Table link". Admin-only controls (behind `isAdmin`): per-queue-entry Remove (✕) and Set-next (↑next), a Reset Table button on the queue panel, and a Reset Table button on the game-over screen.
+
 ## Bidding order (coin toss + alternation)
 
 - Coin toss happens ONCE per match (server-side `performCoinToss`, fired by `start_game`).

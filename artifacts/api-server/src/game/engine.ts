@@ -887,6 +887,25 @@ export function removeChallenger(
   return state;
 }
 
+/**
+ * KotT host control: move the challenger identified by socketId to the head
+ * of the queue so they are seated in the next rotation. No-op (returns the
+ * unchanged state) if the socketId isn't queued or it's already at the head.
+ */
+export function setNextChallenger(
+  roomCode: string,
+  socketId: string
+): GameState | null {
+  const state = rooms.get(roomCode);
+  if (!state) return null;
+  const idx = state.challengerQueue.findIndex((c) => c.socketId === socketId);
+  if (idx <= 0) return state;
+  const [entry] = state.challengerQueue.splice(idx, 1);
+  state.challengerQueue.unshift(entry);
+  rooms.set(roomCode, state);
+  return state;
+}
+
 export interface KingPromotion {
   state: GameState;
   promoted: { socketId: string; playerIndex: 0 | 1; name: string };
