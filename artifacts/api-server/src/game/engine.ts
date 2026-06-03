@@ -736,11 +736,15 @@ function calculateRoundScore(
     const tricksTaken = tricks[i];
 
     if (bid === 0) {
-      // Nil bid — 1v1 Competitive Spades house rule: ±125
+      // Nil bid — 1v1 Competitive Spades house rule: ±125.
+      // A failed nil still accumulates a bag for every trick taken, and each
+      // of those bags adds +1 to the round score (e.g. nil + 1 trick = -124,
+      // +1 bag). The usual bag-threshold penalties below then apply to the
+      // updated bag count just like non-nil overtricks.
       if (tricksTaken === 0) {
         scoreDeltas[i] = 125;
       } else {
-        scoreDeltas[i] = -125;
+        scoreDeltas[i] = -125 + tricksTaken;
         newBags[i] += tricksTaken;
       }
     } else {

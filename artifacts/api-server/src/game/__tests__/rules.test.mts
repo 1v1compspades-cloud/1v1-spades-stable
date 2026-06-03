@@ -509,15 +509,71 @@ function playFullRound_seat0Sweeps(s: GameState): GameState {
 // Scripted Hand 4 — failed nil (+ sub-250 5-bag penalty on opponent)
 {
   const final = forceRoundOutcome({ bid0: 0, bid1: 5, tricks0: 3, firstBidder: 1 });
-  // seat 0 nil failed (took 3) → -125, +3 bags
+  // seat 0 nil failed (took 3) → -125 + 3 bag points = -122, +3 bags
   // seat 1 bid 5, took 10 → +50 + 5 bags. Pre-score 0 (sub-250) → bags 0→5 crosses
   //   5-bag threshold once → −50 penalty. Net: 50+5−50 = 5.
-  ok("Hand 4 (failed nil) — seat 0 -125",
-    final.scores[0] === -125, { got: final.scores[0] });
+  ok("Hand 4 (failed nil) — seat 0 -125 + 3 trick bags = -122",
+    final.scores[0] === -122, { got: final.scores[0] });
   ok("Hand 4 — failed nil DOES accumulate bags",
     final.bags[0] === 3, { got: final.bags[0] });
   ok("Hand 4 — opponent gets +bid +bags −sub250penalty",
     final.scores[1] === 5, { got: final.scores[1] });
+}
+
+// Nil + bags — failed nil score = -125 + (1 point per trick taken).
+// These cover the exact rule: bags accumulate AND each bag adds +1 to the
+// round score (so the bag count and the score stay in lockstep).
+{
+  // Nil, 0 tricks → successful nil: +125, +0 bags.
+  const f0 = forceRoundOutcome({ bid0: 0, bid1: 5, tricks0: 0, firstBidder: 1 });
+  ok("Nil 0 tricks — +125 score", f0.scores[0] === 125, { got: f0.scores[0] });
+  ok("Nil 0 tricks — +0 bags", f0.bags[0] === 0, { got: f0.bags[0] });
+
+  // Nil, 1 trick → -125 + 1 = -124, +1 bag. (The reported bug case.)
+  const f1 = forceRoundOutcome({ bid0: 0, bid1: 5, tricks0: 1, firstBidder: 1 });
+  ok("Nil 1 trick — -124 score", f1.scores[0] === -124, { got: f1.scores[0] });
+  ok("Nil 1 trick — +1 bag", f1.bags[0] === 1, { got: f1.bags[0] });
+
+  // Nil, 2 tricks → -125 + 2 = -123, +2 bags.
+  const f2 = forceRoundOutcome({ bid0: 0, bid1: 5, tricks0: 2, firstBidder: 1 });
+  ok("Nil 2 tricks — -123 score", f2.scores[0] === -123, { got: f2.scores[0] });
+  ok("Nil 2 tricks — +2 bags", f2.bags[0] === 2, { got: f2.bags[0] });
+
+  // Nil, 5 tricks → -125 + 5 = -120, +5 bags. Pre-score 0 (sub-250) → bags 0→5
+  // crosses the 5-bag threshold once → -50 penalty. Net: -120 - 50 = -170.
+  const f5 = forceRoundOutcome({ bid0: 0, bid1: 5, tricks0: 5, firstBidder: 1 });
+  ok("Nil 5 tricks — base score before penalty = -120, bag penalty -50 → -170",
+    f5.scores[0] === -170, { got: f5.scores[0] });
+  ok("Nil 5 tricks — +5 bags", f5.bags[0] === 5, { got: f5.bags[0] });
+
+  // Boundary: nil takes ALL 13 tricks → base -125 + 13 = -112, +13 bags. Pre-score 0
+  // (sub-250) → bags 0→13 cross the 5- and 10-bag thresholds twice → 2*-50 = -100.
+  // Net: -112 - 100 = -212.
+  const f13 = forceRoundOutcome({ bid0: 0, bid1: 13, tricks0: 13, firstBidder: 1 });
+  ok("Nil 13 tricks — base -112, two sub-250 bag penalties (-100) → -212",
+    f13.scores[0] === -212, { got: f13.scores[0] });
+  ok("Nil 13 tricks — +13 bags", f13.bags[0] === 13, { got: f13.bags[0] });
+
+  // 250+ tier interaction: failed nil whose trick bags cross a 10-bag threshold.
+  // Pre-score 300 (250+ tier → every 10 bags = -100). Start at 7 bags, take 5 tricks
+  // → bags 7→12 cross 10 once → -100. Base delta -125 + 5 = -120. Net total:
+  // 300 - 120 - 100 = 80.
+  const fTier = forceRoundOutcome({
+    bid0: 0, bid1: 5, tricks0: 5,
+    preScores: [300, 0], preBags: [7, 0], firstBidder: 1, matchTarget: 500,
+  });
+  ok("Nil 5 tricks @250+ tier crossing 10-bag threshold — 300 -120 -100 = 80",
+    fTier.scores[0] === 80, { got: fTier.scores[0] });
+  ok("Nil 5 tricks @250+ tier — bags 7→12", fTier.bags[0] === 12, { got: fTier.bags[0] });
+}
+
+// Non-nil scoring must be UNCHANGED: bid 10, take 12 = 100 + 2 bags = 102.
+{
+  const final = forceRoundOutcome({ bid0: 10, bid1: 3, tricks0: 12, firstBidder: 1 });
+  ok("Non-nil regression — bid 10 take 12 = +102",
+    final.scores[0] === 102, { got: final.scores[0] });
+  ok("Non-nil regression — +2 bags",
+    final.bags[0] === 2, { got: final.bags[0] });
 }
 
 // Scripted Hand 5 — spade break / follow-suit edge case
@@ -627,25 +683,16 @@ function playFullRound_seat0Sweeps(s: GameState): GameState {
   ok("Target-reach (no tie) → phase = game_over",
     sIn.phase === "game_over", { phase: sIn.phase, scores: sIn.scores });
 
-  // Initial tiebreaker TRIGGER from tiebreakerActive=false: both finish the round
-  // tied at exactly the target. Use pre 250/250 (already at target) with both bid 0
-  // nil → both fail → both −125 → 125/125 tied. Even though both are below target
-  // post-round, this exercises the round_over branch that keeps tiebreakerActive
-  // unset when not yet at target. We need a DIFFERENT scenario for the trigger:
-  // pre 187/187 + both bid 7 nil-ish... too brittle.
-  // Cleanest exercisable case: pre 250/250 (already tied at target) + both bid 0 +
-  // both fail → 125/125. The engine sees "bothAtTarget && tied" was previously true
-  // (state is mid-match with active=false). When scores recede below target, the
-  // tiebreaker doesn't trigger — it triggers only when bothAtTarget is currently true.
-  // So exercise the actual trigger: state with both at 250 going INTO the round,
-  // active=false; round leaves them above target & tied. Use both bid 1 took 1 →
-  // helper can't produce 1/1 split. Instead set preScores=[245,245] + both bid 5 + t0=5
-  // → seat0 245+50=295, seat1 245+50+3bags = 298 (bag penalty sub-250: 0→3 no
-  // crossing). Not tied. Use both nil with preScores=[375,375] preBags=[0,0] tier
-  // 250+ no penalty. Both fail nil → 250/250 tied at exactly target.
+  // Initial tiebreaker TRIGGER from tiebreakerActive=false: both finish the
+  // round tied at exactly the target. Both bid nil and fail. Because a failed
+  // nil now scores -125 + (1 per trick taken), the two seats' deltas differ by
+  // their trick split (t0=5 → -120 for seat 0; t1=8 → -117 for seat 1), so we
+  // offset the pre-scores by that same 3-point gap to land BOTH on exactly 250.
+  // Pre-scores are in the 250+ tier and bags (5, 8) stay under 10, so no bag
+  // penalty fires. This isolates the tiebreaker state machine from the scoring.
   const triggerTied = forceRoundOutcome({
     bid0: 0, bid1: 0, tricks0: 5,
-    preScores: [375, 375], preBags: [0, 0],
+    preScores: [370, 367], preBags: [0, 0],
     firstBidder: 1, matchTarget: 250,
     // tiebreakerActive intentionally OMITTED (defaults false) — this is the entry path
   });
@@ -680,10 +727,10 @@ function playFullRound_seat0Sweeps(s: GameState): GameState {
   // Run any round. If post-scores tied → new block; if not → game_over.
   // Score both equal: pre 250/250, both bid 6 took 6 — but t0=6 forces t1=7. Asymmetric.
 
-  // FORCE A TIE via both-fail-nil. Each side bids 0, each side takes ≥1 trick →
-  // both score −125 deltas. Pre-scores equal + symmetric delta = tied result. Bag
-  // accumulation differs per side (t0 vs 13−t0) but does NOT trigger a 10-bag/−100
-  // 250+ penalty unless one side crosses 10 (here t0=5 → bags [5,8], safe).
+  // Mid-block (round 2 of 3): the engine must stay in round_over with
+  // tiebreakerActive still true. Both bid nil and fail; with the corrected
+  // nil-bag scoring the deltas are -120 / -117 (not symmetric), so this test
+  // deliberately checks ONLY the phase/active flags, not the exact scores.
   const tieRound = forceRoundOutcome({
     bid0: 0, bid1: 0, tricks0: 5,
     preScores: [250, 250], preBags: [0, 0],
@@ -691,16 +738,20 @@ function playFullRound_seat0Sweeps(s: GameState): GameState {
     firstBidder: 1, matchTarget: 250,
     roundNumber: 3,
   });
-  // Both fail nil → both −125 → scores 125/125 (tied). Engine sees tiebreakerRound=2
-  // < 3 inside calculateRoundScore → stay in round_over, tiebreakerActive remains true.
+  // tiebreakerRound=2 < 3 inside calculateRoundScore → stay in round_over,
+  // tiebreakerActive remains true.
   ok("Tiebreaker mid-block (round 2 of 3) → still round_over, still tiebreakerActive",
     tieRound.phase === "round_over" && tieRound.tiebreakerActive === true,
     { phase: tieRound.phase, tbActive: tieRound.tiebreakerActive, scores: tieRound.scores });
 
   // Tiebreaker round 3 with TIED result → reset to new block (tiebreakerRound→0).
+  // Both bid nil and fail; the corrected nil-bag scoring gives -120 / -117
+  // (seat 0 takes 5, seat 1 takes 8), so offset the pre-scores by 3 to keep the
+  // round ending tied (both land on 133). Pre-scores 250+ tier, bags <10 → no
+  // bag penalty.
   const tieRound3 = forceRoundOutcome({
     bid0: 0, bid1: 0, tricks0: 5,
-    preScores: [250, 250], preBags: [0, 0],
+    preScores: [253, 250], preBags: [0, 0],
     tiebreakerActive: true, tiebreakerRound: 3,
     firstBidder: 1, matchTarget: 250,
     roundNumber: 5,
@@ -708,7 +759,8 @@ function playFullRound_seat0Sweeps(s: GameState): GameState {
   ok("Tiebreaker round 3, still tied → new block (tiebreakerActive stays true, round resets)",
     tieRound3.phase === "round_over" &&
     tieRound3.tiebreakerActive === true &&
-    tieRound3.tiebreakerRound === 0,
+    tieRound3.tiebreakerRound === 0 &&
+    tieRound3.scores[0] === tieRound3.scores[1],
     { phase: tieRound3.phase, tbActive: tieRound3.tiebreakerActive, tbRound: tieRound3.tiebreakerRound, scores: tieRound3.scores });
 
   // Tiebreaker round 3 with NON-tied result → game_over.
