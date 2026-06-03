@@ -50,41 +50,41 @@
   --app-font-mono: 'Space Mono', monospace;
   --radius: 0.5rem;
 
-  /* Dark Felt Table Aesthetic */
-  --background: 160 30% 12%; 
-  --foreground: 45 40% 90%; 
+  /* Black & Gold Casino Aesthetic */
+  --background: 40 8% 7%;        /* near-black warm charcoal */
+  --foreground: 45 22% 93%;      /* clean off-white */
 
-  --border: 160 20% 25%;
-  --input: 160 20% 25%;
-  --ring: 35 90% 55%; 
+  --border: 40 8% 18%;
+  --input: 40 8% 18%;
+  --ring: 43 78% 53%;            /* gold */
 
-  --card: 160 30% 10%;
-  --card-foreground: 45 40% 90%;
-  --card-border: 160 20% 25%;
+  --card: 40 9% 9%;              /* raised charcoal */
+  --card-foreground: 45 22% 93%;
+  --card-border: 43 45% 24%;     /* subtle gold-tinted edge */
 
-  --popover: 160 30% 10%;
-  --popover-foreground: 45 40% 90%;
-  --popover-border: 160 20% 25%;
+  --popover: 40 10% 8%;
+  --popover-foreground: 45 22% 93%;
+  --popover-border: 43 45% 24%;
 
-  --primary: 35 90% 55%; /* Warm Amber */
-  --primary-foreground: 160 30% 10%;
+  --primary: 43 78% 53%; /* Rich Gold */
+  --primary-foreground: 40 30% 7%;
 
-  --secondary: 160 20% 20%;
-  --secondary-foreground: 45 40% 90%;
+  --secondary: 40 8% 15%;
+  --secondary-foreground: 45 22% 93%;
 
-  --muted: 160 20% 20%;
-  --muted-foreground: 160 10% 60%;
+  --muted: 40 8% 15%;
+  --muted-foreground: 42 10% 65%;
 
-  --accent: 35 90% 55%;
-  --accent-foreground: 160 30% 10%;
+  --accent: 43 78% 53%;
+  --accent-foreground: 40 30% 7%;
 
-  --destructive: 0 70% 50%;
+  --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
 
-  --chart-1: 35 90% 55%;
-  --chart-2: 160 30% 40%;
-  --chart-3: 45 90% 55%;
-  --chart-4: 0 70% 50%;
+  --chart-1: 43 78% 53%;
+  --chart-2: 42 50% 40%;
+  --chart-3: 45 85% 60%;
+  --chart-4: 0 72% 51%;
   --chart-5: 200 70% 50%;
   
   --sidebar: var(--background);
@@ -104,34 +104,34 @@
 
 .dark {
   /* Same as root since it's a dark-only game */
-  --background: 160 30% 12%; 
-  --foreground: 45 40% 90%; 
+  --background: 40 8% 7%;
+  --foreground: 45 22% 93%;
 
-  --border: 160 20% 25%;
-  --input: 160 20% 25%;
-  --ring: 35 90% 55%; 
+  --border: 40 8% 18%;
+  --input: 40 8% 18%;
+  --ring: 43 78% 53%;
 
-  --card: 160 30% 10%;
-  --card-foreground: 45 40% 90%;
-  --card-border: 160 20% 25%;
+  --card: 40 9% 9%;
+  --card-foreground: 45 22% 93%;
+  --card-border: 43 45% 24%;
 
-  --popover: 160 30% 10%;
-  --popover-foreground: 45 40% 90%;
-  --popover-border: 160 20% 25%;
+  --popover: 40 10% 8%;
+  --popover-foreground: 45 22% 93%;
+  --popover-border: 43 45% 24%;
 
-  --primary: 35 90% 55%; /* Warm Amber */
-  --primary-foreground: 160 30% 10%;
+  --primary: 43 78% 53%; /* Rich Gold */
+  --primary-foreground: 40 30% 7%;
 
-  --secondary: 160 20% 20%;
-  --secondary-foreground: 45 40% 90%;
+  --secondary: 40 8% 15%;
+  --secondary-foreground: 45 22% 93%;
 
-  --muted: 160 20% 20%;
-  --muted-foreground: 160 10% 60%;
+  --muted: 40 8% 15%;
+  --muted-foreground: 42 10% 65%;
 
-  --accent: 35 90% 55%;
-  --accent-foreground: 160 30% 10%;
+  --accent: 43 78% 53%;
+  --accent-foreground: 40 30% 7%;
 
-  --destructive: 0 70% 50%;
+  --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
 }
 
@@ -141,12 +141,12 @@
   }
   body {
     @apply font-sans antialiased bg-background text-foreground selection:bg-primary selection:text-primary-foreground;
-    /* Felt table: radial gold-tinted glow + soft noise overlay */
+    /* Casino black: gold-tinted top glow, deep vignette + soft noise overlay */
     background-color: hsl(var(--background));
     background-image:
-      radial-gradient(ellipse at 50% 0%, hsla(35, 90%, 55%, 0.08), transparent 55%),
-      radial-gradient(ellipse at 50% 100%, hsla(160, 60%, 20%, 0.45), transparent 60%),
-      url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+      radial-gradient(ellipse at 50% 0%, hsla(43, 78%, 53%, 0.10), transparent 55%),
+      radial-gradient(ellipse at 50% 120%, hsla(43, 60%, 40%, 0.06), transparent 55%),
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
     background-attachment: fixed, fixed, fixed;
     /* iPhone safe-area awareness for fixed/full-screen layouts */
     min-height: 100dvh;

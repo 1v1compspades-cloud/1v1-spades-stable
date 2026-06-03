@@ -1051,7 +1051,7 @@ export default function Room() {
     return (
       <div className="flex-1 overflow-y-auto px-4 py-6 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
         <div className="mx-auto w-full max-w-2xl">
-          <div className="rounded-2xl border-2 border-primary/40 bg-gradient-to-b from-emerald-950/70 via-emerald-950/40 to-black/70 shadow-[0_10px_60px_-10px_rgba(234,179,8,0.25)] backdrop-blur-sm overflow-hidden">
+          <div className="rounded-2xl border-2 border-primary/40 bg-gradient-to-b from-card/80 via-card/50 to-black/70 shadow-[0_10px_60px_-10px_rgba(234,179,8,0.25)] backdrop-blur-sm overflow-hidden">
             {/* Header */}
             <div className="px-5 pt-6 pb-4 text-center border-b border-primary/20">
               <div className="flex items-center justify-center gap-2 text-base mb-2" aria-hidden>
@@ -1212,7 +1212,7 @@ export default function Room() {
   const renderSpectatorWaiting = () => (
     <div className="flex-1 overflow-y-auto px-4 py-6 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
       <div className="mx-auto w-full max-w-2xl">
-        <div className="rounded-2xl border-2 border-primary/40 bg-gradient-to-b from-emerald-950/70 via-emerald-950/40 to-black/70 shadow-[0_10px_60px_-10px_rgba(234,179,8,0.25)] backdrop-blur-sm overflow-hidden">
+        <div className="rounded-2xl border-2 border-primary/40 bg-gradient-to-b from-card/80 via-card/50 to-black/70 shadow-[0_10px_60px_-10px_rgba(234,179,8,0.25)] backdrop-blur-sm overflow-hidden">
           <div className="px-5 pt-6 pb-4 text-center border-b border-primary/20">
             <Badge variant="outline" className="border-primary/40 text-primary uppercase tracking-widest text-[10px] mb-2">
               Spectator
@@ -1459,7 +1459,7 @@ export default function Room() {
                           "min-h-[44px] rounded-lg border text-sm font-bold tabular-nums transition-colors",
                           selected
                             ? "bg-primary text-primary-foreground border-primary shadow-md"
-                            : "bg-[#071f18] text-foreground border-white/20 hover:bg-white/5 active:bg-white/10"
+                            : "bg-white/[0.04] text-foreground border-white/20 hover:bg-white/[0.08] active:bg-white/10"
                         )}
                       >
                         {i === 0 ? "Nil" : i}

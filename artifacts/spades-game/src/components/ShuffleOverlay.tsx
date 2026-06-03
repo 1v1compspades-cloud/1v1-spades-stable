@@ -11,7 +11,7 @@ function CardBack({ className = "", style }: CardBackProps) {
       style={style}
       className={
         "w-10 h-14 sm:w-14 sm:h-20 rounded-md border-2 border-amber-300/70 " +
-        "bg-gradient-to-br from-emerald-800 via-emerald-900 to-black " +
+        "bg-gradient-to-br from-[#2a2620] via-[#15120d] to-black " +
         "shadow-[0_6px_18px_-4px_rgba(0,0,0,0.6)] " +
         "relative overflow-hidden " +
         className
@@ -97,8 +97,8 @@ export function ShuffleOverlay() {
             width: `${PILE_RADIUS * 2 + 80}px`,
             height: `${PILE_RADIUS * 2 + 80}px`,
             border: "1px dashed rgba(245, 197, 24, 0.18)",
-            boxShadow: "inset 0 0 40px rgba(16, 80, 50, 0.35)",
-            background: "radial-gradient(circle at center, rgba(20,90,60,0.18) 0%, rgba(0,0,0,0) 70%)",
+            boxShadow: "inset 0 0 40px rgba(0, 0, 0, 0.5)",
+            background: "radial-gradient(circle at center, rgba(224,168,42,0.10) 0%, rgba(0,0,0,0) 70%)",
             animation: `shuffle-fade-in 400ms ease-out ${DEAL_START_MS - 200}ms both`,
             opacity: 0,
           }}
