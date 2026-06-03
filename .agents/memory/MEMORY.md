@@ -22,3 +22,4 @@
 - [Spades tournament reconnect self-heal](spades-tournament-reconnect-selfheal.md) — cached per-round room code is NOT authoritative; on "Room not found" route via tournament page so pendingAssignment re-routes to current match; never clear token on stale-room/retryable errors; 5-min grace + pause-holds-slot auto-forfeit.
 - [Spades socket autoConnect:false](spades-socket-autoconnect.md) — shared socket never auto-connects; every entry page must call connect() on mount or a connected-gated page hangs on load/refresh only (masked by client-side nav). Host dashboard hit this.
 - [Spades old-tab guard gating](spades-tab-guard-gating.md) — a superseded-tab overlay alone does not stop reconnect; gate auto-reattach effects on tabSuperseded too.
+- [Spades deal/shuffle overlay budget](spades-deal-overlay-budget.md) — ShuffleOverlay is pure client visual; its full timeline must finish under the server's fixed SHUFFLE_ANIMATION_MS window or it gets cut off.

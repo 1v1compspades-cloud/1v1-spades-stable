@@ -191,57 +191,12 @@
   65%  { transform: rotate(10deg)  translateY(-10px); }
   100% { transform: rotate(0deg)   translateY(0); }
 }
-@keyframes shuffle-deal-up {
-  0%   { transform: translate(0, 0) rotate(0deg) scale(1);   opacity: 1; }
-  100% { transform: translate(0, -42vh) rotate(-12deg) scale(0.7); opacity: 0; }
-}
-@keyframes shuffle-deal-down {
-  0%   { transform: translate(0, 0) rotate(0deg) scale(1);   opacity: 1; }
-  100% { transform: translate(0, 42vh) rotate(12deg) scale(0.7); opacity: 0; }
-}
-/* 4-pile deal: HARDCODED per-direction keyframes. Cards fly from center
-   along a curved arc (50% stop) to each of 4 pile positions around the
-   table. Hardcoded values (PILE_RADIUS = 80) — keep these in sync with
-   PILE_RADIUS in ShuffleOverlay.tsx if you change either.
-
-   Avoided var()-based keyframes here because they don't reliably resolve
-   custom properties across all browsers when the keyframe is registered
-   globally — symptom was cards collapsing toward the center. */
-@keyframes shuffle-deal-bottom {
-  0%   { transform: translate(0,    0)    rotate(0deg) scale(1.05); opacity: 1; }
-  50%  { transform: translate(32px, 40px) rotate(0deg) scale(1.02); opacity: 1; }
-  100% { transform: translate(0,    80px) rotate(0deg) scale(1);    opacity: 0; }
-}
-@keyframes shuffle-deal-left {
-  0%   { transform: translate(0,     0)    rotate(0deg)  scale(1.05); opacity: 1; }
-  50%  { transform: translate(-40px, 32px) rotate(-4deg) scale(1.02); opacity: 1; }
-  100% { transform: translate(-80px, 0)    rotate(-8deg) scale(1);    opacity: 0; }
-}
-@keyframes shuffle-deal-top {
-  0%   { transform: translate(0,     0)     rotate(0deg) scale(1.05); opacity: 1; }
-  50%  { transform: translate(-32px, -40px) rotate(0deg) scale(1.02); opacity: 1; }
-  100% { transform: translate(0,     -80px) rotate(0deg) scale(1);    opacity: 0; }
-}
-@keyframes shuffle-deal-right {
-  0%   { transform: translate(0,    0)     rotate(0deg) scale(1.05); opacity: 1; }
-  50%  { transform: translate(40px, -32px) rotate(4deg) scale(1.02); opacity: 1; }
-  100% { transform: translate(80px, 0)     rotate(8deg) scale(1);    opacity: 0; }
-}
-/* Side-pile discard: slide off-table while fading. One per side so the
-   transforms are also hardcoded (matches deal-left / deal-right end state). */
-@keyframes shuffle-pile-discard-left {
-  0%   { transform: translate(-80px,  0)    rotate(-8deg)  scale(1);   opacity: 1; }
-  100% { transform: translate(-220px, 18vh) rotate(-22deg) scale(0.7); opacity: 0; }
-}
-@keyframes shuffle-pile-discard-right {
-  0%   { transform: translate(80px,  0)    rotate(8deg)  scale(1);   opacity: 1; }
-  100% { transform: translate(220px, 18vh) rotate(22deg) scale(0.7); opacity: 0; }
-}
-/* Side-pile dim/glow overlay during the discard moment. */
-@keyframes shuffle-pile-dim {
-  0%   { opacity: 0; }
-  60%  { opacity: 1; }
-  100% { opacity: 0.85; }
+/* Kept-hand (You / Opponent) gold pulse during the discard moment. The deal
+   itself is driven by inline CSS transitions in ShuffleOverlay.tsx (reliable
+   dynamic transforms), so only this ambient glow lives here as a keyframe. */
+@keyframes deal-keep-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 197, 24, 0); }
+  50%      { box-shadow: 0 0 18px 3px rgba(245, 197, 24, 0.5); }
 }
 @keyframes shuffle-fade-in {
   from { opacity: 0; }

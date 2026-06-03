@@ -113,6 +113,14 @@ export default function Room() {
   const [fastFinishOpen, setFastFinishOpen] = useState(false);
   const [fastFinishing, setFastFinishing] = useState(false);
 
+  // Per-round skip for the deal animation. Intentionally NOT persisted: each new
+  // round re-shows the teaching deal unless the player skips it again. Pure
+  // client visual state — has no effect on game/socket/server logic.
+  const [dealSkipped, setDealSkipped] = useState(false);
+  useEffect(() => {
+    if (gameState?.phase === "shuffling") setDealSkipped(false);
+  }, [gameState?.phase]);
+
   // Tick every 15s so AFK indicators re-render without depending on socket events.
   const [now, setNow] = useState<number>(() => Date.now());
   useEffect(() => {
@@ -1358,8 +1366,10 @@ export default function Room() {
           </div>
         </div>
 
-        {/* Shuffle / deal animation — shown to all roles for ~2.6s before each round */}
-        {gameState.phase === "shuffling" && <ShuffleOverlay />}
+        {/* Shuffle / deal animation — shown to all roles within the server's ~3.1s shuffling window before each round */}
+        {gameState.phase === "shuffling" && !dealSkipped && (
+          <ShuffleOverlay onSkip={() => setDealSkipped(true)} />
+        )}
 
         {/* Coin toss overlay — shown to all roles for ~3.5s, server transitions to bidding */}
         {gameState.phase === "coin_toss" && gameState.coinFlipWinner !== null && (() => {
