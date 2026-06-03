@@ -36,17 +36,26 @@ export function InfoPageLayout({
             <span aria-hidden className="mr-2 text-base">♠</span>
             1v1 Competitive Spades
           </Link>
-          <nav aria-label="Info pages" className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-            {NAV.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="text-muted-foreground hover:text-primary transition-colors"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <nav aria-label="Info pages" className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+              {NAV.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="text-muted-foreground hover:text-primary transition-colors"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+            <Link
+              href="/"
+              data-testid="button-back-to-game"
+              className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              ← Back to Game
+            </Link>
+          </div>
         </div>
       </header>
 

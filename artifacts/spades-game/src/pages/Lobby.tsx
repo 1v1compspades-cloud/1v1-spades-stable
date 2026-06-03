@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ConnectionPill } from "@/components/ConnectionPill";
+import { InfoMenu } from "@/components/InfoMenu";
 import { PreGameChecklist } from "@/components/PreGameChecklist";
 
 export default function Lobby() {
@@ -202,6 +203,7 @@ export default function Lobby() {
   return (
     <div className="min-h-[100dvh] flex items-center justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
       <ConnectionPill />
+      <InfoMenu />
       <Card className="w-full max-w-md border-primary/30 shadow-2xl shadow-primary/10 bg-card/80 backdrop-blur-sm">
         <CardHeader className="text-center space-y-3 pb-4">
           <div className="flex items-center justify-center gap-2 text-primary text-lg" aria-hidden>
