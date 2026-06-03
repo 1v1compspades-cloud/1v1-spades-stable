@@ -944,7 +944,7 @@ export default function Room() {
   // ── Shared lobby pieces (used by both player + spectator waiting screens) ──
   const matchSettingsItems: { label: string; value: string }[] = [
     { label: "Race to", value: String(gameState?.matchTarget ?? 250) },
-    { label: "Nil bids", value: "Allowed (±125)" },
+    { label: "Nil bids", value: "Allowed (±100)" },
     { label: "Hidden hands", value: "Enforced" },
     { label: "Anti-cheat", value: "Server-authoritative" },
   ];
@@ -1450,7 +1450,7 @@ export default function Room() {
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  You have {gameState.hand.length} cards. Bid 0 for Nil (+/−125).
+                  You have {gameState.hand.length} cards. Bid 0 for Nil (+/−100).
                 </p>
                 <div
                   data-testid="bid-buttons"
@@ -1510,12 +1510,16 @@ export default function Room() {
                   const tricks   = lastRound.tricks[idx];
                   const delta    = lastRound.scores[idx];
                   const total    = gameState.scores[idx];
-                  const newBags  = lastRound.bags[idx];
-                  const bagsDelta = newBags - prevBags[idx];
                   const isNil    = bid === 0;
                   const nilMade   = isNil && tricks === 0;
                   const nilBroken = isNil && tricks > 0;
                   const made      = !isNil && tricks >= bid;
+                  const newBags  = lastRound.bags[idx];
+                  const bagThreshold  = (gameState.matchTarget ?? 250) >= 500 ? 10 : 5;
+                  const bagPenaltyAmt = (gameState.matchTarget ?? 250) >= 500 ? 100 : 50;
+                  const bagsTaken = isNil ? (nilBroken ? tricks : 0) : Math.max(0, tricks - bid);
+                  const freshBags = prevBags[idx] + bagsTaken;
+                  const bagPenalty = Math.floor(freshBags / bagThreshold) * bagPenaltyAmt;
 
                   return (
                     <div key={idx} className={`space-y-2 p-3 rounded-lg ${isMyCol ? "bg-primary/10 border border-primary/20" : "bg-white/5"}`}>
@@ -1540,12 +1544,18 @@ export default function Room() {
                           <span className="text-muted-foreground">Total</span>
                           <span className="font-mono">{total}</span>
                         </div>
-                        {bagsDelta > 0 && (
+                        {bagsTaken > 0 && (
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Bags</span>
-                            <span className={`font-mono ${newBags >= 8 ? "text-yellow-400" : "text-muted-foreground"}`}>
-                              +{bagsDelta} → {newBags}
+                            <span className="font-mono text-muted-foreground">
+                              +{bagsTaken} → {newBags}
                             </span>
+                          </div>
+                        )}
+                        {bagPenalty > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Bag penalty</span>
+                            <span className="font-mono text-red-400">−{bagPenalty}</span>
                           </div>
                         )}
                       </div>

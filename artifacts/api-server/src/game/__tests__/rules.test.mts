@@ -82,10 +82,11 @@ function hand(spec: string): Card[] {
 function mkGameForBidding(
   h0: Card[],
   h1: Card[],
-  opts: { firstBidder?: 0 | 1; matchTarget?: number; preScores?: [number, number]; preBags?: [number, number]; roundNumber?: number } = {},
+  opts: { firstBidder?: 0 | 1; matchTarget?: number; preScores?: [number, number]; preBags?: [number, number]; roundNumber?: number; mode?: "quick" | "king"; tournamentRef?: { code: string; matchId: string } } = {},
 ): GameState {
   const firstBidder = opts.firstBidder ?? 0;
-  const state = createGame("TESTRM", opts.matchTarget ?? 250);
+  const state = createGame("TESTRM", opts.matchTarget ?? 250, undefined, opts.mode ?? "quick");
+  if (opts.tournamentRef) state.tournamentRef = opts.tournamentRef;
   state.players[0] = { id: "p0", name: "Alice", socketId: "p0", index: 0 };
   state.players[1] = { id: "p1", name: "Bob", socketId: "p1", index: 1 };
   state.coinFlipWinner = firstBidder === 0 ? 1 : 0;
@@ -374,6 +375,8 @@ function playFullRound_seat0Sweeps(s: GameState): GameState {
     tiebreakerActive?: boolean;
     tiebreakerRound?: number;
     roundNumber?: number;
+    mode?: "quick" | "king";
+    tournamentRef?: { code: string; matchId: string };
   }): GameState {
     const t0 = opts.tricks0;
     if (t0 < 0 || t0 > 13) throw new Error(`t0 out of range: ${t0}`);
@@ -414,6 +417,8 @@ function playFullRound_seat0Sweeps(s: GameState): GameState {
       preScores: opts.preScores,
       preBags: opts.preBags,
       roundNumber: opts.roundNumber,
+      mode: opts.mode,
+      tournamentRef: opts.tournamentRef,
     });
     if (opts.tiebreakerActive !== undefined) s.tiebreakerActive = opts.tiebreakerActive;
     if (opts.tiebreakerRound !== undefined) s.tiebreakerRound = opts.tiebreakerRound;
@@ -474,97 +479,106 @@ function playFullRound_seat0Sweeps(s: GameState): GameState {
     final.bags[0] === 1 && final.bags[1] === 3);
 }
 
-// Scripted Hand 2 — failed bid (+ sub-250 5-bag penalty triggers on opponent)
+// Scripted Hand 2 — failed bid (+ Race-to-250 5-bag penalty triggers on opponent)
 {
   const final = forceRoundOutcome({ bid0: 8, bid1: 4, tricks0: 4, firstBidder: 1 });
   // seat 0 bid 8, took 4 → -80
-  // seat 1 bid 4, took 9 → +40 +5 bags. Pre-score 0 (sub-250) → bags 0→5 crosses
+  // seat 1 bid 4, took 9 → +40 +5 bags. Race-to-250 → bags 0→5 crosses
   //   5-bag threshold once → −50 penalty. Net: 40+5−50 = −5.
   ok("Hand 2 (failed bid) — seat 0 lost bid value",
     final.scores[0] === -80, { got: final.scores[0] });
-  ok("Hand 2 — seat 1 score = +bid +bags −sub250penalty",
+  ok("Hand 2 — seat 1 score = +bid +bags −250penalty",
     final.scores[1] === -5, { got: final.scores[1] });
   ok("Hand 2 — failed bid does NOT accumulate bags for the failer",
     final.bags[0] === 0, { got: final.bags[0] });
-  ok("Hand 2 — opponent's bags carry forward (not reset by penalty)",
-    final.bags[1] === 5, { got: final.bags[1] });
+  ok("Hand 2 — opponent's bags roll over (mod 5) after the penalty",
+    final.bags[1] === 0, { got: final.bags[1] });
 }
 
-// Scripted Hand 3 — successful nil (+ sub-250 5-bag penalty on opponent)
+// Scripted Hand 3 — successful nil (+ Race-to-250 5-bag penalty on opponent)
 {
   const final = forceRoundOutcome({ bid0: 0, bid1: 5, tricks0: 0, firstBidder: 1 });
-  // seat 0 nil success → +125
-  // seat 1 bid 5, took 13 → +50 + 8 bags. Pre-score 0 (sub-250) → bags 0→8 crosses
-  //   5-bag threshold once → −50 penalty. Net: 50+8−50 = 8.
-  ok("Hand 3 (successful nil) — seat 0 +125",
-    final.scores[0] === 125, { got: final.scores[0] });
-  ok("Hand 3 — seat 1 makes bid with overtricks (sub-250 penalty applied)",
+  // seat 0 nil success → +100
+  // seat 1 bid 5, took 13 → +50 + 8 bags. Race-to-250 → bags 0→8 crosses the
+  //   5-bag threshold once → −50 penalty, bags roll over (8 mod 5 = 3). Net: 50+8−50 = 8.
+  ok("Hand 3 (successful nil) — seat 0 +100",
+    final.scores[0] === 100, { got: final.scores[0] });
+  ok("Hand 3 — seat 1 makes bid with overtricks (Race250 penalty applied)",
     final.scores[1] === 8, { got: final.scores[1] });
   ok("Hand 3 — successful nil contributes 0 bags",
     final.bags[0] === 0);
-  ok("Hand 3 — opponent bags = 8 carried forward",
-    final.bags[1] === 8, { got: final.bags[1] });
+  ok("Hand 3 — opponent bags roll over to 3 (8 mod 5)",
+    final.bags[1] === 3, { got: final.bags[1] });
 }
 
-// Scripted Hand 4 — failed nil (+ sub-250 5-bag penalty on opponent)
+// Scripted Hand 4 — failed nil (+ Race-to-250 5-bag penalty on opponent)
 {
   const final = forceRoundOutcome({ bid0: 0, bid1: 5, tricks0: 3, firstBidder: 1 });
-  // seat 0 nil failed (took 3) → -125 + 3 bag points = -122, +3 bags
-  // seat 1 bid 5, took 10 → +50 + 5 bags. Pre-score 0 (sub-250) → bags 0→5 crosses
-  //   5-bag threshold once → −50 penalty. Net: 50+5−50 = 5.
-  ok("Hand 4 (failed nil) — seat 0 -125 + 3 trick bags = -122",
-    final.scores[0] === -122, { got: final.scores[0] });
+  // seat 0 nil failed (took 3) → -100 + 3 trick points = -97, +3 bags (3 < 5, no penalty)
+  // seat 1 bid 5, took 10 → +50 + 5 bags. Race-to-250 → bags 0→5 hits the 5-bag
+  //   threshold once → -50 penalty, bags roll over to 0. Net: 50+5-50 = 5.
+  ok("Hand 4 (failed nil) — seat 0 -100 + 3 trick points = -97",
+    final.scores[0] === -97, { got: final.scores[0] });
   ok("Hand 4 — failed nil DOES accumulate bags",
     final.bags[0] === 3, { got: final.bags[0] });
-  ok("Hand 4 — opponent gets +bid +bags −sub250penalty",
+  ok("Hand 4 — opponent gets +bid +bags -250penalty",
     final.scores[1] === 5, { got: final.scores[1] });
+  ok("Hand 4 — opponent bags roll over to 0 after the 5-bag penalty",
+    final.bags[1] === 0, { got: final.bags[1] });
 }
 
-// Nil + bags — failed nil score = -125 + (1 point per trick taken).
-// These cover the exact rule: bags accumulate AND each bag adds +1 to the
-// round score (so the bag count and the score stay in lockstep).
+// ── Nil + bag scoring, Race to 250 (5 bags = -50, roll over) ───────────────
 {
-  // Nil, 0 tricks → successful nil: +125, +0 bags.
-  const f0 = forceRoundOutcome({ bid0: 0, bid1: 5, tricks0: 0, firstBidder: 1 });
-  ok("Nil 0 tricks — +125 score", f0.scores[0] === 125, { got: f0.scores[0] });
-  ok("Nil 0 tricks — +0 bags", f0.bags[0] === 0, { got: f0.bags[0] });
+  // Race 250: nil made → +100, +0 bags.
+  const made = forceRoundOutcome({ bid0: 0, bid1: 5, tricks0: 0, firstBidder: 1, matchTarget: 250 });
+  ok("Race250 nil made — +100 score", made.scores[0] === 100, { got: made.scores[0] });
+  ok("Race250 nil made — +0 bags", made.bags[0] === 0, { got: made.bags[0] });
 
-  // Nil, 1 trick → -125 + 1 = -124, +1 bag. (The reported bug case.)
-  const f1 = forceRoundOutcome({ bid0: 0, bid1: 5, tricks0: 1, firstBidder: 1 });
-  ok("Nil 1 trick — -124 score", f1.scores[0] === -124, { got: f1.scores[0] });
-  ok("Nil 1 trick — +1 bag", f1.bags[0] === 1, { got: f1.bags[0] });
+  // Race 250: nil failed w/1 trick → -100 + 1 = -99, +1 bag (no penalty).
+  const f1 = forceRoundOutcome({ bid0: 0, bid1: 5, tricks0: 1, firstBidder: 1, matchTarget: 250 });
+  ok("Race250 nil 1 trick — -99 score", f1.scores[0] === -99, { got: f1.scores[0] });
+  ok("Race250 nil 1 trick — +1 bag", f1.bags[0] === 1, { got: f1.bags[0] });
 
-  // Nil, 2 tricks → -125 + 2 = -123, +2 bags.
-  const f2 = forceRoundOutcome({ bid0: 0, bid1: 5, tricks0: 2, firstBidder: 1 });
-  ok("Nil 2 tricks — -123 score", f2.scores[0] === -123, { got: f2.scores[0] });
-  ok("Nil 2 tricks — +2 bags", f2.bags[0] === 2, { got: f2.bags[0] });
+  // Race 250: nil failed w/5 tricks → -100 + 5 - 50 = -145, bags reset to 0.
+  const f5 = forceRoundOutcome({ bid0: 0, bid1: 5, tricks0: 5, firstBidder: 1, matchTarget: 250 });
+  ok("Race250 nil 5 tricks — -100 +5 -50 = -145", f5.scores[0] === -145, { got: f5.scores[0] });
+  ok("Race250 nil 5 tricks — bags reset to 0", f5.bags[0] === 0, { got: f5.bags[0] });
 
-  // Nil, 5 tricks → -125 + 5 = -120, +5 bags. Pre-score 0 (sub-250) → bags 0→5
-  // crosses the 5-bag threshold once → -50 penalty. Net: -120 - 50 = -170.
-  const f5 = forceRoundOutcome({ bid0: 0, bid1: 5, tricks0: 5, firstBidder: 1 });
-  ok("Nil 5 tricks — base score before penalty = -120, bag penalty -50 → -170",
-    f5.scores[0] === -170, { got: f5.scores[0] });
-  ok("Nil 5 tricks — +5 bags", f5.bags[0] === 5, { got: f5.bags[0] });
+  // Race 250: nil failed w/6 tricks → -100 + 6 - 50 = -144, bags reset to 1.
+  const f6 = forceRoundOutcome({ bid0: 0, bid1: 6, tricks0: 6, firstBidder: 1, matchTarget: 250 });
+  ok("Race250 nil 6 tricks — -100 +6 -50 = -144", f6.scores[0] === -144, { got: f6.scores[0] });
+  ok("Race250 nil 6 tricks — bags reset to 1", f6.bags[0] === 1, { got: f6.bags[0] });
+}
 
-  // Boundary: nil takes ALL 13 tricks → base -125 + 13 = -112, +13 bags. Pre-score 0
-  // (sub-250) → bags 0→13 cross the 5- and 10-bag thresholds twice → 2*-50 = -100.
-  // Net: -112 - 100 = -212.
-  const f13 = forceRoundOutcome({ bid0: 0, bid1: 13, tricks0: 13, firstBidder: 1 });
-  ok("Nil 13 tricks — base -112, two sub-250 bag penalties (-100) → -212",
-    f13.scores[0] === -212, { got: f13.scores[0] });
-  ok("Nil 13 tricks — +13 bags", f13.bags[0] === 13, { got: f13.bags[0] });
+// ── Nil + bag scoring, Race to 500 (10 bags = -100, roll over) ─────────────
+{
+  // Race 500: nil made → +100, +0 bags.
+  const made = forceRoundOutcome({ bid0: 0, bid1: 5, tricks0: 0, firstBidder: 1, matchTarget: 500 });
+  ok("Race500 nil made — +100 score", made.scores[0] === 100, { got: made.scores[0] });
+  ok("Race500 nil made — +0 bags", made.bags[0] === 0, { got: made.bags[0] });
 
-  // 250+ tier interaction: failed nil whose trick bags cross a 10-bag threshold.
-  // Pre-score 300 (250+ tier → every 10 bags = -100). Start at 7 bags, take 5 tricks
-  // → bags 7→12 cross 10 once → -100. Base delta -125 + 5 = -120. Net total:
-  // 300 - 120 - 100 = 80.
-  const fTier = forceRoundOutcome({
-    bid0: 0, bid1: 5, tricks0: 5,
-    preScores: [300, 0], preBags: [7, 0], firstBidder: 1, matchTarget: 500,
-  });
-  ok("Nil 5 tricks @250+ tier crossing 10-bag threshold — 300 -120 -100 = 80",
-    fTier.scores[0] === 80, { got: fTier.scores[0] });
-  ok("Nil 5 tricks @250+ tier — bags 7→12", fTier.bags[0] === 12, { got: fTier.bags[0] });
+  // Race 500: nil failed w/1 trick → -100 + 1 = -99, +1 bag (no penalty until 10).
+  const f1 = forceRoundOutcome({ bid0: 0, bid1: 5, tricks0: 1, firstBidder: 1, matchTarget: 500 });
+  ok("Race500 nil 1 trick — -99 score", f1.scores[0] === -99, { got: f1.scores[0] });
+  ok("Race500 nil 1 trick — +1 bag", f1.bags[0] === 1, { got: f1.bags[0] });
+
+  // Race 500: reaching the 10-bag threshold fires -100 and rolls bags over (mod 10).
+  // Bags accrue across rounds, so we seed 5 carried bags and fail nil with 5 more
+  // tricks → fresh total 10 → -100, rolls to 0. Delta: -100 + 5 - 100 = -195.
+  const cross10 = forceRoundOutcome({ bid0: 0, bid1: 5, tricks0: 5, firstBidder: 1, matchTarget: 500, preBags: [5, 0] });
+  ok("Race500 10-bag threshold — -100 +5 -100 = -195", cross10.scores[0] === -195, { got: cross10.scores[0] });
+  ok("Race500 10-bag threshold — bags roll over to 0", cross10.bags[0] === 0, { got: cross10.bags[0] });
+
+  // One more bag past the threshold → rolls over to 1. Delta: -100 + 6 - 100 = -194.
+  const cross11 = forceRoundOutcome({ bid0: 0, bid1: 6, tricks0: 6, firstBidder: 1, matchTarget: 500, preBags: [5, 0] });
+  ok("Race500 11-bag rollover — -100 +6 -100 = -194", cross11.scores[0] === -194, { got: cross11.scores[0] });
+  ok("Race500 11-bag rollover — bags roll over to 1", cross11.bags[0] === 1, { got: cross11.bags[0] });
+
+  // Race 500: only 5 bags should NOT trigger a penalty (threshold is 10, not 5).
+  const f5 = forceRoundOutcome({ bid0: 0, bid1: 5, tricks0: 5, firstBidder: 1, matchTarget: 500 });
+  ok("Race500 nil 5 tricks — no penalty under the 10-bag threshold (-95)",
+    f5.scores[0] === -95, { got: f5.scores[0] });
+  ok("Race500 nil 5 tricks — +5 bags retained", f5.bags[0] === 5, { got: f5.bags[0] });
 }
 
 // Non-nil scoring must be UNCHANGED: bid 10, take 12 = 100 + 2 bags = 102.
@@ -574,6 +588,42 @@ function playFullRound_seat0Sweeps(s: GameState): GameState {
     final.scores[0] === 102, { got: final.scores[0] });
   ok("Non-nil regression — +2 bags",
     final.bags[0] === 2, { got: final.bags[0] });
+}
+
+// Tournament & King-of-the-Table rooms must score with the SAME selected-mode
+// nil/bag rules — scoring depends only on the race target, never on room kind.
+{
+  const quick = forceRoundOutcome({ bid0: 0, bid1: 5, tricks0: 5, firstBidder: 1, matchTarget: 250 });
+  const king  = forceRoundOutcome({ bid0: 0, bid1: 5, tricks0: 5, firstBidder: 1, matchTarget: 250, mode: "king" });
+  const tourn = forceRoundOutcome({
+    bid0: 0, bid1: 5, tricks0: 5, firstBidder: 1, matchTarget: 250,
+    tournamentRef: { code: "TCODE", matchId: "m1" },
+  });
+  ok("KotT match scores identically to quick match (Race250 nil 5 = -145, bags 0)",
+    king.scores[0] === quick.scores[0] && king.bags[0] === quick.bags[0] &&
+    king.scores[0] === -145 && king.bags[0] === 0,
+    { quick: quick.scores[0], king: king.scores[0], bags: king.bags[0] });
+  ok("Tournament match scores identically to quick match (Race250 nil 5 = -145, bags 0)",
+    tourn.scores[0] === quick.scores[0] && tourn.bags[0] === quick.bags[0] &&
+    tourn.scores[0] === -145 && tourn.bags[0] === 0,
+    { quick: quick.scores[0], tourn: tourn.scores[0], bags: tourn.bags[0] });
+
+  // Same room kinds at Race500 → 10-bag threshold (not 5) applies identically.
+  // 5 carried bags + 5 fresh = 10 → -100, rolls to 0. Delta: -100 +5 -100 = -195.
+  const quick500 = forceRoundOutcome({ bid0: 0, bid1: 5, tricks0: 5, firstBidder: 1, matchTarget: 500, preBags: [5, 0] });
+  const king500  = forceRoundOutcome({ bid0: 0, bid1: 5, tricks0: 5, firstBidder: 1, matchTarget: 500, preBags: [5, 0], mode: "king" });
+  const tourn500 = forceRoundOutcome({
+    bid0: 0, bid1: 5, tricks0: 5, firstBidder: 1, matchTarget: 500, preBags: [5, 0],
+    tournamentRef: { code: "TCODE", matchId: "m2" },
+  });
+  ok("KotT @Race500 uses 10-bag threshold like quick (-195, bags 0)",
+    king500.scores[0] === quick500.scores[0] && king500.bags[0] === quick500.bags[0] &&
+    king500.scores[0] === -195 && king500.bags[0] === 0,
+    { score: king500.scores[0], bags: king500.bags[0] });
+  ok("Tournament @Race500 uses 10-bag threshold like quick (-195, bags 0)",
+    tourn500.scores[0] === quick500.scores[0] && tourn500.bags[0] === quick500.bags[0] &&
+    tourn500.scores[0] === -195 && tourn500.bags[0] === 0,
+    { score: tourn500.scores[0], bags: tourn500.bags[0] });
 }
 
 // Scripted Hand 5 — spade break / follow-suit edge case
@@ -597,57 +647,58 @@ function playFullRound_seat0Sweeps(s: GameState): GameState {
     canPlayCard(r2.state, 1, C("3", "spades")).ok);
 }
 
-// Bag penalty — sub-250 (5 bags = -50)
+// Bag penalty — Race to 250 (every 5 bags = -50, rolls over)
 {
-  // Pre-round: seat 0 at score 100 (sub-250) with 4 bags. Bid 1. The universal
-  // helper, due to stable-sort tie-breaking in the auto-play loop, produces
-  // tricks=[8,5] for this layout (not [7,6]) — that's fine, still a valid round.
-  // seat 0 bid 1 took 8 → +10 +7 bags; bags rise 4 → 11. Sub-250 threshold:
-  // floor(11/5) − floor(4/5) = 2 thresholds crossed × −50 = −100.
-  // Net delta: 10+7−100 = −83. Final: 100−83 = 17.
+  // Race-to-250: 5-bag threshold regardless of score. The universal helper, due to
+  // stable-sort tie-breaking in the auto-play loop, produces tricks=[8,5] for this
+  // layout. seat 0 bid 1 took 8 → +10 +7 bags; bags rise 4 → 11. Threshold:
+  // floor(11/5) = 2 thresholds × −50 = −100. Net delta: 10+7−100 = −83. Final: 100−83 = 17.
+  // Bags roll over: 11 mod 5 = 1.
   const final = forceRoundOutcome({
     bid0: 1, bid1: 6, tricks0: 7,
     preScores: [100, 0], preBags: [4, 0],
-    firstBidder: 1,
+    firstBidder: 1, matchTarget: 250,
   });
-  ok("Sub-250 bag penalty — fires at 5-bag thresholds (2× −50)",
+  ok("Race250 bag penalty — fires at 5-bag thresholds (2× −50)",
     final.scores[0] === 17, { got: final.scores[0], expectedPenalty: -100 });
-  ok("Sub-250 bag penalty — bags carry forward (not reset)",
-    final.bags[0] === 11, { got: final.bags[0] });
+  ok("Race250 bag penalty — bags roll over (11 mod 5 = 1)",
+    final.bags[0] === 1, { got: final.bags[0] });
 }
 
-// Bag penalty — 250+ (10 bags = -100)
+// Bag penalty — Race to 500 (every 10 bags = -100, rolls over)
 {
-  // Pre-round: seat 0 at score 260 with 8 bags. Bid 1, take 4 → +10 +3 = +13.
-  // Bags 8 → 11. Crossing 10 at 250+ threshold = 1 * -100 = -100.
-  // Final delta: +13 - 100 = -87. New score: 260 - 87 = 173.
+  // Race-to-500: 10-bag threshold (not 5). seat 0 bid 1, take 4 → +10 +3 = +13.
+  // Bags 8 → 11. Crossing 10 = 1 × -100. Final delta: +13 - 100 = -87. New score: 260 - 87 = 173.
+  // Bags roll over: 11 mod 10 = 1.
   const final = forceRoundOutcome({
     bid0: 1, bid1: 9, tricks0: 4,
     preScores: [260, 0], preBags: [8, 0],
-    firstBidder: 1,
+    firstBidder: 1, matchTarget: 500,
   });
-  ok("250+ bag penalty — fires only at 10-bag thresholds",
+  ok("Race500 bag penalty — fires only at 10-bag thresholds",
     final.scores[0] === 173, { got: final.scores[0] });
-  ok("250+ bag penalty — 9 bags crossed nothing → 11 bags crossed 1 × -100",
-    final.bags[0] === 11);
+  ok("Race500 bag penalty — bags roll over (11 mod 10 = 1)",
+    final.bags[0] === 1, { got: final.bags[0] });
 }
 
-// Bag penalty — PRE-round tier lock at 249 → 250 boundary
+// Bag threshold is driven by RACE MODE, not by current score.
 {
-  // Pre-round: seat 0 at 249 (sub-250 tier) with 0 bags. The helper produces
-  // tricks=[8,5] for this layout. seat 0 bid 1 took 8 → +10 +7 bags. Bags 0 → 7
-  // at sub-250 tier crosses the 5-bag threshold once → -50. Net delta: 10+7−50
-  // = −33. Final: 249−33 = 216. If the engine WRONGLY used the post-round tier
-  // (250+ → 10-bag, which 0→7 does NOT cross), final would be 249+17 = 266.
-  // Asserting 216 proves the tier is locked at pre-round, not post-round.
+  // Same round at a high score: at Race-to-250 the 5-bag threshold STILL applies
+  // regardless of the seat sitting at 249. The helper produces tricks=[8,5]:
+  // seat 0 bid 1 took 8 → +10 +7 bags. Bags 0 → 7 crosses the 5-bag threshold once
+  // → -50. Net delta: 10+7−50 = −33. Final: 249−33 = 216. Bags roll over (7 mod 5 = 2).
+  // (Under the old score-tier rule this seat would have flipped to a 10-bag tier and
+  // avoided the penalty — proving the threshold now follows the mode, not the score.)
   const final = forceRoundOutcome({
     bid0: 1, bid1: 6, tricks0: 7,
     preScores: [249, 0], preBags: [0, 0],
-    firstBidder: 1,
+    firstBidder: 1, matchTarget: 250,
   });
-  ok("Bag tier lock — pre-round 249 (sub-250) stays sub-250 even when post-round ≥ 250",
+  ok("Mode-driven threshold — Race250 keeps the 5-bag threshold even at score 249",
     final.scores[0] === 216,
-    { got: final.scores[0], wouldBe_ifPostRoundTier: 266 });
+    { got: final.scores[0], wouldBe_ifScoreTier: 266 });
+  ok("Mode-driven threshold — bags roll over (7 mod 5 = 2)",
+    final.bags[0] === 2, { got: final.bags[0] });
 }
 
 // Tiebreaker — both reach target tied → block of up to 3 rounds
@@ -684,15 +735,13 @@ function playFullRound_seat0Sweeps(s: GameState): GameState {
     sIn.phase === "game_over", { phase: sIn.phase, scores: sIn.scores });
 
   // Initial tiebreaker TRIGGER from tiebreakerActive=false: both finish the
-  // round tied at exactly the target. Both bid nil and fail. Because a failed
-  // nil now scores -125 + (1 per trick taken), the two seats' deltas differ by
-  // their trick split (t0=5 → -120 for seat 0; t1=8 → -117 for seat 1), so we
-  // offset the pre-scores by that same 3-point gap to land BOTH on exactly 250.
-  // Pre-scores are in the 250+ tier and bags (5, 8) stay under 10, so no bag
-  // penalty fires. This isolates the tiebreaker state machine from the scoring.
+  // round tied at exactly the target. Use EXACT (made) bids so neither seat earns
+  // overtricks/bags — that isolates the tiebreaker state machine from bag scoring.
+  // t0=6 → seat 0 bid 6 takes 6 → +60; seat 1 bid 7 takes 7 → +70. The 10-point
+  // delta is absorbed by the pre-scores [190, 180] so BOTH finish at exactly 250.
   const triggerTied = forceRoundOutcome({
-    bid0: 0, bid1: 0, tricks0: 5,
-    preScores: [370, 367], preBags: [0, 0],
+    bid0: 6, bid1: 7, tricks0: 6,
+    preScores: [190, 180], preBags: [0, 0],
     firstBidder: 1, matchTarget: 250,
     // tiebreakerActive intentionally OMITTED (defaults false) — this is the entry path
   });
@@ -714,7 +763,7 @@ function playFullRound_seat0Sweeps(s: GameState): GameState {
   // Use bid 8/5, t0=8. seat 0: 200 + 80 = 280; seat 1 bid 5 took 5 → +50 = 250. Not tied.
   // Use bid 8/3, t0=8. seat 0: 200+80=280; seat 1 bid 3 took 5 → +30 +2 = +32 → 232. Not tied.
   // Use bid 8/8, t0=8. seat 0: 200+80=280; seat 1 bid 8 took 5 → -80 → 120. Game over.
-  // Use bid 13/0 nil, t0=13. seat 0: 200+130=330; seat 1: nil success +125 → 325. Not tied.
+  // Use bid 13/0 nil, t0=13. seat 0: 200+130=330; seat 1: nil success +100 → 300. Not tied.
   // Use bid 12/1, t0=12. seat 0: 200+120 = 320; seat 1 bid 1 took 1 → +10 = 210. Game over.
 
   // To FORCE a tie cleanly: pre 250/250 with tiebreakerActive=true, tiebreakerRound=2.

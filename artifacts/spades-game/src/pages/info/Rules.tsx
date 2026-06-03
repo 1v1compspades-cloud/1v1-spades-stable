@@ -33,8 +33,10 @@ export default function Rules() {
             <li>Bid the number of books you believe you can take.</li>
             <li>
               <strong>Nil is allowed:</strong> bid zero and try to win no books
-              at all. A successful nil is a big swing in your favor; a failed nil
-              works against you.
+              at all. A made nil is worth <strong>+100</strong>; a failed nil is{" "}
+              <strong>−100</strong> plus one point back for every book you were
+              forced to take (so nil with one book is −99). Those books still
+              count as bags.
             </li>
           </ul>
         </section>
@@ -57,10 +59,26 @@ export default function Rules() {
         <section>
           <h2>Bag penalties</h2>
           <p>
-            Overbidding to grab extra books is risky. Accumulated bags cost you
-            points once they cross a threshold, so consistently bidding accurate
-            counts — rather than sandbagging — keeps your score climbing. Bidding
-            too low just to be safe will quietly bleed points over a long match.
+            Overbidding to grab extra books is risky. Bags pile up across rounds
+            and cost you points once they cross a threshold, which depends on the
+            race mode you are playing:
+          </p>
+          <ul>
+            <li>
+              <strong>Race to 250:</strong> every 5 bags = <strong>−50</strong>{" "}
+              points, and your bag count rolls over (5 bags → −50 and 0 left, 6
+              bags → −50 and 1 left).
+            </li>
+            <li>
+              <strong>Race to 500:</strong> every 10 bags = <strong>−100</strong>{" "}
+              points, and your bag count rolls over (10 bags → −100 and 0 left,
+              11 bags → −100 and 1 left).
+            </li>
+          </ul>
+          <p>
+            Consistently bidding accurate counts — rather than sandbagging —
+            keeps your score climbing. Bidding too low just to be safe will
+            quietly bleed points over a long match.
           </p>
         </section>
 

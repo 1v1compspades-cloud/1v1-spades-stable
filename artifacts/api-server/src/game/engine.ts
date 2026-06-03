@@ -584,29 +584,34 @@ export function playCard(
       roundResult.newBags[1],
     ];
 
-    // 1v1 Competitive bag penalties (per-seat, threshold depends on the
-    // seat's PRE-round score):
-    //   - score < 250 at start of round → every 5 bags = -50
-    //   - score ≥ 250 at start of round → every 10 bags = -100
-    // Crossing the 250 threshold mid-round does not reclassify this round's
-    // penalty (threshold is locked at round start) — keeps the math deterministic.
-    const bagPenalty = (preScore: number, oldBags: number, freshBags: number): number => {
-      if (preScore < 250) {
-        const crossed = Math.floor(freshBags / 5) - Math.floor(oldBags / 5);
-        return crossed * 50;
-      }
-      const crossed = Math.floor(freshBags / 10) - Math.floor(oldBags / 10);
-      return crossed * 100;
-    };
+    // Bag penalties are determined by the SELECTED RACE MODE (match target),
+    // NOT the running score:
+    //   - Race to 250 → every 5 bags  = -50, then the bag count rolls over (mod 5)
+    //   - Race to 500 → every 10 bags = -100, then the bag count rolls over (mod 10)
+    // Each completed threshold subtracts the penalty once and the running bag
+    // count carried into the next round is the remainder (e.g. 6 bags @250 →
+    // -50 and 1 bag left; 11 bags @500 → -100 and 1 bag left). Because the bag
+    // count is reset every round, oldBags is always below the threshold.
+    const bagThreshold     = state.matchTarget >= 500 ? 10 : 5;
+    const bagPenaltyAmount = state.matchTarget >= 500 ? 100 : 50;
+    const bagPenalty = (freshBags: number): number =>
+      Math.floor(freshBags / bagThreshold) * bagPenaltyAmount;
     const finalScores: [number, number] = [
-      newScores[0] - bagPenalty(state.scores[0], state.bags[0], newBags[0]),
-      newScores[1] - bagPenalty(state.scores[1], state.bags[1], newBags[1]),
+      newScores[0] - bagPenalty(newBags[0]),
+      newScores[1] - bagPenalty(newBags[1]),
+    ];
+
+    // Roll the running bag count over by the threshold so it reflects the bags
+    // carried INTO the next round (the "bags reset to N" behavior in the rules).
+    const carriedBags: [number, number] = [
+      newBags[0] % bagThreshold,
+      newBags[1] % bagThreshold,
     ];
 
     const roundHistory: RoundScore = {
       round: state.roundNumber,
       scores: [roundResult.scoreDeltas[0], roundResult.scoreDeltas[1]],
-      bags: newBags,
+      bags: carriedBags,
       bids: [state.bids[0] as number, state.bids[1] as number],
       tricks: newTricks,
     };
@@ -688,7 +693,7 @@ export function playCard(
       ...intermediateState,
       currentTrick: [],
       scores: finalScores,
-      bags: newBags,
+      bags: carriedBags,
       phase: isGameOver ? "game_over" : "round_over",
       currentTurnIndex: null,
       roundHistory: [...state.roundHistory, roundHistory],
@@ -736,15 +741,15 @@ function calculateRoundScore(
     const tricksTaken = tricks[i];
 
     if (bid === 0) {
-      // Nil bid — 1v1 Competitive Spades house rule: ±125.
+      // Nil bid — 1v1 Competitive Spades house rule: ±100.
       // A failed nil still accumulates a bag for every trick taken, and each
-      // of those bags adds +1 to the round score (e.g. nil + 1 trick = -124,
+      // of those bags adds +1 to the round score (e.g. nil + 1 trick = -99,
       // +1 bag). The usual bag-threshold penalties below then apply to the
       // updated bag count just like non-nil overtricks.
       if (tricksTaken === 0) {
-        scoreDeltas[i] = 125;
+        scoreDeltas[i] = 100;
       } else {
-        scoreDeltas[i] = -125 + tricksTaken;
+        scoreDeltas[i] = -100 + tricksTaken;
         newBags[i] += tricksTaken;
       }
     } else {
