@@ -14,6 +14,18 @@ export default function Discord() {
         intro="The 1V1 Competitive Spades community lives on Discord. It's where events are announced, players check in, results are posted, and champions are celebrated."
       >
         <section>
+          <a
+            href="https://discord.gg/bT2G3uNX5"
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="link-join-discord"
+            className="inline-flex items-center justify-center rounded-md bg-primary px-6 py-3 text-base font-bold text-primary-foreground hover:bg-primary/90 transition-colors no-underline"
+          >
+            Join the Discord
+          </a>
+        </section>
+
+        <section>
           <h2>What happens in the community</h2>
           <ul>
             <li>
