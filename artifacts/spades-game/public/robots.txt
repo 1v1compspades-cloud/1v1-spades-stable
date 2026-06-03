@@ -1,2 +1,4 @@
 User-agent: *
 Allow: /
+
+Sitemap: https://1v1spades.com/sitemap.xml
