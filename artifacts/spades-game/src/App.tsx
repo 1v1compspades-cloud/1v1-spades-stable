@@ -10,6 +10,10 @@ import Lobby from "@/pages/Lobby";
 import Room from "@/pages/Room";
 import Tournament from "@/pages/Tournament";
 import HostDashboard from "@/pages/HostDashboard";
+import Rules from "@/pages/info/Rules";
+import TournamentsInfo from "@/pages/info/Tournaments";
+import KingOfTheTable from "@/pages/info/KingOfTheTable";
+import DiscordInfo from "@/pages/info/Discord";
 
 const queryClient = new QueryClient();
 
@@ -17,6 +21,10 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Lobby} />
+      <Route path="/rules" component={Rules} />
+      <Route path="/tournaments" component={TournamentsInfo} />
+      <Route path="/king-of-the-table" component={KingOfTheTable} />
+      <Route path="/discord" component={DiscordInfo} />
       <Route path="/room/:roomCode" component={Room} />
       <Route path="/tournament/:code/host" component={HostDashboard} />
       <Route path="/tournament/:code" component={Tournament} />
