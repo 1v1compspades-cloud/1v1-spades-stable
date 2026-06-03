@@ -8,6 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ConnectionPill } from "@/components/ConnectionPill";
+import { PreGameChecklist } from "@/components/PreGameChecklist";
+import { TabConflictOverlay } from "@/components/TabConflictOverlay";
+import { useTabGuard } from "@/hooks/useTabGuard";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -229,6 +232,13 @@ export default function Tournament() {
   // lobby (which previously hid the join form for additional invitees).
   const [authenticated, setAuthenticated] = useState(false);
 
+  // Old-tab protection: if the same browser opens this tournament in a newer
+  // tab, the newer one wins and this stale tab is flagged superseded. Pure
+  // client UX — the server already rebinds the seat/host to the newest socket.
+  const { superseded: tabSuperseded, reclaim: reclaimTab } = useTabGuard(
+    code ? `tournament:${code}` : null,
+  );
+
   useEffect(() => { connect(); }, [connect]);
 
   // Honour a `?join_name=...&join_token=...` query string. This is the URL
@@ -255,6 +265,10 @@ export default function Tournament() {
   // Subscribe / resubscribe whenever socket reconnects.
   useEffect(() => {
     if (!connected || !code) return;
+    // Old-tab guard: a superseded (stale) tab must NOT re-subscribe — doing so
+    // rebinds this player's/host's socket to the stale tab, defeating "prefer
+    // newest tab". The user can take over via the overlay's "Use this tab".
+    if (tabSuperseded) return;
     // Tournaments are admin-only; admin authority rides on the unlocked socket,
     // never a token in this payload. The only token sent here is the player's
     // own per-seat reconnect token (present only if this browser joined as a
@@ -267,7 +281,7 @@ export default function Tournament() {
         toast({ description: typeof err === "string" ? err : "Tournament not found", variant: "destructive" });
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connected, code]);
+  }, [connected, code, tabSuperseded]);
 
   // When a match is assigned (start or next round), save state and show a
   // full-screen "Match Ready" overlay. The overlay auto-navigates to the room
@@ -456,6 +470,17 @@ export default function Tournament() {
           </CardHeader>
         </Card>
       </div>
+    );
+  }
+
+  // Old-tab guard: a newer tab opened this same tournament → pause this stale tab.
+  if (tabSuperseded) {
+    return (
+      <TabConflictOverlay
+        scopeLabel="tournament"
+        onUseHere={reclaimTab}
+        onLeave={() => setLocation("/")}
+      />
     );
   }
 
@@ -654,6 +679,8 @@ export default function Tournament() {
                   </p>
                 </div>
               )}
+
+              {isLobby && <PreGameChecklist />}
 
               {/* Lobby-full state for non-roster visitors. */}
               {!iAmInRoster && t.players.length >= t.size && (

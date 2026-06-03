@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ConnectionPill } from "@/components/ConnectionPill";
+import { PreGameChecklist } from "@/components/PreGameChecklist";
 
 export default function Lobby() {
   const [, setLocation] = useLocation();
@@ -385,6 +386,8 @@ export default function Lobby() {
               Spectators can watch without seeing hidden hands.
             </p>
           </div>
+
+          <PreGameChecklist />
 
           {/* Admin access — discreet entry. Tournaments are admin-only; this
               unlocks the Custom Tournament tile + host tools. The secret key is

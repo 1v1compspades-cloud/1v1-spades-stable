@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SocketProvider } from "@/hooks/useSocket";
 import { MusicPlayer } from "@/components/MusicPlayer";
+import { InAppBrowserBanner } from "@/components/InAppBrowserBanner";
 import NotFound from "@/pages/not-found";
 import Lobby from "@/pages/Lobby";
 import Room from "@/pages/Room";
@@ -29,6 +30,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <SocketProvider>
+          <InAppBrowserBanner />
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <Router />
           </WouterRouter>

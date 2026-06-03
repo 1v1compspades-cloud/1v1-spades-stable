@@ -28,6 +28,9 @@ function formatCard(card: unknown): string {
 }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { PreGameChecklist } from "@/components/PreGameChecklist";
+import { TabConflictOverlay } from "@/components/TabConflictOverlay";
+import { useTabGuard } from "@/hooks/useTabGuard";
 
 /**
  * Live countdown bar for tournament-room turn timers. Re-renders every 250ms
@@ -80,7 +83,7 @@ export default function Room() {
 
   const {
     socket,
-    connected, status, gameState, connect, joinRoom, reconnect,
+    connected, status, gameState, error, connect, joinRoom, reconnect,
     startGame, placeBid, playCard, nextRound, newMatch,
     resetRoom: doResetRoom,
     setReady: doSetReady,
@@ -118,6 +121,14 @@ export default function Room() {
   }, []);
 
   const isHost = !isSpectator && playerIndex === 0;
+
+  // Old-tab protection: if this same browser opens the same room in another
+  // tab, the newer tab wins and this (older) tab is flagged superseded so we
+  // can pause it and avoid confusing double-state. Pure client UX — the server
+  // already rebinds the seat to the most-recent socket on reconnect.
+  const { superseded: tabSuperseded, reclaim: reclaimTab } = useTabGuard(
+    roomCode ? `room:${roomCode.toUpperCase()}` : null,
+  );
 
   // KotT: react to server-driven role swaps. When a spectator is promoted
   // out of the challenger queue into a player seat, the server emits
@@ -206,6 +217,11 @@ export default function Room() {
 
   useEffect(() => {
     if (!connected || !roomCode || !playerName || gameState) return;
+    // Old-tab guard: a superseded (stale) tab must NOT auto-reconnect/rejoin —
+    // otherwise it would silently reclaim the seat from the newer tab during a
+    // reconnect window, defeating "prefer newest tab". The user can still take
+    // over via the overlay's "Use this tab instead" (which calls reclaim()).
+    if (tabSuperseded) return;
     // Wait for the stale-room-code guard above to settle before attempting
     // any join/reconnect — otherwise we might fire with a stale playerIndex
     // from a previous room.
@@ -261,7 +277,18 @@ export default function Room() {
         setLocation("/");
       });
     }
-  }, [connected, roomCode, storedRoomCode, playerName, gameState, playerIndex, isSpectator, wantsSpectate, reconnect, reconnectAsSpectator, joinAsSpectator, joinRoom, setLocation, savePlayerIndex, saveIsSpectator, toast, getPlayerToken, savePlayerToken, clearPlayerToken]);
+  }, [connected, roomCode, storedRoomCode, playerName, gameState, playerIndex, isSpectator, wantsSpectate, tabSuperseded, reconnect, reconnectAsSpectator, joinAsSpectator, joinRoom, setLocation, savePlayerIndex, saveIsSpectator, toast, getPlayerToken, savePlayerToken, clearPlayerToken]);
+
+  // Old-tab guard: a newer tab opened this same room → pause this stale tab.
+  if (tabSuperseded) {
+    return (
+      <TabConflictOverlay
+        scopeLabel="room"
+        onUseHere={reclaimTab}
+        onLeave={() => setLocation("/")}
+      />
+    );
+  }
 
   // Spectator arriving via a shared "?spectator=1" link may have no stored
   // name yet. Prompt for a display name so the join effect can fire — without
@@ -1099,6 +1126,8 @@ export default function Room() {
               >
                 {statusMsg}
               </div>
+
+              <PreGameChecklist />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <Button
@@ -2085,6 +2114,24 @@ export default function Room() {
     gameState.phase !== "waiting" &&
     gameState.phase !== "game_over";
 
+  // Opponent-offline indicator. The server preserves the seat and arms a grace
+  // window on disconnect; this surfaces that state to the still-connected player
+  // (and spectators) so nobody assumes the opponent rage-quit. Driven by the
+  // `error` string set on `opponent_disconnected` and cleared on reconnect.
+  const opponentOffline = !!error && /disconnect/i.test(error);
+  const renderOpponentOffline = () =>
+    opponentOffline ? (
+      <div
+        role="status"
+        aria-live="polite"
+        data-testid="banner-opponent-offline"
+        className="absolute top-2 left-1/2 -translate-x-1/2 z-[55] inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-950/90 px-3 py-1 text-[11px] font-semibold text-amber-200 shadow-lg backdrop-blur-sm"
+      >
+        <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+        Opponent disconnected — waiting for them to reconnect…
+      </div>
+    ) : null;
+
   const renderHostResetFab = () => (
     <button
       type="button"
@@ -2180,6 +2227,7 @@ export default function Room() {
     return (
       <div className="h-[100dvh] flex flex-col bg-background overflow-hidden relative">
         {renderStatusPill()}
+        {renderOpponentOffline()}
         {renderQueuePanel()}
         {renderSpectatorWaiting()}
         {renderSpectatorFooter()}
@@ -2190,6 +2238,7 @@ export default function Room() {
   return (
     <div className="h-[100dvh] flex flex-col bg-background overflow-hidden relative">
       {renderStatusPill()}
+      {renderOpponentOffline()}
       {!spectator && gameState.phase === "waiting" ? (
         <>
           {renderQueuePanel()}

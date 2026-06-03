@@ -1,0 +1,29 @@
+KOTT stream test went well, but Shaw disconnected because the room link was opened through Discord’s in-app browser instead of normal Safari. I need a low-risk session/reconnect hardening pass for King of the Table and tournament rooms.
+
+Goal: make links opened from Discord/mobile safer and make reconnect behavior more reliable without changing gameplay, scoring, bidding, trick logic, tournament advancement, or KOTT crown logic.
+
+Please implement:
+	1.	Add a clear mobile/browser warning banner when the app detects an in-app browser such as Discord/Facebook/Instagram/TikTok webview.
+Message: “For best results, open this link in Safari/Chrome. Do not use private browsing. Close old game tabs before joining.”
+	2.	Add an “Open in Safari/Chrome” helper where possible, or at minimum show instructions for iPhone users: tap the browser/share icon and open externally.
+	3.	Harden reconnect/session restore:
+	•	If a player refreshes or disconnects, restore their same seat using the existing room/player token if available.
+	•	Do not create a duplicate player entry from the same browser/session.
+	•	If the room already has that player/session, reattach them instead of treating them as a new user.
+	•	Make stale duplicate socket connections harmless.
+	4.	Add old-tab protection:
+	•	If the same player/session opens the same room in a second tab, show a warning like “This room is already open in another tab. Use one tab only.”
+	•	Prefer the most recent active tab/socket and prevent the older tab from causing state confusion.
+	5.	For KOTT specifically:
+	•	Preserve king/challenger/waiting player state on reconnect.
+	•	If a player disconnects briefly, do not immediately break the KOTT flow.
+	•	Add a visible reconnecting/offline indicator before forcing any action.
+	6.	Keep private lobbies as the default for now. Do not make tournament or KOTT lobbies public unless explicitly requested.
+	7.	Add a short pre-game checklist on lobby pages:
+	•	Open in Safari/Chrome
+	•	No Discord in-app browser
+	•	No private mode
+	•	Close old tabs
+	•	One player, one device, one tab
+
+This should be a low-risk UX/session hardening update only. Do not change core game rules, scoring, bidding, cards, tournament advancement, or admin permissions.
