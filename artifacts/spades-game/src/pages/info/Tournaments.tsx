@@ -5,65 +5,69 @@ export default function Tournaments() {
   return (
     <>
       <Seo
-        title="1v1 Spades Tournaments — Single-Elimination Brackets | 1v1 Competitive Spades"
-        description="Run online 1v1 Spades tournaments: single-elimination brackets of 4, 8, 16, or 32 players with random seeding. Every match is a standard head-to-head game."
+        title="Free-Entry Private 1V1 Spades Tournaments — Brackets & Prize Pools"
+        description="Free-entry, invite-only online 1V1 Spades tournaments: private lobbies, player check-ins, single-elimination brackets, sponsor-funded prize pools, a champion screen, and weekly Monday and Friday events."
         path="/tournaments"
       />
       <InfoPageLayout
-        title="1v1 Spades Tournaments"
-        intro="Host a bracket and crown a champion. Tournament mode runs a single-elimination bracket where every match is a standard head-to-head 1v1 Spades game — perfect for friends, communities, and streamed events."
+        title="1V1 Competitive Spades Tournaments"
+        intro="Compete in free-entry, private online tournaments built for real competition. Invite-only lobbies, organized check-ins, single-elimination brackets, and a champion screen to crown the winner."
       >
         <section>
-          <h2>How tournaments work</h2>
+          <h2>Free entry, invite-only lobbies</h2>
+          <p>
+            Tournaments are free to enter and run in private, invite-only
+            lobbies. Players join with an invite link or code from the host, so
+            every event is a known, controlled field rather than an open public
+            free-for-all.
+          </p>
+        </section>
+
+        <section>
+          <h2>Check-ins and brackets</h2>
           <ul>
             <li>
-              <strong>Bracket sizes:</strong> 4, 8, 16, or 32 players, single
-              elimination.
+              <strong>Check-ins:</strong> players confirm they're present and
+              ready before the bracket locks, so matches start with active
+              participants.
             </li>
             <li>
-              <strong>Random seeding:</strong> the bracket is seeded randomly
-              when the host starts the event.
+              <strong>Single-elimination brackets:</strong> win and advance, lose
+              and you're out. Bracket sizes scale to the field, and winners move
+              forward automatically.
             </li>
             <li>
-              <strong>Standard matches:</strong> every round is a normal 1v1
-              game to the chosen point target — same rules, same scoring.
-            </li>
-            <li>
-              <strong>Auto-advancing bracket:</strong> winners move forward
-              automatically, and the next round's matches are created as soon as
-              both feeder matches finish.
+              <strong>Champion screen:</strong> the final match ends on a
+              dedicated champion screen that crowns the tournament winner.
             </li>
           </ul>
         </section>
 
         <section>
-          <h2>Joining a tournament</h2>
+          <h2>Sponsor-funded prize pools</h2>
           <p>
-            The host creates a tournament and shares an invite link or code.
-            Players open the link, enter a name, and claim a spot in the lobby.
-            When the bracket is full, the host starts the event and each player
-            is dropped straight into their first match.
+            Select events feature prize pools funded by sponsors. Entry stays
+            free for players — sponsors back the rewards — keeping the focus on
+            competition and community rather than buy-ins.
           </p>
         </section>
 
         <section>
-          <h2>Built for real events</h2>
+          <h2>Weekly schedule</h2>
           <p>
-            Tournaments are designed to survive the chaos of live play. Players
-            who refresh or briefly lose connection are routed back into their
-            current match, and hosts have recovery tools to handle disconnects,
-            swap in backups before the event starts, and keep the bracket
-            moving.
+            Tournaments run on a regular weekly cadence, with events on
+            <strong> Mondays and Fridays</strong>. Watch the community for
+            announcements, check-in times, and bracket links for each event.
           </p>
         </section>
 
         <section>
           <h2>Other ways to play</h2>
           <p>
-            Prefer a casual game? Start a quick head-to-head match, or try{" "}
-            King of the Table, where the winner keeps their seat and challengers
-            line up to take them down. New to the game? Read the full{" "}
-            rules first.
+            Prefer a casual game? Try King of the Table, where the winner keeps
+            their seat and challengers line up to take them down. New to the
+            game? Read the full rules first, and review our fair-play and
+            anti-cheat approach.
           </p>
         </section>
       </InfoPageLayout>

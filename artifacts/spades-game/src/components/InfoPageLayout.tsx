@@ -5,6 +5,7 @@ const NAV = [
   { href: "/rules", label: "Rules" },
   { href: "/tournaments", label: "Tournaments" },
   { href: "/king-of-the-table", label: "King of the Table" },
+  { href: "/fair-play", label: "Fair Play" },
   { href: "/discord", label: "Community" },
 ];
 
