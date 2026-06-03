@@ -5,8 +5,8 @@ export default function Rules() {
   return (
     <>
       <Seo
-        title="How to Play 1V1 Competitive Spades — Rules & Scoring"
-        description="Rules for 1V1 Competitive Spades: head-to-head play with no partner, bidding 0–13, nil bids, books and bags, bag penalties, spades breaking, the renege rule, and the race to 250 (finals to 500)."
+        title="1V1 Spades Rules | No Partner. No Excuses."
+        description="Learn the rules of 1V1 Competitive Spades, including bidding, nil, bags, spades breaking, renege penalties, scoring, and tournament race formats."
         path="/rules"
       />
       <InfoPageLayout

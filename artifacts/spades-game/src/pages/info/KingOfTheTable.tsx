@@ -5,8 +5,8 @@ export default function KingOfTheTable() {
   return (
     <>
       <Seo
-        title="King of the Table — Winner-Stays 1V1 Spades"
-        description="King of the Table is a winner-stays 1V1 Spades mode: the winner holds the seat as King, a new challenger joins, crowns and streaks track the run, and matches stay fast and live-stream friendly."
+        title="King of the Table | 1V1 Competitive Spades"
+        description="Challenge the current King in 1V1 Spades. Winner stays, crowns stack, and challengers compete in a live-stream friendly competitive format."
         path="/king-of-the-table"
       />
       <InfoPageLayout

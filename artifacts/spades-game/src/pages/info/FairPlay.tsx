@@ -13,8 +13,8 @@ export default function FairPlay() {
   return (
     <>
       <Seo
-        title="Fair Play & Anti-Cheat — 1V1 Competitive Spades"
-        description="How 1V1 Competitive Spades reduces cheating risk: private invite-only tournaments, hidden spectator hands, locked admin tools, one-player/one-account/one-tab policy, old-tab protection, opponent-offline indicators, in-app browser warnings, manual host oversight, and result tracking."
+        title="Fair Play & Anti-Cheat | 1V1 Competitive Spades"
+        description="Learn how 1V1 Competitive Spades uses private lobbies, hidden spectator hands, locked admin tools, host oversight, and fair-play policies to reduce cheating risk."
         path="/fair-play"
       />
       <InfoPageLayout

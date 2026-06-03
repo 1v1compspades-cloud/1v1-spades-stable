@@ -5,8 +5,8 @@ export default function Tournaments() {
   return (
     <>
       <Seo
-        title="Free-Entry Private 1V1 Spades Tournaments — Brackets & Prize Pools"
-        description="Free-entry, invite-only online 1V1 Spades tournaments: private lobbies, player check-ins, single-elimination brackets, sponsor-funded prize pools, a champion screen, and weekly Monday and Friday events."
+        title="Online Spades Tournaments | 1V1 Competitive Spades"
+        description="Join free-entry private online 1V1 Spades tournaments with sponsor-funded prizes, champion brackets, live matches, and weekly competitive events."
         path="/tournaments"
       />
       <InfoPageLayout

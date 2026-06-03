@@ -5,8 +5,8 @@ export default function Discord() {
   return (
     <>
       <Seo
-        title="Join the 1V1 Competitive Spades Community on Discord"
-        description="Join the 1V1 Competitive Spades Discord for tournament announcements, check-ins, rules, match results, champions, King of the Table action, clips, and to find opponents for live head-to-head matches."
+        title="Join the 1V1 Spades Discord | Competitive Spades Community"
+        description="Join the 1V1 Competitive Spades Discord for tournaments, check-ins, King of the Table, match results, clips, champions, and community updates."
         path="/discord"
       />
       <InfoPageLayout
