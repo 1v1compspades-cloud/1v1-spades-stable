@@ -29,3 +29,22 @@ authority (only a UI follow-suit *hint* is allowed client-side).
 **Seat source-of-truth:** derive the player's seat from the route param, else the
 persisted AsyncStorage session — never silently default to seat 0, or the seat-1
 player gets mislabeled turns/scores.
+
+## Animations must render in BOTH web preview and on-device
+Use React Native's built-in `Animated` API for free-play animations, with
+`useNativeDriver` gated to native only (`Platform.OS !== "web"`).
+**Why:** the app is verified via the Replit **web** preview (expo.riker domain),
+where the native animated module is absent — `useNativeDriver:true` warns and
+falls back, and react-native-reanimated worklets can misbehave. Gating keeps the
+web preview clean while still running on the UI thread on device.
+**How to apply:** define `const NATIVE = Platform.OS !== "web";` and pass
+`useNativeDriver: NATIVE`. Only animate transform/opacity. Guard phase-chained
+Animated callbacks with a `cancelled` ref and call `stopAnimation()` on every
+value in the effect cleanup, so a screen unmount mid-deal can't setState/zombie.
+
+## Teaching visuals are standalone, never wired into the live game
+The deal/shuffle/graveyard teaching animation is a separate route
+(`app/learn-deal.tsx`), reached from the Rules page — NOT injected into the live
+`game.tsx` shuffling phase. **Why:** touching game.tsx risks coupling decorative
+timing to real socket-driven game state (a protected boundary). Keep teaching
+screens fully decoupled from gameplay wiring.

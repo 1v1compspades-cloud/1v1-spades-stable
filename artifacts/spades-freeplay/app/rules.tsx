@@ -1,8 +1,10 @@
 import { Feather } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { GoldButton } from "@/components/GoldButton";
 import { useColors } from "@/hooks/useColors";
 
 type Section = {
@@ -47,6 +49,7 @@ const SECTIONS: Section[] = [
 export default function Rules() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   return (
     <ScrollView
@@ -60,6 +63,13 @@ export default function Rules() {
         A quick guide to 1v1 Spades. Same rules as the table — just you and one
         opponent.
       </Text>
+
+      <GoldButton
+        label="Watch how dealing works"
+        icon="play-circle"
+        variant="outline"
+        onPress={() => router.push("/learn-deal")}
+      />
 
       {SECTIONS.map((s) => (
         <View
