@@ -1,0 +1,15 @@
+{
+  "name": "@workspace/spades-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "tsx src/__tests__/rules.test.ts"
+  },
+  "devDependencies": {
+    "tsx": "catalog:"
+  }
+}

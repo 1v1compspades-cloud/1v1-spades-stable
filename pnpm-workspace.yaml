@@ -158,3 +158,12 @@ overrides:
   # drizzle-kit uses esbuild internally on an older version that's vulnerable, this overrides it
   "@esbuild-kit/esm-loader": "npm:tsx@^4.21.0"
   esbuild: "0.27.3"
+  # Dedupe React type definitions to a single version across the workspace.
+  # The web app pins @types/react via the catalog (^19.2.0) while the Expo
+  # app's transitive deps want ~19.1. Two copies cause TypeScript's @types
+  # directory walk to surface "two different types with this name exist"
+  # errors in the web app. React runtime is 19.1.0 for both; the 19.2 types
+  # are a backward-compatible superset, so a single version keeps every
+  # package's typecheck green.
+  "@types/react": "^19.2.0"
+  "@types/react-dom": "^19.2.0"
