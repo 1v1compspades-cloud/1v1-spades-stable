@@ -15,6 +15,9 @@ import TournamentsInfo from "@/pages/info/Tournaments";
 import KingOfTheTable from "@/pages/info/KingOfTheTable";
 import FairPlay from "@/pages/info/FairPlay";
 import DiscordInfo from "@/pages/info/Discord";
+import Privacy from "@/pages/info/Privacy";
+import Terms from "@/pages/info/Terms";
+import Support from "@/pages/info/Support";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +30,9 @@ function Router() {
       <Route path="/king-of-the-table" component={KingOfTheTable} />
       <Route path="/fair-play" component={FairPlay} />
       <Route path="/discord" component={DiscordInfo} />
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/terms" component={Terms} />
+      <Route path="/support" component={Support} />
       <Route path="/room/:roomCode" component={Room} />
       <Route path="/tournament/:code/host" component={HostDashboard} />
       <Route path="/tournament/:code" component={Tournament} />
