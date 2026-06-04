@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -11,53 +11,57 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { GoldButton } from "@/components/GoldButton";
-import { PlayingCard } from "@/components/PlayingCard";
 import { useColors } from "@/hooks/useColors";
-import { sortHandBySuit, type Card } from "@workspace/spades-core";
-
-const SAMPLE_HAND: Card[] = [
-  { suit: "spades", rank: "A" },
-  { suit: "spades", rank: "10" },
-  { suit: "hearts", rank: "K" },
-  { suit: "hearts", rank: "7" },
-  { suit: "clubs", rank: "Q" },
-  { suit: "diamonds", rank: "9" },
-];
+import { useSocket } from "@/hooks/useSocket";
+import { loadName, saveSession } from "@/lib/session";
 
 export default function Play() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { createRoom, status } = useSocket();
+
   const [name, setName] = useState("");
-  const [searching, setSearching] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
-  const grouped = sortHandBySuit(SAMPLE_HAND);
+  useEffect(() => {
+    loadName().then((n) => n && setName(n));
+  }, []);
 
-  const onFindMatch = () => {
-    setSearching(true);
+  const onCreate = async () => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const { roomCode, playerIndex, token } = await createRoom(trimmed);
+      await saveSession({ roomCode, playerIndex, token, playerName: trimmed });
+      router.replace({
+        pathname: "/game",
+        params: { code: roomCode, seat: String(playerIndex), name: trimmed },
+      });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not create the table.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
     <ScrollView
       style={{ backgroundColor: colors.background }}
-      contentContainerStyle={[
-        styles.content,
-        { paddingBottom: insets.bottom + 32 },
-      ]}
+      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
       keyboardShouldPersistTaps="handled"
     >
-      <Text style={[styles.heading, { color: colors.foreground }]}>
-        Find a 1v1 match
-      </Text>
+      <Text style={[styles.heading, { color: colors.foreground }]}>Quick 1v1</Text>
       <Text style={[styles.body, { color: colors.mutedForeground }]}>
-        Get matched against another player for a free head-to-head game. Just
-        you, an opponent, and a deck.
+        Spin up a private table and share the code with anyone for a free
+        head-to-head game. Just you, an opponent, and a deck.
       </Text>
 
       <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.foreground }]}>
-          Display name
-        </Text>
+        <Text style={[styles.label, { color: colors.foreground }]}>Display name</Text>
         <TextInput
           value={name}
           onChangeText={setName}
@@ -77,86 +81,38 @@ export default function Play() {
         />
       </View>
 
-      {searching ? (
-        <View
-          style={[
-            styles.searchCard,
-            {
-              backgroundColor: colors.card,
-              borderColor: colors.border,
-              borderRadius: colors.radius,
-            },
-          ]}
-        >
-          <Feather name="search" size={22} color={colors.primary} />
-          <Text style={[styles.searchTitle, { color: colors.foreground }]}>
-            Matchmaking coming soon
-          </Text>
-          <Text style={[styles.searchBody, { color: colors.mutedForeground }]}>
-            Live matchmaking lands in the next update. For now, you can play a
-            friend with a private table.
-          </Text>
-          <GoldButton
-            label="Play a Friend instead"
-            icon="users"
-            variant="outline"
-            onPress={() => router.replace("/friend")}
-            style={{ marginTop: 6 }}
-          />
-        </View>
-      ) : (
-        <GoldButton
-          label="Find Match"
-          icon="zap"
-          onPress={onFindMatch}
-          disabled={name.trim().length === 0}
-        />
-      )}
+      {err ? <Text style={[styles.err, { color: colors.destructive }]}>{err}</Text> : null}
 
-      {/* Preview of a sorted hand, rendered via shared spades-core helpers */}
-      <View style={styles.previewBlock}>
-        <Text style={[styles.previewLabel, { color: colors.mutedForeground }]}>
-          YOUR HAND, SORTED
+      <GoldButton
+        label="Create Quick Table"
+        icon="zap"
+        loading={busy}
+        onPress={onCreate}
+        disabled={name.trim().length === 0 || status === "offline"}
+      />
+
+      <View
+        style={[
+          styles.infoCard,
+          { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius },
+        ]}
+      >
+        <Feather name="info" size={18} color={colors.primary} />
+        <Text style={[styles.infoText, { color: colors.mutedForeground }]}>
+          Once your table is created, send the code to a friend. The match begins
+          the moment they join and you both ready up.
         </Text>
-        <View style={styles.handRow}>
-          {grouped.flatMap((group) =>
-            group.cards.map((card) => (
-              <PlayingCard
-                key={`${card.suit}-${card.rank}`}
-                card={card}
-                width={46}
-                style={{ marginRight: 6, marginBottom: 6 }}
-              />
-            )),
-          )}
-        </View>
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: 22,
-    paddingTop: 20,
-    gap: 18,
-  },
-  heading: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 24,
-  },
-  body: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 14.5,
-    lineHeight: 21,
-  },
-  field: {
-    gap: 8,
-  },
-  label: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-  },
+  content: { paddingHorizontal: 22, paddingTop: 20, gap: 18 },
+  heading: { fontFamily: "Inter_700Bold", fontSize: 24 },
+  body: { fontFamily: "Inter_400Regular", fontSize: 14.5, lineHeight: 21 },
+  field: { gap: 8 },
+  label: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
   input: {
     borderWidth: 1,
     paddingHorizontal: 16,
@@ -164,32 +120,14 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 16,
   },
-  searchCard: {
-    borderWidth: 1,
-    padding: 20,
-    gap: 10,
-    alignItems: "flex-start",
-  },
-  searchTitle: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 17,
-  },
-  searchBody: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  previewBlock: {
-    gap: 12,
-    marginTop: 8,
-  },
-  previewLabel: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 11,
-    letterSpacing: 2,
-  },
-  handRow: {
+  err: { fontFamily: "Inter_500Medium", fontSize: 13 },
+  infoCard: {
     flexDirection: "row",
-    flexWrap: "wrap",
+    gap: 12,
+    borderWidth: 1,
+    padding: 16,
+    alignItems: "flex-start",
+    marginTop: 4,
   },
+  infoText: { fontFamily: "Inter_400Regular", fontSize: 13.5, lineHeight: 20, flex: 1 },
 });

@@ -129,13 +129,13 @@ export default function Home() {
           />
           <CommunityLink
             icon="globe"
-            label="Tournaments on 1v1spades.com"
-            onPress={() => openLink(LINKS.websiteTournaments)}
+            label="Visit 1v1spades.com"
+            onPress={() => openLink(LINKS.website)}
           />
         </View>
 
         <Text style={[styles.footnote, { color: colors.mutedForeground }]}>
-          Tournaments are hosted on the website. This app is free play only.
+          This app is free play only.
         </Text>
       </ScrollView>
     </View>

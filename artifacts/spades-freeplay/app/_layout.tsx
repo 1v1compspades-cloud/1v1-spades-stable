@@ -16,6 +16,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { SocketProvider } from "@/hooks/useSocket";
 import colors from "@/constants/colors";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -43,6 +44,7 @@ function RootLayoutNav() {
       <Stack.Screen name="friend" options={{ title: "Play a Friend" }} />
       <Stack.Screen name="rules" options={{ title: "How to Play" }} />
       <Stack.Screen name="fairplay" options={{ title: "Fair Play" }} />
+      <Stack.Screen name="game" options={{ title: "Table", headerBackVisible: false }} />
     </Stack>
   );
 }
@@ -69,8 +71,10 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView>
             <KeyboardProvider>
-              <StatusBar style="light" />
-              <RootLayoutNav />
+              <SocketProvider>
+                <StatusBar style="light" />
+                <RootLayoutNav />
+              </SocketProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>
