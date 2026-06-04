@@ -53,3 +53,9 @@ id = "dN2W0i9CsAWs8qKFKBRzP"
 uri = "file://artifacts/spades-freeplay/PHASE3_COMPLETE.md"
 type = "text"
 title = "Phase 3 Completion Summary"
+
+[[outputs]]
+id = "reAFnUnq4S0cWMjIXY4bo"
+uri = "file://artifacts/spades-freeplay/APP_STORE_CHECKLIST.md"
+type = "text"
+title = "App Store / TestFlight Readiness Checklist"

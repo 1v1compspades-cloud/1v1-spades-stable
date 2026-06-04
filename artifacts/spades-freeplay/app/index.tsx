@@ -174,6 +174,39 @@ export default function Home() {
         <Text style={[styles.footnote, { color: colors.mutedForeground }]}>
           Free play only — competitive tournaments are hosted on the website.
         </Text>
+
+        {/* Legal / support */}
+        <View style={styles.legalRow}>
+          <Pressable
+            onPress={() => openLink(LINKS.privacy)}
+            hitSlop={8}
+            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+          >
+            <Text style={[styles.legalLink, { color: colors.mutedForeground }]}>
+              Privacy
+            </Text>
+          </Pressable>
+          <Text style={[styles.legalDot, { color: colors.border }]}>•</Text>
+          <Pressable
+            onPress={() => openLink(LINKS.terms)}
+            hitSlop={8}
+            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+          >
+            <Text style={[styles.legalLink, { color: colors.mutedForeground }]}>
+              Terms
+            </Text>
+          </Pressable>
+          <Text style={[styles.legalDot, { color: colors.border }]}>•</Text>
+          <Pressable
+            onPress={() => openLink(LINKS.support)}
+            hitSlop={8}
+            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+          >
+            <Text style={[styles.legalLink, { color: colors.mutedForeground }]}>
+              Support
+            </Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </View>
   );
@@ -338,5 +371,19 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: -8,
     paddingHorizontal: 24,
+  },
+  legalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    marginTop: -12,
+  },
+  legalLink: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12.5,
+  },
+  legalDot: {
+    fontSize: 12,
   },
 });

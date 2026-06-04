@@ -6,17 +6,27 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "spades-freeplay",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
+    "primaryColor": "#d4af37",
+    "description": "Free, head-to-head 1v1 Spades. Just you and one opponent — no stakes, no catches.",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0b0b0d"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.oneononespades.freeplay",
+      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
-    "android": {},
+    "android": {
+      "package": "com.oneononespades.freeplay",
+      "versionCode": 1
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
