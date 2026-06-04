@@ -2,9 +2,8 @@ import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,6 +16,7 @@ import { GoldButton } from "@/components/GoldButton";
 import { PlayingCard } from "@/components/PlayingCard";
 import { useColors } from "@/hooks/useColors";
 import { LINKS } from "@/constants/links";
+import { loadOnboarded } from "@/lib/session";
 import type { Card } from "@workspace/spades-core";
 
 const HERO_FAN: Card[] = [
@@ -30,10 +30,31 @@ export default function Home() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [ready, setReady] = useState(false);
+
+  // First-launch gate: send brand-new users to onboarding before the home screen.
+  useEffect(() => {
+    let active = true;
+    loadOnboarded().then((seen) => {
+      if (!active) return;
+      if (seen) {
+        setReady(true);
+      } else {
+        router.replace("/onboarding");
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [router]);
 
   const openLink = (url: string) => {
     WebBrowser.openBrowserAsync(url).catch(() => {});
   };
+
+  if (!ready) {
+    return <View style={[styles.root, { backgroundColor: colors.background }]} />;
+  }
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -123,6 +144,11 @@ export default function Home() {
         {/* Community / web */}
         <View style={styles.community}>
           <CommunityLink
+            icon="award"
+            label="Tournaments on 1v1spades.com"
+            onPress={() => openLink(LINKS.websiteTournaments)}
+          />
+          <CommunityLink
             icon="message-circle"
             label="Join the Discord"
             onPress={() => openLink(LINKS.discord)}
@@ -134,8 +160,19 @@ export default function Home() {
           />
         </View>
 
+        {/* Replay onboarding */}
+        <Pressable
+          onPress={() => router.push("/onboarding")}
+          style={({ pressed }) => [styles.tourRow, { opacity: pressed ? 0.6 : 1 }]}
+        >
+          <Feather name="help-circle" size={14} color={colors.mutedForeground} />
+          <Text style={[styles.tourLabel, { color: colors.mutedForeground }]}>
+            New here? Take the tour
+          </Text>
+        </Pressable>
+
         <Text style={[styles.footnote, { color: colors.mutedForeground }]}>
-          This app is free play only.
+          Free play only — competitive tournaments are hosted on the website.
         </Text>
       </ScrollView>
     </View>
@@ -282,11 +319,24 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 14.5,
   },
+  tourRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    paddingVertical: 4,
+    marginTop: -10,
+  },
+  tourLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+  },
   footnote: {
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     textAlign: "center",
     lineHeight: 18,
     marginTop: -8,
+    paddingHorizontal: 24,
   },
 });

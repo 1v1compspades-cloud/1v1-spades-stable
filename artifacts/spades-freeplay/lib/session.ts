@@ -9,6 +9,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const SESSION_KEY = "spades_fp_session";
 const NAME_KEY = "spades_fp_name";
+const ONBOARDED_KEY = "spades_fp_onboarded";
 
 export interface SeatSession {
   roomCode: string;
@@ -66,5 +67,22 @@ export async function loadName(): Promise<string> {
     return (await AsyncStorage.getItem(NAME_KEY)) ?? "";
   } catch {
     return "";
+  }
+}
+
+/** Whether the user has completed (or skipped) the first-launch onboarding. */
+export async function loadOnboarded(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(ONBOARDED_KEY)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export async function setOnboarded(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(ONBOARDED_KEY, "1");
+  } catch {
+    /* ignore */
   }
 }

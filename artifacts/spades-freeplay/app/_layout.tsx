@@ -40,6 +40,7 @@ function RootLayoutNav() {
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen name="play" options={{ title: "Quick Match" }} />
       <Stack.Screen name="friend" options={{ title: "Play a Friend" }} />
       <Stack.Screen name="rules" options={{ title: "How to Play" }} />
