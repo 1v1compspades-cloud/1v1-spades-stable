@@ -47,3 +47,9 @@ id = "iNTy9s2B8Im2QUzqMKFEW"
 uri = "file://attached_assets/june-1-risk-assessment.md"
 type = "text"
 title = "June 1 Risk Assessment — ~92% confidence"
+
+[[outputs]]
+id = "dN2W0i9CsAWs8qKFKBRzP"
+uri = "file://artifacts/spades-freeplay/PHASE3_COMPLETE.md"
+type = "text"
+title = "Phase 3 Completion Summary"
