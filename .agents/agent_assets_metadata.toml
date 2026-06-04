@@ -59,3 +59,9 @@ id = "reAFnUnq4S0cWMjIXY4bo"
 uri = "file://artifacts/spades-freeplay/APP_STORE_CHECKLIST.md"
 type = "text"
 title = "App Store / TestFlight Readiness Checklist"
+
+[[outputs]]
+id = "OcwLeozTuD0nTtU6rk1UL"
+uri = "file://artifacts/spades-freeplay/TESTFLIGHT_SUBMISSION.md"
+type = "text"
+title = "Final TestFlight / App Store Submission Checklist"
