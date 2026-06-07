@@ -12,12 +12,17 @@ test("home screen has the main routes and actions", async () => {
 
   assert.match(html, /1V1 Euchre Free Play/);
   assert.match(publicActions, /Create Room/);
+  assert.match(publicActions, /href="\.\/room\.html\?action=create"/);
   assert.match(publicActions, /Join Room/);
+  assert.match(publicActions, /id="homeJoinRoomCode"/);
+  assert.match(publicActions, /id="homeJoinRoomButton"/);
   assert.match(publicActions, /Quick Match/);
   assert.match(publicActions, /Rules/);
   assert.doesNotMatch(publicActions, /Create Tournament/);
   assert.match(html, /Player name/);
   assert.match(html, /Match Settings/);
+  assert.match(html, /Mode/);
+  assert.match(html, /Community Competitive/);
   assert.match(html, /Score limit/);
   assert.match(html, /Stick the Dealer/);
   assert.match(html, /Trump may be led immediately/);
@@ -29,6 +34,7 @@ test("home screen has the main routes and actions", async () => {
   assert.match(html, /Spectator views are read-only/);
   assert.match(html, /id="homepageAdminCode"/);
   assert.match(html, /id="homepageAdminControls" class="homepage-admin-controls" hidden/);
+  assert.match(html, /class="home-admin-panel"/);
   assert.match(html, /Create Tournament/);
   assert.match(html, /Tournament settings/);
   assert.match(html, /Host tournament tools/);
@@ -77,8 +83,9 @@ test("room screen exposes create, join, share, and spectator labels", async () =
   assert.match(html, /Join Room/);
   assert.match(html, /id="lobbyControls"/);
   assert.match(html, /id="activeRoomControls" class="controls" hidden/);
-  assert.match(html, /Copy Code/);
-  assert.match(html, /Room Link/);
+  assert.match(html, /Copy Invite Link/);
+  assert.match(html, /Copy Spectator Link/);
+  assert.match(html, /Invite Link/);
   assert.match(html, /id="readyButton"/);
   assert.match(html, /id="readyStatus"/);
   assert.match(html, /id="pregamePanel"/);
@@ -94,17 +101,48 @@ test("room screen exposes create, join, share, and spectator labels", async () =
   assert.match(html, /id="currentDealer"/);
   assert.match(html, /Be Dealer/);
   assert.match(html, /Be Non-Dealer/);
+  assert.match(html, /class="coin-modal"/);
+  assert.match(html, /id="coinFlipMessage"/);
   assert.match(html, /Spectator view is read-only/);
+  assert.equal((html.match(/id="createRoomButton"/g) ?? []).length, 1);
+  assert.equal((html.match(/id="joinRoomButton"/g) ?? []).length, 1);
+  assert.equal((html.match(/id="joinRoomCode"/g) ?? []).length, 1);
+});
+
+test("pre-match lobby keeps gameplay interface hidden", async () => {
+  const html = await readText("room.html");
+
+  assert.match(html, /id="roomTable" class="table-grid room-table" hidden/);
+  assert.match(html, /id="pregamePanel" class="panel pregame-panel"/);
+  assert.match(html, /Player 1 Slot/);
+  assert.match(html, /Player 2 Slot/);
+  assert.match(html, /id="readyStatus"/);
 });
 
 test("active room screen hides lobby create and join controls", async () => {
   const client = await readText("src/room-client.js");
 
+  assert.match(client, /urlParams\.get\("action"\) === "create"/);
+  assert.match(client, /createRoomFromUi/);
   assert.match(client, /lobbyControls: document\.querySelector\("#lobbyControls"\)/);
   assert.match(client, /activeRoomControls: document\.querySelector\("#activeRoomControls"\)/);
   assert.match(client, /elements\.lobbyControls\.hidden = true/);
   assert.match(client, /elements\.activeRoomControls\.hidden = false/);
+  assert.match(client, /elements\.invitePanel\.hidden = false/);
+  assert.match(client, /copySpectatorLinkButton/);
+  assert.match(client, /spectatorLinkFor/);
   assert.match(client, /Trump: \$\{suitName\(activeTrumpSuit\(state\)\)\}/);
+});
+
+test("dealer choice buttons are coin-flip only and hide after selection", async () => {
+  const client = await readText("src/room-client.js");
+
+  assert.match(client, /state\.phase === "coin_sequence"/);
+  assert.match(client, /viewerSeat === roomView\.coinFlipWinner/);
+  assert.match(client, /!roomView\.firstDealer/);
+  assert.match(client, /elements\.coinFlipPanel\.hidden = !showCoinSequence/);
+  assert.match(client, /elements\.chooseDealerButton\.disabled = !canChoosePosition/);
+  assert.match(client, /elements\.chooseNonDealerButton\.disabled = !canChoosePosition/);
 });
 
 test("Quick Match is wired as a placeholder", async () => {
@@ -114,13 +152,25 @@ test("Quick Match is wired as a placeholder", async () => {
   assert.match(client, /Quick Match coming next/);
 });
 
+test("home join room button opens room by code", async () => {
+  const client = await readText("src/home-client.js");
+
+  assert.match(client, /homeJoinRoomButton\.addEventListener/);
+  assert.match(client, /homeJoinRoomCode\.value\.trim\(\)\.toUpperCase\(\)/);
+  assert.match(client, /\.\/room\.html\?room=\$\{encodeURIComponent\(roomCode\)\}/);
+  assert.match(client, /Enter a room code/);
+});
+
 test("home admin code gate unlocks tournament controls client-side", async () => {
   const client = await readText("src/home-client.js");
+  const css = await readText("src/styles.css");
 
   assert.match(client, /homepageAdminCodeValue = "MEHDI"/);
   assert.match(client, /homepageAdminControls\.hidden = false/);
   assert.match(client, /Admin tournament controls unlocked/);
   assert.match(client, /Admin code not recognized/);
+  assert.match(css, /\.home-admin-panel/);
+  assert.match(css, /max-width: 128px/);
 });
 
 test("deployment notes document launch commands and entrypoint", async () => {

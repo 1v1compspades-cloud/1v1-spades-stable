@@ -43,7 +43,8 @@ export function createRoom({
       player1: false,
       player2: false
     },
-    coinFlipWinner,
+    coinFlipWinner: null,
+    coinFlipWinnerSeed: coinFlipWinner,
     startingPositionChoice: null,
     firstDealer: null,
     countdownStartedAt: null,
@@ -69,7 +70,6 @@ export function joinRoom(room, { seatToken = generateSeatToken() } = {}) {
   }
 
   if (!room.players.player2) {
-    const coinFlipWinner = room.coinFlipWinner ?? flipCoinWinner();
     return {
       room: syncRoomFields({
         ...room,
@@ -81,7 +81,6 @@ export function joinRoom(room, { seatToken = generateSeatToken() } = {}) {
             connected: true
           }
         },
-        coinFlipWinner,
         countdownStartedAt: null,
         countdownEndsAt: null,
         gameState: {
@@ -114,7 +113,7 @@ export function applyRoomAction(room, { seatToken, type, suit, position, card, d
 
   if (type === "ready") {
     ensurePregameOrCountdown(gameState);
-    ensureStartingDealerChosen(room);
+    ensureBothPlayersSeated(room);
 
     const nextReady = {
       ...room.playerReady,
@@ -129,7 +128,7 @@ export function applyRoomAction(room, { seatToken, type, suit, position, card, d
   }
 
   if (type === "chooseStartingPosition") {
-    ensurePregameOrCountdown(gameState);
+    ensurePhase(gameState, "coin_sequence");
     ensureBothPlayersSeated(room);
 
     if (seat !== room.coinFlipWinner) {
@@ -146,10 +145,12 @@ export function applyRoomAction(room, { seatToken, type, suit, position, card, d
       ...room,
       startingPositionChoice: position,
       firstDealer,
-      gameState: {
+      countdownStartedAt: null,
+      countdownEndsAt: null,
+      gameState: startHand({
         ...gameState,
         dealer: firstDealer
-      },
+      }, { deck }),
       updatedAt: new Date().toISOString()
     });
   }
@@ -314,9 +315,12 @@ export function sanitizeRoomForViewer(room, seatToken) {
 
 export function advanceRoomClock(room, { now = Date.now(), deck } = {}) {
   if (!bothPlayersConnected(room)) {
-    if (room.gameState.phase === "ready_countdown") {
+    if (["ready_countdown", "coin_sequence"].includes(room.gameState.phase)) {
       return syncRoomFields({
         ...room,
+        coinFlipWinner: null,
+        startingPositionChoice: null,
+        firstDealer: null,
         countdownStartedAt: null,
         countdownEndsAt: null,
         gameState: {
@@ -332,11 +336,18 @@ export function advanceRoomClock(room, { now = Date.now(), deck } = {}) {
   }
 
   if (room.gameState.phase === "ready_countdown" && room.countdownEndsAt && now >= Date.parse(room.countdownEndsAt)) {
+    const coinFlipWinner = room.coinFlipWinner ?? room.coinFlipWinnerSeed ?? flipCoinWinner();
     return syncRoomFields({
       ...room,
+      coinFlipWinner,
       countdownStartedAt: null,
       countdownEndsAt: null,
-      gameState: startHand(room.gameState, { deck }),
+      gameState: {
+        ...room.gameState,
+        phase: "coin_sequence",
+        actionPhase: "coin_sequence",
+        currentTurn: coinFlipWinner
+      },
       updatedAt: new Date().toISOString()
     });
   }
@@ -614,7 +625,7 @@ function syncRoomFields(room) {
 }
 
 function maybeStartReadyCountdown(room) {
-  if (!bothPlayersConnected(room) || !bothPlayersReady(room) || !room.firstDealer) {
+  if (!bothPlayersConnected(room) || !bothPlayersReady(room)) {
     return syncRoomFields({
       ...room,
       countdownStartedAt: null,

@@ -9,6 +9,7 @@ const elements = {
   joinRoomCode: document.querySelector("#joinRoomCode"),
   joinRoomButton: document.querySelector("#joinRoomButton"),
   copyCodeButton: document.querySelector("#copyCodeButton"),
+  copySpectatorLinkButton: document.querySelector("#copySpectatorLinkButton"),
   nextHandButton: document.querySelector("#nextHandButton"),
   roomStatus: document.querySelector("#roomStatus"),
   roomCode: document.querySelector("#roomCode"),
@@ -19,11 +20,14 @@ const elements = {
   matchStatus: document.querySelector("#matchStatus"),
   readyStatus: document.querySelector("#readyStatus"),
   coinFlipWinner: document.querySelector("#coinFlipWinner"),
+  startingPositionTile: document.querySelector("#startingPositionTile"),
   startingPosition: document.querySelector("#startingPosition"),
   currentDealer: document.querySelector("#currentDealer"),
+  invitePanel: document.querySelector("#invitePanel"),
   roomLink: document.querySelector("#roomLink"),
   waitingNotice: document.querySelector("#waitingNotice"),
   coinFlipPanel: document.querySelector("#coinFlipPanel"),
+  coinFlipMessage: document.querySelector("#coinFlipMessage"),
   chooseDealerButton: document.querySelector("#chooseDealerButton"),
   chooseNonDealerButton: document.querySelector("#chooseNonDealerButton"),
   readyButton: document.querySelector("#readyButton"),
@@ -50,19 +54,25 @@ const elements = {
   trickHistory: document.querySelector("#trickHistory")
 };
 
+const urlParams = new URL(window.location.href).searchParams;
 let session = loadSession();
 let roomView = null;
 let pollHandle = null;
 
-elements.createRoomButton.addEventListener("click", async () => {
+elements.createRoomButton.addEventListener("click", () => {
+  createRoomFromUi();
+});
+
+async function createRoomFromUi() {
   try {
     const result = await api("/api/rooms", { method: "POST" });
     setSession(result.room.roomCode, result.seatToken);
     setRoom(result.room, "You are Player 1. Share the room code with Player 2.");
+    window.history.replaceState(null, "", `./room.html?room=${encodeURIComponent(result.room.roomCode)}`);
   } catch (error) {
     setStatus(error.message);
   }
-});
+}
 
 elements.joinRoomButton.addEventListener("click", async () => {
   const roomCode = elements.joinRoomCode.value.trim().toUpperCase();
@@ -97,6 +107,19 @@ elements.copyCodeButton.addEventListener("click", async () => {
   }
 });
 
+elements.copySpectatorLinkButton.addEventListener("click", async () => {
+  if (!roomView?.roomCode) return;
+
+  const text = spectatorLinkFor(roomView.roomCode);
+
+  if (navigator.clipboard) {
+    await navigator.clipboard.writeText(text);
+    setStatus("Spectator link copied.");
+  } else {
+    setStatus(text);
+  }
+});
+
 elements.passButton.addEventListener("click", async () => {
   await sendAction({ type: "passTrump" });
 });
@@ -121,10 +144,14 @@ window.addEventListener("beforeunload", () => {
   if (pollHandle) clearInterval(pollHandle);
 });
 
-if (session?.roomCode && session?.seatToken) {
+if (urlParams.get("action") === "create") {
+  localStorage.removeItem(storageKey);
+  session = null;
+  createRoomFromUi();
+} else if (session?.roomCode && session?.seatToken) {
   refreshRoom("Reconnected from this browser.");
 } else {
-  const urlRoomCode = new URL(window.location.href).searchParams.get("room");
+  const urlRoomCode = urlParams.get("room");
   if (urlRoomCode) {
     elements.joinRoomCode.value = urlRoomCode.toUpperCase();
     autoJoinRoom(urlRoomCode.toUpperCase());
@@ -228,9 +255,11 @@ function startPolling() {
 
 function render() {
   if (!roomView) {
-  elements.trumpPanel.hidden = true;
-  elements.nextHandButton.disabled = true;
-  elements.readyButton.disabled = true;
+    elements.trumpPanel.hidden = true;
+    elements.nextHandButton.disabled = true;
+    elements.copyCodeButton.disabled = true;
+    elements.copySpectatorLinkButton.disabled = true;
+    elements.readyButton.disabled = true;
     return;
   }
 
@@ -243,6 +272,7 @@ function render() {
 
   elements.lobbyControls.hidden = true;
   elements.activeRoomControls.hidden = false;
+  elements.invitePanel.hidden = false;
   elements.roomCode.textContent = roomView.roomCode;
   elements.viewerSeat.textContent = seatName(viewerSeat);
   elements.playerStatus.textContent = `${playerCount} / 2`;
@@ -256,6 +286,9 @@ function render() {
   elements.roomLink.textContent = roomLinkFor(roomView.roomCode);
   elements.waitingNotice.textContent = waitingMessage(roomView, state, playerCount);
   elements.copyCodeButton.disabled = false;
+  elements.copySpectatorLinkButton.disabled = false;
+  elements.coinFlipWinner.closest("div").hidden = gameInterfaceActive;
+  elements.startingPositionTile.hidden = gameInterfaceActive || !roomView.startingPositionChoice;
   elements.player1Score.textContent = state.score.player1;
   elements.player2Score.textContent = state.score.player2;
   elements.targetScore.textContent = state.targetScore;
@@ -267,14 +300,18 @@ function render() {
   elements.opponentTricks.textContent = viewerSeat === "spectator" ? "0 tricks" : `${state.tricksWon[opponentSeat]} tricks`;
   elements.spectatorNotice.hidden = viewerSeat !== "spectator";
   const viewerReady = viewerSeat === "spectator" ? true : roomView.playerReady?.[viewerSeat];
-  const canChoosePosition = state.phase === "pregame_settings"
+  const canChoosePosition = state.phase === "coin_sequence"
     && viewerSeat === roomView.coinFlipWinner
     && !roomView.firstDealer;
-  elements.coinFlipPanel.hidden = !canChoosePosition;
+  const showCoinSequence = state.phase === "coin_sequence" && !roomView.firstDealer;
+  elements.coinFlipPanel.hidden = !showCoinSequence;
+  elements.coinFlipMessage.textContent = showCoinSequence
+    ? `${seatName(roomView.coinFlipWinner)} won the coin flip. ${canChoosePosition ? "Choose the starting position." : "Waiting for starting position choice."}`
+    : "";
   elements.chooseDealerButton.disabled = !canChoosePosition;
   elements.chooseNonDealerButton.disabled = !canChoosePosition;
   elements.readyButton.hidden = !["pregame_settings", "ready_countdown"].includes(state.phase) || viewerSeat === "spectator";
-  elements.readyButton.disabled = Boolean(viewerReady) || viewerSeat === "spectator" || !roomView.firstDealer;
+  elements.readyButton.disabled = Boolean(viewerReady) || viewerSeat === "spectator";
   elements.readyButton.textContent = viewerReady ? "Ready Set" : "Ready";
   elements.nextHandButton.hidden = true;
   elements.nextHandButton.disabled = true;
@@ -299,13 +336,11 @@ function renderStatus() {
   } else if (state.phase === "waiting_for_players") {
     setStatus("Waiting for Player 2.");
   } else if (state.phase === "pregame_settings") {
-    if (!roomView.firstDealer) {
-      setStatus(`${seatName(roomView.coinFlipWinner)} won the coin flip and chooses dealer or non-dealer.`);
-    } else {
-      setStatus(`Waiting for both players. ${readyLabel(roomView.playerReady)}.`);
-    }
+    setStatus(`Waiting for both players. ${readyLabel(roomView.playerReady)}.`);
   } else if (state.phase === "ready_countdown") {
     setStatus(`Game starts in ${secondsUntil(state.countdownEndsAt)}.`);
+  } else if (state.phase === "coin_sequence") {
+    setStatus(`${seatName(roomView.coinFlipWinner)} won the coin flip and chooses dealer or non-dealer.`);
   } else if (state.actionPhase === "selectingTrump") {
     if (roomView.viewerSeat === "spectator") {
       setStatus("Spectator view. This room is read-only for you.");
@@ -439,14 +474,15 @@ function waitingMessage(view, state, playerCount) {
   }
 
   if (state.phase === "pregame_settings") {
-    if (!view.firstDealer) {
-      return `${seatName(view.coinFlipWinner)} won the coin flip. Waiting for starting position choice.`;
-    }
     return `${readyLabel(view.playerReady)}. Waiting for both players to ready up.`;
   }
 
   if (state.phase === "ready_countdown") {
     return `Game starts in ${secondsUntil(state.countdownEndsAt)}.`;
+  }
+
+  if (state.phase === "coin_sequence") {
+    return `${seatName(view.coinFlipWinner)} won the coin flip. Waiting for dealer choice.`;
   }
 
   if (state.actionPhase === "selectingTrump") {
@@ -494,6 +530,13 @@ function roomLinkFor(roomCode) {
   const url = new URL(window.location.href);
   url.pathname = url.pathname.replace(/[^/]*$/, "room.html");
   url.search = `?room=${encodeURIComponent(roomCode)}`;
+  return url.toString();
+}
+
+function spectatorLinkFor(roomCode) {
+  if (!roomCode) return "";
+  const url = new URL(roomLinkFor(roomCode));
+  url.searchParams.set("view", "spectator");
   return url.toString();
 }
 

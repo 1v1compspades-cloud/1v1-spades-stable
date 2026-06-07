@@ -57,6 +57,7 @@ test("joins second player and supports reconnect by seat token", () => {
 
   assert.equal(joined.seat, "player2");
   assert.equal(joined.room.players.player2.seatToken, "guest-token");
+  assert.equal(joined.room.coinFlipWinner, null);
 
   const rejoined = joinRoom(joined.room, { seatToken: "guest-token" });
   assert.equal(rejoined.seat, "player2");
@@ -65,20 +66,27 @@ test("joins second player and supports reconnect by seat token", () => {
   assert.equal(rejoined.room.gameState.hands.player1.length, 0);
 });
 
-test("coin flip appears only after both players are seated", () => {
+test("coin flip appears only after both players are seated and ready countdown completes", () => {
   let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token" });
   assert.equal(room.coinFlipWinner, null);
   assert.equal(room.gameState.phase, "waiting_for_players");
 
   room = joinRoom(room, { seatToken: "guest-token" }).room;
 
-  assert.equal(["player1", "player2"].includes(room.coinFlipWinner), true);
+  assert.equal(room.coinFlipWinner, null);
   assert.equal(room.gameState.phase, "pregame_settings");
+
+  room = applyRoomAction(room, { seatToken: "host-token", type: "ready" });
+  room = applyRoomAction(room, { seatToken: "guest-token", type: "ready" });
+  room = advanceRoomClock(room, { now: Date.parse(room.countdownEndsAt) + 1 });
+
+  assert.equal(["player1", "player2"].includes(room.coinFlipWinner), true);
+  assert.equal(room.gameState.phase, "coin_sequence");
+  assert.deepEqual(room.gameState.hands.player1, []);
 });
 
 test("coin flip winner receives choice and assigns first dealer", () => {
-  let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", coinFlipWinner: "player1" });
-  room = joinRoom(room, { seatToken: "guest-token" }).room;
+  let room = createCoinSequenceRoom();
 
   assert.throws(() => applyRoomAction(room, {
     seatToken: "guest-token",
@@ -89,33 +97,41 @@ test("coin flip winner receives choice and assigns first dealer", () => {
   room = applyRoomAction(room, {
     seatToken: "host-token",
     type: "chooseStartingPosition",
-    position: "dealer"
+    position: "dealer",
+    deck: fixedDeck
   });
 
   assert.equal(room.startingPositionChoice, "dealer");
   assert.equal(room.firstDealer, "player1");
   assert.equal(room.gameState.dealer, "player1");
+  assert.equal(room.gameState.phase, "playing");
+  assert.equal(room.gameState.hands.player1.length, 5);
 });
 
 test("coin flip winner can choose first non-dealer", () => {
-  let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", coinFlipWinner: "player1" });
-  room = joinRoom(room, { seatToken: "guest-token" }).room;
+  let room = createCoinSequenceRoom();
   room = applyRoomAction(room, {
     seatToken: "host-token",
     type: "chooseStartingPosition",
-    position: "non_dealer"
+    position: "non_dealer",
+    deck: fixedDeck
   });
 
   assert.equal(room.startingPositionChoice, "non_dealer");
   assert.equal(room.firstDealer, "player2");
   assert.equal(room.gameState.dealer, "player2");
+  assert.equal(room.gameState.phase, "playing");
 });
 
-test("ready before starting dealer choice is rejected", () => {
+test("ready is allowed before coin flip and dealer choice", () => {
   let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", coinFlipWinner: "player1" });
   room = joinRoom(room, { seatToken: "guest-token" }).room;
 
-  assert.throws(() => applyRoomAction(room, { seatToken: "host-token", type: "ready" }), /Coin flip winner/);
+  room = applyRoomAction(room, { seatToken: "host-token", type: "ready" });
+
+  assert.equal(room.playerReady.player1, true);
+  assert.equal(room.coinFlipWinner, null);
+  assert.equal(room.firstDealer, null);
 });
 
 test("Player 1 alone cannot ready, start, or deal cards", () => {
@@ -130,11 +146,6 @@ test("Player 1 alone cannot ready, start, or deal cards", () => {
 test("Player 1 ready without Player 2 ready does not deal cards", () => {
   let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", coinFlipWinner: "player1" });
   room = joinRoom(room, { seatToken: "guest-token" }).room;
-  room = applyRoomAction(room, {
-    seatToken: "host-token",
-    type: "chooseStartingPosition",
-    position: "dealer"
-  });
 
   room = applyRoomAction(room, { seatToken: "host-token", type: "ready" });
 
@@ -148,31 +159,28 @@ test("Player 1 ready without Player 2 ready does not deal cards", () => {
 test("both players ready triggers countdown without dealing immediately", () => {
   let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", coinFlipWinner: "player1" });
   room = joinRoom(room, { seatToken: "guest-token" }).room;
-  room = applyRoomAction(room, {
-    seatToken: "host-token",
-    type: "chooseStartingPosition",
-    position: "dealer"
-  });
   room = applyRoomAction(room, { seatToken: "host-token", type: "ready" });
   room = applyRoomAction(room, { seatToken: "guest-token", type: "ready" });
 
   assert.equal(room.gameState.phase, "ready_countdown");
   assert.equal(Boolean(room.countdownEndsAt), true);
+  assert.equal(room.coinFlipWinner, null);
   assert.equal(room.gameState.hands.player1.length, 0);
   assert.equal(room.gameState.hands.player2.length, 0);
 });
 
-test("countdown expiry shuffles and deals without host start", () => {
+test("countdown expiry starts coin sequence without dealing yet", () => {
   let room = createReadyCountdownRoom();
   const afterCountdown = Date.parse(room.countdownEndsAt) + 1;
 
   room = advanceRoomClock(room, { now: afterCountdown, deck: fixedDeck });
 
-  assert.equal(room.gameState.phase, "playing");
-  assert.equal(room.gameState.actionPhase, "selectingTrump");
-  assert.equal(room.gameState.hands.player1.length, 5);
-  assert.equal(room.gameState.hands.player2.length, 5);
-  assert.equal(room.gameState.kitty.length, 14);
+  assert.equal(room.gameState.phase, "coin_sequence");
+  assert.equal(room.gameState.actionPhase, "coin_sequence");
+  assert.equal(room.coinFlipWinner, "player1");
+  assert.equal(room.gameState.currentTurn, "player1");
+  assert.equal(room.gameState.hands.player1.length, 0);
+  assert.equal(room.gameState.hands.player2.length, 0);
   assert.equal(room.countdownEndsAt, null);
 });
 
@@ -419,14 +427,15 @@ test("match room includes spectator-safe tournament metadata", () => {
     }
   });
   room = joinRoom(room, { seatToken: "guest-token" }).room;
-  room = applyRoomAction(room, {
-    seatToken: room.coinFlipWinner === "player1" ? "host-token" : "guest-token",
-    type: "chooseStartingPosition",
-    position: "dealer"
-  });
   room = applyRoomAction(room, { seatToken: "host-token", type: "ready" });
   room = applyRoomAction(room, { seatToken: "guest-token", type: "ready" });
   room = advanceRoomClock(room, { now: Date.parse(room.countdownEndsAt) + 1, deck: fixedDeck });
+  room = applyRoomAction(room, {
+    seatToken: room.coinFlipWinner === "player1" ? "host-token" : "guest-token",
+    type: "chooseStartingPosition",
+    position: "dealer",
+    deck: fixedDeck
+  });
   const view = sanitizeRoomForViewer(room, null);
 
   assert.equal(view.tournamentMatch.tournamentCode, "EUCHRE");
@@ -463,18 +472,23 @@ test("room state has no restricted commerce fields", () => {
 function createReadyCountdownRoom() {
   let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", coinFlipWinner: "player1" });
   room = joinRoom(room, { seatToken: "guest-token" }).room;
-  room = applyRoomAction(room, {
-    seatToken: "host-token",
-    type: "chooseStartingPosition",
-    position: "non_dealer"
-  });
   room = applyRoomAction(room, { seatToken: "host-token", type: "ready" });
   return applyRoomAction(room, { seatToken: "guest-token", type: "ready" });
 }
 
-function createStartedRoom() {
+function createCoinSequenceRoom() {
   const room = createReadyCountdownRoom();
   return advanceRoomClock(room, { now: Date.parse(room.countdownEndsAt) + 1, deck: fixedDeck });
+}
+
+function createStartedRoom() {
+  let room = createCoinSequenceRoom();
+  return applyRoomAction(room, {
+    seatToken: "host-token",
+    type: "chooseStartingPosition",
+    position: "non_dealer",
+    deck: fixedDeck
+  });
 }
 
 function completeHandRoom(room = createStartedRoom()) {

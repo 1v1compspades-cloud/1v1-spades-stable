@@ -62,7 +62,7 @@
           <span>Coin Flip</span>
           <strong id="coinFlipWinner">None</strong>
         </div>
-        <div>
+        <div id="startingPositionTile">
           <span>Start Choice</span>
           <strong id="startingPosition">None</strong>
         </div>
@@ -71,22 +71,32 @@
           <strong id="currentDealer">None</strong>
         </div>
         <div>
-          <button id="copyCodeButton" class="secondary" type="button" disabled>Copy Code</button>
+          <button id="copyCodeButton" class="secondary" type="button" disabled>Copy Invite Link</button>
+        </div>
+        <div>
+          <button id="copySpectatorLinkButton" class="secondary" type="button" disabled>Copy Spectator Link</button>
         </div>
       </section>
 
-      <section class="share-panel">
+      <section id="invitePanel" class="share-panel invite-panel">
         <div>
-          <span>Room Link</span>
+          <span>Invite Link</span>
           <strong id="roomLink">Create or join a room.</strong>
         </div>
         <p id="waitingNotice">Waiting for room setup.</p>
-        <div id="coinFlipPanel" class="ready-panel" hidden>
-          <span>Coin flip winner chooses the first position.</span>
-          <button id="chooseDealerButton" type="button">Be Dealer</button>
-          <button id="chooseNonDealerButton" class="secondary" type="button">Be Non-Dealer</button>
-        </div>
         <button id="readyButton" type="button" disabled>Ready</button>
+      </section>
+
+      <section id="coinFlipPanel" class="coin-modal" hidden>
+        <div class="coin-card">
+          <p class="eyebrow">Start Sequence</p>
+          <h2>Coin Flip</h2>
+          <p id="coinFlipMessage">Waiting for both players to ready up.</p>
+          <div class="coin-actions">
+            <button id="chooseDealerButton" type="button">Be Dealer</button>
+            <button id="chooseNonDealerButton" class="secondary" type="button">Be Non-Dealer</button>
+          </div>
+        </div>
       </section>
 
       <section id="pregamePanel" class="panel pregame-panel">

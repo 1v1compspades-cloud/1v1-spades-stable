@@ -30,6 +30,16 @@
         </div>
 
         <div class="settings-grid">
+          <label class="setting-control" for="modeSelect">
+            <span>Mode</span>
+            <select id="modeSelect">
+              <option value="communityCompetitive" selected>Community Competitive</option>
+              <option value="classicCasual">Classic Casual</option>
+              <option value="fastGame">Fast Game</option>
+              <option value="practiceMode">Practice Mode</option>
+            </select>
+          </label>
+
           <label class="setting-control" for="scoreLimitSelect">
             <span>Score limit</span>
             <select id="scoreLimitSelect">
@@ -55,7 +65,11 @@
       <section class="home-action-panel" aria-label="Main actions">
         <div class="home-actions">
           <a class="button-link" href="./room.html?action=create">Create Room</a>
-          <a class="button-link secondary-link" href="./room.html?action=join">Join Room</a>
+          <label class="home-join-control" for="homeJoinRoomCode">
+            <span>Room code</span>
+            <input id="homeJoinRoomCode" maxlength="8" autocomplete="off" placeholder="ABCDE">
+          </label>
+          <button id="homeJoinRoomButton" class="secondary" type="button">Join Room</button>
           <button id="quickMatchButton" type="button">Quick Match</button>
           <a class="button-link secondary-link" href="./rules.html">Rules</a>
         </div>
@@ -91,7 +105,7 @@
             <input id="homepageAdminCode" class="admin-code-input" type="password" autocomplete="off">
             <button id="unlockAdminButton" class="compact-button secondary" type="button">Unlock</button>
           </div>
-          <p id="homepageAdminStatus" class="admin-status" aria-live="polite">Tournament controls are hidden from normal players.</p>
+          <p id="homepageAdminStatus" class="admin-status" aria-live="polite"></p>
           <div id="homepageAdminControls" class="homepage-admin-controls" hidden>
             <a class="button-link" href="./tournament.html">Create Tournament</a>
             <a class="button-link secondary-link" href="./tournament.html">Tournament settings</a>

@@ -1,6 +1,9 @@
 const quickMatchButton = document.querySelector("#quickMatchButton");
 const quickMatchStatus = document.querySelector("#quickMatchStatus");
+const homeJoinRoomCode = document.querySelector("#homeJoinRoomCode");
+const homeJoinRoomButton = document.querySelector("#homeJoinRoomButton");
 const playerNameInput = document.querySelector("#playerNameInput");
+const modeSelect = document.querySelector("#modeSelect");
 const scoreLimitSelect = document.querySelector("#scoreLimitSelect");
 const stickDealerToggle = document.querySelector("#stickDealerToggle");
 const homepageAdminCode = document.querySelector("#homepageAdminCode");
@@ -13,6 +16,7 @@ const homepageAdminCodeValue = "MEHDI";
 
 const savedSettings = loadSettings();
 playerNameInput.value = savedSettings.playerName ?? "";
+modeSelect.value = savedSettings.modeId ?? "communityCompetitive";
 scoreLimitSelect.value = savedSettings.targetScore ?? "10";
 stickDealerToggle.checked = savedSettings.stickTheDealer ?? true;
 
@@ -35,7 +39,20 @@ quickMatchButton.addEventListener("click", async () => {
   }
 });
 
+homeJoinRoomButton.addEventListener("click", () => {
+  saveSettings();
+  const roomCode = homeJoinRoomCode.value.trim().toUpperCase();
+
+  if (!roomCode) {
+    quickMatchStatus.textContent = "Enter a room code.";
+    return;
+  }
+
+  window.location.href = `./room.html?room=${encodeURIComponent(roomCode)}`;
+});
+
 playerNameInput.addEventListener("input", saveSettings);
+modeSelect.addEventListener("change", saveSettings);
 scoreLimitSelect.addEventListener("change", saveSettings);
 stickDealerToggle.addEventListener("change", saveSettings);
 
@@ -62,6 +79,7 @@ function showAdminControls(message) {
 function saveSettings() {
   localStorage.setItem(homepageSettingsKey, JSON.stringify({
     playerName: playerNameInput.value.trim(),
+    modeId: modeSelect.value,
     targetScore: scoreLimitSelect.value,
     stickTheDealer: stickDealerToggle.checked
   }));

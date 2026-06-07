@@ -6,33 +6,50 @@ This standard applies to future 1V1 games, including Spades, Euchre, Hearts, Bid
 
 All 1V1 games should use the same clear room flow:
 
-Opening screen settings first -> both players join -> both players ready up -> 5-second countdown -> gameplay interface starts.
+Home settings -> pre-match lobby -> both players ready up -> 5-second countdown -> coin/start sequence when required -> gameplay -> round result countdown -> next round or winner.
 
 The goal is to make every game feel familiar, predictable, spectator-safe, and easy to test.
 
 ## Standard Room Flow
 
-1. The opening screen always shows settings and rules first.
-2. Player 1 creates the room.
-3. Player 2 joins by room link or room code.
-4. A third visitor becomes a spectator.
-5. The gameplay interface is not shown until both players are seated.
-6. Both seated players must ready up.
-7. A 5-second countdown starts after both players are ready.
-8. Shuffle, deal, and game start happen only after the countdown reaches zero.
-9. After each hand or round, show score/result for 5 seconds.
-10. The next hand or round starts automatically unless the match is complete.
-11. Spectators never see hidden hands or private player-only state.
-12. Admin or host tools are separate from player seats.
-13. Games are free-play only by default.
-14. Payment, wallet, deposit, or prize wording must not appear unless legal approval exists later.
+1. The home screen always shows settings and rules first.
+2. Player 1 creates the room from the home/settings screen.
+3. The creator is sent to the pre-match lobby with a room code and invite link.
+4. Player 2 joins by room link or room code.
+5. A third visitor becomes a spectator.
+6. The pre-match lobby shows player slots, ready status, match settings, and invite links.
+7. No gameplay interface is shown in the pre-match lobby.
+8. Both seated players must ready up.
+9. A 5-second countdown starts after both players are ready.
+10. After the countdown, the game runs its coin/start sequence when required.
+11. Shuffle, deal, and game start happen only after the countdown and required start sequence complete.
+12. After each hand or round, show score/result for 5 seconds.
+13. The next hand or round starts automatically unless the match is complete.
+14. Spectators never see hidden hands or private player-only state.
+15. Admin or host tools are separate from player seats.
+16. Games are free-play only by default.
+17. Payment, wallet, deposit, or prize wording must not appear unless legal approval exists later.
 
-## Opening Screen Requirements
+## Home Settings Requirements
 
-The opening room screen should show:
+The home/settings screen should show:
+
+- Player name
+- Game mode
+- Target score or match length
+- Important rule toggles
+- Short rules summary
+- Create Room
+- Join Room
+- Rules
+
+## Pre-Match Lobby Requirements
+
+The pre-match lobby should show:
 
 - Room code
-- Copy/share room link
+- Copy invite link
+- Copy spectator link, when available
 - Match type or game mode
 - Target score or match length
 - Important rule toggles
@@ -42,6 +59,14 @@ The opening room screen should show:
 - Ready status for both players
 - Ready button for seated players only
 - Spectator label for non-seated visitors
+
+The pre-match lobby must not show:
+
+- Player hands
+- Opponent hidden-card area
+- Deck/kitty/upcard/game-specific hidden resources
+- Trick/play area
+- Gameplay action controls
 
 ## Seat Assignment
 
@@ -55,7 +80,7 @@ Player seating should be deterministic and safe:
 
 ## Gameplay Visibility
 
-Before the countdown completes, do not show:
+Before the countdown and required start sequence complete, do not show:
 
 - Player hands
 - Opponent hidden-card area
@@ -63,7 +88,20 @@ Before the countdown completes, do not show:
 - Trick/play area
 - Action controls for gameplay
 
-After the countdown completes, show the full game interface.
+After the countdown and required start sequence complete, show the full game interface.
+
+## Coin Or Start Sequence
+
+Some games need a start sequence after both players are ready. Examples include a coin toss, first dealer choice, first lead choice, or opening crib/deal order.
+
+When a start sequence is required:
+
+- Run it only after both players are seated and ready.
+- Show it as a focused modal or centered decision panel.
+- Clearly identify the winner or chooser.
+- Show choice buttons only to the player who may act.
+- Hide choice buttons after the decision is saved.
+- Start gameplay only after the required decision is complete.
 
 ## Countdown Rules
 
@@ -74,6 +112,8 @@ Required fields may include:
 - `phase`
 - `playerReady`
 - `countdownEndsAt`
+- `coinFlipWinner` or equivalent start-sequence winner, when needed
+- `firstDealer` or equivalent starting-position choice, when needed
 - `nextRoundStartsAt`
 - seated player session identifiers
 
@@ -127,10 +167,11 @@ Before a 1V1 game is considered ready for tester use:
 - Player 2 can join by link/code.
 - A third visitor becomes spectator.
 - The opening screen shows settings/rules first.
-- No gameplay UI appears before both players are seated and ready.
+- The pre-match lobby shows room code, invite links, player slots, ready status, and settings.
+- No gameplay UI appears before both players are seated, ready, and through any required start sequence.
 - Both players can ready up.
 - The 5-second countdown starts once.
-- Gameplay starts only after countdown completion.
+- Gameplay starts only after countdown completion and any required start sequence.
 - Hidden hands remain hidden from spectators.
 - The score screen appears after each hand/round.
 - The next hand/round starts automatically when appropriate.
