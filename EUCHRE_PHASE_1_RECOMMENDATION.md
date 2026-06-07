@@ -31,7 +31,7 @@ Do not build yet:
 ## Recommended Implementation Order
 
 1. Scaffold the standalone project.
-2. Add docs and README.
+2. Move the existing root-level Phase 0 docs in the private GitHub repository into `/docs`.
 3. Add mode constants for Community Competitive, Classic Casual, Fast Game, Tournament Mode, and Practice Mode.
 4. Add Euchre engine tests for deck, bowers, effective suit, legal play, trick winner, scoring, and Stick the Dealer.
 5. Implement the minimum engine needed to pass those tests.
@@ -42,7 +42,7 @@ Do not build yet:
 ## Recommended Phase 1 Command
 
 ```text
-Create Phase 1 for the standalone 1v1-euchre-freeplay project. Do not modify or import any Spades project files. Build a new free-play Euchre app shell with home, rules, Quick Match, Play a Friend, tournament lobby, admin-key host placeholders, and match-room placeholders. Add a tested Euchre rules engine for 24-card 1v1 Euchre with bowers, effective suit, legal play, trick winner, scoring, first-to-10 default, Fast Game first-to-5, and Stick the Dealer behavior. Planning docs only may be reused from /docs. Keep the project strictly free-play.
+Create Phase 1 for the standalone 1v1-euchre-freeplay project. Do not modify or import any Spades project files. Move the existing root-level Phase 0 planning docs into /docs before adding app code. Build a new free-play Euchre app shell with home, rules, Quick Match, Play a Friend, tournament lobby, admin-key host placeholders, and match-room placeholders. Add a tested Euchre rules engine for 24-card 1v1 Euchre with bowers, effective suit, legal play based on following the led suit when possible, trump lead allowed immediately after trump is chosen, no broken-trump or cut-trump restriction, trick winner, scoring, first-to-10 default, Fast Game first-to-5, and Stick the Dealer behavior. Planning docs only may be reused from /docs. Keep the project strictly free-play.
 ```
 
 ## Open Questions Before Coding

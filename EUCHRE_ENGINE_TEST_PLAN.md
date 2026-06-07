@@ -52,7 +52,9 @@ Verify:
 
 Verify:
 
-- Player must follow led effective suit when able.
+- Trump may be led immediately after trump is selected.
+- There is no broken-trump or cut-trump restriction.
+- Player must follow the led suit when able.
 - Player may play any card only when unable to follow suit.
 - A left bower in hand can satisfy a requirement to follow trump.
 - A left bower in hand does not satisfy a requirement to follow its printed suit.

@@ -51,6 +51,7 @@ The largest risk in a Euchre implementation is treating left bower as its printe
 Other risks:
 
 - Allowing illegal off-suit plays when a player can follow effective suit
+- Accidentally adding a broken-trump or cut-trump rule that does not belong in Euchre
 - Scoring maker and defender incorrectly
 - Mishandling Stick the Dealer
 - Letting tournament rules change after match start

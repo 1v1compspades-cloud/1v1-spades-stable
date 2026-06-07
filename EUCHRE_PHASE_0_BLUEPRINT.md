@@ -87,6 +87,9 @@ Admin tools should be available only after a private admin key is verified. The 
 - Right bower is highest trump
 - Left bower is second-highest trump and counts as trump
 - Players must follow suit when able
+- Once trump is chosen, trump may be led at any time
+- Euchre has no broken-trump or cut-trump restriction
+- Legal play is based on following the led suit when possible
 - Maker needs 3 or more tricks
 - Maker takes 3 or 4 tricks: maker scores 1 point
 - Maker takes 5 tricks: maker scores 2 points

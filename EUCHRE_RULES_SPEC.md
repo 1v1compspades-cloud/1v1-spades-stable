@@ -57,6 +57,12 @@ If both players pass in round 1, players may choose a different trump suit or pa
 
 The upcard suit cannot be selected in round 2.
 
+### After Trump Is Chosen
+
+Once trump is chosen, trump may be led at any time.
+
+Euchre has no broken-trump or cut-trump restriction.
+
 ## Stick the Dealer
 
 Stick the Dealer is ON by default.
@@ -117,11 +123,19 @@ The left bower is removed from its printed suit and treated as trump.
 
 Each hand has 5 tricks.
 
-The leader plays the first card of a trick. The other player must follow the led effective suit if able.
+Euchre has no broken-trump or cut-trump restriction. Trump does not need to be played, cut, or broken before it can be led.
+
+Once trump is chosen, the leader may lead trump on any trick.
+
+The leader plays the first card of a trick. The other player must follow the led suit if able, using effective suit for bower handling.
+
+Legal play is based on following the led suit when possible.
 
 If a player cannot follow suit, they may play any card.
 
 The trick winner leads the next trick.
+
+The left bower counts as trump for follow-suit logic.
 
 ## Trick Winner
 

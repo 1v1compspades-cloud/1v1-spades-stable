@@ -6,6 +6,8 @@ Define a clean standalone structure for the future `1v1-euchre-freeplay` project
 
 Phase 0 creates planning docs only. This file is a recommendation for Phase 1 and beyond.
 
+The current private GitHub repository has the Phase 0 docs uploaded at the root level. Before Phase 1 code is added, move those planning files into `/docs` so the root can stay focused on the app scaffold, README, package metadata, and project configuration.
+
 ## Recommended Top-Level Structure
 
 ```text
