@@ -128,7 +128,7 @@ export function applyRoomAction(room, { seatToken, type, suit, position, card, d
   }
 
   if (type === "chooseStartingPosition") {
-    ensurePhase(gameState, "coin_sequence");
+    ensurePhase(gameState, "dealer_choice");
     ensureBothPlayersSeated(room);
 
     if (seat !== room.coinFlipWinner) {
@@ -315,7 +315,7 @@ export function sanitizeRoomForViewer(room, seatToken) {
 
 export function advanceRoomClock(room, { now = Date.now(), deck } = {}) {
   if (!bothPlayersConnected(room)) {
-    if (["ready_countdown", "coin_sequence"].includes(room.gameState.phase)) {
+    if (["ready_countdown", "coin_flip"].includes(room.gameState.phase)) {
       return syncRoomFields({
         ...room,
         coinFlipWinner: null,
@@ -344,8 +344,8 @@ export function advanceRoomClock(room, { now = Date.now(), deck } = {}) {
       countdownEndsAt: null,
       gameState: {
         ...room.gameState,
-        phase: "coin_sequence",
-        actionPhase: "coin_sequence",
+        phase: "coin_flip",
+        actionPhase: "dealer_choice",
         currentTurn: coinFlipWinner
       },
       updatedAt: new Date().toISOString()

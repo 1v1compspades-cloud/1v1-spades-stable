@@ -137,7 +137,7 @@ test("active room screen hides lobby create and join controls", async () => {
 test("dealer choice buttons are coin-flip only and hide after selection", async () => {
   const client = await readText("src/room-client.js");
 
-  assert.match(client, /state\.phase === "coin_sequence"/);
+  assert.match(client, /state\.phase === "coin_flip"/);
   assert.match(client, /viewerSeat === roomView\.coinFlipWinner/);
   assert.match(client, /!roomView\.firstDealer/);
   assert.match(client, /elements\.coinFlipPanel\.hidden = !showCoinSequence/);

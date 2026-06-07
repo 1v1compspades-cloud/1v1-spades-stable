@@ -300,10 +300,10 @@ function render() {
   elements.opponentTricks.textContent = viewerSeat === "spectator" ? "0 tricks" : `${state.tricksWon[opponentSeat]} tricks`;
   elements.spectatorNotice.hidden = viewerSeat !== "spectator";
   const viewerReady = viewerSeat === "spectator" ? true : roomView.playerReady?.[viewerSeat];
-  const canChoosePosition = state.phase === "coin_sequence"
+  const canChoosePosition = state.phase === "coin_flip"
     && viewerSeat === roomView.coinFlipWinner
     && !roomView.firstDealer;
-  const showCoinSequence = state.phase === "coin_sequence" && !roomView.firstDealer;
+  const showCoinSequence = state.phase === "coin_flip" && !roomView.firstDealer;
   elements.coinFlipPanel.hidden = !showCoinSequence;
   elements.coinFlipMessage.textContent = showCoinSequence
     ? `${seatName(roomView.coinFlipWinner)} won the coin flip. ${canChoosePosition ? "Choose the starting position." : "Waiting for starting position choice."}`
@@ -339,7 +339,7 @@ function renderStatus() {
     setStatus(`Waiting for both players. ${readyLabel(roomView.playerReady)}.`);
   } else if (state.phase === "ready_countdown") {
     setStatus(`Game starts in ${secondsUntil(state.countdownEndsAt)}.`);
-  } else if (state.phase === "coin_sequence") {
+  } else if (state.phase === "coin_flip") {
     setStatus(`${seatName(roomView.coinFlipWinner)} won the coin flip and chooses dealer or non-dealer.`);
   } else if (state.actionPhase === "selectingTrump") {
     if (roomView.viewerSeat === "spectator") {
@@ -481,7 +481,7 @@ function waitingMessage(view, state, playerCount) {
     return `Game starts in ${secondsUntil(state.countdownEndsAt)}.`;
   }
 
-  if (state.phase === "coin_sequence") {
+  if (state.phase === "coin_flip") {
     return `${seatName(view.coinFlipWinner)} won the coin flip. Waiting for dealer choice.`;
   }
 

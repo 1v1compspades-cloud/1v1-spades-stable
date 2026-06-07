@@ -81,12 +81,13 @@ test("coin flip appears only after both players are seated and ready countdown c
   room = advanceRoomClock(room, { now: Date.parse(room.countdownEndsAt) + 1 });
 
   assert.equal(["player1", "player2"].includes(room.coinFlipWinner), true);
-  assert.equal(room.gameState.phase, "coin_sequence");
+  assert.equal(room.gameState.phase, "coin_flip");
+  assert.equal(room.gameState.actionPhase, "dealer_choice");
   assert.deepEqual(room.gameState.hands.player1, []);
 });
 
 test("coin flip winner receives choice and assigns first dealer", () => {
-  let room = createCoinSequenceRoom();
+  let room = createCoinFlipRoom();
 
   assert.throws(() => applyRoomAction(room, {
     seatToken: "guest-token",
@@ -109,7 +110,7 @@ test("coin flip winner receives choice and assigns first dealer", () => {
 });
 
 test("coin flip winner can choose first non-dealer", () => {
-  let room = createCoinSequenceRoom();
+  let room = createCoinFlipRoom();
   room = applyRoomAction(room, {
     seatToken: "host-token",
     type: "chooseStartingPosition",
@@ -169,19 +170,40 @@ test("both players ready triggers countdown without dealing immediately", () => 
   assert.equal(room.gameState.hands.player2.length, 0);
 });
 
-test("countdown expiry starts coin sequence without dealing yet", () => {
+test("countdown expiry triggers coin flip without dealing yet", () => {
   let room = createReadyCountdownRoom();
   const afterCountdown = Date.parse(room.countdownEndsAt) + 1;
 
   room = advanceRoomClock(room, { now: afterCountdown, deck: fixedDeck });
 
-  assert.equal(room.gameState.phase, "coin_sequence");
-  assert.equal(room.gameState.actionPhase, "coin_sequence");
+  assert.equal(room.gameState.phase, "coin_flip");
+  assert.equal(room.gameState.actionPhase, "dealer_choice");
   assert.equal(room.coinFlipWinner, "player1");
   assert.equal(room.gameState.currentTurn, "player1");
   assert.equal(room.gameState.hands.player1.length, 0);
   assert.equal(room.gameState.hands.player2.length, 0);
   assert.equal(room.countdownEndsAt, null);
+});
+
+test("dealer choice happens before deal and starts gameplay", () => {
+  let room = createCoinFlipRoom();
+
+  assert.equal(room.gameState.phase, "coin_flip");
+  assert.equal(room.gameState.hands.player1.length, 0);
+  assert.equal(room.gameState.hands.player2.length, 0);
+
+  room = applyRoomAction(room, {
+    seatToken: "host-token",
+    type: "chooseStartingPosition",
+    position: "dealer",
+    deck: fixedDeck
+  });
+
+  assert.equal(room.gameState.phase, "playing");
+  assert.equal(room.gameState.actionPhase, "selectingTrump");
+  assert.equal(room.gameState.dealer, "player1");
+  assert.equal(room.gameState.hands.player1.length, 5);
+  assert.equal(room.gameState.hands.player2.length, 5);
 });
 
 test("countdown does not duplicate during polling", () => {
@@ -476,13 +498,13 @@ function createReadyCountdownRoom() {
   return applyRoomAction(room, { seatToken: "guest-token", type: "ready" });
 }
 
-function createCoinSequenceRoom() {
+function createCoinFlipRoom() {
   const room = createReadyCountdownRoom();
   return advanceRoomClock(room, { now: Date.parse(room.countdownEndsAt) + 1, deck: fixedDeck });
 }
 
 function createStartedRoom() {
-  let room = createCoinSequenceRoom();
+  let room = createCoinFlipRoom();
   return applyRoomAction(room, {
     seatToken: "host-token",
     type: "chooseStartingPosition",
