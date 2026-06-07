@@ -134,10 +134,29 @@ test("active room screen hides lobby create and join controls", async () => {
   assert.match(client, /Trump: \$\{suitName\(activeTrumpSuit\(state\)\)\}/);
 });
 
+test("invite links use the public room route without the app subdirectory", async () => {
+  const client = await readText("src/room-client.js");
+
+  assert.match(client, /new URL\("\/room\.html", window\.location\.origin\)/);
+  assert.match(client, /url\.search = `\?room=\$\{encodeURIComponent\(roomCode\)\}`/);
+  assert.match(client, /url\.searchParams\.set\("view", "spectator"\)/);
+  assert.doesNotMatch(client, /roomLinkFor[\s\S]*\/apps\/euchre-table-prototype/);
+});
+
+test("spectator invite opens read-only room view instead of taking Player 2 seat", async () => {
+  const client = await readText("src/room-client.js");
+
+  assert.match(client, /urlParams\.get\("view"\) === "spectator"/);
+  assert.match(client, /viewRoomAsSpectator\(urlRoomCode\.toUpperCase\(\)\)/);
+  assert.match(client, /Spectator View\. Hidden hands stay private\./);
+});
+
 test("dealer choice buttons are coin-flip only and hide after selection", async () => {
   const client = await readText("src/room-client.js");
 
+  assert.match(client, /playerCount === 2/);
   assert.match(client, /state\.phase === "coin_flip"/);
+  assert.match(client, /state\.actionPhase === "dealer_choice"/);
   assert.match(client, /viewerSeat === roomView\.coinFlipWinner/);
   assert.match(client, /!roomView\.firstDealer/);
   assert.match(client, /elements\.coinFlipPanel\.hidden = !showCoinSequence/);
@@ -267,6 +286,7 @@ test("server health check and root route work", async () => {
     cwd: new URL(".", appRoot),
     env: {
       ...process.env,
+      HOST: "127.0.0.1",
       PORT: String(port),
       NODE_ENV: "production"
     },
@@ -289,6 +309,53 @@ test("server health check and root route work", async () => {
     const home = await requestText(port, "/apps/euchre-table-prototype/home.html");
     assert.equal(home.statusCode, 200);
     assert.match(home.body, /1V1 Euchre Free Play/);
+  } finally {
+    server.kill();
+  }
+});
+
+test("public room invite route serves room and lets Player 2 join by invite code", async () => {
+  const port = 5199;
+  const server = spawn(process.execPath, ["server.js"], {
+    cwd: new URL(".", appRoot),
+    env: {
+      ...process.env,
+      HOST: "127.0.0.1",
+      PORT: String(port),
+      NODE_ENV: "production"
+    },
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+
+  try {
+    await waitForServer(server, port);
+    const created = await requestJson(port, "/api/rooms", {
+      method: "POST"
+    });
+    const roomCode = created.body.room.roomCode;
+    const invitePath = `/room.html?room=${encodeURIComponent(roomCode)}`;
+
+    assert.equal(created.statusCode, 201);
+    assert.equal(created.body.room.players.player1, true);
+    assert.equal(created.body.room.players.player2, false);
+    assert.equal(created.body.room.coinFlipWinner, null);
+    assert.equal(invitePath.includes("/apps/euchre-table-prototype"), false);
+
+    const invitePage = await requestText(port, invitePath);
+    assert.equal(invitePage.statusCode, 200);
+    assert.match(invitePage.body, /Private Euchre Room/);
+
+    const joined = await requestJson(port, `/api/rooms/${roomCode}/join`, {
+      method: "POST",
+      body: {}
+    });
+
+    assert.equal(joined.statusCode, 200);
+    assert.equal(joined.body.seat, "player2");
+    assert.equal(joined.body.room.viewerSeat, "player2");
+    assert.equal(joined.body.room.players.player2, true);
+    assert.equal(joined.body.room.coinFlipWinner, null);
+    assert.equal(joined.body.room.gameState.phase, "pregame_settings");
   } finally {
     server.kill();
   }
@@ -372,7 +439,7 @@ function waitForServer(server, port) {
 
     server.stdout.on("data", (chunk) => {
       output += chunk.toString();
-      if (output.includes(`port ${port}`)) {
+      if (output.includes(`:${port}`)) {
         clearTimeout(timeout);
         resolve();
       }
@@ -396,20 +463,27 @@ function waitForServer(server, port) {
   });
 }
 
-function requestJson(port, path) {
-  return requestText(port, path).then((result) => ({
+function requestJson(port, path, options) {
+  return requestText(port, path, options).then((result) => ({
     ...result,
     body: JSON.parse(result.body)
   }));
 }
 
-function requestText(port, path) {
+function requestText(port, path, { method = "GET", body } = {}) {
   return new Promise((resolve, reject) => {
+    const payload = body ? JSON.stringify(body) : null;
     const request = http.request({
       hostname: "127.0.0.1",
       port,
       path,
-      method: "GET"
+      method,
+      headers: payload
+        ? {
+            "Content-Type": "application/json",
+            "Content-Length": Buffer.byteLength(payload)
+          }
+        : undefined
     }, (response) => {
       let body = "";
       response.on("data", (chunk) => {
@@ -425,6 +499,7 @@ function requestText(port, path) {
     });
 
     request.on("error", reject);
+    if (payload) request.write(payload);
     request.end();
   });
 }

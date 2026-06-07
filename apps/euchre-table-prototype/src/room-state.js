@@ -243,30 +243,31 @@ export function applyRoomAction(room, { seatToken, type, suit, position, card, d
 }
 
 export function sanitizeRoomForViewer(room, seatToken) {
-  const viewerSeat = getViewerSeat(room, seatToken);
-  const state = room.gameState;
+  const safeRoom = syncRoomFields(room);
+  const viewerSeat = getViewerSeat(safeRoom, seatToken);
+  const state = safeRoom.gameState;
   const viewerHand = viewerSeat === "spectator" ? [] : [...state.hands[viewerSeat]];
 
   return {
-    roomCode: room.roomCode,
+    roomCode: safeRoom.roomCode,
     viewerSeat,
     players: {
-      player1: Boolean(room.players.player1),
-      player2: Boolean(room.players.player2)
+      player1: Boolean(safeRoom.players.player1),
+      player2: Boolean(safeRoom.players.player2)
     },
     playerReady: {
-      player1: Boolean(room.playerReady?.player1),
-      player2: Boolean(room.playerReady?.player2)
+      player1: Boolean(safeRoom.playerReady?.player1),
+      player2: Boolean(safeRoom.playerReady?.player2)
     },
-    coinFlipWinner: room.coinFlipWinner,
-    startingPositionChoice: room.startingPositionChoice,
-    firstDealer: room.firstDealer,
-    countdownStartedAt: room.countdownStartedAt,
-    countdownEndsAt: room.countdownEndsAt,
-    nextHandStartsAt: room.nextHandStartsAt,
-    nextRoundStartsAt: room.nextRoundStartsAt,
-    tournamentMatch: room.tournamentMatch
-      ? sanitizeTournamentMatch(room.tournamentMatch, state)
+    coinFlipWinner: safeRoom.coinFlipWinner,
+    startingPositionChoice: safeRoom.startingPositionChoice,
+    firstDealer: safeRoom.firstDealer,
+    countdownStartedAt: safeRoom.countdownStartedAt,
+    countdownEndsAt: safeRoom.countdownEndsAt,
+    nextHandStartsAt: safeRoom.nextHandStartsAt,
+    nextRoundStartsAt: safeRoom.nextRoundStartsAt,
+    tournamentMatch: safeRoom.tournamentMatch
+      ? sanitizeTournamentMatch(safeRoom.tournamentMatch, state)
       : null,
     gameState: {
       phase: state.phase,
@@ -297,9 +298,9 @@ export function sanitizeRoomForViewer(room, seatToken) {
       tricksWon: state.tricksWon,
       handScore: state.handScore,
       handHistory: state.handHistory,
-      countdownEndsAt: room.countdownEndsAt,
-      nextHandStartsAt: room.nextHandStartsAt,
-      nextRoundStartsAt: room.nextRoundStartsAt,
+      countdownEndsAt: safeRoom.countdownEndsAt,
+      nextHandStartsAt: safeRoom.nextHandStartsAt,
+      nextRoundStartsAt: safeRoom.nextRoundStartsAt,
       availableTrumpSuits: state.actionPhase === "selectingTrump" && viewerSeat === state.currentTurn
         ? availableTrumpSuits(state.trumpState)
         : []
@@ -606,21 +607,43 @@ function applyDealerPickupIfNeeded(state, trumpState) {
 }
 
 function syncRoomFields(room) {
+  const guardedRoom = guardWaitingForPlayers(room);
+
   return {
-    ...room,
-    tournamentMatch: room.tournamentMatch
+    ...guardedRoom,
+    tournamentMatch: guardedRoom.tournamentMatch
       ? {
-          ...room.tournamentMatch,
-          status: room.gameState.winner ? "complete" : room.tournamentMatch.status,
-          winner: room.gameState.winner ?? room.tournamentMatch.winner ?? null
+          ...guardedRoom.tournamentMatch,
+          status: guardedRoom.gameState.winner ? "complete" : guardedRoom.tournamentMatch.status,
+          winner: guardedRoom.gameState.winner ?? guardedRoom.tournamentMatch.winner ?? null
         }
       : null,
-    currentTurn: room.gameState.currentTurn,
-    dealer: room.gameState.dealer,
-    currentDealer: room.gameState.dealer,
-    trumpState: room.gameState.trumpState,
-    score: room.gameState.score,
-    handHistory: room.gameState.handHistory
+    currentTurn: guardedRoom.gameState.currentTurn,
+    dealer: guardedRoom.gameState.dealer,
+    currentDealer: guardedRoom.gameState.dealer,
+    trumpState: guardedRoom.gameState.trumpState,
+    score: guardedRoom.gameState.score,
+    handHistory: guardedRoom.gameState.handHistory
+  };
+}
+
+function guardWaitingForPlayers(room) {
+  if (room.players.player1 && room.players.player2) return room;
+
+  return {
+    ...room,
+    coinFlipWinner: null,
+    startingPositionChoice: null,
+    firstDealer: null,
+    countdownStartedAt: null,
+    countdownEndsAt: null,
+    gameState: {
+      ...room.gameState,
+      phase: "waiting_for_players",
+      actionPhase: "waiting_for_players",
+      currentTurn: null,
+      dealer: null
+    }
   };
 }
 

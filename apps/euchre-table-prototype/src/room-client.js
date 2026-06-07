@@ -154,7 +154,11 @@ if (urlParams.get("action") === "create") {
   const urlRoomCode = urlParams.get("room");
   if (urlRoomCode) {
     elements.joinRoomCode.value = urlRoomCode.toUpperCase();
-    autoJoinRoom(urlRoomCode.toUpperCase());
+    if (urlParams.get("view") === "spectator") {
+      viewRoomAsSpectator(urlRoomCode.toUpperCase());
+    } else {
+      autoJoinRoom(urlRoomCode.toUpperCase());
+    }
   }
 }
 
@@ -211,6 +215,15 @@ async function autoJoinRoom(roomCode) {
   }
 }
 
+async function viewRoomAsSpectator(roomCode) {
+  try {
+    const result = await api(`/api/rooms/${roomCode}`);
+    setRoom(result.room, "Spectator View. Hidden hands stay private.");
+  } catch (error) {
+    setStatus(error.message);
+  }
+}
+
 async function api(path, { method = "GET", body } = {}) {
   const response = await fetch(path, {
     method,
@@ -255,6 +268,10 @@ function startPolling() {
 
 function render() {
   if (!roomView) {
+    elements.lobbyControls.hidden = false;
+    elements.activeRoomControls.hidden = true;
+    elements.invitePanel.hidden = true;
+    elements.coinFlipPanel.hidden = true;
     elements.trumpPanel.hidden = true;
     elements.nextHandButton.disabled = true;
     elements.copyCodeButton.disabled = true;
@@ -300,10 +317,15 @@ function render() {
   elements.opponentTricks.textContent = viewerSeat === "spectator" ? "0 tricks" : `${state.tricksWon[opponentSeat]} tricks`;
   elements.spectatorNotice.hidden = viewerSeat !== "spectator";
   const viewerReady = viewerSeat === "spectator" ? true : roomView.playerReady?.[viewerSeat];
-  const canChoosePosition = state.phase === "coin_flip"
-    && viewerSeat === roomView.coinFlipWinner
+  const startSequenceActive = playerCount === 2
+    && state.phase === "coin_flip"
+    && state.actionPhase === "dealer_choice"
+    && roomView.coinFlipWinner
     && !roomView.firstDealer;
-  const showCoinSequence = state.phase === "coin_flip" && !roomView.firstDealer;
+  const canChoosePosition = startSequenceActive
+    && viewerSeat === roomView.coinFlipWinner
+    && !roomView.startingPositionChoice;
+  const showCoinSequence = startSequenceActive;
   elements.coinFlipPanel.hidden = !showCoinSequence;
   elements.coinFlipMessage.textContent = showCoinSequence
     ? `${seatName(roomView.coinFlipWinner)} won the coin flip. ${canChoosePosition ? "Choose the starting position." : "Waiting for starting position choice."}`
@@ -527,8 +549,7 @@ function matchStatusLabel(match) {
 
 function roomLinkFor(roomCode) {
   if (!roomCode) return "";
-  const url = new URL(window.location.href);
-  url.pathname = url.pathname.replace(/[^/]*$/, "room.html");
+  const url = new URL("/room.html", window.location.origin);
   url.search = `?room=${encodeURIComponent(roomCode)}`;
   return url.toString();
 }

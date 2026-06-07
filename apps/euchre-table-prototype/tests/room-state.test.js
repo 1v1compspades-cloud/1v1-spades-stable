@@ -144,6 +144,39 @@ test("Player 1 alone cannot ready, start, or deal cards", () => {
   assert.equal(room.coinFlipWinner, null);
 });
 
+test("one-player room snapshots are forced back to waiting state with no start sequence", () => {
+  const room = createRoom({
+    roomCode: "ABCDE",
+    seatToken: "host-token",
+    coinFlipWinner: "player1"
+  });
+  const malformed = {
+    ...room,
+    coinFlipWinner: "player1",
+    startingPositionChoice: "dealer",
+    firstDealer: "player1",
+    countdownStartedAt: new Date().toISOString(),
+    countdownEndsAt: new Date(Date.now() + 5000).toISOString(),
+    gameState: {
+      ...room.gameState,
+      phase: "coin_flip",
+      actionPhase: "dealer_choice",
+      currentTurn: "player1",
+      dealer: "player1"
+    }
+  };
+
+  const view = sanitizeRoomForViewer(malformed, "host-token");
+
+  assert.equal(view.gameState.phase, "waiting_for_players");
+  assert.equal(view.gameState.actionPhase, "waiting_for_players");
+  assert.equal(view.coinFlipWinner, null);
+  assert.equal(view.startingPositionChoice, null);
+  assert.equal(view.firstDealer, null);
+  assert.equal(view.gameState.currentTurn, null);
+  assert.equal(view.gameState.dealer, null);
+});
+
 test("Player 1 ready without Player 2 ready does not deal cards", () => {
   let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", coinFlipWinner: "player1" });
   room = joinRoom(room, { seatToken: "guest-token" }).room;

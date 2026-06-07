@@ -25,6 +25,7 @@ import {
 
 const appName = "1v1-euchre-freeplay";
 const port = Number.parseInt(process.env.PORT ?? "5174", 10);
+const host = process.env.HOST ?? "0.0.0.0";
 const appDir = fileURLToPath(new URL(".", import.meta.url));
 const rootDir = resolve(join(appDir, "../.."));
 const rooms = new Map();
@@ -55,8 +56,8 @@ const server = createServer(async (request, response) => {
   }
 });
 
-server.listen(port, () => {
-  console.log(`${appName} server listening on port ${port}`);
+server.listen(port, host, () => {
+  console.log(`${appName} server listening on ${host}:${port}`);
 });
 
 async function handleApi(request, response) {
@@ -257,7 +258,7 @@ async function serveStatic(request, response) {
     return;
   }
 
-  const pathname = url.pathname;
+  const pathname = publicRoutePath(url.pathname);
   const safePath = normalize(decodeURIComponent(pathname)).replace(/^(\.\.[/\\])+/, "");
   const filePath = resolve(join(rootDir, safePath));
 
@@ -270,6 +271,15 @@ async function serveStatic(request, response) {
     "Content-Type": contentType(filePath)
   });
   createReadStream(filePath).pipe(response);
+}
+
+function publicRoutePath(pathname) {
+  return {
+    "/home.html": "/apps/euchre-table-prototype/home.html",
+    "/room.html": "/apps/euchre-table-prototype/room.html",
+    "/rules.html": "/apps/euchre-table-prototype/rules.html",
+    "/tournament.html": "/apps/euchre-table-prototype/tournament.html"
+  }[pathname] ?? pathname;
 }
 
 function createUniqueRoom() {
