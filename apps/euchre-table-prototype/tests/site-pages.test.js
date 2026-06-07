@@ -76,16 +76,20 @@ test("rules screen includes the core Euchre rule copy", async () => {
   assert.match(html, /hidden hands stay private/);
 });
 
-test("room screen exposes create, join, share, and spectator labels", async () => {
+test("one-player room lobby exposes invite controls without start sequence or create/join controls", async () => {
   const html = await readText("room.html");
 
-  assert.match(html, /Create Room/);
-  assert.match(html, /Join Room/);
-  assert.match(html, /id="lobbyControls"/);
-  assert.match(html, /id="activeRoomControls" class="controls" hidden/);
+  assert.doesNotMatch(html, /Create Room/);
+  assert.doesNotMatch(html, /Join Room/);
+  assert.doesNotMatch(html, /Room Code/);
+  assert.doesNotMatch(html, /Be Dealer/);
+  assert.doesNotMatch(html, /Be Non-Dealer/);
+  assert.doesNotMatch(html, /Coin Flip/);
+  assert.match(html, /id="activeRoomControls" class="controls"/);
   assert.match(html, /Copy Invite Link/);
   assert.match(html, /Copy Spectator Link/);
   assert.match(html, /Invite Link/);
+  assert.match(html, /Join as Player 2/);
   assert.match(html, /id="readyButton"/);
   assert.match(html, /id="readyStatus"/);
   assert.match(html, /id="pregamePanel"/);
@@ -99,14 +103,11 @@ test("room screen exposes create, join, share, and spectator labels", async () =
   assert.match(html, /id="coinFlipWinner"/);
   assert.match(html, /id="startingPosition"/);
   assert.match(html, /id="currentDealer"/);
-  assert.match(html, /Be Dealer/);
-  assert.match(html, /Be Non-Dealer/);
   assert.match(html, /class="coin-modal"/);
-  assert.match(html, /id="coinFlipMessage"/);
   assert.match(html, /Spectator view is read-only/);
-  assert.equal((html.match(/id="createRoomButton"/g) ?? []).length, 1);
-  assert.equal((html.match(/id="joinRoomButton"/g) ?? []).length, 1);
-  assert.equal((html.match(/id="joinRoomCode"/g) ?? []).length, 1);
+  assert.equal((html.match(/id="createRoomButton"/g) ?? []).length, 0);
+  assert.equal((html.match(/id="joinRoomButton"/g) ?? []).length, 0);
+  assert.equal((html.match(/id="joinRoomCode"/g) ?? []).length, 0);
 });
 
 test("pre-match lobby keeps gameplay interface hidden", async () => {
@@ -124,13 +125,17 @@ test("active room screen hides lobby create and join controls", async () => {
 
   assert.match(client, /urlParams\.get\("action"\) === "create"/);
   assert.match(client, /createRoomFromUi/);
-  assert.match(client, /lobbyControls: document\.querySelector\("#lobbyControls"\)/);
   assert.match(client, /activeRoomControls: document\.querySelector\("#activeRoomControls"\)/);
-  assert.match(client, /elements\.lobbyControls\.hidden = true/);
   assert.match(client, /elements\.activeRoomControls\.hidden = false/);
   assert.match(client, /elements\.invitePanel\.hidden = false/);
+  assert.doesNotMatch(client, /createRoomButton/);
+  assert.doesNotMatch(client, /joinRoomButton/);
+  assert.doesNotMatch(client, /joinRoomCode/);
   assert.match(client, /copySpectatorLinkButton/);
   assert.match(client, /spectatorLinkFor/);
+  assert.match(client, /joinAsPlayer2Button/);
+  assert.match(client, /joinNameInput/);
+  assert.match(client, /body: \{ displayName \}/);
   assert.match(client, /Trump: \$\{suitName\(activeTrumpSuit\(state\)\)\}/);
 });
 
@@ -154,14 +159,15 @@ test("spectator invite opens read-only room view instead of taking Player 2 seat
 test("dealer choice buttons are coin-flip only and hide after selection", async () => {
   const client = await readText("src/room-client.js");
 
+  assert.match(client, /function shouldShowStartSequence/);
   assert.match(client, /playerCount === 2/);
-  assert.match(client, /state\.phase === "coin_flip"/);
+  assert.match(client, /\["coin_flip", "dealer_choice"\]\.includes\(state\.phase\)/);
   assert.match(client, /state\.actionPhase === "dealer_choice"/);
-  assert.match(client, /viewerSeat === roomView\.coinFlipWinner/);
-  assert.match(client, /!roomView\.firstDealer/);
-  assert.match(client, /elements\.coinFlipPanel\.hidden = !showCoinSequence/);
-  assert.match(client, /elements\.chooseDealerButton\.disabled = !canChoosePosition/);
-  assert.match(client, /elements\.chooseNonDealerButton\.disabled = !canChoosePosition/);
+  assert.match(client, /view\.playerReady\?\.player1 === true/);
+  assert.match(client, /view\.playerReady\?\.player2 === true/);
+  assert.match(client, /elements\.coinFlipPanel\.replaceChildren\(\)/);
+  assert.match(client, /dealerButton\.textContent = "Be Dealer"/);
+  assert.match(client, /nonDealerButton\.textContent = "Be Non-Dealer"/);
 });
 
 test("Quick Match is wired as a placeholder", async () => {
@@ -174,9 +180,13 @@ test("Quick Match is wired as a placeholder", async () => {
 test("home join room button opens room by code", async () => {
   const client = await readText("src/home-client.js");
 
+  assert.match(client, /createRoomLink\.addEventListener/);
+  assert.match(client, /requiredPlayerName\(\)/);
+  assert.match(client, /Enter your name to continue\./);
+  assert.match(client, /action=create&name=\$\{encodeURIComponent\(playerName\)\}/);
   assert.match(client, /homeJoinRoomButton\.addEventListener/);
   assert.match(client, /homeJoinRoomCode\.value\.trim\(\)\.toUpperCase\(\)/);
-  assert.match(client, /\.\/room\.html\?room=\$\{encodeURIComponent\(roomCode\)\}/);
+  assert.match(client, /\.\/room\.html\?room=\$\{encodeURIComponent\(roomCode\)\}&name=\$\{encodeURIComponent\(playerName\)\}/);
   assert.match(client, /Enter a room code/);
 });
 
@@ -329,8 +339,16 @@ test("public room invite route serves room and lets Player 2 join by invite code
 
   try {
     await waitForServer(server, port);
+    const blankCreate = await requestJson(port, "/api/rooms", {
+      method: "POST",
+      body: { displayName: "   " }
+    });
+    assert.equal(blankCreate.statusCode, 400);
+    assert.equal(blankCreate.body.error, "Enter your name to continue.");
+
     const created = await requestJson(port, "/api/rooms", {
-      method: "POST"
+      method: "POST",
+      body: { displayName: "Alice" }
     });
     const roomCode = created.body.room.roomCode;
     const invitePath = `/room.html?room=${encodeURIComponent(roomCode)}`;
@@ -338,6 +356,7 @@ test("public room invite route serves room and lets Player 2 join by invite code
     assert.equal(created.statusCode, 201);
     assert.equal(created.body.room.players.player1, true);
     assert.equal(created.body.room.players.player2, false);
+    assert.equal(created.body.room.playerNames.player1, "Alice");
     assert.equal(created.body.room.coinFlipWinner, null);
     assert.equal(invitePath.includes("/apps/euchre-table-prototype"), false);
 
@@ -345,15 +364,23 @@ test("public room invite route serves room and lets Player 2 join by invite code
     assert.equal(invitePage.statusCode, 200);
     assert.match(invitePage.body, /Private Euchre Room/);
 
+    const blankJoin = await requestJson(port, `/api/rooms/${roomCode}/join`, {
+      method: "POST",
+      body: { displayName: "" }
+    });
+    assert.equal(blankJoin.statusCode, 400);
+    assert.equal(blankJoin.body.error, "Enter your name to continue.");
+
     const joined = await requestJson(port, `/api/rooms/${roomCode}/join`, {
       method: "POST",
-      body: {}
+      body: { displayName: "Bob" }
     });
 
     assert.equal(joined.statusCode, 200);
     assert.equal(joined.body.seat, "player2");
     assert.equal(joined.body.room.viewerSeat, "player2");
     assert.equal(joined.body.room.players.player2, true);
+    assert.equal(joined.body.room.playerNames.player2, "Bob");
     assert.equal(joined.body.room.coinFlipWinner, null);
     assert.equal(joined.body.room.gameState.phase, "pregame_settings");
   } finally {

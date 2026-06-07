@@ -66,6 +66,19 @@ test("joins second player and supports reconnect by seat token", () => {
   assert.equal(rejoined.room.gameState.hands.player1.length, 0);
 });
 
+test("invite link seating gives open Player 2 seat and third visitor is spectator", () => {
+  const room = createRoom({ roomCode: "ABCDE", seatToken: "host-token" });
+  const secondBrowser = joinRoom(room, { seatToken: "guest-token" });
+
+  assert.equal(secondBrowser.seat, "player2");
+  assert.equal(secondBrowser.room.players.player2.seatToken, "guest-token");
+
+  assert.throws(() => joinRoom(secondBrowser.room, { seatToken: "third-token" }), /two seated players/);
+  const thirdView = sanitizeRoomForViewer(secondBrowser.room, "third-token");
+  assert.equal(thirdView.viewerSeat, "spectator");
+  assert.deepEqual(thirdView.gameState.viewerHand, []);
+});
+
 test("coin flip appears only after both players are seated and ready countdown completes", () => {
   let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token" });
   assert.equal(room.coinFlipWinner, null);

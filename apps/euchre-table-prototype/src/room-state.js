@@ -23,11 +23,13 @@ export function createRoom({
   roomCode = generateRoomCode(),
   seatToken = generateSeatToken(),
   modeId = "communityCompetitive",
+  displayName = "Player 1",
   coinFlipWinner = null,
   tournamentMatch = null
 } = {}) {
   const mode = GAME_MODES[modeId] ?? GAME_MODES.communityCompetitive;
   const gameState = createWaitingGameState({ mode, modeId: mode.id });
+  const name = normalizeDisplayName(displayName);
 
   return syncRoomFields({
     roomCode,
@@ -35,7 +37,8 @@ export function createRoom({
       player1: {
         seat: "player1",
         seatToken,
-        connected: true
+        connected: true,
+        displayName: name
       },
       player2: null
     },
@@ -58,7 +61,7 @@ export function createRoom({
   });
 }
 
-export function joinRoom(room, { seatToken = generateSeatToken() } = {}) {
+export function joinRoom(room, { seatToken = generateSeatToken(), displayName = "Player 2" } = {}) {
   const existingSeat = seatForToken(room, seatToken);
 
   if (existingSeat) {
@@ -70,6 +73,7 @@ export function joinRoom(room, { seatToken = generateSeatToken() } = {}) {
   }
 
   if (!room.players.player2) {
+    const name = normalizeDisplayName(displayName);
     return {
       room: syncRoomFields({
         ...room,
@@ -78,7 +82,8 @@ export function joinRoom(room, { seatToken = generateSeatToken() } = {}) {
           player2: {
             seat: "player2",
             seatToken,
-            connected: true
+            connected: true,
+            displayName: name
           }
         },
         countdownStartedAt: null,
@@ -254,6 +259,10 @@ export function sanitizeRoomForViewer(room, seatToken) {
     players: {
       player1: Boolean(safeRoom.players.player1),
       player2: Boolean(safeRoom.players.player2)
+    },
+    playerNames: {
+      player1: safeRoom.players.player1?.displayName ?? "Player 1",
+      player2: safeRoom.players.player2?.displayName ?? null
     },
     playerReady: {
       player1: Boolean(safeRoom.playerReady?.player1),
@@ -755,6 +764,14 @@ function ensurePregameOrCountdown(gameState) {
   if (!["pregame_settings", "ready_countdown"].includes(gameState.phase)) {
     throw new Error("Ready is only available before the first hand");
   }
+}
+
+function normalizeDisplayName(displayName) {
+  const name = String(displayName ?? "").trim();
+  if (!name) {
+    throw roomError(400, "Enter your name to continue.");
+  }
+  return name.slice(0, 32);
 }
 
 function removeCard(hand, card) {

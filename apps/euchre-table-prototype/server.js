@@ -65,7 +65,8 @@ async function handleApi(request, response) {
   const segments = url.pathname.split("/").filter(Boolean);
 
   if (request.method === "POST" && url.pathname === "/api/rooms") {
-    const room = createUniqueRoom();
+    const body = await readJson(request);
+    const room = createUniqueRoom({ displayName: requiredDisplayName(body.displayName) });
     rooms.set(room.roomCode, room);
     const seatToken = room.players.player1.seatToken;
 
@@ -218,7 +219,10 @@ async function handleApi(request, response) {
 
     if (request.method === "POST" && segments[3] === "join") {
       const body = await readJson(request);
-      const result = joinRoom(room, { seatToken: body.seatToken });
+      const result = joinRoom(room, {
+        seatToken: body.seatToken,
+        displayName: requiredDisplayName(body.displayName)
+      });
       const nextRoom = advanceAndSaveRoom(result.room);
       sendJson(response, 200, {
         seat: result.seat,
@@ -282,9 +286,9 @@ function publicRoutePath(pathname) {
   }[pathname] ?? pathname;
 }
 
-function createUniqueRoom() {
+function createUniqueRoom({ displayName } = {}) {
   for (let attempts = 0; attempts < 20; attempts += 1) {
-    const room = createRoom();
+    const room = createRoom({ displayName });
     if (!rooms.has(room.roomCode)) return room;
   }
 
@@ -375,6 +379,12 @@ function httpError(statusCode, message) {
   const error = new Error(message);
   error.statusCode = statusCode;
   return error;
+}
+
+function requiredDisplayName(displayName) {
+  const name = String(displayName ?? "").trim();
+  if (!name) throw httpError(400, "Enter your name to continue.");
+  return name;
 }
 
 function contentType(filePath) {

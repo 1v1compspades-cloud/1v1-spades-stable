@@ -2,12 +2,9 @@ import { cardsEqual } from "../../../packages/euchre-core/src/index.js";
 import { cardLabel, suitSymbol } from "./table-state.js";
 
 const storageKey = "euchreRoomSeat";
+const homepageSettingsKey = "euchreHomepageSettings";
 const elements = {
-  lobbyControls: document.querySelector("#lobbyControls"),
   activeRoomControls: document.querySelector("#activeRoomControls"),
-  createRoomButton: document.querySelector("#createRoomButton"),
-  joinRoomCode: document.querySelector("#joinRoomCode"),
-  joinRoomButton: document.querySelector("#joinRoomButton"),
   copyCodeButton: document.querySelector("#copyCodeButton"),
   copySpectatorLinkButton: document.querySelector("#copySpectatorLinkButton"),
   nextHandButton: document.querySelector("#nextHandButton"),
@@ -26,10 +23,9 @@ const elements = {
   invitePanel: document.querySelector("#invitePanel"),
   roomLink: document.querySelector("#roomLink"),
   waitingNotice: document.querySelector("#waitingNotice"),
+  joinNameInput: document.querySelector("#joinNameInput"),
+  joinAsPlayer2Button: document.querySelector("#joinAsPlayer2Button"),
   coinFlipPanel: document.querySelector("#coinFlipPanel"),
-  coinFlipMessage: document.querySelector("#coinFlipMessage"),
-  chooseDealerButton: document.querySelector("#chooseDealerButton"),
-  chooseNonDealerButton: document.querySelector("#chooseNonDealerButton"),
   readyButton: document.querySelector("#readyButton"),
   player1Score: document.querySelector("#player1Score"),
   player2Score: document.querySelector("#player2Score"),
@@ -59,13 +55,18 @@ let session = loadSession();
 let roomView = null;
 let pollHandle = null;
 
-elements.createRoomButton.addEventListener("click", () => {
-  createRoomFromUi();
-});
-
 async function createRoomFromUi() {
+  const displayName = currentPlayerName();
+  if (!displayName) {
+    setStatus("Enter your name to continue.");
+    return;
+  }
+
   try {
-    const result = await api("/api/rooms", { method: "POST" });
+    const result = await api("/api/rooms", {
+      method: "POST",
+      body: { displayName }
+    });
     setSession(result.room.roomCode, result.seatToken);
     setRoom(result.room, "You are Player 1. Share the room code with Player 2.");
     window.history.replaceState(null, "", `./room.html?room=${encodeURIComponent(result.room.roomCode)}`);
@@ -73,26 +74,6 @@ async function createRoomFromUi() {
     setStatus(error.message);
   }
 }
-
-elements.joinRoomButton.addEventListener("click", async () => {
-  const roomCode = elements.joinRoomCode.value.trim().toUpperCase();
-  if (!roomCode) {
-    setStatus("Enter a room code.");
-    return;
-  }
-
-  try {
-    const knownToken = session?.roomCode === roomCode ? session.seatToken : null;
-    const result = await api(`/api/rooms/${roomCode}/join`, {
-      method: "POST",
-      body: { seatToken: knownToken }
-    });
-    setSession(result.room.roomCode, result.seatToken);
-    setRoom(result.room, `You are ${seatName(result.seat)}.`);
-  } catch (error) {
-    setStatus(error.message);
-  }
-});
 
 elements.copyCodeButton.addEventListener("click", async () => {
   if (!roomView?.roomCode) return;
@@ -132,12 +113,24 @@ elements.readyButton.addEventListener("click", async () => {
   await sendAction({ type: "ready" });
 });
 
-elements.chooseDealerButton.addEventListener("click", async () => {
-  await sendAction({ type: "chooseStartingPosition", position: "dealer" });
-});
+elements.joinAsPlayer2Button.addEventListener("click", async () => {
+  if (!roomView?.roomCode) return;
+  const displayName = fallbackJoinName();
+  if (!displayName) {
+    setStatus("Enter your name to continue.");
+    return;
+  }
 
-elements.chooseNonDealerButton.addEventListener("click", async () => {
-  await sendAction({ type: "chooseStartingPosition", position: "non_dealer" });
+  try {
+    const result = await api(`/api/rooms/${roomView.roomCode}/join`, {
+      method: "POST",
+      body: { displayName }
+    });
+    setSession(result.room.roomCode, result.seatToken);
+    setRoom(result.room, `You are ${seatName(result.seat)}.`);
+  } catch (error) {
+    setStatus(error.message);
+  }
 });
 
 window.addEventListener("beforeunload", () => {
@@ -153,7 +146,6 @@ if (urlParams.get("action") === "create") {
 } else {
   const urlRoomCode = urlParams.get("room");
   if (urlRoomCode) {
-    elements.joinRoomCode.value = urlRoomCode.toUpperCase();
     if (urlParams.get("view") === "spectator") {
       viewRoomAsSpectator(urlRoomCode.toUpperCase());
     } else {
@@ -198,27 +190,32 @@ async function refreshRoom(status) {
 }
 
 async function autoJoinRoom(roomCode) {
+  const displayName = currentPlayerName();
+  if (!displayName) {
+    await viewRoomAsSpectator(roomCode, "Enter your name to continue.");
+    return;
+  }
+
   try {
     const result = await api(`/api/rooms/${roomCode}/join`, {
       method: "POST",
-      body: {}
+      body: { displayName }
     });
     setSession(result.room.roomCode, result.seatToken);
     setRoom(result.room, `You are ${seatName(result.seat)}.`);
   } catch (error) {
     try {
-      const result = await api(`/api/rooms/${roomCode}`);
-      setRoom(result.room, "Spectator View. Both player seats are already taken.");
+      await viewRoomAsSpectator(roomCode, "Spectator View. Both player seats are already taken.");
     } catch {
       setStatus(error.message);
     }
   }
 }
 
-async function viewRoomAsSpectator(roomCode) {
+async function viewRoomAsSpectator(roomCode, status = "Spectator View. Hidden hands stay private.") {
   try {
     const result = await api(`/api/rooms/${roomCode}`);
-    setRoom(result.room, "Spectator View. Hidden hands stay private.");
+    setRoom(result.room, status);
   } catch (error) {
     setStatus(error.message);
   }
@@ -259,6 +256,40 @@ function loadSession() {
   }
 }
 
+function currentPlayerName() {
+  const urlName = urlParams.get("name")?.trim();
+  if (urlName) {
+    savePlayerName(urlName);
+    return urlName;
+  }
+
+  try {
+    const settings = JSON.parse(localStorage.getItem(homepageSettingsKey));
+    return settings?.playerName?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function fallbackJoinName() {
+  const name = elements.joinNameInput.value.trim() || currentPlayerName();
+  if (name) savePlayerName(name);
+  return name || null;
+}
+
+function savePlayerName(playerName) {
+  let settings = {};
+  try {
+    settings = JSON.parse(localStorage.getItem(homepageSettingsKey)) ?? {};
+  } catch {
+    settings = {};
+  }
+  localStorage.setItem(homepageSettingsKey, JSON.stringify({
+    ...settings,
+    playerName: playerName.trim()
+  }));
+}
+
 function startPolling() {
   if (pollHandle) return;
   pollHandle = setInterval(() => {
@@ -268,14 +299,15 @@ function startPolling() {
 
 function render() {
   if (!roomView) {
-    elements.lobbyControls.hidden = false;
-    elements.activeRoomControls.hidden = true;
     elements.invitePanel.hidden = true;
     elements.coinFlipPanel.hidden = true;
+    elements.coinFlipPanel.replaceChildren();
     elements.trumpPanel.hidden = true;
     elements.nextHandButton.disabled = true;
     elements.copyCodeButton.disabled = true;
     elements.copySpectatorLinkButton.disabled = true;
+    elements.joinAsPlayer2Button.hidden = true;
+    elements.joinNameInput.hidden = true;
     elements.readyButton.disabled = true;
     return;
   }
@@ -287,7 +319,6 @@ function render() {
   const gameInterfaceActive = state.phase === "playing";
   const trumpSuit = activeTrumpSuit(state);
 
-  elements.lobbyControls.hidden = true;
   elements.activeRoomControls.hidden = false;
   elements.invitePanel.hidden = false;
   elements.roomCode.textContent = roomView.roomCode;
@@ -304,34 +335,24 @@ function render() {
   elements.waitingNotice.textContent = waitingMessage(roomView, state, playerCount);
   elements.copyCodeButton.disabled = false;
   elements.copySpectatorLinkButton.disabled = false;
+  const showJoinFallback = viewerSeat === "spectator" && !roomView.players.player2;
+  elements.joinAsPlayer2Button.hidden = !showJoinFallback;
+  elements.joinNameInput.hidden = !showJoinFallback;
   elements.coinFlipWinner.closest("div").hidden = gameInterfaceActive;
   elements.startingPositionTile.hidden = gameInterfaceActive || !roomView.startingPositionChoice;
   elements.player1Score.textContent = state.score.player1;
   elements.player2Score.textContent = state.score.player2;
   elements.targetScore.textContent = state.targetScore;
   elements.pregameTargetScore.textContent = state.targetScore;
-  elements.player1Slot.textContent = roomView.players.player1 ? readySeatLabel("player1", roomView.playerReady) : "Waiting";
-  elements.player2Slot.textContent = roomView.players.player2 ? readySeatLabel("player2", roomView.playerReady) : "Waiting";
+  elements.player1Slot.textContent = roomView.players.player1 ? readySeatLabel("player1", roomView.playerReady, roomView.playerNames) : "Waiting";
+  elements.player2Slot.textContent = roomView.players.player2 ? readySeatLabel("player2", roomView.playerReady, roomView.playerNames) : "Waiting";
   elements.kittyCount.textContent = `${state.kittyCount} cards`;
   elements.viewerTricks.textContent = viewerSeat === "spectator" ? "0 tricks" : `${state.tricksWon[viewerSeat]} tricks`;
   elements.opponentTricks.textContent = viewerSeat === "spectator" ? "0 tricks" : `${state.tricksWon[opponentSeat]} tricks`;
   elements.spectatorNotice.hidden = viewerSeat !== "spectator";
   const viewerReady = viewerSeat === "spectator" ? true : roomView.playerReady?.[viewerSeat];
-  const startSequenceActive = playerCount === 2
-    && state.phase === "coin_flip"
-    && state.actionPhase === "dealer_choice"
-    && roomView.coinFlipWinner
-    && !roomView.firstDealer;
-  const canChoosePosition = startSequenceActive
-    && viewerSeat === roomView.coinFlipWinner
-    && !roomView.startingPositionChoice;
-  const showCoinSequence = startSequenceActive;
-  elements.coinFlipPanel.hidden = !showCoinSequence;
-  elements.coinFlipMessage.textContent = showCoinSequence
-    ? `${seatName(roomView.coinFlipWinner)} won the coin flip. ${canChoosePosition ? "Choose the starting position." : "Waiting for starting position choice."}`
-    : "";
-  elements.chooseDealerButton.disabled = !canChoosePosition;
-  elements.chooseNonDealerButton.disabled = !canChoosePosition;
+  const showStartSequence = shouldShowStartSequence(roomView, state, playerCount);
+  renderStartSequenceModal(showStartSequence, viewerSeat);
   elements.readyButton.hidden = !["pregame_settings", "ready_countdown"].includes(state.phase) || viewerSeat === "spectator";
   elements.readyButton.disabled = Boolean(viewerReady) || viewerSeat === "spectator";
   elements.readyButton.textContent = viewerReady ? "Ready Set" : "Ready";
@@ -347,6 +368,56 @@ function render() {
   renderOpponentHand(state, viewerSeat, opponentSeat);
   renderCurrentTrick(state);
   renderTrickHistory(state);
+}
+
+function shouldShowStartSequence(view, state, playerCount) {
+  return playerCount === 2
+    && view.playerReady?.player1 === true
+    && view.playerReady?.player2 === true
+    && ["coin_flip", "dealer_choice"].includes(state.phase)
+    && state.actionPhase === "dealer_choice"
+    && Boolean(view.coinFlipWinner)
+    && !view.firstDealer;
+}
+
+function renderStartSequenceModal(showStartSequence, viewerSeat) {
+  elements.coinFlipPanel.replaceChildren();
+
+  if (!showStartSequence) {
+    elements.coinFlipPanel.hidden = true;
+    return;
+  }
+
+  const canChoosePosition = viewerSeat === roomView.coinFlipWinner && !roomView.startingPositionChoice;
+  const card = document.createElement("div");
+  card.className = "coin-card";
+  card.innerHTML = `
+    <p class="eyebrow">Start Sequence</p>
+    <h2>Coin Flip</h2>
+    <p>${seatName(roomView.coinFlipWinner)} won the coin flip. ${canChoosePosition ? "Choose the starting position." : "Waiting for starting position choice."}</p>
+  `;
+
+  if (canChoosePosition) {
+    const actions = document.createElement("div");
+    actions.className = "coin-actions";
+
+    const dealerButton = document.createElement("button");
+    dealerButton.type = "button";
+    dealerButton.textContent = "Be Dealer";
+    dealerButton.addEventListener("click", () => sendAction({ type: "chooseStartingPosition", position: "dealer" }));
+
+    const nonDealerButton = document.createElement("button");
+    nonDealerButton.type = "button";
+    nonDealerButton.className = "secondary";
+    nonDealerButton.textContent = "Be Non-Dealer";
+    nonDealerButton.addEventListener("click", () => sendAction({ type: "chooseStartingPosition", position: "non_dealer" }));
+
+    actions.append(dealerButton, nonDealerButton);
+    card.append(actions);
+  }
+
+  elements.coinFlipPanel.append(card);
+  elements.coinFlipPanel.hidden = false;
 }
 
 function renderStatus() {
@@ -526,8 +597,8 @@ function readyLabel(ready = {}) {
   return `P1 ${ready.player1 ? "Ready" : "Not Ready"} / P2 ${ready.player2 ? "Ready" : "Not Ready"}`;
 }
 
-function readySeatLabel(seat, ready = {}) {
-  return `${seatName(seat)} ${ready[seat] ? "Ready" : "Not Ready"}`;
+function readySeatLabel(seat, ready = {}, names = {}) {
+  return `${names[seat] ?? seatName(seat)} ${ready[seat] ? "Ready" : "Not Ready"}`;
 }
 
 function startingPositionLabel(choice) {

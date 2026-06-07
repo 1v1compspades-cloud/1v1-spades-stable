@@ -13,14 +13,7 @@
           <p class="eyebrow">Play a Friend</p>
           <h1>Private Euchre Room</h1>
         </div>
-        <div id="lobbyControls" class="controls">
-          <a class="button-link secondary-link" href="./home.html">Home</a>
-          <button id="createRoomButton" type="button">Create Room</button>
-          <label for="joinRoomCode">Room Code</label>
-          <input id="joinRoomCode" class="room-input" maxlength="8" autocomplete="off" placeholder="ABCDE">
-          <button id="joinRoomButton" type="button">Join Room</button>
-        </div>
-        <div id="activeRoomControls" class="controls" hidden>
+        <div id="activeRoomControls" class="controls">
           <a class="button-link secondary-link" href="./home.html">Home</a>
         </div>
       </header>
@@ -59,7 +52,7 @@
           <strong id="readyStatus">P1 No / P2 No</strong>
         </div>
         <div>
-          <span>Coin Flip</span>
+          <span>Start</span>
           <strong id="coinFlipWinner">None</strong>
         </div>
         <div id="startingPositionTile">
@@ -84,20 +77,12 @@
           <strong id="roomLink">Create or join a room.</strong>
         </div>
         <p id="waitingNotice">Waiting for room setup.</p>
+        <input id="joinNameInput" class="name-input" type="text" autocomplete="nickname" placeholder="Your name" hidden>
+        <button id="joinAsPlayer2Button" class="secondary" type="button" hidden>Join as Player 2</button>
         <button id="readyButton" type="button" disabled>Ready</button>
       </section>
 
-      <section id="coinFlipPanel" class="coin-modal" hidden>
-        <div class="coin-card">
-          <p class="eyebrow">Start Sequence</p>
-          <h2>Coin Flip</h2>
-          <p id="coinFlipMessage">Waiting for both players to ready up.</p>
-          <div class="coin-actions">
-            <button id="chooseDealerButton" type="button">Be Dealer</button>
-            <button id="chooseNonDealerButton" class="secondary" type="button">Be Non-Dealer</button>
-          </div>
-        </div>
-      </section>
+      <section id="coinFlipPanel" class="coin-modal" hidden></section>
 
       <section id="pregamePanel" class="panel pregame-panel">
         <div class="panel-heading">
@@ -119,7 +104,7 @@
           </div>
           <div>
             <span>Rules Summary</span>
-            <strong>Coin flip, ready-up, countdown, then deal.</strong>
+            <strong>Ready-up, countdown, start choice, then deal.</strong>
           </div>
           <div>
             <span>Player 1 Slot</span>

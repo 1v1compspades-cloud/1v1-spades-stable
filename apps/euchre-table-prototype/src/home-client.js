@@ -2,6 +2,7 @@ const quickMatchButton = document.querySelector("#quickMatchButton");
 const quickMatchStatus = document.querySelector("#quickMatchStatus");
 const homeJoinRoomCode = document.querySelector("#homeJoinRoomCode");
 const homeJoinRoomButton = document.querySelector("#homeJoinRoomButton");
+const createRoomLink = document.querySelector("#createRoomLink");
 const playerNameInput = document.querySelector("#playerNameInput");
 const modeSelect = document.querySelector("#modeSelect");
 const scoreLimitSelect = document.querySelector("#scoreLimitSelect");
@@ -39,8 +40,19 @@ quickMatchButton.addEventListener("click", async () => {
   }
 });
 
-homeJoinRoomButton.addEventListener("click", () => {
+createRoomLink.addEventListener("click", (event) => {
+  event.preventDefault();
+  const playerName = requiredPlayerName();
+  if (!playerName) return;
+
   saveSettings();
+  window.location.href = `./room.html?action=create&name=${encodeURIComponent(playerName)}`;
+});
+
+homeJoinRoomButton.addEventListener("click", () => {
+  const playerName = requiredPlayerName();
+  if (!playerName) return;
+
   const roomCode = homeJoinRoomCode.value.trim().toUpperCase();
 
   if (!roomCode) {
@@ -48,7 +60,8 @@ homeJoinRoomButton.addEventListener("click", () => {
     return;
   }
 
-  window.location.href = `./room.html?room=${encodeURIComponent(roomCode)}`;
+  saveSettings();
+  window.location.href = `./room.html?room=${encodeURIComponent(roomCode)}&name=${encodeURIComponent(playerName)}`;
 });
 
 playerNameInput.addEventListener("input", saveSettings);
@@ -83,6 +96,15 @@ function saveSettings() {
     targetScore: scoreLimitSelect.value,
     stickTheDealer: stickDealerToggle.checked
   }));
+}
+
+function requiredPlayerName() {
+  const playerName = playerNameInput.value.trim();
+  if (!playerName) {
+    quickMatchStatus.textContent = "Enter your name to continue.";
+    return null;
+  }
+  return playerName;
 }
 
 function loadSettings() {
