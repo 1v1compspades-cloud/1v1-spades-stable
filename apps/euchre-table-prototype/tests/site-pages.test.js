@@ -48,6 +48,9 @@ test("rules screen includes the core Euchre rule copy", async () => {
   assert.match(html, /left bower/);
   assert.match(html, /counts as trump/);
   assert.match(html, /led immediately/);
+  assert.match(html, /coin flip determines choice/);
+  assert.match(html, /first dealer or first non-dealer/);
+  assert.match(html, /Dealer rotates every hand thereafter/);
   assert.match(html, /must follow/);
   assert.match(html, /First to 10/);
   assert.match(html, /Stick the Dealer is ON/);
@@ -63,6 +66,13 @@ test("room screen exposes create, join, share, and spectator labels", async () =
   assert.match(html, /Join Room/);
   assert.match(html, /Copy Code/);
   assert.match(html, /Room Link/);
+  assert.match(html, /id="readyButton"/);
+  assert.match(html, /id="readyStatus"/);
+  assert.match(html, /id="coinFlipWinner"/);
+  assert.match(html, /id="startingPosition"/);
+  assert.match(html, /id="currentDealer"/);
+  assert.match(html, /Be Dealer/);
+  assert.match(html, /Be Non-Dealer/);
   assert.match(html, /Spectator view is read-only/);
 });
 

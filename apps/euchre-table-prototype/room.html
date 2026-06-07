@@ -52,6 +52,22 @@
           <strong id="matchStatus">Casual</strong>
         </div>
         <div>
+          <span>Ready</span>
+          <strong id="readyStatus">P1 No / P2 No</strong>
+        </div>
+        <div>
+          <span>Coin Flip</span>
+          <strong id="coinFlipWinner">None</strong>
+        </div>
+        <div>
+          <span>Start Choice</span>
+          <strong id="startingPosition">None</strong>
+        </div>
+        <div>
+          <span>Dealer</span>
+          <strong id="currentDealer">None</strong>
+        </div>
+        <div>
           <button id="copyCodeButton" class="secondary" type="button" disabled>Copy Code</button>
         </div>
       </section>
@@ -62,6 +78,12 @@
           <strong id="roomLink">Create or join a room.</strong>
         </div>
         <p id="waitingNotice">Waiting for room setup.</p>
+        <div id="coinFlipPanel" class="ready-panel" hidden>
+          <span>Coin flip winner chooses the first position.</span>
+          <button id="chooseDealerButton" type="button">Be Dealer</button>
+          <button id="chooseNonDealerButton" class="secondary" type="button">Be Non-Dealer</button>
+        </div>
+        <button id="readyButton" type="button" disabled>Ready</button>
       </section>
 
       <section class="scoreband" aria-label="Match score">

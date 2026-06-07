@@ -15,8 +15,16 @@ const elements = {
   currentTurn: document.querySelector("#currentTurn"),
   trumpStatus: document.querySelector("#trumpStatus"),
   matchStatus: document.querySelector("#matchStatus"),
+  readyStatus: document.querySelector("#readyStatus"),
+  coinFlipWinner: document.querySelector("#coinFlipWinner"),
+  startingPosition: document.querySelector("#startingPosition"),
+  currentDealer: document.querySelector("#currentDealer"),
   roomLink: document.querySelector("#roomLink"),
   waitingNotice: document.querySelector("#waitingNotice"),
+  coinFlipPanel: document.querySelector("#coinFlipPanel"),
+  chooseDealerButton: document.querySelector("#chooseDealerButton"),
+  chooseNonDealerButton: document.querySelector("#chooseNonDealerButton"),
+  readyButton: document.querySelector("#readyButton"),
   player1Score: document.querySelector("#player1Score"),
   player2Score: document.querySelector("#player2Score"),
   targetScore: document.querySelector("#targetScore"),
@@ -88,6 +96,18 @@ elements.passButton.addEventListener("click", async () => {
 
 elements.nextHandButton.addEventListener("click", async () => {
   await sendAction({ type: "startNextHand" });
+});
+
+elements.readyButton.addEventListener("click", async () => {
+  await sendAction({ type: "ready" });
+});
+
+elements.chooseDealerButton.addEventListener("click", async () => {
+  await sendAction({ type: "chooseStartingPosition", position: "dealer" });
+});
+
+elements.chooseNonDealerButton.addEventListener("click", async () => {
+  await sendAction({ type: "chooseStartingPosition", position: "non_dealer" });
 });
 
 window.addEventListener("beforeunload", () => {
@@ -183,8 +203,9 @@ function startPolling() {
 
 function render() {
   if (!roomView) {
-    elements.trumpPanel.hidden = true;
-    elements.nextHandButton.disabled = true;
+  elements.trumpPanel.hidden = true;
+  elements.nextHandButton.disabled = true;
+  elements.readyButton.disabled = true;
     return;
   }
 
@@ -199,6 +220,10 @@ function render() {
   elements.currentTurn.textContent = seatName(state.currentTurn);
   elements.trumpStatus.textContent = suitName(state.trumpSuit);
   elements.matchStatus.textContent = matchStatusLabel(roomView.tournamentMatch);
+  elements.readyStatus.textContent = readyLabel(roomView.playerReady);
+  elements.coinFlipWinner.textContent = seatName(roomView.coinFlipWinner);
+  elements.startingPosition.textContent = startingPositionLabel(roomView.startingPositionChoice);
+  elements.currentDealer.textContent = seatName(state.currentDealer);
   elements.roomLink.textContent = roomLinkFor(roomView.roomCode);
   elements.waitingNotice.textContent = waitingMessage(roomView, state, playerCount);
   elements.copyCodeButton.disabled = false;
@@ -209,7 +234,18 @@ function render() {
   elements.viewerTricks.textContent = viewerSeat === "spectator" ? "0 tricks" : `${state.tricksWon[viewerSeat]} tricks`;
   elements.opponentTricks.textContent = viewerSeat === "spectator" ? "0 tricks" : `${state.tricksWon[opponentSeat]} tricks`;
   elements.spectatorNotice.hidden = viewerSeat !== "spectator";
-  elements.nextHandButton.disabled = state.phase !== "handComplete" || viewerSeat === "spectator";
+  const viewerReady = viewerSeat === "spectator" ? true : roomView.playerReady?.[viewerSeat];
+  const canChoosePosition = state.phase === "waiting_for_players"
+    && viewerSeat === roomView.coinFlipWinner
+    && !roomView.firstDealer;
+  elements.coinFlipPanel.hidden = !canChoosePosition;
+  elements.chooseDealerButton.disabled = !canChoosePosition;
+  elements.chooseNonDealerButton.disabled = !canChoosePosition;
+  elements.readyButton.hidden = !["waiting_for_players", "ready_countdown"].includes(state.phase) || viewerSeat === "spectator";
+  elements.readyButton.disabled = Boolean(viewerReady) || viewerSeat === "spectator" || !roomView.firstDealer;
+  elements.readyButton.textContent = viewerReady ? "Ready Set" : "Ready";
+  elements.nextHandButton.hidden = true;
+  elements.nextHandButton.disabled = true;
 
   renderStatus();
   renderUpcard(state.upcard);
@@ -226,7 +262,15 @@ function renderStatus() {
 
   if (state.winner) {
     setStatus(`${seatName(state.winner)} wins the match.`);
-  } else if (state.phase === "selectingTrump") {
+  } else if (state.phase === "waiting_for_players") {
+    if (!roomView.firstDealer) {
+      setStatus(`${seatName(roomView.coinFlipWinner)} won the coin flip and chooses dealer or non-dealer.`);
+    } else {
+      setStatus(`Waiting for both players. ${readyLabel(roomView.playerReady)}.`);
+    }
+  } else if (state.phase === "ready_countdown") {
+    setStatus(`Game starts in ${secondsUntil(state.countdownEndsAt)}.`);
+  } else if (state.actionPhase === "selectingTrump") {
     if (roomView.viewerSeat === "spectator") {
       setStatus("Spectator view. This room is read-only for you.");
     } else if (playerCount < 2 && roomView.viewerSeat === "player1") {
@@ -236,17 +280,17 @@ function renderStatus() {
     } else {
       setStatus(`${seatName(state.currentTurn)} to choose or pass trump.`);
     }
-  } else if (state.phase === "playing") {
+  } else if (state.actionPhase === "playing") {
     setStatus(`${seatName(state.currentTurn)} to play. Trump is ${suitName(state.trumpSuit)}.`);
-  } else if (state.phase === "handComplete") {
+  } else if (state.phase === "hand_score") {
     const points = state.handScore.points;
-    setStatus(`Hand complete. Player 1 +${points.player1}, Player 2 +${points.player2}.`);
+    setStatus(`Hand complete. Player 1 +${points.player1}, Player 2 +${points.player2}. Next round starts in ${secondsUntil(state.nextHandStartsAt)}.`);
   }
 }
 
 function renderTrumpControls(state, viewerSeat) {
-  const canAct = state.phase === "selectingTrump" && viewerSeat === state.currentTurn;
-  elements.trumpPanel.hidden = state.phase !== "selectingTrump";
+  const canAct = state.actionPhase === "selectingTrump" && viewerSeat === state.currentTurn;
+  elements.trumpPanel.hidden = state.actionPhase !== "selectingTrump";
   elements.trumpButtons.replaceChildren();
   elements.passButton.disabled = !canAct || state.trumpState.forcedDealerChoice;
   elements.trumpHelp.textContent = canAct
@@ -296,7 +340,7 @@ function renderOpponentHand(state, viewerSeat, opponentSeat) {
 
 function renderUpcard(card) {
   elements.upcard.className = `upcard ${card && isRed(card.suit) ? "red" : ""}`;
-  elements.upcard.innerHTML = card ? cardMarkup(card) : "No room";
+  elements.upcard.innerHTML = card ? cardMarkup(card) : "No cards dealt";
 }
 
 function renderCurrentTrick(state) {
@@ -355,18 +399,49 @@ function waitingMessage(view, state, playerCount) {
   }
 
   if (playerCount < 2) {
-    return "Waiting for Player 2.";
+    return "Waiting for both players.";
   }
 
-  if (state.phase === "selectingTrump") {
+  if (state.phase === "waiting_for_players") {
+    if (!view.firstDealer) {
+      return `${seatName(view.coinFlipWinner)} won the coin flip. Waiting for starting position choice.`;
+    }
+    return `${readyLabel(view.playerReady)}. Waiting for both players to ready up.`;
+  }
+
+  if (state.phase === "ready_countdown") {
+    return `Game starts in ${secondsUntil(state.countdownEndsAt)}.`;
+  }
+
+  if (state.actionPhase === "selectingTrump") {
     return `${seatName(state.currentTurn)} is choosing trump.`;
   }
 
-  if (state.phase === "playing") {
+  if (state.actionPhase === "playing") {
     return `${seatName(state.currentTurn)} plays next.`;
   }
 
+  if (state.phase === "hand_score") {
+    return `Next round starts in ${secondsUntil(state.nextHandStartsAt)}.`;
+  }
+
   return "Room ready.";
+}
+
+function readyLabel(ready = {}) {
+  return `P1 ${ready.player1 ? "Ready" : "Not Ready"} / P2 ${ready.player2 ? "Ready" : "Not Ready"}`;
+}
+
+function startingPositionLabel(choice) {
+  return {
+    dealer: "Dealer",
+    non_dealer: "Non-Dealer"
+  }[choice] ?? "None";
+}
+
+function secondsUntil(isoTime) {
+  if (!isoTime) return 0;
+  return Math.max(0, Math.ceil((Date.parse(isoTime) - Date.now()) / 1000));
 }
 
 function matchStatusLabel(match) {

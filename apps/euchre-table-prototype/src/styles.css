@@ -231,6 +231,17 @@ button:disabled {
   font-weight: 800;
 }
 
+.ready-panel {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.ready-panel span {
+  flex: 1 1 180px;
+}
+
 .scoreband div {
   padding: 14px;
   text-align: center;

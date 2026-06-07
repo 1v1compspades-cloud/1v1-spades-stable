@@ -16,24 +16,18 @@ import {
 } from "../../../packages/euchre-core/src/index.js";
 
 const ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const READY_COUNTDOWN_MS = 5000;
+const NEXT_HAND_DELAY_MS = 5000;
 
 export function createRoom({
   roomCode = generateRoomCode(),
   seatToken = generateSeatToken(),
   modeId = "communityCompetitive",
-  deck = shuffleDeck(createDeck()),
+  coinFlipWinner = flipCoinWinner(),
   tournamentMatch = null
 } = {}) {
   const mode = GAME_MODES[modeId] ?? GAME_MODES.communityCompetitive;
-  const gameState = startHand({
-    mode,
-    modeId: mode.id,
-    score: { player1: 0, player2: 0 },
-    dealer: "player2",
-    handNumber: 0,
-    handHistory: [],
-    winner: null
-  }, { deck });
+  const gameState = createWaitingGameState({ mode, modeId: mode.id });
 
   return syncRoomFields({
     roomCode,
@@ -45,6 +39,16 @@ export function createRoom({
       },
       player2: null
     },
+    playerReady: {
+      player1: false,
+      player2: false
+    },
+    coinFlipWinner,
+    startingPositionChoice: null,
+    firstDealer: null,
+    countdownStartedAt: null,
+    countdownEndsAt: null,
+    nextHandStartsAt: null,
     tournamentMatch,
     gameState,
     createdAt: new Date().toISOString(),
@@ -75,6 +79,8 @@ export function joinRoom(room, { seatToken = generateSeatToken() } = {}) {
             connected: true
           }
         },
+        countdownStartedAt: null,
+        countdownEndsAt: null,
         updatedAt: new Date().toISOString()
       }),
       seat: "player2",
@@ -89,7 +95,7 @@ export function getViewerSeat(room, seatToken) {
   return seatForToken(room, seatToken) ?? "spectator";
 }
 
-export function applyRoomAction(room, { seatToken, type, suit, card, deck }) {
+export function applyRoomAction(room, { seatToken, type, suit, position, card, deck }) {
   const seat = seatForToken(room, seatToken);
 
   if (!seat) {
@@ -97,6 +103,47 @@ export function applyRoomAction(room, { seatToken, type, suit, card, deck }) {
   }
 
   const gameState = room.gameState;
+
+  if (type === "ready") {
+    ensureWaitingOrCountdown(gameState);
+    ensureStartingDealerChosen(room);
+
+    const nextReady = {
+      ...room.playerReady,
+      [seat]: true
+    };
+
+    return maybeStartReadyCountdown(syncRoomFields({
+      ...room,
+      playerReady: nextReady,
+      updatedAt: new Date().toISOString()
+    }));
+  }
+
+  if (type === "chooseStartingPosition") {
+    ensureWaitingOrCountdown(gameState);
+
+    if (seat !== room.coinFlipWinner) {
+      throw roomError(403, "Only the coin flip winner chooses the starting position");
+    }
+
+    if (!["dealer", "non_dealer"].includes(position)) {
+      throw new Error("Starting position must be dealer or non_dealer");
+    }
+
+    const firstDealer = position === "dealer" ? seat : otherPlayer(seat);
+
+    return syncRoomFields({
+      ...room,
+      startingPositionChoice: position,
+      firstDealer,
+      gameState: {
+        ...gameState,
+        dealer: firstDealer
+      },
+      updatedAt: new Date().toISOString()
+    });
+  }
 
   if (type === "chooseTrump") {
     ensureTurn(room, seat);
@@ -107,11 +154,13 @@ export function applyRoomAction(room, { seatToken, type, suit, card, deck }) {
     }
 
     const trumpState = chooseTrump(gameState.trumpState, seat, suit);
+    const nextState = applyDealerPickupIfNeeded(gameState, trumpState);
     return syncRoomFields({
       ...room,
       gameState: {
-        ...gameState,
+        ...nextState,
         phase: "playing",
+        actionPhase: "playing",
         trumpState,
         trumpSuit: trumpState.trumpSuit,
         maker: trumpState.maker,
@@ -165,7 +214,7 @@ export function applyRoomAction(room, { seatToken, type, suit, card, deck }) {
   }
 
   if (type === "startNextHand") {
-    if (!["handComplete", "matchComplete"].includes(gameState.phase)) {
+    if (!["hand_score", "match_complete"].includes(gameState.phase)) {
       throw new Error("Current hand is not complete");
     }
 
@@ -195,17 +244,30 @@ export function sanitizeRoomForViewer(room, seatToken) {
       player1: Boolean(room.players.player1),
       player2: Boolean(room.players.player2)
     },
+    playerReady: {
+      player1: Boolean(room.playerReady?.player1),
+      player2: Boolean(room.playerReady?.player2)
+    },
+    coinFlipWinner: room.coinFlipWinner,
+    startingPositionChoice: room.startingPositionChoice,
+    firstDealer: room.firstDealer,
+    countdownStartedAt: room.countdownStartedAt,
+    countdownEndsAt: room.countdownEndsAt,
+    nextHandStartsAt: room.nextHandStartsAt,
     tournamentMatch: room.tournamentMatch
       ? sanitizeTournamentMatch(room.tournamentMatch, state)
       : null,
     gameState: {
       phase: state.phase,
+      actionPhase: state.actionPhase,
       modeId: state.modeId,
       score: state.score,
       targetScore: state.mode.targetScore,
       winner: state.winner,
       currentTurn: state.currentTurn,
       dealer: state.dealer,
+      currentDealer: state.dealer,
+      handNumber: state.handNumber,
       trumpSuit: state.trumpSuit,
       maker: state.maker,
       trumpState: sanitizeTrumpState(state.trumpState),
@@ -216,7 +278,7 @@ export function sanitizeRoomForViewer(room, seatToken) {
         player1: state.hands.player1.length,
         player2: state.hands.player2.length
       },
-      playableCards: viewerSeat === state.currentTurn && state.phase === "playing"
+      playableCards: viewerSeat === state.currentTurn && state.actionPhase === "playing" && state.trumpSuit
         ? getPlayableCards(viewerHand, state.currentTrick[0]?.card ?? null, state.trumpSuit)
         : [],
       currentTrick: state.currentTrick,
@@ -224,7 +286,9 @@ export function sanitizeRoomForViewer(room, seatToken) {
       tricksWon: state.tricksWon,
       handScore: state.handScore,
       handHistory: state.handHistory,
-      availableTrumpSuits: state.phase === "selectingTrump" && viewerSeat === state.currentTurn
+      countdownEndsAt: room.countdownEndsAt,
+      nextHandStartsAt: room.nextHandStartsAt,
+      availableTrumpSuits: state.actionPhase === "selectingTrump" && viewerSeat === state.currentTurn
         ? availableTrumpSuits(state.trumpState)
         : []
     },
@@ -235,6 +299,47 @@ export function sanitizeRoomForViewer(room, seatToken) {
         }
       : null
   };
+}
+
+export function advanceRoomClock(room, { now = Date.now(), deck } = {}) {
+  if (!bothPlayersConnected(room)) {
+    if (room.gameState.phase === "ready_countdown") {
+      return syncRoomFields({
+        ...room,
+        countdownStartedAt: null,
+        countdownEndsAt: null,
+        gameState: {
+          ...room.gameState,
+          phase: "waiting_for_players",
+          actionPhase: "waiting_for_players",
+          currentTurn: null
+        },
+        updatedAt: new Date().toISOString()
+      });
+    }
+    return room;
+  }
+
+  if (room.gameState.phase === "ready_countdown" && room.countdownEndsAt && now >= Date.parse(room.countdownEndsAt)) {
+    return syncRoomFields({
+      ...room,
+      countdownStartedAt: null,
+      countdownEndsAt: null,
+      gameState: startHand(room.gameState, { deck }),
+      updatedAt: new Date().toISOString()
+    });
+  }
+
+  if (room.gameState.phase === "hand_score" && !room.gameState.winner && room.nextHandStartsAt && now >= Date.parse(room.nextHandStartsAt)) {
+    return syncRoomFields({
+      ...room,
+      nextHandStartsAt: null,
+      gameState: startHand(room.gameState, { deck }),
+      updatedAt: new Date().toISOString()
+    });
+  }
+
+  return room;
 }
 
 export function noRestrictedFields(value, restrictedTerms = []) {
@@ -304,7 +409,8 @@ function startHand(previousState, { deck = shuffleDeck(createDeck()) } = {}) {
   return {
     modeId: previousState.modeId,
     mode: previousState.mode,
-    phase: "selectingTrump",
+    phase: "playing",
+    actionPhase: "selectingTrump",
     score: previousState.score,
     winner: getMatchWinner(previousState.score, previousState.mode.targetScore),
     dealer,
@@ -325,6 +431,35 @@ function startHand(previousState, { deck = shuffleDeck(createDeck()) } = {}) {
     tricksWon: { player1: 0, player2: 0 },
     handScore: null,
     handHistory: previousState.handHistory
+  };
+}
+
+function createWaitingGameState({ mode, modeId }) {
+  return {
+    modeId,
+    mode,
+    phase: "waiting_for_players",
+    actionPhase: "waiting_for_players",
+    score: { player1: 0, player2: 0 },
+    winner: null,
+    dealer: null,
+    handNumber: 0,
+    hands: {
+      player1: [],
+      player2: []
+    },
+    kitty: [],
+    upcard: null,
+    trumpState: null,
+    trumpSuit: null,
+    maker: null,
+    leader: null,
+    currentTurn: null,
+    currentTrick: [],
+    completedTricks: [],
+    tricksWon: { player1: 0, player2: 0 },
+    handScore: null,
+    handHistory: []
   };
 }
 
@@ -395,9 +530,11 @@ function playCardForRoom(room, player, card) {
         tricksWon,
         handScore,
         handHistory: [...state.handHistory, handSummary],
-        phase: winner ? "matchComplete" : "handComplete",
+        phase: winner ? "match_complete" : "hand_score",
+        actionPhase: winner ? "match_complete" : "hand_score",
         currentTurn: null
       },
+      nextHandStartsAt: winner ? null : new Date(Date.now() + NEXT_HAND_DELAY_MS).toISOString(),
       updatedAt: new Date().toISOString()
     });
   }
@@ -417,6 +554,32 @@ function playCardForRoom(room, player, card) {
   });
 }
 
+function applyDealerPickupIfNeeded(state, trumpState) {
+  if (trumpState.round !== 1 || trumpState.trumpSuit !== trumpState.upcardSuit) {
+    return state;
+  }
+
+  const dealer = trumpState.dealer;
+  const dealerHand = state.hands[dealer];
+  const pickupHand = [...dealerHand, state.upcard];
+  const discardIndex = 0;
+  const discarded = pickupHand[discardIndex];
+
+  return {
+    ...state,
+    hands: {
+      ...state.hands,
+      [dealer]: pickupHand.filter((_, index) => index !== discardIndex)
+    },
+    kitty: state.kitty.filter((card) => !cardsEqual(card, state.upcard)),
+    dealerPickup: {
+      dealer,
+      upcard: state.upcard,
+      discarded
+    }
+  };
+}
+
 function syncRoomFields(room) {
   return {
     ...room,
@@ -429,10 +592,55 @@ function syncRoomFields(room) {
       : null,
     currentTurn: room.gameState.currentTurn,
     dealer: room.gameState.dealer,
+    currentDealer: room.gameState.dealer,
     trumpState: room.gameState.trumpState,
     score: room.gameState.score,
     handHistory: room.gameState.handHistory
   };
+}
+
+function maybeStartReadyCountdown(room) {
+  if (!bothPlayersConnected(room) || !bothPlayersReady(room) || !room.firstDealer) {
+    return syncRoomFields({
+      ...room,
+      countdownStartedAt: null,
+      countdownEndsAt: null,
+      gameState: {
+        ...room.gameState,
+        phase: "waiting_for_players",
+        actionPhase: "waiting_for_players"
+      }
+    });
+  }
+
+  if (room.countdownEndsAt) return room;
+
+  const startedAt = new Date();
+  return syncRoomFields({
+    ...room,
+    countdownStartedAt: startedAt.toISOString(),
+    countdownEndsAt: new Date(startedAt.getTime() + READY_COUNTDOWN_MS).toISOString(),
+    gameState: {
+      ...room.gameState,
+      phase: "ready_countdown",
+      actionPhase: "ready_countdown",
+      currentTurn: null
+    }
+  });
+}
+
+function bothPlayersConnected(room) {
+  return Boolean(room.players.player1?.connected && room.players.player2?.connected);
+}
+
+function bothPlayersReady(room) {
+  return Boolean(room.playerReady?.player1 && room.playerReady?.player2);
+}
+
+function ensureStartingDealerChosen(room) {
+  if (!room.firstDealer) {
+    throw new Error("Coin flip winner must choose dealer or non-dealer first");
+  }
 }
 
 function sanitizeTournamentMatch(match, state) {
@@ -484,8 +692,14 @@ function ensureTurn(room, seat) {
 }
 
 function ensurePhase(gameState, phase) {
-  if (gameState.phase !== phase) {
+  if ((gameState.actionPhase ?? gameState.phase) !== phase) {
     throw new Error(`Expected phase ${phase}`);
+  }
+}
+
+function ensureWaitingOrCountdown(gameState) {
+  if (!["waiting_for_players", "ready_countdown"].includes(gameState.phase)) {
+    throw new Error("Ready is only available before the first hand");
   }
 }
 
@@ -499,6 +713,20 @@ function removeCard(hand, card) {
 }
 
 function sanitizeTrumpState(trumpState) {
+  if (!trumpState) {
+    return {
+      dealer: null,
+      upcardSuit: null,
+      round: 1,
+      passes: [],
+      trumpSuit: null,
+      maker: null,
+      forcedDealerChoice: false,
+      redealRequired: false,
+      complete: false
+    };
+  }
+
   return {
     dealer: trumpState.dealer,
     upcardSuit: trumpState.upcardSuit,
@@ -531,4 +759,8 @@ function roomError(statusCode, message) {
   const error = new Error(message);
   error.statusCode = statusCode;
   return error;
+}
+
+function flipCoinWinner() {
+  return Math.random() < 0.5 ? "player1" : "player2";
 }

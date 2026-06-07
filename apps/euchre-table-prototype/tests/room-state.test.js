@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  advanceRoomClock,
   applyRoomAction,
   createRoom,
   joinRoom,
@@ -35,17 +36,23 @@ const fixedDeck = [
   { rank: "10", suit: "spades" }
 ];
 
-test("creates a room and seats host as Player 1", () => {
-  const room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", deck: fixedDeck });
+test("creates a room, seats host as Player 1, and records coin flip winner", () => {
+  const room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", coinFlipWinner: "player1" });
 
   assert.equal(room.roomCode, "ABCDE");
   assert.equal(room.players.player1.seatToken, "host-token");
   assert.equal(room.players.player2, null);
-  assert.equal(room.currentTurn, "player1");
+  assert.equal(room.coinFlipWinner, "player1");
+  assert.equal(room.firstDealer, null);
+  assert.equal(room.gameState.dealer, null);
+  assert.equal(room.currentTurn, null);
+  assert.equal(room.gameState.phase, "waiting_for_players");
+  assert.deepEqual(room.gameState.hands.player1, []);
+  assert.deepEqual(room.gameState.hands.player2, []);
 });
 
 test("joins second player and supports reconnect by seat token", () => {
-  const room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", deck: fixedDeck });
+  const room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", coinFlipWinner: "player1" });
   const joined = joinRoom(room, { seatToken: "guest-token" });
 
   assert.equal(joined.seat, "player2");
@@ -54,6 +61,155 @@ test("joins second player and supports reconnect by seat token", () => {
   const rejoined = joinRoom(joined.room, { seatToken: "guest-token" });
   assert.equal(rejoined.seat, "player2");
   assert.equal(rejoined.room.players.player2.seatToken, "guest-token");
+  assert.equal(rejoined.room.gameState.phase, "waiting_for_players");
+  assert.equal(rejoined.room.gameState.hands.player1.length, 0);
+});
+
+test("coin flip winner receives choice and assigns first dealer", () => {
+  let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", coinFlipWinner: "player1" });
+  room = joinRoom(room, { seatToken: "guest-token" }).room;
+
+  assert.throws(() => applyRoomAction(room, {
+    seatToken: "guest-token",
+    type: "chooseStartingPosition",
+    position: "dealer"
+  }), /Only the coin flip winner/);
+
+  room = applyRoomAction(room, {
+    seatToken: "host-token",
+    type: "chooseStartingPosition",
+    position: "dealer"
+  });
+
+  assert.equal(room.startingPositionChoice, "dealer");
+  assert.equal(room.firstDealer, "player1");
+  assert.equal(room.gameState.dealer, "player1");
+});
+
+test("coin flip winner can choose first non-dealer", () => {
+  let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", coinFlipWinner: "player1" });
+  room = joinRoom(room, { seatToken: "guest-token" }).room;
+  room = applyRoomAction(room, {
+    seatToken: "host-token",
+    type: "chooseStartingPosition",
+    position: "non_dealer"
+  });
+
+  assert.equal(room.startingPositionChoice, "non_dealer");
+  assert.equal(room.firstDealer, "player2");
+  assert.equal(room.gameState.dealer, "player2");
+});
+
+test("ready before starting dealer choice is rejected", () => {
+  let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", coinFlipWinner: "player1" });
+  room = joinRoom(room, { seatToken: "guest-token" }).room;
+
+  assert.throws(() => applyRoomAction(room, { seatToken: "host-token", type: "ready" }), /Coin flip winner/);
+});
+
+test("Player 1 ready alone does not deal cards", () => {
+  let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", coinFlipWinner: "player1" });
+  room = applyRoomAction(room, {
+    seatToken: "host-token",
+    type: "chooseStartingPosition",
+    position: "dealer"
+  });
+
+  room = applyRoomAction(room, { seatToken: "host-token", type: "ready" });
+
+  assert.equal(room.playerReady.player1, true);
+  assert.equal(room.playerReady.player2, false);
+  assert.equal(room.gameState.phase, "waiting_for_players");
+  assert.equal(room.gameState.hands.player1.length, 0);
+  assert.equal(room.countdownEndsAt, null);
+});
+
+test("both players ready triggers countdown without dealing immediately", () => {
+  let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", coinFlipWinner: "player1" });
+  room = joinRoom(room, { seatToken: "guest-token" }).room;
+  room = applyRoomAction(room, {
+    seatToken: "host-token",
+    type: "chooseStartingPosition",
+    position: "dealer"
+  });
+  room = applyRoomAction(room, { seatToken: "host-token", type: "ready" });
+  room = applyRoomAction(room, { seatToken: "guest-token", type: "ready" });
+
+  assert.equal(room.gameState.phase, "ready_countdown");
+  assert.equal(Boolean(room.countdownEndsAt), true);
+  assert.equal(room.gameState.hands.player1.length, 0);
+  assert.equal(room.gameState.hands.player2.length, 0);
+});
+
+test("countdown expiry shuffles and deals without host start", () => {
+  let room = createReadyCountdownRoom();
+  const afterCountdown = Date.parse(room.countdownEndsAt) + 1;
+
+  room = advanceRoomClock(room, { now: afterCountdown, deck: fixedDeck });
+
+  assert.equal(room.gameState.phase, "playing");
+  assert.equal(room.gameState.actionPhase, "selectingTrump");
+  assert.equal(room.gameState.hands.player1.length, 5);
+  assert.equal(room.gameState.hands.player2.length, 5);
+  assert.equal(room.gameState.kitty.length, 14);
+  assert.equal(room.countdownEndsAt, null);
+});
+
+test("countdown does not duplicate during polling", () => {
+  let room = createReadyCountdownRoom();
+  const firstEndsAt = room.countdownEndsAt;
+
+  room = advanceRoomClock(room, { now: Date.parse(firstEndsAt) - 1000 });
+  room = applyRoomAction(room, { seatToken: "host-token", type: "ready" });
+
+  assert.equal(room.countdownEndsAt, firstEndsAt);
+  assert.equal(room.gameState.phase, "ready_countdown");
+});
+
+test("non-dealer acts first and dealer acts second during trump selection", () => {
+  let room = createStartedRoom();
+
+  assert.equal(room.gameState.dealer, "player2");
+  assert.equal(room.gameState.currentTurn, "player1");
+
+  room = applyRoomAction(room, { seatToken: "host-token", type: "passTrump" });
+
+  assert.equal(room.gameState.currentTurn, "player2");
+});
+
+test("dealer picks up upcard and discards when upcard suit is ordered", () => {
+  let room = createStartedRoom();
+  const dealerHandBefore = room.gameState.hands.player2;
+  const upcard = room.gameState.upcard;
+
+  room = applyRoomAction(room, { seatToken: "host-token", type: "chooseTrump", suit: upcard.suit });
+
+  assert.equal(room.gameState.hands.player2.length, 5);
+  assert.equal(room.gameState.hands.player2.some((card) => card.rank === upcard.rank && card.suit === upcard.suit), true);
+  assert.equal(room.gameState.kitty.some((card) => card.rank === upcard.rank && card.suit === upcard.suit), false);
+  assert.equal(room.gameState.dealerPickup.dealer, "player2");
+  assert.deepEqual(room.gameState.dealerPickup.upcard, upcard);
+  assert.deepEqual(room.gameState.dealerPickup.discarded, dealerHandBefore[0]);
+});
+
+test("dealer rotates every hand across multiple hands", () => {
+  let room = createStartedRoom();
+
+  assert.equal(room.gameState.handNumber, 1);
+  assert.equal(room.gameState.dealer, "player2");
+
+  room = completeHandRoom(room);
+  room = advanceRoomClock(room, { now: Date.parse(room.nextHandStartsAt) + 1, deck: fixedDeck });
+
+  assert.equal(room.gameState.handNumber, 2);
+  assert.equal(room.gameState.dealer, "player1");
+
+  room = applyRoomAction(room, { seatToken: "guest-token", type: "chooseTrump", suit: "hearts" });
+  room = playFixedHandWithPlayer2Lead(room);
+  room = advanceRoomClock(room, { now: Date.parse(room.nextHandStartsAt) + 1, deck: fixedDeck });
+
+  assert.equal(room.gameState.handNumber, 3);
+  assert.equal(room.gameState.dealer, "player2");
 });
 
 test("prevents a third active seated player", () => {
@@ -68,11 +224,10 @@ test("prevents a third active seated player", () => {
 });
 
 test("enforces trump selection turn order", () => {
-  const room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", deck: fixedDeck });
-  const joined = joinRoom(room, { seatToken: "guest-token" });
+  const room = createStartedRoom();
 
   assert.throws(
-    () => applyRoomAction(joined.room, { seatToken: "guest-token", type: "chooseTrump", suit: "hearts" }),
+    () => applyRoomAction(room, { seatToken: "guest-token", type: "chooseTrump", suit: "hearts" }),
     /player1's turn/
   );
 });
@@ -92,9 +247,10 @@ test("rejects action when viewer has no player seat", () => {
 });
 
 test("rejects illegal card play", () => {
-  let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", deck: fixedDeck });
-  room = joinRoom(room, { seatToken: "guest-token" }).room;
-  room = applyRoomAction(room, { seatToken: "host-token", type: "chooseTrump", suit: "hearts" });
+  let room = createStartedRoom();
+  room = applyRoomAction(room, { seatToken: "host-token", type: "passTrump" });
+  room = applyRoomAction(room, { seatToken: "guest-token", type: "passTrump" });
+  room = applyRoomAction(room, { seatToken: "host-token", type: "chooseTrump", suit: "spades" });
   room = applyRoomAction(room, {
     seatToken: "host-token",
     type: "playCard",
@@ -112,28 +268,51 @@ test("rejects illegal card play", () => {
 });
 
 test("room game can complete a hand", () => {
-  let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", deck: fixedDeck });
-  room = joinRoom(room, { seatToken: "guest-token" }).room;
-  room = applyRoomAction(room, { seatToken: "host-token", type: "chooseTrump", suit: "hearts" });
+  const room = completeHandRoom();
 
-  room = applyRoomAction(room, { seatToken: "host-token", type: "playCard", card: { rank: "J", suit: "diamonds" } });
-  room = applyRoomAction(room, { seatToken: "guest-token", type: "playCard", card: { rank: "A", suit: "hearts" } });
-  room = applyRoomAction(room, { seatToken: "host-token", type: "playCard", card: { rank: "9", suit: "spades" } });
-  room = applyRoomAction(room, { seatToken: "guest-token", type: "playCard", card: { rank: "K", suit: "hearts" } });
-  room = applyRoomAction(room, { seatToken: "guest-token", type: "playCard", card: { rank: "Q", suit: "hearts" } });
-  room = applyRoomAction(room, { seatToken: "host-token", type: "playCard", card: { rank: "A", suit: "clubs" } });
-  room = applyRoomAction(room, { seatToken: "guest-token", type: "playCard", card: { rank: "10", suit: "hearts" } });
-  room = applyRoomAction(room, { seatToken: "host-token", type: "playCard", card: { rank: "K", suit: "clubs" } });
-  room = applyRoomAction(room, { seatToken: "guest-token", type: "playCard", card: { rank: "9", suit: "clubs" } });
-  room = applyRoomAction(room, { seatToken: "host-token", type: "playCard", card: { rank: "Q", suit: "clubs" } });
-
-  assert.equal(room.gameState.phase, "handComplete");
+  assert.equal(room.gameState.phase, "hand_score");
   assert.deepEqual(room.score, { player1: 0, player2: 2 });
   assert.equal(room.handHistory.length, 1);
+  assert.equal(Boolean(room.nextHandStartsAt), true);
+});
+
+test("next hand auto-starts after score phase if match is not complete", () => {
+  let room = completeHandRoom();
+  const nextHandAt = Date.parse(room.nextHandStartsAt) + 1;
+
+  room = advanceRoomClock(room, { now: nextHandAt, deck: fixedDeck });
+
+  assert.equal(room.gameState.phase, "playing");
+  assert.equal(room.gameState.actionPhase, "selectingTrump");
+  assert.equal(room.gameState.handNumber, 2);
+  assert.equal(room.nextHandStartsAt, null);
+  assert.equal(room.gameState.hands.player1.length, 5);
+});
+
+test("next hand does not auto-start when match target is reached", () => {
+  let room = createStartedRoom();
+  room = {
+    ...room,
+    gameState: {
+      ...room.gameState,
+      score: { player1: 0, player2: 8 },
+      mode: {
+        ...room.gameState.mode,
+        targetScore: 10
+      }
+    }
+  };
+  room = applyRoomAction(room, { seatToken: "host-token", type: "chooseTrump", suit: "hearts" });
+  room = playFixedHand(room);
+
+  assert.equal(room.gameState.phase, "match_complete");
+  assert.equal(room.gameState.winner, "player2");
+  assert.equal(room.nextHandStartsAt, null);
+  assert.equal(advanceRoomClock(room, { now: Date.now() + 6000, deck: fixedDeck }).gameState.phase, "match_complete");
 });
 
 test("spectator-safe room view does not expose hidden hands", () => {
-  const room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", deck: fixedDeck });
+  const room = createStartedRoom();
   const spectatorView = sanitizeRoomForViewer(room, null);
   const playerView = sanitizeRoomForViewer(room, "host-token");
 
@@ -144,10 +323,9 @@ test("spectator-safe room view does not expose hidden hands", () => {
 });
 
 test("match room includes spectator-safe tournament metadata", () => {
-  const room = createRoom({
+  let room = createRoom({
     roomCode: "MCH11",
     seatToken: "host-token",
-    deck: fixedDeck,
     tournamentMatch: {
       tournamentCode: "EUCHRE",
       matchId: "r1m1",
@@ -158,6 +336,15 @@ test("match room includes spectator-safe tournament metadata", () => {
       winner: null
     }
   });
+  room = joinRoom(room, { seatToken: "guest-token" }).room;
+  room = applyRoomAction(room, {
+    seatToken: room.coinFlipWinner === "player1" ? "host-token" : "guest-token",
+    type: "chooseStartingPosition",
+    position: "dealer"
+  });
+  room = applyRoomAction(room, { seatToken: "host-token", type: "ready" });
+  room = applyRoomAction(room, { seatToken: "guest-token", type: "ready" });
+  room = advanceRoomClock(room, { now: Date.parse(room.countdownEndsAt) + 1, deck: fixedDeck });
   const view = sanitizeRoomForViewer(room, null);
 
   assert.equal(view.tournamentMatch.tournamentCode, "EUCHRE");
@@ -190,3 +377,51 @@ test("room state has no restricted commerce fields", () => {
 
   assert.equal(noRestrictedFields(room, restricted), true);
 });
+
+function createReadyCountdownRoom() {
+  let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", coinFlipWinner: "player1" });
+  room = joinRoom(room, { seatToken: "guest-token" }).room;
+  room = applyRoomAction(room, {
+    seatToken: "host-token",
+    type: "chooseStartingPosition",
+    position: "non_dealer"
+  });
+  room = applyRoomAction(room, { seatToken: "host-token", type: "ready" });
+  return applyRoomAction(room, { seatToken: "guest-token", type: "ready" });
+}
+
+function createStartedRoom() {
+  const room = createReadyCountdownRoom();
+  return advanceRoomClock(room, { now: Date.parse(room.countdownEndsAt) + 1, deck: fixedDeck });
+}
+
+function completeHandRoom(room = createStartedRoom()) {
+  room = applyRoomAction(room, { seatToken: "host-token", type: "chooseTrump", suit: "hearts" });
+  return playFixedHand(room);
+}
+
+function playFixedHand(room) {
+  room = applyRoomAction(room, { seatToken: "host-token", type: "playCard", card: { rank: "J", suit: "diamonds" } });
+  room = applyRoomAction(room, { seatToken: "guest-token", type: "playCard", card: { rank: "A", suit: "hearts" } });
+  room = applyRoomAction(room, { seatToken: "host-token", type: "playCard", card: { rank: "9", suit: "spades" } });
+  room = applyRoomAction(room, { seatToken: "guest-token", type: "playCard", card: { rank: "K", suit: "hearts" } });
+  room = applyRoomAction(room, { seatToken: "guest-token", type: "playCard", card: { rank: "Q", suit: "hearts" } });
+  room = applyRoomAction(room, { seatToken: "host-token", type: "playCard", card: { rank: "A", suit: "clubs" } });
+  room = applyRoomAction(room, { seatToken: "guest-token", type: "playCard", card: { rank: "10", suit: "hearts" } });
+  room = applyRoomAction(room, { seatToken: "host-token", type: "playCard", card: { rank: "K", suit: "clubs" } });
+  room = applyRoomAction(room, { seatToken: "guest-token", type: "playCard", card: { rank: "9", suit: "hearts" } });
+  return applyRoomAction(room, { seatToken: "host-token", type: "playCard", card: { rank: "Q", suit: "clubs" } });
+}
+
+function playFixedHandWithPlayer2Lead(room) {
+  room = applyRoomAction(room, { seatToken: "guest-token", type: "playCard", card: { rank: "A", suit: "hearts" } });
+  room = applyRoomAction(room, { seatToken: "host-token", type: "playCard", card: { rank: "J", suit: "diamonds" } });
+  room = applyRoomAction(room, { seatToken: "host-token", type: "playCard", card: { rank: "K", suit: "clubs" } });
+  room = applyRoomAction(room, { seatToken: "guest-token", type: "playCard", card: { rank: "9", suit: "clubs" } });
+  room = applyRoomAction(room, { seatToken: "host-token", type: "playCard", card: { rank: "Q", suit: "clubs" } });
+  room = applyRoomAction(room, { seatToken: "guest-token", type: "playCard", card: { rank: "K", suit: "hearts" } });
+  room = applyRoomAction(room, { seatToken: "guest-token", type: "playCard", card: { rank: "Q", suit: "hearts" } });
+  room = applyRoomAction(room, { seatToken: "host-token", type: "playCard", card: { rank: "9", suit: "hearts" } });
+  room = applyRoomAction(room, { seatToken: "guest-token", type: "playCard", card: { rank: "10", suit: "hearts" } });
+  return applyRoomAction(room, { seatToken: "host-token", type: "playCard", card: { rank: "9", suit: "spades" } });
+}

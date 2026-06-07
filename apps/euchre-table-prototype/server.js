@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  advanceRoomClock,
   applyRoomAction,
   createRoom,
   joinRoom,
@@ -202,8 +203,9 @@ async function handleApi(request, response) {
 
   if (segments[0] === "api" && segments[1] === "rooms" && segments[2]) {
     const roomCode = segments[2].toUpperCase();
-    const room = rooms.get(roomCode);
+    let room = rooms.get(roomCode);
     if (!room) throw httpError(404, "Room not found");
+    room = advanceAndSaveRoom(room);
 
     if (request.method === "GET" && segments.length === 3) {
       const seatToken = url.searchParams.get("seatToken");
@@ -216,20 +218,18 @@ async function handleApi(request, response) {
     if (request.method === "POST" && segments[3] === "join") {
       const body = await readJson(request);
       const result = joinRoom(room, { seatToken: body.seatToken });
-      rooms.set(roomCode, result.room);
+      const nextRoom = advanceAndSaveRoom(result.room);
       sendJson(response, 200, {
         seat: result.seat,
         seatToken: result.seatToken,
-        room: sanitizeRoomForViewer(result.room, result.seatToken)
+        room: sanitizeRoomForViewer(nextRoom, result.seatToken)
       });
       return;
     }
 
     if (request.method === "POST" && segments[3] === "actions") {
       const body = await readJson(request);
-      const nextRoom = applyRoomAction(room, body);
-      rooms.set(roomCode, nextRoom);
-      syncTournamentFromRoom(nextRoom);
+      const nextRoom = advanceAndSaveRoom(applyRoomAction(room, body));
       sendJson(response, 200, {
         room: sanitizeRoomForViewer(nextRoom, body.seatToken)
       });
@@ -238,6 +238,13 @@ async function handleApi(request, response) {
   }
 
   throw httpError(404, "Not found");
+}
+
+function advanceAndSaveRoom(room) {
+  const nextRoom = advanceRoomClock(room);
+  rooms.set(nextRoom.roomCode, nextRoom);
+  syncTournamentFromRoom(nextRoom);
+  return nextRoom;
 }
 
 async function serveStatic(request, response) {
@@ -310,7 +317,7 @@ function createTournamentMatchRoom({ tournamentCode, round, matchNumber, player1
 }
 
 function syncTournamentFromRoom(room) {
-  if (!room.tournamentMatch || room.gameState.phase !== "matchComplete" || !room.gameState.winner) {
+  if (!room.tournamentMatch || room.gameState.phase !== "match_complete" || !room.gameState.winner) {
     return;
   }
 
