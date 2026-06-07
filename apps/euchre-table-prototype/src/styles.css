@@ -1,0 +1,661 @@
+:root {
+  color-scheme: light;
+  --felt: #17624d;
+  --felt-dark: #0d3f34;
+  --ink: #17201d;
+  --muted: #61706b;
+  --panel: #fffaf0;
+  --line: #d8d0bf;
+  --accent: #bd3f32;
+  --accent-2: #2367a5;
+  --legal: #1f7a55;
+  --disabled: #b4aa99;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--felt-dark), var(--felt));
+  color: var(--ink);
+}
+
+button,
+select,
+a.button-link {
+  font: inherit;
+}
+
+.shell {
+  width: min(1180px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 24px 0;
+}
+
+.topbar,
+.scoreband,
+.status,
+.panel {
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  background: var(--panel);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.18);
+}
+
+.topbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 20px;
+  border-radius: 8px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 0;
+  font-size: clamp(1.7rem, 4vw, 2.6rem);
+}
+
+h2 {
+  margin-bottom: 0;
+  font-size: 1rem;
+}
+
+h3 {
+  margin-bottom: 8px;
+  font-size: 0.94rem;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+label {
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+select,
+input,
+button {
+  min-height: 40px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+}
+
+select {
+  padding: 0 10px;
+  background: white;
+}
+
+input {
+  padding: 0 10px;
+  min-width: 120px;
+  background: white;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+
+button {
+  padding: 0 14px;
+  background: var(--accent-2);
+  color: white;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+a.button-link {
+  display: inline-grid;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--accent-2);
+  color: white;
+  cursor: pointer;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+button.secondary {
+  background: white;
+  color: var(--accent-2);
+}
+
+.secondary-link {
+  background: white;
+  color: var(--accent-2);
+}
+
+button:disabled {
+  background: var(--disabled);
+  color: #fff;
+  cursor: not-allowed;
+}
+
+.scoreband {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: 16px;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.room-band {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
+  gap: 1px;
+  margin-top: 16px;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  background: var(--panel);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.18);
+}
+
+.room-band div {
+  display: grid;
+  align-content: center;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.room-band span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.room-band strong {
+  display: block;
+  font-size: 1.3rem;
+  overflow-wrap: anywhere;
+}
+
+.share-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.18);
+}
+
+.share-panel span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.share-panel strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.share-panel p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.scoreband div {
+  padding: 14px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.scoreband span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.scoreband strong {
+  display: block;
+  font-size: 2rem;
+}
+
+.status {
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: 8px;
+}
+
+.status p {
+  margin: 0;
+  font-weight: 800;
+}
+
+.table-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.9fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.panel {
+  min-width: 0;
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.panel-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.panel-heading span {
+  color: var(--muted);
+  font-weight: 800;
+  font-size: 0.86rem;
+}
+
+.hand {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
+  gap: 10px;
+}
+
+.card,
+.upcard {
+  min-height: 118px;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: var(--ink);
+  font-weight: 900;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+}
+
+.card {
+  width: 100%;
+}
+
+.card .rank {
+  display: block;
+  font-size: 1.5rem;
+}
+
+.card .suit {
+  display: block;
+  font-size: 1.8rem;
+}
+
+.card.red {
+  color: #b32925;
+}
+
+.card.legal {
+  border-color: var(--legal);
+}
+
+.card.current-player {
+  outline: 3px solid rgba(35, 103, 165, 0.25);
+}
+
+.card-back {
+  color: white;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.18) 25%, transparent 25%) 0 0 / 16px 16px,
+    linear-gradient(135deg, transparent 75%, rgba(255, 255, 255, 0.18) 75%) 0 0 / 16px 16px,
+    var(--accent-2);
+}
+
+.upcard {
+  margin-bottom: 16px;
+}
+
+.upcard.empty {
+  color: var(--muted);
+}
+
+.trump-panel {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.56);
+}
+
+.trump-panel p {
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.trump-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.trick-area,
+.history {
+  margin-top: 16px;
+}
+
+.current-trick {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  min-height: 118px;
+}
+
+.play-slot {
+  min-height: 118px;
+  border: 2px dashed var(--line);
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+ol {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--muted);
+}
+
+.muted-note {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.home-shell {
+  min-height: 100vh;
+  display: grid;
+  align-content: center;
+  gap: 16px;
+}
+
+.home-hero,
+.rules-panel,
+.info-panel {
+  padding: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.18);
+}
+
+.home-hero h1 {
+  font-size: clamp(2rem, 7vw, 4rem);
+}
+
+.home-copy,
+.home-disclaimer,
+.home-status {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.home-disclaimer {
+  margin-bottom: 0;
+}
+
+.home-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.home-info-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.info-panel {
+  padding: 18px;
+}
+
+.info-panel p {
+  margin-bottom: 0;
+  color: var(--muted);
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.text-link,
+.disabled-link {
+  display: inline-block;
+  margin-top: 12px;
+  color: var(--accent-2);
+  font-weight: 900;
+}
+
+.disabled-link {
+  color: var(--muted);
+}
+
+.rules-panel {
+  margin-top: 16px;
+}
+
+.rules-list {
+  margin: 16px 0 0;
+  padding-left: 22px;
+  line-height: 1.7;
+}
+
+.tournament-controls,
+.tournament-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.tournament-controls .panel {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.admin-key-reveal {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.admin-key-reveal span,
+.admin-key-reveal small {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.admin-key-reveal strong {
+  font-size: 1.2rem;
+  overflow-wrap: anywhere;
+}
+
+.admin-panel {
+  margin-top: 16px;
+}
+
+.admin-verify,
+.host-controls,
+.match-admin-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.host-controls {
+  margin-top: 12px;
+}
+
+.player-list {
+  margin: 0;
+  padding-left: 22px;
+  line-height: 1.9;
+}
+
+.empty-slot {
+  color: var(--muted);
+}
+
+.bracket-panel {
+  overflow: hidden;
+}
+
+.bracket-view {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.bracket-round {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.match-card {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.match-card span,
+.match-card small {
+  overflow-wrap: anywhere;
+}
+
+.match-link {
+  margin-top: 4px;
+}
+
+.compact-button {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 0.82rem;
+}
+
+li + li {
+  margin-top: 6px;
+}
+
+@media (max-width: 860px) {
+  .topbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .controls {
+    justify-content: stretch;
+  }
+
+  .controls > * {
+    flex: 1 1 160px;
+  }
+
+  .table-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .room-band {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .share-panel,
+  .home-actions,
+  .home-info-grid,
+  .tournament-controls,
+  .tournament-grid,
+  .admin-verify,
+  .host-controls,
+  .match-admin-actions {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  button,
+  input,
+  select,
+  a.button-link {
+    height: 48px;
+    min-height: 48px;
+    width: 100%;
+  }
+
+  .hand {
+    grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  }
+
+  .card,
+  .upcard,
+  .play-slot {
+    min-height: 96px;
+  }
+}
+
+@media (max-width: 520px) {
+  .shell {
+    width: min(100vw - 20px, 1180px);
+    padding: 10px 0;
+  }
+
+  .scoreband strong {
+    font-size: 1.45rem;
+  }
+
+  .room-band {
+    grid-template-columns: 1fr;
+  }
+
+  .panel {
+    padding: 12px;
+  }
+}

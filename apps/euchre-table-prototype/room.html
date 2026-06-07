@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Play a Friend - 1v1 Euchre Freeplay</title>
+    <link rel="stylesheet" href="./src/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Play a Friend</p>
+          <h1>Private Euchre Room</h1>
+        </div>
+        <div class="controls">
+          <a class="button-link secondary-link" href="./home.html">Home</a>
+          <button id="createRoomButton" type="button">Create Room</button>
+          <label for="joinRoomCode">Room Code</label>
+          <input id="joinRoomCode" class="room-input" maxlength="8" autocomplete="off" placeholder="ABCDE">
+          <button id="joinRoomButton" type="button">Join Room</button>
+        </div>
+      </header>
+
+      <section class="status" aria-live="polite">
+        <p id="roomStatus">Create a private room or join with a room code.</p>
+      </section>
+
+      <section class="room-band">
+        <div>
+          <span>Room</span>
+          <strong id="roomCode">-----</strong>
+        </div>
+        <div>
+          <span>Your Seat</span>
+          <strong id="viewerSeat">None</strong>
+        </div>
+        <div>
+          <span>Players</span>
+          <strong id="playerStatus">0 / 2</strong>
+        </div>
+        <div>
+          <span>Turn</span>
+          <strong id="currentTurn">None</strong>
+        </div>
+        <div>
+          <span>Trump</span>
+          <strong id="trumpStatus">None</strong>
+        </div>
+        <div>
+          <span>Match</span>
+          <strong id="matchStatus">Casual</strong>
+        </div>
+        <div>
+          <button id="copyCodeButton" class="secondary" type="button" disabled>Copy Code</button>
+        </div>
+      </section>
+
+      <section class="share-panel">
+        <div>
+          <span>Room Link</span>
+          <strong id="roomLink">Create or join a room.</strong>
+        </div>
+        <p id="waitingNotice">Waiting for room setup.</p>
+      </section>
+
+      <section class="scoreband" aria-label="Match score">
+        <div>
+          <span>Player 1</span>
+          <strong id="player1Score">0</strong>
+        </div>
+        <div>
+          <span>Target</span>
+          <strong id="targetScore">10</strong>
+        </div>
+        <div>
+          <span>Player 2</span>
+          <strong id="player2Score">0</strong>
+        </div>
+      </section>
+
+      <section class="table-grid room-table">
+        <article class="panel player-panel">
+          <div class="panel-heading">
+            <h2>Your Hand</h2>
+            <span id="viewerTricks">0 tricks</span>
+          </div>
+          <div id="viewerHand" class="hand" aria-label="Your hand"></div>
+          <p id="spectatorNotice" class="muted-note" hidden>Spectator view is read-only and hidden hands are not shown.</p>
+        </article>
+
+        <article class="panel center-panel">
+          <div class="panel-heading">
+            <h2>Kitty / Upcard</h2>
+            <span id="kittyCount">0 cards</span>
+          </div>
+          <div id="upcard" class="upcard empty">No room</div>
+
+          <div id="trumpPanel" class="trump-panel">
+            <h3>Select Trump</h3>
+            <p id="trumpHelp">Waiting for room.</p>
+            <div id="trumpButtons" class="trump-buttons"></div>
+            <button id="passButton" class="secondary" type="button">Pass</button>
+          </div>
+
+          <div class="trick-area">
+            <h3>Current Trick</h3>
+            <div id="currentTrick" class="current-trick"></div>
+          </div>
+
+          <div class="history">
+            <h3>Completed Tricks</h3>
+            <ol id="trickHistory"></ol>
+          </div>
+        </article>
+
+        <article class="panel player-panel">
+          <div class="panel-heading">
+            <h2>Opponent</h2>
+            <span id="opponentTricks">0 tricks</span>
+          </div>
+          <div id="opponentHand" class="hand card-backs" aria-label="Opponent hand"></div>
+          <button id="nextHandButton" type="button" disabled>Start Next Hand</button>
+        </article>
+      </section>
+    </main>
+
+    <script type="module" src="./src/room-client.js"></script>
+  </body>
+</html>

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>1V1 Euchre Free Play</title>
+    <link rel="stylesheet" href="./src/styles.css">
+  </head>
+  <body>
+    <main class="shell home-shell">
+      <section class="home-hero">
+        <p class="eyebrow">Euchre Free Play</p>
+        <h1>1V1 Euchre Free Play</h1>
+        <p class="home-copy">Free-play competitive 1v1 Euchre for tester rooms and small community brackets.</p>
+        <p class="home-disclaimer">Free-play only. No cash games. No deposits. No wallets. No paid entries.</p>
+        <div class="home-actions">
+          <a class="button-link" href="./room.html?action=create">Create Room</a>
+          <a class="button-link secondary-link" href="./room.html?action=join">Join Room</a>
+          <button id="quickMatchButton" type="button">Quick Match</button>
+          <a class="button-link" href="./tournament.html">Create Tournament</a>
+          <a class="button-link secondary-link" href="./rules.html">Rules</a>
+        </div>
+        <p id="quickMatchStatus" class="home-status" aria-live="polite"></p>
+      </section>
+
+      <section class="home-info-grid" aria-label="Launch information">
+        <article class="info-panel">
+          <h2>Fair Play</h2>
+          <p>Free-play only. Keep matches clean, finish hands in good faith, and use host controls only to recover tester events.</p>
+        </article>
+        <article class="info-panel">
+          <h2>Rules</h2>
+          <p>Two players, a 24-card deck, bowers handled as trump, immediate trump leads allowed, and first to 10 by default.</p>
+          <a class="text-link" href="./rules.html">Read the rules</a>
+        </article>
+        <article class="info-panel">
+          <h2>Community</h2>
+          <p>Discord/community link placeholder for tester coordination and support.</p>
+          <span class="disabled-link" aria-disabled="true">Discord coming soon</span>
+        </article>
+        <article class="info-panel">
+          <h2>Spectators</h2>
+          <p>Spectator views are read-only and keep hidden hands private while showing public match status.</p>
+        </article>
+      </section>
+    </main>
+
+    <script type="module" src="./src/home-client.js"></script>
+  </body>
+</html>

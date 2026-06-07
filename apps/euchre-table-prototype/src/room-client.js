@@ -1,0 +1,391 @@
+import { cardsEqual } from "../../../packages/euchre-core/src/index.js";
+import { cardLabel, suitSymbol } from "./table-state.js";
+
+const storageKey = "euchreRoomSeat";
+const elements = {
+  createRoomButton: document.querySelector("#createRoomButton"),
+  joinRoomCode: document.querySelector("#joinRoomCode"),
+  joinRoomButton: document.querySelector("#joinRoomButton"),
+  copyCodeButton: document.querySelector("#copyCodeButton"),
+  nextHandButton: document.querySelector("#nextHandButton"),
+  roomStatus: document.querySelector("#roomStatus"),
+  roomCode: document.querySelector("#roomCode"),
+  viewerSeat: document.querySelector("#viewerSeat"),
+  playerStatus: document.querySelector("#playerStatus"),
+  currentTurn: document.querySelector("#currentTurn"),
+  trumpStatus: document.querySelector("#trumpStatus"),
+  matchStatus: document.querySelector("#matchStatus"),
+  roomLink: document.querySelector("#roomLink"),
+  waitingNotice: document.querySelector("#waitingNotice"),
+  player1Score: document.querySelector("#player1Score"),
+  player2Score: document.querySelector("#player2Score"),
+  targetScore: document.querySelector("#targetScore"),
+  viewerTricks: document.querySelector("#viewerTricks"),
+  opponentTricks: document.querySelector("#opponentTricks"),
+  viewerHand: document.querySelector("#viewerHand"),
+  opponentHand: document.querySelector("#opponentHand"),
+  spectatorNotice: document.querySelector("#spectatorNotice"),
+  kittyCount: document.querySelector("#kittyCount"),
+  upcard: document.querySelector("#upcard"),
+  trumpPanel: document.querySelector("#trumpPanel"),
+  trumpHelp: document.querySelector("#trumpHelp"),
+  trumpButtons: document.querySelector("#trumpButtons"),
+  passButton: document.querySelector("#passButton"),
+  currentTrick: document.querySelector("#currentTrick"),
+  trickHistory: document.querySelector("#trickHistory")
+};
+
+let session = loadSession();
+let roomView = null;
+let pollHandle = null;
+
+elements.createRoomButton.addEventListener("click", async () => {
+  try {
+    const result = await api("/api/rooms", { method: "POST" });
+    setSession(result.room.roomCode, result.seatToken);
+    setRoom(result.room, "You are Player 1. Share the room code with Player 2.");
+  } catch (error) {
+    setStatus(error.message);
+  }
+});
+
+elements.joinRoomButton.addEventListener("click", async () => {
+  const roomCode = elements.joinRoomCode.value.trim().toUpperCase();
+  if (!roomCode) {
+    setStatus("Enter a room code.");
+    return;
+  }
+
+  try {
+    const knownToken = session?.roomCode === roomCode ? session.seatToken : null;
+    const result = await api(`/api/rooms/${roomCode}/join`, {
+      method: "POST",
+      body: { seatToken: knownToken }
+    });
+    setSession(result.room.roomCode, result.seatToken);
+    setRoom(result.room, `You are ${seatName(result.seat)}.`);
+  } catch (error) {
+    setStatus(error.message);
+  }
+});
+
+elements.copyCodeButton.addEventListener("click", async () => {
+  if (!roomView?.roomCode) return;
+
+  const text = roomLinkFor(roomView.roomCode);
+
+  if (navigator.clipboard) {
+    await navigator.clipboard.writeText(text);
+    setStatus("Room link copied.");
+  } else {
+    setStatus(text);
+  }
+});
+
+elements.passButton.addEventListener("click", async () => {
+  await sendAction({ type: "passTrump" });
+});
+
+elements.nextHandButton.addEventListener("click", async () => {
+  await sendAction({ type: "startNextHand" });
+});
+
+window.addEventListener("beforeunload", () => {
+  if (pollHandle) clearInterval(pollHandle);
+});
+
+if (session?.roomCode && session?.seatToken) {
+  refreshRoom("Reconnected from this browser.");
+} else {
+  const urlRoomCode = new URL(window.location.href).searchParams.get("room");
+  if (urlRoomCode) {
+    elements.joinRoomCode.value = urlRoomCode.toUpperCase();
+    setStatus("Room code loaded. Join to take an open seat or watch as a spectator.");
+  }
+}
+
+render();
+
+async function sendAction(action) {
+  if (!session?.roomCode || !session?.seatToken) {
+    setStatus("Join this room before taking a player action.");
+    return;
+  }
+
+  try {
+    const result = await api(`/api/rooms/${session.roomCode}/actions`, {
+      method: "POST",
+      body: {
+        seatToken: session.seatToken,
+        ...action
+      }
+    });
+    setRoom(result.room);
+  } catch (error) {
+    setStatus(error.message);
+  }
+}
+
+async function refreshRoom(status) {
+  if (!session?.roomCode) return;
+
+  try {
+    const result = await api(`/api/rooms/${session.roomCode}?seatToken=${encodeURIComponent(session.seatToken ?? "")}`);
+    setRoom(result.room, status);
+  } catch (error) {
+    localStorage.removeItem(storageKey);
+    session = null;
+    setStatus(`${error.message}. Create a room or enter a room code to continue.`);
+  }
+}
+
+async function api(path, { method = "GET", body } = {}) {
+  const response = await fetch(path, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const payload = await response.json();
+
+  if (!response.ok) {
+    throw new Error(payload.error ?? "Request failed");
+  }
+
+  return payload;
+}
+
+function setRoom(nextRoom, status) {
+  roomView = nextRoom;
+  if (status) setStatus(status);
+  startPolling();
+  render();
+}
+
+function setSession(roomCode, seatToken) {
+  session = { roomCode, seatToken };
+  localStorage.setItem(storageKey, JSON.stringify(session));
+}
+
+function loadSession() {
+  try {
+    return JSON.parse(localStorage.getItem(storageKey));
+  } catch {
+    return null;
+  }
+}
+
+function startPolling() {
+  if (pollHandle) return;
+  pollHandle = setInterval(() => {
+    refreshRoom().catch((error) => setStatus(error.message));
+  }, 1500);
+}
+
+function render() {
+  if (!roomView) {
+    elements.trumpPanel.hidden = true;
+    elements.nextHandButton.disabled = true;
+    return;
+  }
+
+  const state = roomView.gameState;
+  const viewerSeat = roomView.viewerSeat;
+  const opponentSeat = viewerSeat === "player1" ? "player2" : "player1";
+  const playerCount = Number(roomView.players.player1) + Number(roomView.players.player2);
+
+  elements.roomCode.textContent = roomView.roomCode;
+  elements.viewerSeat.textContent = seatName(viewerSeat);
+  elements.playerStatus.textContent = `${playerCount} / 2`;
+  elements.currentTurn.textContent = seatName(state.currentTurn);
+  elements.trumpStatus.textContent = suitName(state.trumpSuit);
+  elements.matchStatus.textContent = matchStatusLabel(roomView.tournamentMatch);
+  elements.roomLink.textContent = roomLinkFor(roomView.roomCode);
+  elements.waitingNotice.textContent = waitingMessage(roomView, state, playerCount);
+  elements.copyCodeButton.disabled = false;
+  elements.player1Score.textContent = state.score.player1;
+  elements.player2Score.textContent = state.score.player2;
+  elements.targetScore.textContent = state.targetScore;
+  elements.kittyCount.textContent = `${state.kittyCount} cards`;
+  elements.viewerTricks.textContent = viewerSeat === "spectator" ? "0 tricks" : `${state.tricksWon[viewerSeat]} tricks`;
+  elements.opponentTricks.textContent = viewerSeat === "spectator" ? "0 tricks" : `${state.tricksWon[opponentSeat]} tricks`;
+  elements.spectatorNotice.hidden = viewerSeat !== "spectator";
+  elements.nextHandButton.disabled = state.phase !== "handComplete" || viewerSeat === "spectator";
+
+  renderStatus();
+  renderUpcard(state.upcard);
+  renderTrumpControls(state, viewerSeat);
+  renderViewerHand(state, viewerSeat);
+  renderOpponentHand(state, viewerSeat, opponentSeat);
+  renderCurrentTrick(state);
+  renderTrickHistory(state);
+}
+
+function renderStatus() {
+  const state = roomView.gameState;
+  const playerCount = Number(roomView.players.player1) + Number(roomView.players.player2);
+
+  if (state.winner) {
+    setStatus(`${seatName(state.winner)} wins the match.`);
+  } else if (state.phase === "selectingTrump") {
+    if (roomView.viewerSeat === "spectator") {
+      setStatus("Spectator view. This room is read-only for you.");
+    } else if (playerCount < 2 && roomView.viewerSeat === "player1") {
+      setStatus("You are Player 1. Waiting for Player 2.");
+    } else if (roomView.viewerSeat === "player2") {
+      setStatus(`You are Player 2. ${seatName(state.currentTurn)} to choose or pass trump.`);
+    } else {
+      setStatus(`${seatName(state.currentTurn)} to choose or pass trump.`);
+    }
+  } else if (state.phase === "playing") {
+    setStatus(`${seatName(state.currentTurn)} to play. Trump is ${suitName(state.trumpSuit)}.`);
+  } else if (state.phase === "handComplete") {
+    const points = state.handScore.points;
+    setStatus(`Hand complete. Player 1 +${points.player1}, Player 2 +${points.player2}.`);
+  }
+}
+
+function renderTrumpControls(state, viewerSeat) {
+  const canAct = state.phase === "selectingTrump" && viewerSeat === state.currentTurn;
+  elements.trumpPanel.hidden = state.phase !== "selectingTrump";
+  elements.trumpButtons.replaceChildren();
+  elements.passButton.disabled = !canAct || state.trumpState.forcedDealerChoice;
+  elements.trumpHelp.textContent = canAct
+    ? "Choose trump or pass. Trump may be led immediately once chosen."
+    : `${seatName(state.currentTurn)} is choosing trump.`;
+
+  if (!canAct) return;
+
+  for (const suit of state.availableTrumpSuits) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = `${suitSymbol(suit)} ${suitName(suit)}`;
+    button.addEventListener("click", () => sendAction({ type: "chooseTrump", suit }).catch((error) => setStatus(error.message)));
+    elements.trumpButtons.append(button);
+  }
+}
+
+function renderViewerHand(state, viewerSeat) {
+  elements.viewerHand.replaceChildren();
+
+  if (viewerSeat === "spectator") return;
+
+  for (const card of state.viewerHand) {
+    const legal = state.playableCards.some((candidate) => cardsEqual(candidate, card));
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = ["card", isRed(card.suit) ? "red" : "", legal ? "legal" : ""].filter(Boolean).join(" ");
+    button.innerHTML = cardMarkup(card);
+    button.disabled = !legal;
+    button.addEventListener("click", () => sendAction({ type: "playCard", card }).catch((error) => setStatus(error.message)));
+    elements.viewerHand.append(button);
+  }
+}
+
+function renderOpponentHand(state, viewerSeat, opponentSeat) {
+  elements.opponentHand.replaceChildren();
+  const opponentSeated = roomView.players[opponentSeat];
+  const count = viewerSeat === "spectator" || !opponentSeated ? 0 : state.handCounts[opponentSeat];
+
+  for (let index = 0; index < count; index += 1) {
+    const back = document.createElement("div");
+    back.className = "card card-back";
+    back.textContent = "Card";
+    elements.opponentHand.append(back);
+  }
+}
+
+function renderUpcard(card) {
+  elements.upcard.className = `upcard ${card && isRed(card.suit) ? "red" : ""}`;
+  elements.upcard.innerHTML = card ? cardMarkup(card) : "No room";
+}
+
+function renderCurrentTrick(state) {
+  elements.currentTrick.replaceChildren();
+
+  for (const play of state.currentTrick) {
+    const div = document.createElement("div");
+    div.className = `card ${isRed(play.card.suit) ? "red" : ""}`;
+    div.innerHTML = `<span>${seatName(play.player)}</span>${cardMarkup(play.card)}`;
+    elements.currentTrick.append(div);
+  }
+
+  for (let index = state.currentTrick.length; index < 2; index += 1) {
+    const slot = document.createElement("div");
+    slot.className = "play-slot";
+    slot.textContent = "Waiting";
+    elements.currentTrick.append(slot);
+  }
+}
+
+function renderTrickHistory(state) {
+  elements.trickHistory.replaceChildren();
+
+  for (const [index, trick] of state.completedTricks.entries()) {
+    const item = document.createElement("li");
+    const plays = trick.plays.map((play) => `${seatName(play.player)} ${cardLabel(play.card)}`).join(", ");
+    item.textContent = `Trick ${index + 1}: ${plays}. Winner: ${seatName(trick.winner)}.`;
+    elements.trickHistory.append(item);
+  }
+}
+
+function cardMarkup(card) {
+  return `<span><span class="rank">${card.rank}</span><span class="suit">${suitSymbol(card.suit)}</span></span>`;
+}
+
+function setStatus(message) {
+  elements.roomStatus.textContent = message;
+}
+
+function seatName(seat) {
+  return {
+    player1: "Player 1",
+    player2: "Player 2",
+    spectator: "Spectator"
+  }[seat] ?? "None";
+}
+
+function waitingMessage(view, state, playerCount) {
+  if (view.tournamentMatch) {
+    const match = view.tournamentMatch;
+    return `${match.tournamentCode} ${match.matchId.toUpperCase()}: ${match.player1?.displayName ?? "TBD"} vs ${match.player2?.displayName ?? "TBD"} (${match.status}).`;
+  }
+
+  if (view.viewerSeat === "spectator") {
+    return "Spectator mode: hidden hands stay private.";
+  }
+
+  if (playerCount < 2) {
+    return "Waiting for Player 2.";
+  }
+
+  if (state.phase === "selectingTrump") {
+    return `${seatName(state.currentTurn)} is choosing trump.`;
+  }
+
+  if (state.phase === "playing") {
+    return `${seatName(state.currentTurn)} plays next.`;
+  }
+
+  return "Room ready.";
+}
+
+function matchStatusLabel(match) {
+  if (!match) return "Casual";
+  return `${match.matchId.toUpperCase()} ${match.status}`;
+}
+
+function roomLinkFor(roomCode) {
+  if (!roomCode) return "";
+  const url = new URL(window.location.href);
+  url.pathname = url.pathname.replace(/[^/]*$/, "room.html");
+  url.search = `?room=${encodeURIComponent(roomCode)}`;
+  return url.toString();
+}
+
+function suitName(suit) {
+  return suit ? suit[0].toUpperCase() + suit.slice(1) : "None";
+}
+
+function isRed(suit) {
+  return suit === "hearts" || suit === "diamonds";
+}
