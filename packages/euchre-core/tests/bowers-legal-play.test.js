@@ -33,6 +33,17 @@ test("must follow led suit when possible", () => {
   assert.equal(isLegalPlay({ hand, card: { rank: "A", suit: "spades" }, ledCard, trumpSuit: "hearts" }), false);
 });
 
+test("may throw off only when void in the led suit", () => {
+  const hand = [
+    { rank: "9", suit: "clubs" },
+    { rank: "A", suit: "spades" }
+  ];
+  const ledCard = { rank: "K", suit: "diamonds" };
+
+  assert.deepEqual(getPlayableCards(hand, ledCard, "hearts"), hand);
+  assert.equal(isLegalPlay({ hand, card: { rank: "A", suit: "spades" }, ledCard, trumpSuit: "hearts" }), true);
+});
+
 test("left bower counts as trump for follow-suit logic", () => {
   const hand = [
     { rank: "J", suit: "diamonds" },
@@ -41,6 +52,18 @@ test("left bower counts as trump for follow-suit logic", () => {
   const ledCard = { rank: "9", suit: "hearts" };
 
   assert.deepEqual(getPlayableCards(hand, ledCard, "hearts"), [{ rank: "J", suit: "diamonds" }]);
+});
+
+test("left bower follows chosen trump instead of printed suit", () => {
+  const hand = [
+    { rank: "J", suit: "spades" },
+    { rank: "A", suit: "diamonds" }
+  ];
+  const ledTrump = { rank: "9", suit: "clubs" };
+  const ledPrintedSuit = { rank: "9", suit: "spades" };
+
+  assert.deepEqual(getPlayableCards(hand, ledTrump, "clubs"), [{ rank: "J", suit: "spades" }]);
+  assert.deepEqual(getPlayableCards(hand, ledPrintedSuit, "clubs"), hand);
 });
 
 test("left bower does not count as its printed suit for follow-suit logic", () => {

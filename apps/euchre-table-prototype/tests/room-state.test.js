@@ -288,6 +288,67 @@ test("rejects illegal card play", () => {
   );
 });
 
+test("player can throw off only when void in the led suit", () => {
+  let room = createStartedRoom();
+  room = applyRoomAction(room, { seatToken: "host-token", type: "passTrump" });
+  room = applyRoomAction(room, { seatToken: "guest-token", type: "passTrump" });
+  room = applyRoomAction(room, { seatToken: "host-token", type: "chooseTrump", suit: "spades" });
+  room = applyRoomAction(room, {
+    seatToken: "host-token",
+    type: "playCard",
+    card: { rank: "A", suit: "clubs" }
+  });
+
+  assert.throws(
+    () => applyRoomAction(room, {
+      seatToken: "guest-token",
+      type: "playCard",
+      card: { rank: "A", suit: "hearts" }
+    }),
+    /not legal/
+  );
+
+  room = applyRoomAction(room, {
+    seatToken: "guest-token",
+    type: "playCard",
+    card: { rank: "9", suit: "clubs" }
+  });
+  room = applyRoomAction(room, {
+    seatToken: "host-token",
+    type: "playCard",
+    card: { rank: "J", suit: "diamonds" }
+  });
+  room = applyRoomAction(room, {
+    seatToken: "guest-token",
+    type: "playCard",
+    card: { rank: "A", suit: "hearts" }
+  });
+
+  assert.equal(room.gameState.completedTricks.length, 2);
+});
+
+test("both players can pass upcard and choose second-round trump", () => {
+  let room = createStartedRoom();
+  const upcardSuit = room.gameState.upcard.suit;
+
+  room = applyRoomAction(room, { seatToken: "host-token", type: "passTrump" });
+  room = applyRoomAction(room, { seatToken: "guest-token", type: "passTrump" });
+
+  assert.equal(room.gameState.trumpState.round, 2);
+  assert.equal(room.gameState.trumpSuit, null);
+  assert.equal(room.gameState.currentTurn, "player1");
+  assert.equal(room.gameState.trumpState.upcardSuit, upcardSuit);
+
+  room = applyRoomAction(room, { seatToken: "host-token", type: "chooseTrump", suit: "spades" });
+  const view = sanitizeRoomForViewer(room, "host-token");
+
+  assert.equal(view.gameState.phase, "playing");
+  assert.equal(view.gameState.actionPhase, "playing");
+  assert.equal(view.gameState.trumpSuit, "spades");
+  assert.equal(view.gameState.trumpState.trumpSuit, "spades");
+  assert.notEqual(view.gameState.trumpSuit, null);
+});
+
 test("room game can complete a hand", () => {
   const room = completeHandRoom();
 

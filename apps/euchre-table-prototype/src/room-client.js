@@ -3,6 +3,8 @@ import { cardLabel, suitSymbol } from "./table-state.js";
 
 const storageKey = "euchreRoomSeat";
 const elements = {
+  lobbyControls: document.querySelector("#lobbyControls"),
+  activeRoomControls: document.querySelector("#activeRoomControls"),
   createRoomButton: document.querySelector("#createRoomButton"),
   joinRoomCode: document.querySelector("#joinRoomCode"),
   joinRoomButton: document.querySelector("#joinRoomButton"),
@@ -237,12 +239,15 @@ function render() {
   const opponentSeat = viewerSeat === "player1" ? "player2" : "player1";
   const playerCount = Number(roomView.players.player1) + Number(roomView.players.player2);
   const gameInterfaceActive = state.phase === "playing";
+  const trumpSuit = activeTrumpSuit(state);
 
+  elements.lobbyControls.hidden = true;
+  elements.activeRoomControls.hidden = false;
   elements.roomCode.textContent = roomView.roomCode;
   elements.viewerSeat.textContent = seatName(viewerSeat);
   elements.playerStatus.textContent = `${playerCount} / 2`;
   elements.currentTurn.textContent = seatName(state.currentTurn);
-  elements.trumpStatus.textContent = suitName(state.trumpSuit);
+  elements.trumpStatus.textContent = trumpLabel(trumpSuit);
   elements.matchStatus.textContent = matchStatusLabel(roomView.tournamentMatch);
   elements.readyStatus.textContent = readyLabel(roomView.playerReady);
   elements.coinFlipWinner.textContent = seatName(roomView.coinFlipWinner);
@@ -312,7 +317,7 @@ function renderStatus() {
       setStatus(`${seatName(state.currentTurn)} to choose or pass trump.`);
     }
   } else if (state.actionPhase === "playing") {
-    setStatus(`${seatName(state.currentTurn)} to play. Trump is ${suitName(state.trumpSuit)}.`);
+    setStatus(`${seatName(state.currentTurn)} to play. Trump: ${suitName(activeTrumpSuit(state))}.`);
   } else if (state.phase === "next_round_countdown" || state.phase === "hand_score") {
     const points = state.handScore.points;
     setStatus(`Hand complete. Player 1 +${points.player1}, Player 2 +${points.player2}. Next round starts in ${secondsUntil(state.nextRoundStartsAt)}.`);
@@ -494,6 +499,14 @@ function roomLinkFor(roomCode) {
 
 function suitName(suit) {
   return suit ? suit[0].toUpperCase() + suit.slice(1) : "None";
+}
+
+function trumpLabel(suit) {
+  return suit ? `Trump: ${suitName(suit)}` : "None";
+}
+
+function activeTrumpSuit(state) {
+  return state.trumpSuit ?? state.trumpState?.trumpSuit ?? null;
 }
 
 function isRed(suit) {

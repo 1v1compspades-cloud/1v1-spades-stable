@@ -13,12 +13,15 @@
           <p class="eyebrow">Play a Friend</p>
           <h1>Private Euchre Room</h1>
         </div>
-        <div class="controls">
+        <div id="lobbyControls" class="controls">
           <a class="button-link secondary-link" href="./home.html">Home</a>
           <button id="createRoomButton" type="button">Create Room</button>
           <label for="joinRoomCode">Room Code</label>
           <input id="joinRoomCode" class="room-input" maxlength="8" autocomplete="off" placeholder="ABCDE">
           <button id="joinRoomButton" type="button">Join Room</button>
+        </div>
+        <div id="activeRoomControls" class="controls" hidden>
+          <a class="button-link secondary-link" href="./home.html">Home</a>
         </div>
       </header>
 

@@ -75,6 +75,8 @@ test("room screen exposes create, join, share, and spectator labels", async () =
 
   assert.match(html, /Create Room/);
   assert.match(html, /Join Room/);
+  assert.match(html, /id="lobbyControls"/);
+  assert.match(html, /id="activeRoomControls" class="controls" hidden/);
   assert.match(html, /Copy Code/);
   assert.match(html, /Room Link/);
   assert.match(html, /id="readyButton"/);
@@ -93,6 +95,16 @@ test("room screen exposes create, join, share, and spectator labels", async () =
   assert.match(html, /Be Dealer/);
   assert.match(html, /Be Non-Dealer/);
   assert.match(html, /Spectator view is read-only/);
+});
+
+test("active room screen hides lobby create and join controls", async () => {
+  const client = await readText("src/room-client.js");
+
+  assert.match(client, /lobbyControls: document\.querySelector\("#lobbyControls"\)/);
+  assert.match(client, /activeRoomControls: document\.querySelector\("#activeRoomControls"\)/);
+  assert.match(client, /elements\.lobbyControls\.hidden = true/);
+  assert.match(client, /elements\.activeRoomControls\.hidden = false/);
+  assert.match(client, /Trump: \$\{suitName\(activeTrumpSuit\(state\)\)\}/);
 });
 
 test("Quick Match is wired as a placeholder", async () => {
