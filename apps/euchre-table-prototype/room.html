@@ -86,6 +86,39 @@
         <button id="readyButton" type="button" disabled>Ready</button>
       </section>
 
+      <section id="pregamePanel" class="panel pregame-panel">
+        <div class="panel-heading">
+          <h2>Opening Room</h2>
+          <span>Settings first</span>
+        </div>
+        <div class="pregame-grid">
+          <div>
+            <span>Match Type</span>
+            <strong>Community Competitive</strong>
+          </div>
+          <div>
+            <span>Target Score</span>
+            <strong id="pregameTargetScore">10</strong>
+          </div>
+          <div>
+            <span>Stick the Dealer</span>
+            <strong>On</strong>
+          </div>
+          <div>
+            <span>Rules Summary</span>
+            <strong>Coin flip, ready-up, countdown, then deal.</strong>
+          </div>
+          <div>
+            <span>Player 1 Slot</span>
+            <strong id="player1Slot">Waiting</strong>
+          </div>
+          <div>
+            <span>Player 2 Slot</span>
+            <strong id="player2Slot">Waiting</strong>
+          </div>
+        </div>
+      </section>
+
       <section class="scoreband" aria-label="Match score">
         <div>
           <span>Player 1</span>
@@ -101,7 +134,7 @@
         </div>
       </section>
 
-      <section class="table-grid room-table">
+      <section id="roomTable" class="table-grid room-table" hidden>
         <article class="panel player-panel">
           <div class="panel-heading">
             <h2>Your Hand</h2>

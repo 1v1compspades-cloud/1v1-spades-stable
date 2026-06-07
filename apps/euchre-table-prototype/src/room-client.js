@@ -28,10 +28,15 @@ const elements = {
   player1Score: document.querySelector("#player1Score"),
   player2Score: document.querySelector("#player2Score"),
   targetScore: document.querySelector("#targetScore"),
+  pregameTargetScore: document.querySelector("#pregameTargetScore"),
+  player1Slot: document.querySelector("#player1Slot"),
+  player2Slot: document.querySelector("#player2Slot"),
   viewerTricks: document.querySelector("#viewerTricks"),
   opponentTricks: document.querySelector("#opponentTricks"),
   viewerHand: document.querySelector("#viewerHand"),
   opponentHand: document.querySelector("#opponentHand"),
+  roomTable: document.querySelector("#roomTable"),
+  pregamePanel: document.querySelector("#pregamePanel"),
   spectatorNotice: document.querySelector("#spectatorNotice"),
   kittyCount: document.querySelector("#kittyCount"),
   upcard: document.querySelector("#upcard"),
@@ -120,7 +125,7 @@ if (session?.roomCode && session?.seatToken) {
   const urlRoomCode = new URL(window.location.href).searchParams.get("room");
   if (urlRoomCode) {
     elements.joinRoomCode.value = urlRoomCode.toUpperCase();
-    setStatus("Room code loaded. Join to take an open seat or watch as a spectator.");
+    autoJoinRoom(urlRoomCode.toUpperCase());
   }
 }
 
@@ -156,6 +161,24 @@ async function refreshRoom(status) {
     localStorage.removeItem(storageKey);
     session = null;
     setStatus(`${error.message}. Create a room or enter a room code to continue.`);
+  }
+}
+
+async function autoJoinRoom(roomCode) {
+  try {
+    const result = await api(`/api/rooms/${roomCode}/join`, {
+      method: "POST",
+      body: {}
+    });
+    setSession(result.room.roomCode, result.seatToken);
+    setRoom(result.room, `You are ${seatName(result.seat)}.`);
+  } catch (error) {
+    try {
+      const result = await api(`/api/rooms/${roomCode}`);
+      setRoom(result.room, "Spectator View. Both player seats are already taken.");
+    } catch {
+      setStatus(error.message);
+    }
   }
 }
 
@@ -213,6 +236,7 @@ function render() {
   const viewerSeat = roomView.viewerSeat;
   const opponentSeat = viewerSeat === "player1" ? "player2" : "player1";
   const playerCount = Number(roomView.players.player1) + Number(roomView.players.player2);
+  const gameInterfaceActive = state.phase === "playing";
 
   elements.roomCode.textContent = roomView.roomCode;
   elements.viewerSeat.textContent = seatName(viewerSeat);
@@ -230,22 +254,27 @@ function render() {
   elements.player1Score.textContent = state.score.player1;
   elements.player2Score.textContent = state.score.player2;
   elements.targetScore.textContent = state.targetScore;
+  elements.pregameTargetScore.textContent = state.targetScore;
+  elements.player1Slot.textContent = roomView.players.player1 ? readySeatLabel("player1", roomView.playerReady) : "Waiting";
+  elements.player2Slot.textContent = roomView.players.player2 ? readySeatLabel("player2", roomView.playerReady) : "Waiting";
   elements.kittyCount.textContent = `${state.kittyCount} cards`;
   elements.viewerTricks.textContent = viewerSeat === "spectator" ? "0 tricks" : `${state.tricksWon[viewerSeat]} tricks`;
   elements.opponentTricks.textContent = viewerSeat === "spectator" ? "0 tricks" : `${state.tricksWon[opponentSeat]} tricks`;
   elements.spectatorNotice.hidden = viewerSeat !== "spectator";
   const viewerReady = viewerSeat === "spectator" ? true : roomView.playerReady?.[viewerSeat];
-  const canChoosePosition = state.phase === "waiting_for_players"
+  const canChoosePosition = state.phase === "pregame_settings"
     && viewerSeat === roomView.coinFlipWinner
     && !roomView.firstDealer;
   elements.coinFlipPanel.hidden = !canChoosePosition;
   elements.chooseDealerButton.disabled = !canChoosePosition;
   elements.chooseNonDealerButton.disabled = !canChoosePosition;
-  elements.readyButton.hidden = !["waiting_for_players", "ready_countdown"].includes(state.phase) || viewerSeat === "spectator";
+  elements.readyButton.hidden = !["pregame_settings", "ready_countdown"].includes(state.phase) || viewerSeat === "spectator";
   elements.readyButton.disabled = Boolean(viewerReady) || viewerSeat === "spectator" || !roomView.firstDealer;
   elements.readyButton.textContent = viewerReady ? "Ready Set" : "Ready";
   elements.nextHandButton.hidden = true;
   elements.nextHandButton.disabled = true;
+  elements.roomTable.hidden = !gameInterfaceActive;
+  elements.pregamePanel.hidden = gameInterfaceActive;
 
   renderStatus();
   renderUpcard(state.upcard);
@@ -263,6 +292,8 @@ function renderStatus() {
   if (state.winner) {
     setStatus(`${seatName(state.winner)} wins the match.`);
   } else if (state.phase === "waiting_for_players") {
+    setStatus("Waiting for Player 2.");
+  } else if (state.phase === "pregame_settings") {
     if (!roomView.firstDealer) {
       setStatus(`${seatName(roomView.coinFlipWinner)} won the coin flip and chooses dealer or non-dealer.`);
     } else {
@@ -282,9 +313,9 @@ function renderStatus() {
     }
   } else if (state.actionPhase === "playing") {
     setStatus(`${seatName(state.currentTurn)} to play. Trump is ${suitName(state.trumpSuit)}.`);
-  } else if (state.phase === "hand_score") {
+  } else if (state.phase === "next_round_countdown" || state.phase === "hand_score") {
     const points = state.handScore.points;
-    setStatus(`Hand complete. Player 1 +${points.player1}, Player 2 +${points.player2}. Next round starts in ${secondsUntil(state.nextHandStartsAt)}.`);
+    setStatus(`Hand complete. Player 1 +${points.player1}, Player 2 +${points.player2}. Next round starts in ${secondsUntil(state.nextRoundStartsAt)}.`);
   }
 }
 
@@ -399,10 +430,10 @@ function waitingMessage(view, state, playerCount) {
   }
 
   if (playerCount < 2) {
-    return "Waiting for both players.";
+    return "Waiting for Player 2.";
   }
 
-  if (state.phase === "waiting_for_players") {
+  if (state.phase === "pregame_settings") {
     if (!view.firstDealer) {
       return `${seatName(view.coinFlipWinner)} won the coin flip. Waiting for starting position choice.`;
     }
@@ -421,8 +452,8 @@ function waitingMessage(view, state, playerCount) {
     return `${seatName(state.currentTurn)} plays next.`;
   }
 
-  if (state.phase === "hand_score") {
-    return `Next round starts in ${secondsUntil(state.nextHandStartsAt)}.`;
+  if (state.phase === "next_round_countdown" || state.phase === "hand_score") {
+    return `Next round starts in ${secondsUntil(state.nextRoundStartsAt)}.`;
   }
 
   return "Room ready.";
@@ -430,6 +461,10 @@ function waitingMessage(view, state, playerCount) {
 
 function readyLabel(ready = {}) {
   return `P1 ${ready.player1 ? "Ready" : "Not Ready"} / P2 ${ready.player2 ? "Ready" : "Not Ready"}`;
+}
+
+function readySeatLabel(seat, ready = {}) {
+  return `${seatName(seat)} ${ready[seat] ? "Ready" : "Not Ready"}`;
 }
 
 function startingPositionLabel(choice) {

@@ -23,7 +23,7 @@ export function createRoom({
   roomCode = generateRoomCode(),
   seatToken = generateSeatToken(),
   modeId = "communityCompetitive",
-  coinFlipWinner = flipCoinWinner(),
+  coinFlipWinner = null,
   tournamentMatch = null
 } = {}) {
   const mode = GAME_MODES[modeId] ?? GAME_MODES.communityCompetitive;
@@ -49,6 +49,7 @@ export function createRoom({
     countdownStartedAt: null,
     countdownEndsAt: null,
     nextHandStartsAt: null,
+    nextRoundStartsAt: null,
     tournamentMatch,
     gameState,
     createdAt: new Date().toISOString(),
@@ -68,6 +69,7 @@ export function joinRoom(room, { seatToken = generateSeatToken() } = {}) {
   }
 
   if (!room.players.player2) {
+    const coinFlipWinner = room.coinFlipWinner ?? flipCoinWinner();
     return {
       room: syncRoomFields({
         ...room,
@@ -79,8 +81,14 @@ export function joinRoom(room, { seatToken = generateSeatToken() } = {}) {
             connected: true
           }
         },
+        coinFlipWinner,
         countdownStartedAt: null,
         countdownEndsAt: null,
+        gameState: {
+          ...room.gameState,
+          phase: "pregame_settings",
+          actionPhase: "pregame_settings"
+        },
         updatedAt: new Date().toISOString()
       }),
       seat: "player2",
@@ -105,7 +113,7 @@ export function applyRoomAction(room, { seatToken, type, suit, position, card, d
   const gameState = room.gameState;
 
   if (type === "ready") {
-    ensureWaitingOrCountdown(gameState);
+    ensurePregameOrCountdown(gameState);
     ensureStartingDealerChosen(room);
 
     const nextReady = {
@@ -121,7 +129,8 @@ export function applyRoomAction(room, { seatToken, type, suit, position, card, d
   }
 
   if (type === "chooseStartingPosition") {
-    ensureWaitingOrCountdown(gameState);
+    ensurePregameOrCountdown(gameState);
+    ensureBothPlayersSeated(room);
 
     if (seat !== room.coinFlipWinner) {
       throw roomError(403, "Only the coin flip winner chooses the starting position");
@@ -254,6 +263,7 @@ export function sanitizeRoomForViewer(room, seatToken) {
     countdownStartedAt: room.countdownStartedAt,
     countdownEndsAt: room.countdownEndsAt,
     nextHandStartsAt: room.nextHandStartsAt,
+    nextRoundStartsAt: room.nextRoundStartsAt,
     tournamentMatch: room.tournamentMatch
       ? sanitizeTournamentMatch(room.tournamentMatch, state)
       : null,
@@ -288,6 +298,7 @@ export function sanitizeRoomForViewer(room, seatToken) {
       handHistory: state.handHistory,
       countdownEndsAt: room.countdownEndsAt,
       nextHandStartsAt: room.nextHandStartsAt,
+      nextRoundStartsAt: room.nextRoundStartsAt,
       availableTrumpSuits: state.actionPhase === "selectingTrump" && viewerSeat === state.currentTurn
         ? availableTrumpSuits(state.trumpState)
         : []
@@ -330,10 +341,11 @@ export function advanceRoomClock(room, { now = Date.now(), deck } = {}) {
     });
   }
 
-  if (room.gameState.phase === "hand_score" && !room.gameState.winner && room.nextHandStartsAt && now >= Date.parse(room.nextHandStartsAt)) {
+  if (["hand_score", "next_round_countdown"].includes(room.gameState.phase) && !room.gameState.winner && room.nextRoundStartsAt && now >= Date.parse(room.nextRoundStartsAt)) {
     return syncRoomFields({
       ...room,
       nextHandStartsAt: null,
+      nextRoundStartsAt: null,
       gameState: startHand(room.gameState, { deck }),
       updatedAt: new Date().toISOString()
     });
@@ -517,6 +529,7 @@ function playCardForRoom(room, player, card) {
       score,
       winner
     };
+    const nextRoundStartsAt = winner ? null : new Date(Date.now() + NEXT_HAND_DELAY_MS).toISOString();
 
     return syncRoomFields({
       ...room,
@@ -530,11 +543,12 @@ function playCardForRoom(room, player, card) {
         tricksWon,
         handScore,
         handHistory: [...state.handHistory, handSummary],
-        phase: winner ? "match_complete" : "hand_score",
+        phase: winner ? "match_complete" : "next_round_countdown",
         actionPhase: winner ? "match_complete" : "hand_score",
         currentTurn: null
       },
-      nextHandStartsAt: winner ? null : new Date(Date.now() + NEXT_HAND_DELAY_MS).toISOString(),
+      nextHandStartsAt: nextRoundStartsAt,
+      nextRoundStartsAt,
       updatedAt: new Date().toISOString()
     });
   }
@@ -607,8 +621,8 @@ function maybeStartReadyCountdown(room) {
       countdownEndsAt: null,
       gameState: {
         ...room.gameState,
-        phase: "waiting_for_players",
-        actionPhase: "waiting_for_players"
+        phase: bothPlayersConnected(room) ? "pregame_settings" : "waiting_for_players",
+        actionPhase: bothPlayersConnected(room) ? "pregame_settings" : "waiting_for_players"
       }
     });
   }
@@ -640,6 +654,12 @@ function bothPlayersReady(room) {
 function ensureStartingDealerChosen(room) {
   if (!room.firstDealer) {
     throw new Error("Coin flip winner must choose dealer or non-dealer first");
+  }
+}
+
+function ensureBothPlayersSeated(room) {
+  if (!room.players.player1 || !room.players.player2) {
+    throw new Error("Waiting for Player 2");
   }
 }
 
@@ -697,8 +717,8 @@ function ensurePhase(gameState, phase) {
   }
 }
 
-function ensureWaitingOrCountdown(gameState) {
-  if (!["waiting_for_players", "ready_countdown"].includes(gameState.phase)) {
+function ensurePregameOrCountdown(gameState) {
+  if (!["pregame_settings", "ready_countdown"].includes(gameState.phase)) {
     throw new Error("Ready is only available before the first hand");
   }
 }

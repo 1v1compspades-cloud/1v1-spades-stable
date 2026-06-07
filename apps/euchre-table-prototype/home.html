@@ -13,11 +13,50 @@
         <h1>1V1 Euchre Free Play</h1>
         <p class="home-copy">Free-play competitive 1v1 Euchre for tester rooms and small community brackets.</p>
         <p class="home-disclaimer">Free-play only. No cash games. No deposits. No wallets. No paid entries.</p>
+      </section>
+
+      <section class="home-player-panel" aria-label="Player setup">
+        <label for="playerNameInput">Player name</label>
+        <input id="playerNameInput" class="name-input" type="text" autocomplete="nickname" placeholder="PLAYER 1">
+      </section>
+
+      <section class="home-settings-panel" aria-label="Euchre settings and rules">
+        <div class="settings-heading">
+          <div>
+            <p class="eyebrow">Match Settings</p>
+            <h2>Choose rules before starting</h2>
+          </div>
+          <span>Free-play only</span>
+        </div>
+
+        <div class="settings-grid">
+          <label class="setting-control" for="scoreLimitSelect">
+            <span>Score limit</span>
+            <select id="scoreLimitSelect">
+              <option value="10" selected>First to 10</option>
+              <option value="5">Fast game, first to 5</option>
+            </select>
+          </label>
+
+          <label class="setting-toggle" for="stickDealerToggle">
+            <input id="stickDealerToggle" type="checkbox" checked>
+            <span>Stick the Dealer</span>
+          </label>
+        </div>
+
+        <ul class="rules-summary">
+          <li>24-card deck: 9, 10, J, Q, K, A.</li>
+          <li>Right bower is highest trump; left bower counts as trump.</li>
+          <li>Trump may be led immediately after selection.</li>
+          <li>Players must follow the led suit when possible.</li>
+        </ul>
+      </section>
+
+      <section class="home-action-panel" aria-label="Main actions">
         <div class="home-actions">
           <a class="button-link" href="./room.html?action=create">Create Room</a>
           <a class="button-link secondary-link" href="./room.html?action=join">Join Room</a>
           <button id="quickMatchButton" type="button">Quick Match</button>
-          <a class="button-link" href="./tournament.html">Create Tournament</a>
           <a class="button-link secondary-link" href="./rules.html">Rules</a>
         </div>
         <p id="quickMatchStatus" class="home-status" aria-live="polite"></p>
@@ -42,6 +81,23 @@
           <h2>Spectators</h2>
           <p>Spectator views are read-only and keep hidden hands private while showing public match status.</p>
         </article>
+      </section>
+
+      <section class="home-admin-panel" aria-label="Admin access">
+        <details>
+          <summary>Admin</summary>
+          <div class="admin-code-row">
+            <label for="homepageAdminCode">Code</label>
+            <input id="homepageAdminCode" class="admin-code-input" type="password" autocomplete="off">
+            <button id="unlockAdminButton" class="compact-button secondary" type="button">Unlock</button>
+          </div>
+          <p id="homepageAdminStatus" class="admin-status" aria-live="polite">Tournament controls are hidden from normal players.</p>
+          <div id="homepageAdminControls" class="homepage-admin-controls" hidden>
+            <a class="button-link" href="./tournament.html">Create Tournament</a>
+            <a class="button-link secondary-link" href="./tournament.html">Tournament settings</a>
+            <a class="button-link secondary-link" href="./tournament.html">Host tournament tools</a>
+          </div>
+        </details>
       </section>
     </main>
 

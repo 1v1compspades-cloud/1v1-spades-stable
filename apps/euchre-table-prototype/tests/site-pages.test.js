@@ -8,19 +8,30 @@ const appRoot = new URL("../", import.meta.url);
 
 test("home screen has the main routes and actions", async () => {
   const html = await readText("home.html");
+  const publicActions = html.match(/<section class="home-action-panel"[\s\S]*?<\/section>/)?.[0] ?? "";
 
   assert.match(html, /1V1 Euchre Free Play/);
-  assert.match(html, /Create Room/);
-  assert.match(html, /Join Room/);
-  assert.match(html, /Quick Match/);
-  assert.match(html, /Create Tournament/);
-  assert.match(html, /Rules/);
+  assert.match(publicActions, /Create Room/);
+  assert.match(publicActions, /Join Room/);
+  assert.match(publicActions, /Quick Match/);
+  assert.match(publicActions, /Rules/);
+  assert.doesNotMatch(publicActions, /Create Tournament/);
+  assert.match(html, /Player name/);
+  assert.match(html, /Match Settings/);
+  assert.match(html, /Score limit/);
+  assert.match(html, /Stick the Dealer/);
+  assert.match(html, /Trump may be led immediately/);
   assert.match(html, /Free-play only/);
   assert.match(html, /No cash games\. No deposits\. No wallets\. No paid entries\./);
   assert.match(html, /Free-play competitive 1v1 Euchre/);
   assert.match(html, /Fair Play/);
   assert.match(html, /Discord\/community link placeholder/);
   assert.match(html, /Spectator views are read-only/);
+  assert.match(html, /id="homepageAdminCode"/);
+  assert.match(html, /id="homepageAdminControls" class="homepage-admin-controls" hidden/);
+  assert.match(html, /Create Tournament/);
+  assert.match(html, /Tournament settings/);
+  assert.match(html, /Host tournament tools/);
 });
 
 test("tournament screen has create, join, lobby, and bracket sections", async () => {
@@ -68,6 +79,14 @@ test("room screen exposes create, join, share, and spectator labels", async () =
   assert.match(html, /Room Link/);
   assert.match(html, /id="readyButton"/);
   assert.match(html, /id="readyStatus"/);
+  assert.match(html, /id="pregamePanel"/);
+  assert.match(html, /Opening Room/);
+  assert.match(html, /Match Type/);
+  assert.match(html, /Target Score/);
+  assert.match(html, /Stick the Dealer/);
+  assert.match(html, /Player 1 Slot/);
+  assert.match(html, /Player 2 Slot/);
+  assert.match(html, /id="roomTable"/);
   assert.match(html, /id="coinFlipWinner"/);
   assert.match(html, /id="startingPosition"/);
   assert.match(html, /id="currentDealer"/);
@@ -81,6 +100,15 @@ test("Quick Match is wired as a placeholder", async () => {
 
   assert.match(client, /\/api\/quick-match/);
   assert.match(client, /Quick Match coming next/);
+});
+
+test("home admin code gate unlocks tournament controls client-side", async () => {
+  const client = await readText("src/home-client.js");
+
+  assert.match(client, /homepageAdminCodeValue = "MEHDI"/);
+  assert.match(client, /homepageAdminControls\.hidden = false/);
+  assert.match(client, /Admin tournament controls unlocked/);
+  assert.match(client, /Admin code not recognized/);
 });
 
 test("deployment notes document launch commands and entrypoint", async () => {

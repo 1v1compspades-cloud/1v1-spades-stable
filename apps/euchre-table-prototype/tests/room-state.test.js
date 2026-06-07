@@ -36,13 +36,13 @@ const fixedDeck = [
   { rank: "10", suit: "spades" }
 ];
 
-test("creates a room, seats host as Player 1, and records coin flip winner", () => {
-  const room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", coinFlipWinner: "player1" });
+test("creates a room with no cards dealt and no coin flip before Player 2 joins", () => {
+  const room = createRoom({ roomCode: "ABCDE", seatToken: "host-token" });
 
   assert.equal(room.roomCode, "ABCDE");
   assert.equal(room.players.player1.seatToken, "host-token");
   assert.equal(room.players.player2, null);
-  assert.equal(room.coinFlipWinner, "player1");
+  assert.equal(room.coinFlipWinner, null);
   assert.equal(room.firstDealer, null);
   assert.equal(room.gameState.dealer, null);
   assert.equal(room.currentTurn, null);
@@ -61,8 +61,19 @@ test("joins second player and supports reconnect by seat token", () => {
   const rejoined = joinRoom(joined.room, { seatToken: "guest-token" });
   assert.equal(rejoined.seat, "player2");
   assert.equal(rejoined.room.players.player2.seatToken, "guest-token");
-  assert.equal(rejoined.room.gameState.phase, "waiting_for_players");
+  assert.equal(rejoined.room.gameState.phase, "pregame_settings");
   assert.equal(rejoined.room.gameState.hands.player1.length, 0);
+});
+
+test("coin flip appears only after both players are seated", () => {
+  let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token" });
+  assert.equal(room.coinFlipWinner, null);
+  assert.equal(room.gameState.phase, "waiting_for_players");
+
+  room = joinRoom(room, { seatToken: "guest-token" }).room;
+
+  assert.equal(["player1", "player2"].includes(room.coinFlipWinner), true);
+  assert.equal(room.gameState.phase, "pregame_settings");
 });
 
 test("coin flip winner receives choice and assigns first dealer", () => {
@@ -107,8 +118,18 @@ test("ready before starting dealer choice is rejected", () => {
   assert.throws(() => applyRoomAction(room, { seatToken: "host-token", type: "ready" }), /Coin flip winner/);
 });
 
-test("Player 1 ready alone does not deal cards", () => {
+test("Player 1 alone cannot ready, start, or deal cards", () => {
+  const room = createRoom({ roomCode: "ABCDE", seatToken: "host-token" });
+
+  assert.throws(() => applyRoomAction(room, { seatToken: "host-token", type: "ready" }), /Ready is only available/);
+  assert.equal(room.gameState.phase, "waiting_for_players");
+  assert.equal(room.gameState.hands.player1.length, 0);
+  assert.equal(room.coinFlipWinner, null);
+});
+
+test("Player 1 ready without Player 2 ready does not deal cards", () => {
   let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", coinFlipWinner: "player1" });
+  room = joinRoom(room, { seatToken: "guest-token" }).room;
   room = applyRoomAction(room, {
     seatToken: "host-token",
     type: "chooseStartingPosition",
@@ -119,7 +140,7 @@ test("Player 1 ready alone does not deal cards", () => {
 
   assert.equal(room.playerReady.player1, true);
   assert.equal(room.playerReady.player2, false);
-  assert.equal(room.gameState.phase, "waiting_for_players");
+  assert.equal(room.gameState.phase, "pregame_settings");
   assert.equal(room.gameState.hands.player1.length, 0);
   assert.equal(room.countdownEndsAt, null);
 });
@@ -199,14 +220,14 @@ test("dealer rotates every hand across multiple hands", () => {
   assert.equal(room.gameState.dealer, "player2");
 
   room = completeHandRoom(room);
-  room = advanceRoomClock(room, { now: Date.parse(room.nextHandStartsAt) + 1, deck: fixedDeck });
+  room = advanceRoomClock(room, { now: Date.parse(room.nextRoundStartsAt) + 1, deck: fixedDeck });
 
   assert.equal(room.gameState.handNumber, 2);
   assert.equal(room.gameState.dealer, "player1");
 
   room = applyRoomAction(room, { seatToken: "guest-token", type: "chooseTrump", suit: "hearts" });
   room = playFixedHandWithPlayer2Lead(room);
-  room = advanceRoomClock(room, { now: Date.parse(room.nextHandStartsAt) + 1, deck: fixedDeck });
+  room = advanceRoomClock(room, { now: Date.parse(room.nextRoundStartsAt) + 1, deck: fixedDeck });
 
   assert.equal(room.gameState.handNumber, 3);
   assert.equal(room.gameState.dealer, "player2");
@@ -270,22 +291,22 @@ test("rejects illegal card play", () => {
 test("room game can complete a hand", () => {
   const room = completeHandRoom();
 
-  assert.equal(room.gameState.phase, "hand_score");
+  assert.equal(room.gameState.phase, "next_round_countdown");
   assert.deepEqual(room.score, { player1: 0, player2: 2 });
   assert.equal(room.handHistory.length, 1);
-  assert.equal(Boolean(room.nextHandStartsAt), true);
+  assert.equal(Boolean(room.nextRoundStartsAt), true);
 });
 
 test("next hand auto-starts after score phase if match is not complete", () => {
   let room = completeHandRoom();
-  const nextHandAt = Date.parse(room.nextHandStartsAt) + 1;
+  const nextHandAt = Date.parse(room.nextRoundStartsAt) + 1;
 
   room = advanceRoomClock(room, { now: nextHandAt, deck: fixedDeck });
 
   assert.equal(room.gameState.phase, "playing");
   assert.equal(room.gameState.actionPhase, "selectingTrump");
   assert.equal(room.gameState.handNumber, 2);
-  assert.equal(room.nextHandStartsAt, null);
+  assert.equal(room.nextRoundStartsAt, null);
   assert.equal(room.gameState.hands.player1.length, 5);
 });
 
@@ -307,7 +328,7 @@ test("next hand does not auto-start when match target is reached", () => {
 
   assert.equal(room.gameState.phase, "match_complete");
   assert.equal(room.gameState.winner, "player2");
-  assert.equal(room.nextHandStartsAt, null);
+  assert.equal(room.nextRoundStartsAt, null);
   assert.equal(advanceRoomClock(room, { now: Date.now() + 6000, deck: fixedDeck }).gameState.phase, "match_complete");
 });
 
