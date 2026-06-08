@@ -1,0 +1,311 @@
+{
+  "version": 1,
+  "savedAt": "2026-06-08T15:02:30.395Z",
+  "rooms": {
+    "67QQB": {
+      "roomCode": "67QQB",
+      "players": {
+        "player1": {
+          "seat": "player1",
+          "seatToken": "mq5c987g-zho5436j",
+          "connected": true,
+          "displayName": "me"
+        },
+        "player2": null
+      },
+      "playerReady": {
+        "player1": false,
+        "player2": false
+      },
+      "coinFlipWinner": null,
+      "coinFlipWinnerSeed": null,
+      "startingPositionChoice": null,
+      "firstDealer": null,
+      "countdownStartedAt": null,
+      "countdownEndsAt": null,
+      "nextHandStartsAt": null,
+      "nextRoundStartsAt": null,
+      "tournamentMatch": null,
+      "gameState": {
+        "modeId": "communityCompetitive",
+        "mode": {
+          "id": "communityCompetitive",
+          "name": "Community Competitive",
+          "stickTheDealer": true,
+          "redealOnDoublePass": false,
+          "targetScore": 10,
+          "rulesLocked": true,
+          "hintsEnabled": false
+        },
+        "phase": "waiting_for_players",
+        "actionPhase": "waiting_for_players",
+        "score": {
+          "player1": 0,
+          "player2": 0
+        },
+        "winner": null,
+        "dealer": null,
+        "handNumber": 0,
+        "hands": {
+          "player1": [],
+          "player2": []
+        },
+        "kitty": [],
+        "upcard": null,
+        "trumpState": null,
+        "trumpSuit": null,
+        "maker": null,
+        "leader": null,
+        "currentTurn": null,
+        "currentTrick": [],
+        "completedTricks": [],
+        "tricksWon": {
+          "player1": 0,
+          "player2": 0
+        },
+        "handScore": null,
+        "handHistory": []
+      },
+      "createdAt": "2026-06-08T15:01:07.660Z",
+      "updatedAt": "2026-06-08T15:01:07.660Z",
+      "currentTurn": null,
+      "dealer": null,
+      "currentDealer": null,
+      "trumpState": null,
+      "score": {
+        "player1": 0,
+        "player2": 0
+      },
+      "handHistory": []
+    },
+    "4WTPQ": {
+      "roomCode": "4WTPQ",
+      "players": {
+        "player1": {
+          "seat": "player1",
+          "seatToken": "mq5ca69p-f616fuja",
+          "connected": true,
+          "displayName": "me"
+        },
+        "player2": null
+      },
+      "playerReady": {
+        "player1": false,
+        "player2": false
+      },
+      "coinFlipWinner": null,
+      "coinFlipWinnerSeed": null,
+      "startingPositionChoice": null,
+      "firstDealer": null,
+      "countdownStartedAt": null,
+      "countdownEndsAt": null,
+      "nextHandStartsAt": null,
+      "nextRoundStartsAt": null,
+      "tournamentMatch": null,
+      "gameState": {
+        "modeId": "communityCompetitive",
+        "mode": {
+          "id": "communityCompetitive",
+          "name": "Community Competitive",
+          "stickTheDealer": true,
+          "redealOnDoublePass": false,
+          "targetScore": 10,
+          "rulesLocked": true,
+          "hintsEnabled": false
+        },
+        "phase": "waiting_for_players",
+        "actionPhase": "waiting_for_players",
+        "score": {
+          "player1": 0,
+          "player2": 0
+        },
+        "winner": null,
+        "dealer": null,
+        "handNumber": 0,
+        "hands": {
+          "player1": [],
+          "player2": []
+        },
+        "kitty": [],
+        "upcard": null,
+        "trumpState": null,
+        "trumpSuit": null,
+        "maker": null,
+        "leader": null,
+        "currentTurn": null,
+        "currentTrick": [],
+        "completedTricks": [],
+        "tricksWon": {
+          "player1": 0,
+          "player2": 0
+        },
+        "handScore": null,
+        "handHistory": []
+      },
+      "createdAt": "2026-06-08T15:01:51.805Z",
+      "updatedAt": "2026-06-08T15:01:51.805Z",
+      "currentTurn": null,
+      "dealer": null,
+      "currentDealer": null,
+      "trumpState": null,
+      "score": {
+        "player1": 0,
+        "player2": 0
+      },
+      "handHistory": []
+    },
+    "JHK89": {
+      "roomCode": "JHK89",
+      "players": {
+        "player1": {
+          "seat": "player1",
+          "seatToken": "mq5caflc-x7qwu10i",
+          "connected": true,
+          "displayName": "me"
+        },
+        "player2": null
+      },
+      "playerReady": {
+        "player1": false,
+        "player2": false
+      },
+      "coinFlipWinner": null,
+      "coinFlipWinnerSeed": null,
+      "startingPositionChoice": null,
+      "firstDealer": null,
+      "countdownStartedAt": null,
+      "countdownEndsAt": null,
+      "nextHandStartsAt": null,
+      "nextRoundStartsAt": null,
+      "tournamentMatch": null,
+      "gameState": {
+        "modeId": "communityCompetitive",
+        "mode": {
+          "id": "communityCompetitive",
+          "name": "Community Competitive",
+          "stickTheDealer": true,
+          "redealOnDoublePass": false,
+          "targetScore": 10,
+          "rulesLocked": true,
+          "hintsEnabled": false
+        },
+        "phase": "waiting_for_players",
+        "actionPhase": "waiting_for_players",
+        "score": {
+          "player1": 0,
+          "player2": 0
+        },
+        "winner": null,
+        "dealer": null,
+        "handNumber": 0,
+        "hands": {
+          "player1": [],
+          "player2": []
+        },
+        "kitty": [],
+        "upcard": null,
+        "trumpState": null,
+        "trumpSuit": null,
+        "maker": null,
+        "leader": null,
+        "currentTurn": null,
+        "currentTrick": [],
+        "completedTricks": [],
+        "tricksWon": {
+          "player1": 0,
+          "player2": 0
+        },
+        "handScore": null,
+        "handHistory": []
+      },
+      "createdAt": "2026-06-08T15:02:03.888Z",
+      "updatedAt": "2026-06-08T15:02:03.888Z",
+      "currentTurn": null,
+      "dealer": null,
+      "currentDealer": null,
+      "trumpState": null,
+      "score": {
+        "player1": 0,
+        "player2": 0
+      },
+      "handHistory": []
+    },
+    "5BMTB": {
+      "roomCode": "5BMTB",
+      "players": {
+        "player1": {
+          "seat": "player1",
+          "seatToken": "mq5cap1g-lphtcsyx",
+          "connected": true,
+          "displayName": "me"
+        },
+        "player2": null
+      },
+      "playerReady": {
+        "player1": false,
+        "player2": false
+      },
+      "coinFlipWinner": null,
+      "coinFlipWinnerSeed": null,
+      "startingPositionChoice": null,
+      "firstDealer": null,
+      "countdownStartedAt": null,
+      "countdownEndsAt": null,
+      "nextHandStartsAt": null,
+      "nextRoundStartsAt": null,
+      "tournamentMatch": null,
+      "gameState": {
+        "modeId": "communityCompetitive",
+        "mode": {
+          "id": "communityCompetitive",
+          "name": "Community Competitive",
+          "stickTheDealer": true,
+          "redealOnDoublePass": false,
+          "targetScore": 10,
+          "rulesLocked": true,
+          "hintsEnabled": false
+        },
+        "phase": "waiting_for_players",
+        "actionPhase": "waiting_for_players",
+        "score": {
+          "player1": 0,
+          "player2": 0
+        },
+        "winner": null,
+        "dealer": null,
+        "handNumber": 0,
+        "hands": {
+          "player1": [],
+          "player2": []
+        },
+        "kitty": [],
+        "upcard": null,
+        "trumpState": null,
+        "trumpSuit": null,
+        "maker": null,
+        "leader": null,
+        "currentTurn": null,
+        "currentTrick": [],
+        "completedTricks": [],
+        "tricksWon": {
+          "player1": 0,
+          "player2": 0
+        },
+        "handScore": null,
+        "handHistory": []
+      },
+      "createdAt": "2026-06-08T15:02:16.132Z",
+      "updatedAt": "2026-06-08T15:02:16.132Z",
+      "currentTurn": null,
+      "dealer": null,
+      "currentDealer": null,
+      "trumpState": null,
+      "score": {
+        "player1": 0,
+        "player2": 0
+      },
+      "handHistory": []
+    }
+  },
+  "tournaments": {}
+}
