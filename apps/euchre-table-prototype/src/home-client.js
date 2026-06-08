@@ -15,7 +15,7 @@ const homepageAdminStatus = document.querySelector("#homepageAdminStatus");
 const homepageAdminControls = document.querySelector("#homepageAdminControls");
 const homepageAdminAccessKey = "euchreHomepageAdminUnlocked";
 const homepageSettingsKey = "euchreHomepageSettings";
-const homepageAdminCodeValue = "MEHDI";
+const homepageAdminCodeValue = "Zxcvfdsaqwer1287!";
 
 setupInfoPanel();
 
@@ -78,7 +78,7 @@ document.querySelectorAll(".home-actions a").forEach((link) => {
 });
 
 unlockAdminButton.addEventListener("click", () => {
-  if (homepageAdminCode.value.trim().toUpperCase() !== homepageAdminCodeValue) {
+  if (homepageAdminCode.value.trim() !== homepageAdminCodeValue) {
     homepageAdminControls.hidden = true;
     homepageAdminStatus.textContent = "Admin code not recognized.";
     return;

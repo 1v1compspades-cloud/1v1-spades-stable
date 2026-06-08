@@ -515,19 +515,18 @@ function renderStatus() {
 function renderTrumpControls(state, viewerSeat) {
   if (!elements.trumpPanel || !elements.trumpButtons || !elements.passButton || !elements.trumpHelp) return;
   const canAct = state.actionPhase === "selectingTrump" && viewerSeat === state.currentTurn;
-  elements.trumpPanel.hidden = state.actionPhase !== "selectingTrump";
+  setHidden(elements.trumpPanel, state.actionPhase !== "selectingTrump");
   elements.trumpButtons.replaceChildren();
+  setHidden(elements.passButton, !canAct);
   elements.passButton.disabled = !canAct || state.trumpState.forcedDealerChoice;
-  elements.trumpHelp.textContent = canAct
-    ? "Choose trump or pass. Trump may be led immediately once chosen."
-    : `${getPlayerDisplayName(state.currentTurn)} is choosing trump.`;
+  elements.trumpHelp.textContent = trumpActionHelp(state, canAct);
 
   if (!canAct) return;
 
   for (const suit of state.availableTrumpSuits) {
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = `${suitSymbol(suit)} ${suitName(suit)}`;
+    button.textContent = trumpActionLabel(state, suit);
     button.addEventListener("click", () => sendAction({ type: "chooseTrump", suit }).catch((error) => setStatus(error.message)));
     elements.trumpButtons.append(button);
   }
@@ -698,6 +697,34 @@ function waitingMessage(view, state, playerCount) {
   }
 
   return "Room ready.";
+}
+
+function trumpActionHelp(state, canAct) {
+  if (canAct) {
+    if (state.trumpState?.forcedDealerChoice) {
+      return "Stick the Dealer is active. Choose trump to continue.";
+    }
+
+    return `${getPlayerDisplayName(state.currentTurn)} to choose or pass trump.`;
+  }
+
+  if (roomView?.viewerSeat === "spectator") {
+    return `${getPlayerDisplayName(state.currentTurn)} is choosing trump. Spectators cannot act.`;
+  }
+
+  return `${getPlayerDisplayName(state.currentTurn)} is choosing trump.`;
+}
+
+function trumpActionLabel(state, suit) {
+  const label = `${suitSymbol(suit)} ${suitName(suit)}`;
+
+  if (state.trumpState?.round === 1) {
+    return state.currentTurn === state.trumpState.dealer
+      ? `Keep ${label}`
+      : `Order Up ${label}`;
+  }
+
+  return `Choose ${label}`;
 }
 
 function readyLabel(ready = {}) {

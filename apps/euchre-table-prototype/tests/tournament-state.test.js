@@ -10,7 +10,11 @@ import {
   sanitizeTournamentForAdmin,
   sanitizeTournamentForViewer,
   startTournament,
-  tournamentHasNoRestrictedFields
+  tournamentHasNoRestrictedFields,
+  TOURNAMENT_ADMIN_KEY,
+  VALID_BRACKET_SIZES,
+  validateTournamentBracket,
+  verifyTournamentAdmin
 } from "../src/tournament-state.js";
 
 test("creates a tournament with a selected bracket size", () => {
@@ -21,6 +25,41 @@ test("creates a tournament with a selected bracket size", () => {
   assert.equal(tournament.bracketSize, 4);
   assert.deepEqual(tournament.players, []);
   assert.equal(tournament.status, "lobby");
+});
+
+test("default admin key accepts the configured key and rejects old keys", () => {
+  const tournament = createTournament({ tournamentCode: "EUCHRE", bracketSize: 4 });
+
+  assert.equal(tournament.adminKey, TOURNAMENT_ADMIN_KEY);
+  assert.equal(verifyTournamentAdmin(tournament, "Zxcvfdsaqwer1287!"), true);
+  assert.throws(() => verifyTournamentAdmin(tournament, "MEHDI"), /Invalid admin key/);
+  assert.throws(() => verifyTournamentAdmin(tournament, "HOSTKEY"), /Invalid admin key/);
+  assert.equal(JSON.stringify(sanitizeTournamentForViewer(tournament)).includes(TOURNAMENT_ADMIN_KEY), false);
+});
+
+test("supported bracket sizes create first-round matches", () => {
+  assert.deepEqual(VALID_BRACKET_SIZES, [4, 8, 16, 32, 64]);
+
+  for (const bracketSize of VALID_BRACKET_SIZES) {
+    const createdRooms = [];
+    let tournament = fillTournament(bracketSize);
+    tournament = startTournament(tournament, {
+      adminKey: TOURNAMENT_ADMIN_KEY,
+      createMatchRoom: createMatchRoomRecorder(createdRooms)
+    });
+
+    assert.equal(tournament.bracketSize, bracketSize);
+    assert.equal(tournament.bracket.rounds.length, Math.log2(bracketSize));
+    assert.equal(tournament.bracket.rounds[0].matches.length, bracketSize / 2);
+    assert.equal(createdRooms.length, bracketSize / 2);
+    assert.equal(tournament.bracket.rounds[0].matches.every((match) => match.status === "active"), true);
+  }
+});
+
+test("invalid bracket size is rejected", () => {
+  for (const bracketSize of [0, 2, 6, 12, 24, 128]) {
+    assert.throws(() => createTournament({ tournamentCode: "EUCHRE", bracketSize }), /Bracket size must be 4, 8, 16, 32, or 64/);
+  }
 });
 
 test("player response never includes admin key", () => {
@@ -39,6 +78,28 @@ test("invalid admin key is rejected and valid key unlocks admin view", () => {
   const adminView = sanitizeTournamentForAdmin(tournament, "HOSTKEY");
   assert.equal(adminView.admin.verified, true);
   assert.equal(JSON.stringify(adminView).includes("HOSTKEY"), false);
+});
+
+test("admin-only tournament actions require the admin key", () => {
+  let tournament = fillTournament(4);
+  const createMatchRoom = createMatchRoomRecorder([]);
+
+  assert.throws(() => startTournament(tournament, { adminKey: "WRONG", createMatchRoom }), /Invalid admin key/);
+  assert.throws(() => resetTournamentLobby(tournament, { adminKey: "WRONG" }), /Invalid admin key/);
+  assert.throws(() => validateTournamentBracket(tournament, { adminKey: "WRONG" }), /Invalid admin key/);
+  assert.throws(() => exportTournamentBackup(tournament, { adminKey: "WRONG" }), /Invalid admin key/);
+
+  tournament = startTournament(tournament, { adminKey: TOURNAMENT_ADMIN_KEY, createMatchRoom });
+  const winner = tournament.bracket.rounds[0].matches[0].player1;
+
+  assert.throws(() => adminRecordMatchWinner(tournament, {
+    adminKey: "WRONG",
+    round: 1,
+    matchId: "r1m1",
+    winnerId: winner.id,
+    source: "admin_mark_winner",
+    createMatchRoom
+  }), /Invalid admin key/);
 });
 
 test("joins tournament lobby and prevents duplicate names", () => {
@@ -164,6 +225,32 @@ test("champion appears after final match completes", () => {
   assert.equal(sanitizeTournamentForViewer(tournament).winner.displayName, "A");
 });
 
+test("64-player bracket advances through champion", () => {
+  const createdRooms = [];
+  let tournament = fillTournament(64);
+  const createMatchRoom = createMatchRoomRecorder(createdRooms);
+
+  tournament = startTournament(tournament, {
+    adminKey: TOURNAMENT_ADMIN_KEY,
+    createMatchRoom
+  });
+
+  assert.equal(tournament.bracket.rounds.length, 6);
+  assert.deepEqual(tournament.bracket.rounds.map((round) => round.matches.length), [32, 16, 8, 4, 2, 1]);
+  assert.equal(tournament.bracket.rounds[0].matches.length, 32);
+  assert.equal(createdRooms.length, 32);
+  assert.equal(sanitizeTournamentForAdmin(tournament, TOURNAMENT_ADMIN_KEY).admin.bracketValidation.valid, true);
+
+  tournament = completeBracketByPlayerOne(tournament, createMatchRoom);
+
+  assert.equal(tournament.status, "complete");
+  assert.equal(tournament.winner.displayName, "Player 1");
+  assert.equal(tournament.resultLog.length, 63);
+  assert.equal(createdRooms.length, 63);
+  assert.equal(sanitizeTournamentForViewer(tournament).winner.displayName, "Player 1");
+  assert.equal("admin" in sanitizeTournamentForViewer(tournament), false);
+});
+
 test("player cannot start tournament and admin can reset lobby before start", () => {
   let tournament = createTournament({ tournamentCode: "EUCHRE", adminKey: "HOSTKEY", bracketSize: 4 });
   tournament = joinTournament(tournament, { displayName: "A" });
@@ -265,3 +352,44 @@ test("tournament state has no restricted commerce fields", () => {
 
   assert.equal(tournamentHasNoRestrictedFields(tournament, restricted), true);
 });
+
+function fillTournament(bracketSize) {
+  let tournament = createTournament({
+    tournamentCode: `E${bracketSize}`,
+    bracketSize
+  });
+
+  for (let index = 1; index <= bracketSize; index += 1) {
+    tournament = joinTournament(tournament, { displayName: `Player ${index}` });
+  }
+
+  return tournament;
+}
+
+function createMatchRoomRecorder(createdRooms) {
+  return ({ round, matchNumber }) => {
+    const roomCode = `ROOM${round}-${matchNumber}`;
+    createdRooms.push(roomCode);
+    return { roomCode };
+  };
+}
+
+function completeBracketByPlayerOne(tournament, createMatchRoom) {
+  let nextTournament = tournament;
+
+  for (const round of tournament.bracket.rounds) {
+    const roundMatches = [...nextTournament.bracket.rounds[round.round - 1].matches];
+    for (const match of roundMatches) {
+      nextTournament = adminRecordMatchWinner(nextTournament, {
+        adminKey: TOURNAMENT_ADMIN_KEY,
+        round: match.round,
+        matchId: match.matchId,
+        winnerId: match.player1.id,
+        source: "admin_mark_winner",
+        createMatchRoom
+      });
+    }
+  }
+
+  return nextTournament;
+}

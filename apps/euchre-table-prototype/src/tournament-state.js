@@ -1,7 +1,8 @@
 import { createRoom, noRestrictedFields } from "./room-state.js";
 
 const TOURNAMENT_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const VALID_BRACKET_SIZES = Object.freeze([4, 8, 16]);
+export const TOURNAMENT_ADMIN_KEY = "Zxcvfdsaqwer1287!";
+export const VALID_BRACKET_SIZES = Object.freeze([4, 8, 16, 32, 64]);
 
 export function createTournament({
   tournamentCode = generateTournamentCode(),
@@ -316,13 +317,7 @@ export function generateTournamentCode() {
 }
 
 export function generateAdminKey() {
-  let key = "";
-
-  for (let index = 0; index < 12; index += 1) {
-    key += TOURNAMENT_CODE_ALPHABET[Math.floor(Math.random() * TOURNAMENT_CODE_ALPHABET.length)];
-  }
-
-  return key;
+  return TOURNAMENT_ADMIN_KEY;
 }
 
 function collectMatchLinks(tournament) {
@@ -378,7 +373,7 @@ function normalizeName(name) {
 
 function assertBracketSize(bracketSize) {
   if (!VALID_BRACKET_SIZES.includes(Number(bracketSize))) {
-    throw tournamentError(400, "Bracket size must be 4, 8, or 16");
+    throw tournamentError(400, "Bracket size must be 4, 8, 16, 32, or 64");
   }
 }
 

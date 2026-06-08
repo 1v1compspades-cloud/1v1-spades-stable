@@ -516,7 +516,7 @@ test("spectator-safe room view does not expose hidden hands", () => {
   assert.equal(playerView.gameState.viewerHand.length, 5);
 });
 
-test("match room includes spectator-safe tournament metadata", () => {
+test("tournament match spectator view protects hidden hands", () => {
   let room = createRoom({
     roomCode: "MCH11",
     seatToken: "host-token",
@@ -549,7 +549,11 @@ test("match room includes spectator-safe tournament metadata", () => {
   assert.equal(view.tournamentMatch.player2.displayName, "B");
   assert.equal(view.tournamentMatch.status, "active");
   assert.equal(JSON.stringify(view).includes("seatToken"), false);
+  assert.equal("hands" in view.gameState, false);
   assert.deepEqual(view.gameState.viewerHand, []);
+  assert.deepEqual(view.gameState.playableCards, []);
+  assert.equal(view.gameState.handCounts.player1, 5);
+  assert.equal(view.gameState.handCounts.player2, 5);
 });
 
 test("refresh rejoin keeps the same player seat by token", () => {

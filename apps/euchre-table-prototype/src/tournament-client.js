@@ -39,10 +39,10 @@ elements.createButton.addEventListener("click", async () => {
       method: "POST",
       body: { bracketSize: Number(elements.bracketSize.value) }
     });
-    revealAdminKey(result.tournament.tournamentCode, result.adminKey);
+    showHostAccessNotice();
     verifiedAdminKey = result.adminKey;
-    setTournament(result.tournament, "Tournament created. Save the private host key, then share the public join link.");
-    await verifyAdmin(result.adminKey);
+    setTournament(result.tournament, "Tournament created. Host controls unlocked. Share only the public join link.");
+    await verifyAdmin(result.adminKey, false);
   } catch (error) {
     setStatus(error.message);
   }
@@ -183,7 +183,7 @@ async function verifyAdmin(adminKey, showStatus = true) {
   });
   verifiedAdminKey = adminKey;
   tournamentView = result.tournament;
-  elements.adminKeyInput.value = adminKey;
+  elements.adminKeyInput.value = "";
   elements.adminControls.hidden = false;
   elements.adminState.textContent = "Verified";
   if (showStatus) setStatus("Host controls unlocked.");
@@ -386,10 +386,10 @@ async function adminAction(kind, path, successMessage) {
   }
 }
 
-function revealAdminKey(tournamentCode, adminKey) {
+function showHostAccessNotice() {
   elements.adminKeyReveal.hidden = false;
-  elements.adminKeyOnce.textContent = adminKey;
-  elements.adminKeyInput.value = adminKey;
+  elements.adminKeyOnce.textContent = "Unlocked";
+  elements.adminKeyInput.value = "";
 }
 
 function hasAdmin() {

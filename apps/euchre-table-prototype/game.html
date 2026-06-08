@@ -19,6 +19,18 @@
         <p id="roomStatus">Loading game.</p>
       </section>
 
+      <section id="trumpPanel" class="trump-action-bar" hidden>
+        <div class="trump-action-copy">
+          <p class="eyebrow">Trump Selection</p>
+          <h2>Select Trump</h2>
+          <p id="trumpHelp">Waiting for room.</p>
+        </div>
+        <div class="trump-action-controls" aria-label="Trump actions">
+          <div id="trumpButtons" class="trump-buttons"></div>
+          <button id="passButton" class="secondary" type="button">Pass</button>
+        </div>
+      </section>
+
       <div class="sr-only" aria-hidden="true">
         <strong id="roomCode">-----</strong>
         <strong id="viewerSeat">None</strong>
@@ -68,13 +80,6 @@
             <span id="kittyCount">0 cards</span>
           </div>
           <div id="upcard" class="upcard empty">No cards dealt</div>
-
-          <div id="trumpPanel" class="trump-panel">
-            <h3>Select Trump</h3>
-            <p id="trumpHelp">Waiting for room.</p>
-            <div id="trumpButtons" class="trump-buttons"></div>
-            <button id="passButton" class="secondary" type="button">Pass</button>
-          </div>
 
           <div class="trick-area">
             <h3>Current Trick</h3>

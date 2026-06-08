@@ -67,7 +67,10 @@ test("tournament screen has create, join, lobby, and bracket sections", async ()
   assert.match(html, /Join Tournament/);
   assert.match(html, /Host Controls/);
   assert.match(html, /Verify Host/);
-  assert.match(html, /Save it, keep it private/);
+  assert.match(html, /32 players/);
+  assert.match(html, /64 players/);
+  assert.match(html, /Keep the private key off-screen/);
+  assert.match(html, /id="adminKeyInput" type="password"/);
   assert.match(html, /Players only need the public tournament link\/code/);
   assert.match(html, /Start Tournament/);
   assert.match(html, /Reset Lobby/);
@@ -186,6 +189,44 @@ test("game screen owns gameplay interface and is guarded until start", async () 
   assert.match(client, /\.\/room\.html\?room=\$\{roomCode\}/);
 });
 
+test("mobile trump actions render in a main action bar", async () => {
+  const html = await readText("game.html");
+  const client = await readText("src/room-client.js");
+  const css = await readText("src/styles.css");
+  const statusIndex = html.indexOf('id="roomStatus"');
+  const trumpPanelIndex = html.indexOf('id="trumpPanel"');
+  const roomTableIndex = html.indexOf('id="roomTable"');
+  const headerMarkup = html.match(/<header class="room-topbar">[\s\S]*?<\/header>/)?.[0] ?? "";
+
+  assert.match(html, /id="trumpPanel" class="trump-action-bar" hidden/);
+  assert.match(html, /id="trumpHelp"/);
+  assert.match(html, /id="trumpButtons" class="trump-buttons"/);
+  assert.match(html, /id="passButton" class="secondary" type="button">Pass<\/button>/);
+  assert.equal(statusIndex < trumpPanelIndex, true);
+  assert.equal(trumpPanelIndex < roomTableIndex, true);
+  assert.doesNotMatch(headerMarkup, /trumpPanel|trumpButtons|passButton/);
+  assert.match(client, /Order Up \$\{label\}/);
+  assert.match(client, /Keep \$\{label\}/);
+  assert.match(client, /Choose \$\{label\}/);
+  assert.match(client, /setHidden\(elements\.passButton, !canAct\)/);
+  assert.match(client, /if \(!canAct\) return/);
+  assert.match(css, /\.trump-action-bar/);
+  assert.match(css, /\.trump-action-controls/);
+  assert.match(css, /position: sticky/);
+  assert.match(css, /min-height: 56px/);
+});
+
+test("mobile chrome does not cover trump actions", async () => {
+  const css = await readText("src/styles.css");
+
+  assert.match(css, /overflow-x: hidden/);
+  assert.match(css, /env\(safe-area-inset-bottom\)/);
+  assert.match(css, /\.game-shell[\s\S]*padding-bottom: calc\(110px \+ env\(safe-area-inset-bottom\)\)/);
+  assert.match(css, /\.room-topbar \.online-pill[\s\S]*position: static/);
+  assert.match(css, /pointer-events: none/);
+  assert.match(css, /grid-template-columns: 1fr/);
+});
+
 test("active room screen hides lobby create and join controls", async () => {
   const client = await readText("src/room-client.js");
 
@@ -280,7 +321,9 @@ test("home admin code gate unlocks tournament controls client-side", async () =>
   const client = await readText("src/home-client.js");
   const css = await readText("src/styles.css");
 
-  assert.match(client, /homepageAdminCodeValue = "MEHDI"/);
+  assert.match(client, /homepageAdminCodeValue = "Zxcvfdsaqwer1287!"/);
+  assert.doesNotMatch(client, /homepageAdminCode\.value\.trim\(\)\.toUpperCase\(\)/);
+  assert.doesNotMatch(client, /homepageAdminCodeValue = "MEHDI"/);
   assert.match(client, /homepageAdminControls\.hidden = false/);
   assert.match(client, /Admin tournament controls unlocked/);
   assert.match(client, /Admin code not recognized/);
@@ -318,7 +361,7 @@ test("tester launch checklist covers room, tournament, spectator, and mobile che
   assert.match(checklist, /Join as Player 2 from a second browser\/device/);
   assert.match(checklist, /left bower counts as trump/);
   assert.match(checklist, /Create a tournament/);
-  assert.match(checklist, /Save the private host key/);
+  assert.match(checklist, /private host key/);
   assert.match(checklist, /Confirm champion display appears/);
   assert.match(checklist, /hidden hands stay private/);
   assert.match(checklist, /no horizontal page overflow/);
@@ -333,7 +376,7 @@ test("production launch checklist covers live domain safety checks", async () =>
   assert.match(checklist, /\/healthz/);
   assert.match(checklist, /Create a room/);
   assert.match(checklist, /Join the room from another browser\/device/);
-  assert.match(checklist, /Save the private host key/);
+  assert.match(checklist, /private host key/);
   assert.match(checklist, /not shown to players/);
   assert.match(checklist, /Join 4 players/);
   assert.match(checklist, /champion screen appears/);

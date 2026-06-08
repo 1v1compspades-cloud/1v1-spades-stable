@@ -31,12 +31,14 @@
             <option value="4">4 players</option>
             <option value="8">8 players</option>
             <option value="16">16 players</option>
+            <option value="32">32 players</option>
+            <option value="64">64 players</option>
           </select>
           <button id="createTournamentButton" type="button">Create Tournament</button>
           <div id="adminKeyReveal" class="admin-key-reveal" hidden>
-            <span>Private host key</span>
-            <strong id="adminKeyOnce">------------</strong>
-            <small>Shown only on this creation screen. Save it, keep it private, and share only the public tournament link/code with players.</small>
+            <span>Host access</span>
+            <strong id="adminKeyOnce">Unlocked</strong>
+            <small>Keep the private key off-screen. Share only the public tournament link/code with players.</small>
           </div>
         </article>
 
@@ -57,7 +59,7 @@
         </div>
         <div class="admin-verify">
           <label for="adminKeyInput">Admin key</label>
-          <input id="adminKeyInput" autocomplete="off" placeholder="Private key">
+          <input id="adminKeyInput" type="password" autocomplete="off" placeholder="Private key">
           <button id="verifyAdminButton" type="button">Verify Host</button>
         </div>
         <p class="muted-note">Host tools require the private key. Players only need the public tournament link/code.</p>

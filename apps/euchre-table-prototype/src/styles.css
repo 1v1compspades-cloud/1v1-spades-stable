@@ -27,6 +27,7 @@ body {
   min-height: 100vh;
   background: linear-gradient(135deg, var(--felt-dark), var(--felt));
   color: var(--ink);
+  overflow-x: hidden;
 }
 
 button,
@@ -914,7 +915,7 @@ body::before {
   width: min(860px, 100vw - 28px);
   min-height: 100vh;
   margin: 0 auto;
-  padding: 24px 0 42px;
+  padding: 24px 0 calc(42px + env(safe-area-inset-bottom));
 }
 
 .master-panel {
@@ -1041,6 +1042,7 @@ body::before {
   color: #5ff1bd;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  pointer-events: none;
 }
 
 .home-shell {
@@ -1240,8 +1242,23 @@ body::before {
 
 .room-topbar {
   display: flex;
+  align-items: center;
   justify-content: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
   margin-bottom: 12px;
+}
+
+.room-topbar .info-button,
+.room-topbar .online-pill {
+  position: static;
+}
+
+.room-topbar .online-pill {
+  min-height: 26px;
+  margin-left: auto;
+  padding: 0 10px;
+  font-size: 0.78rem;
 }
 
 .compact-status {
@@ -1255,6 +1272,62 @@ body::before {
 
 .compact-status p {
   color: var(--master-muted);
+}
+
+.game-shell {
+  padding-bottom: calc(110px + env(safe-area-inset-bottom));
+}
+
+.trump-action-bar {
+  display: grid;
+  gap: 16px;
+  margin: 0 0 14px;
+  padding: 18px;
+  border: 1px solid var(--master-line);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(22, 21, 18, 0.96), rgba(5, 5, 5, 0.98));
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.35);
+}
+
+.trump-action-copy {
+  display: grid;
+  gap: 6px;
+  text-align: center;
+}
+
+.trump-action-copy h2,
+.trump-action-copy p {
+  margin: 0;
+}
+
+.trump-action-copy h2 {
+  color: var(--master-gold);
+  font-size: 1.2rem;
+}
+
+.trump-action-copy p:not(.eyebrow) {
+  color: var(--master-text);
+  font-weight: 900;
+}
+
+.trump-action-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 0.42fr);
+  gap: 10px;
+}
+
+.trump-action-bar .trump-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.trump-action-bar button {
+  min-height: 56px;
+  width: 100%;
+  border-radius: 8px;
+  font-size: 1rem;
 }
 
 .lobby-panel {
@@ -1470,6 +1543,10 @@ body::before {
     padding-top: 18px;
   }
 
+  .game-shell {
+    padding-bottom: calc(132px + env(safe-area-inset-bottom));
+  }
+
   .home-master-panel,
   .lobby-panel {
     padding: 22px 18px;
@@ -1490,6 +1567,35 @@ body::before {
 
   .room-code-display {
     letter-spacing: 0.12em;
+  }
+
+  .room-topbar {
+    gap: 8px;
+  }
+
+  .room-topbar .online-pill {
+    min-height: 24px;
+    padding: 0 8px;
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+  }
+
+  .trump-action-bar {
+    position: sticky;
+    top: 8px;
+    z-index: 4;
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .trump-action-controls,
+  .trump-action-bar .trump-buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .trump-action-bar button {
+    min-height: 56px;
+    font-size: 1.05rem;
   }
 
   .info-overlay {
