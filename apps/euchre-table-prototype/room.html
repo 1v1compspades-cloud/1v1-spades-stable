@@ -24,6 +24,7 @@
         <div class="share-actions">
           <button id="copyCodeButton" class="secondary" type="button" disabled>Copy Invite Link</button>
           <button id="copySpectatorLinkButton" class="secondary" type="button" disabled>Copy Spectator Link</button>
+          <button id="openInviteLinkButton" class="secondary" type="button" disabled>Open Invite Link</button>
         </div>
 
         <section class="players-section" aria-label="Players">
@@ -91,66 +92,6 @@
       </section>
 
       <section id="coinFlipPanel" class="coin-modal" hidden></section>
-
-      <section id="scoreband" class="scoreband" aria-label="Match score" hidden>
-        <div>
-          <span>Player 1</span>
-          <strong id="player1Score">0</strong>
-        </div>
-        <div>
-          <span>Target</span>
-          <strong id="targetScore">10</strong>
-        </div>
-        <div>
-          <span>Player 2</span>
-          <strong id="player2Score">0</strong>
-        </div>
-      </section>
-
-      <section id="roomTable" class="table-grid room-table" hidden>
-        <article class="panel player-panel">
-          <div class="panel-heading">
-            <h2>Your Hand</h2>
-            <span id="viewerTricks">0 tricks</span>
-          </div>
-          <div id="viewerHand" class="hand" aria-label="Your hand"></div>
-          <p id="spectatorNotice" class="muted-note" hidden>Spectator view is read-only and hidden hands are not shown.</p>
-        </article>
-
-        <article class="panel center-panel">
-          <div class="panel-heading">
-            <h2>Kitty / Upcard</h2>
-            <span id="kittyCount">0 cards</span>
-          </div>
-          <div id="upcard" class="upcard empty">No room</div>
-
-          <div id="trumpPanel" class="trump-panel">
-            <h3>Select Trump</h3>
-            <p id="trumpHelp">Waiting for room.</p>
-            <div id="trumpButtons" class="trump-buttons"></div>
-            <button id="passButton" class="secondary" type="button">Pass</button>
-          </div>
-
-          <div class="trick-area">
-            <h3>Current Trick</h3>
-            <div id="currentTrick" class="current-trick"></div>
-          </div>
-
-          <div class="history">
-            <h3>Completed Tricks</h3>
-            <ol id="trickHistory"></ol>
-          </div>
-        </article>
-
-        <article class="panel player-panel">
-          <div class="panel-heading">
-            <h2>Opponent</h2>
-            <span id="opponentTricks">0 tricks</span>
-          </div>
-          <div id="opponentHand" class="hand card-backs" aria-label="Opponent hand"></div>
-          <button id="nextHandButton" type="button" disabled>Start Next Hand</button>
-        </article>
-      </section>
     </main>
 
     <script type="module" src="./src/room-client.js"></script>

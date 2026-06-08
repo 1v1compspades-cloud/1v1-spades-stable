@@ -7,6 +7,7 @@ const elements = {
   activeRoomControls: document.querySelector("#activeRoomControls"),
   copyCodeButton: document.querySelector("#copyCodeButton"),
   copySpectatorLinkButton: document.querySelector("#copySpectatorLinkButton"),
+  openInviteLinkButton: document.querySelector("#openInviteLinkButton"),
   nextHandButton: document.querySelector("#nextHandButton"),
   roomStatus: document.querySelector("#roomStatus"),
   roomCode: document.querySelector("#roomCode"),
@@ -52,6 +53,9 @@ const elements = {
 };
 
 const urlParams = new URL(window.location.href).searchParams;
+const gamePagePhases = ["playing", "hand_score", "next_round_countdown", "match_complete"];
+const isGamePage = window.location.pathname.endsWith("/game.html");
+const isRoomPage = window.location.pathname.endsWith("/room.html") || !isGamePage;
 let session = loadSession();
 let roomView = null;
 let pollHandle = null;
@@ -76,7 +80,7 @@ async function createRoomFromUi() {
   }
 }
 
-elements.copyCodeButton.addEventListener("click", async () => {
+elements.copyCodeButton?.addEventListener("click", async () => {
   if (!roomView?.roomCode) return;
 
   const text = roomLinkFor(roomView.roomCode);
@@ -89,7 +93,7 @@ elements.copyCodeButton.addEventListener("click", async () => {
   }
 });
 
-elements.copySpectatorLinkButton.addEventListener("click", async () => {
+elements.copySpectatorLinkButton?.addEventListener("click", async () => {
   if (!roomView?.roomCode) return;
 
   const text = spectatorLinkFor(roomView.roomCode);
@@ -102,23 +106,28 @@ elements.copySpectatorLinkButton.addEventListener("click", async () => {
   }
 });
 
-elements.passButton.addEventListener("click", async () => {
+elements.openInviteLinkButton?.addEventListener("click", () => {
+  if (!roomView?.roomCode) return;
+  window.open(roomLinkFor(roomView.roomCode), "_blank", "noopener");
+});
+
+elements.passButton?.addEventListener("click", async () => {
   await sendAction({ type: "passTrump" });
 });
 
-elements.nextHandButton.addEventListener("click", async () => {
+elements.nextHandButton?.addEventListener("click", async () => {
   await sendAction({ type: "startNextHand" });
 });
 
-elements.readyButton.addEventListener("click", async () => {
+async function handleReadyClick() {
   const viewerSeat = roomView?.viewerSeat;
   const viewerReady = viewerSeat && viewerSeat !== "spectator"
     ? Boolean(roomView?.playerReady?.[viewerSeat])
     : false;
   await sendAction({ type: viewerReady ? "unready" : "ready" });
-});
+}
 
-elements.joinAsPlayer2Button.addEventListener("click", async () => {
+elements.joinAsPlayer2Button?.addEventListener("click", async () => {
   if (!roomView?.roomCode) return;
   const displayName = fallbackJoinName();
   if (!displayName) {
@@ -245,12 +254,36 @@ function setRoom(nextRoom, status) {
   roomView = nextRoom;
   if (status) setStatus(status);
   startPolling();
+  if (redirectForPage(nextRoom)) return;
   render();
+}
+
+function redirectForPage(nextRoom) {
+  if (!nextRoom?.roomCode) return false;
+
+  const roomCode = encodeURIComponent(nextRoom.roomCode);
+  const phase = nextRoom.gameState?.phase;
+
+  if (isRoomPage && isGamePagePhase(phase)) {
+    window.location.replace(`./game.html?room=${roomCode}`);
+    return true;
+  }
+
+  if (isGamePage && !isGamePagePhase(phase)) {
+    window.location.replace(`./room.html?room=${roomCode}`);
+    return true;
+  }
+
+  return false;
 }
 
 function setSession(roomCode, seatToken) {
   session = { roomCode, seatToken };
   localStorage.setItem(storageKey, JSON.stringify(session));
+}
+
+function isGamePagePhase(phase) {
+  return gamePagePhases.includes(phase);
 }
 
 function loadSession() {
@@ -304,17 +337,18 @@ function startPolling() {
 
 function render() {
   if (!roomView) {
-    elements.invitePanel.hidden = true;
-    elements.coinFlipPanel.hidden = true;
-    elements.coinFlipPanel.replaceChildren();
-    elements.trumpPanel.hidden = true;
-    elements.nextHandButton.disabled = true;
-    elements.scoreband.hidden = true;
-    elements.copyCodeButton.disabled = true;
-    elements.copySpectatorLinkButton.disabled = true;
-    elements.joinAsPlayer2Button.hidden = true;
-    elements.joinNameInput.hidden = true;
-    elements.readyButton.disabled = true;
+    setHidden(elements.invitePanel, true);
+    setHidden(elements.coinFlipPanel, true);
+    elements.coinFlipPanel?.replaceChildren();
+    setHidden(elements.trumpPanel, true);
+    setDisabled(elements.nextHandButton, true);
+    setHidden(elements.scoreband, true);
+    setDisabled(elements.copyCodeButton, true);
+    setDisabled(elements.copySpectatorLinkButton, true);
+    setDisabled(elements.openInviteLinkButton, true);
+    setHidden(elements.joinAsPlayer2Button, true);
+    setHidden(elements.joinNameInput, true);
+    setDisabled(elements.readyButton, true);
     return;
   }
 
@@ -322,61 +356,68 @@ function render() {
   const viewerSeat = roomView.viewerSeat;
   const opponentSeat = viewerSeat === "player1" ? "player2" : "player1";
   const playerCount = Number(roomView.players.player1) + Number(roomView.players.player2);
-  const gameInterfaceActive = state.phase === "playing";
+  const gameInterfaceActive = isGamePage && isGamePagePhase(state.phase);
   const trumpSuit = activeTrumpSuit(state);
 
-  elements.activeRoomControls.hidden = false;
-  elements.invitePanel.hidden = false;
-  elements.roomCode.textContent = roomView.roomCode;
-  elements.viewerSeat.textContent = seatName(viewerSeat);
-  elements.playerStatus.textContent = `${playerCount} / 2`;
-  elements.currentTurn.textContent = seatName(state.currentTurn);
-  elements.trumpStatus.textContent = trumpLabel(trumpSuit);
-  elements.matchStatus.textContent = matchStatusLabel(roomView.tournamentMatch);
-  elements.readyStatus.textContent = readyLabel(roomView.playerReady);
-  elements.coinFlipWinner.textContent = seatName(roomView.coinFlipWinner);
-  elements.startingPosition.textContent = startingPositionLabel(roomView.startingPositionChoice);
-  elements.currentDealer.textContent = seatName(state.currentDealer);
-  elements.roomLink.textContent = roomLinkFor(roomView.roomCode);
-  elements.waitingNotice.textContent = waitingMessage(roomView, state, playerCount);
-  elements.copyCodeButton.disabled = false;
-  elements.copySpectatorLinkButton.disabled = false;
+  setHidden(elements.activeRoomControls, false);
+  setHidden(elements.invitePanel, false);
+  setText(elements.roomCode, roomView.roomCode);
+  setText(elements.viewerSeat, seatName(viewerSeat));
+  setText(elements.playerStatus, `${playerCount} / 2`);
+  setText(elements.currentTurn, seatName(state.currentTurn));
+  setText(elements.trumpStatus, trumpLabel(trumpSuit));
+  setText(elements.matchStatus, matchStatusLabel(roomView.tournamentMatch));
+  setText(elements.readyStatus, readyLabel(roomView.playerReady));
+  setText(elements.coinFlipWinner, seatName(roomView.coinFlipWinner));
+  setText(elements.startingPosition, startingPositionLabel(roomView.startingPositionChoice));
+  setText(elements.currentDealer, seatName(state.currentDealer));
+  setText(elements.roomLink, roomLinkFor(roomView.roomCode));
+  setText(elements.waitingNotice, waitingMessage(roomView, state, playerCount));
+  setDisabled(elements.copyCodeButton, false);
+  setDisabled(elements.copySpectatorLinkButton, false);
+  setDisabled(elements.openInviteLinkButton, false);
   const showJoinFallback = viewerSeat === "spectator" && !roomView.players.player2;
-  elements.joinAsPlayer2Button.hidden = !showJoinFallback;
-  elements.joinNameInput.hidden = !showJoinFallback;
-  elements.coinFlipWinner.closest("div").hidden = gameInterfaceActive;
-  elements.startingPositionTile.hidden = gameInterfaceActive || !roomView.startingPositionChoice;
-  elements.player1Score.textContent = state.score.player1;
-  elements.player2Score.textContent = state.score.player2;
-  elements.targetScore.textContent = state.targetScore;
-  elements.pregameTargetScore.textContent = state.targetScore;
-  elements.player1Slot.textContent = roomView.players.player1 ? readySeatLabel("player1", roomView.playerReady, roomView.playerNames) : "Waiting";
-  elements.player2Slot.textContent = roomView.players.player2 ? readySeatLabel("player2", roomView.playerReady, roomView.playerNames) : "Waiting";
-  elements.kittyCount.textContent = `${state.kittyCount} cards`;
-  elements.viewerTricks.textContent = viewerSeat === "spectator" ? "0 tricks" : `${state.tricksWon[viewerSeat]} tricks`;
-  elements.opponentTricks.textContent = viewerSeat === "spectator" ? "0 tricks" : `${state.tricksWon[opponentSeat]} tricks`;
-  elements.spectatorNotice.hidden = viewerSeat !== "spectator";
+  setHidden(elements.joinAsPlayer2Button, !showJoinFallback);
+  setHidden(elements.joinNameInput, !showJoinFallback);
+  setHidden(elements.coinFlipWinner?.closest("div"), gameInterfaceActive);
+  setHidden(elements.startingPositionTile, gameInterfaceActive || !roomView.startingPositionChoice);
+  setText(elements.player1Score, state.score.player1);
+  setText(elements.player2Score, state.score.player2);
+  setText(elements.targetScore, state.targetScore);
+  setText(elements.pregameTargetScore, state.targetScore);
+  setText(elements.player1Slot, roomView.players.player1 ? readySeatLabel("player1", roomView.playerReady, roomView.playerNames) : "Waiting");
+  setText(elements.player2Slot, roomView.players.player2 ? readySeatLabel("player2", roomView.playerReady, roomView.playerNames) : "Waiting");
+  setText(elements.kittyCount, `${state.kittyCount} cards`);
+  setText(elements.viewerTricks, viewerSeat === "spectator" ? "0 tricks" : `${state.tricksWon[viewerSeat]} tricks`);
+  setText(elements.opponentTricks, viewerSeat === "spectator" ? "0 tricks" : `${state.tricksWon[opponentSeat]} tricks`);
+  setHidden(elements.spectatorNotice, viewerSeat !== "spectator");
   const viewerReady = viewerSeat === "spectator" ? true : roomView.playerReady?.[viewerSeat];
   const canReady = viewerSeat !== "spectator"
     && ["waiting_for_players", "pregame_settings", "ready_countdown"].includes(state.phase);
   const showStartSequence = shouldShowStartSequence(roomView, state, playerCount);
   renderStartSequenceModal(showStartSequence, viewerSeat);
-  elements.readyButton.hidden = !canReady;
-  elements.readyButton.disabled = !canReady;
-  elements.readyButton.textContent = viewerReady ? "Ready (Tap to Cancel)" : "Ready Up";
-  elements.nextHandButton.hidden = true;
-  elements.nextHandButton.disabled = true;
-  elements.scoreband.hidden = !gameInterfaceActive;
-  elements.roomTable.hidden = !gameInterfaceActive;
-  elements.pregamePanel.hidden = gameInterfaceActive;
+  setHidden(elements.readyButton, !canReady);
+  setDisabled(elements.readyButton, !canReady);
+  if (elements.readyButton) {
+    elements.readyButton.onclick = canReady ? handleReadyClick : null;
+    elements.readyButton.style.pointerEvents = canReady ? "auto" : "";
+    elements.readyButton.textContent = viewerReady ? "Ready (Tap to Cancel)" : "Ready Up";
+  }
+  setHidden(elements.nextHandButton, true);
+  setDisabled(elements.nextHandButton, true);
+  setHidden(elements.scoreband, !gameInterfaceActive);
+  setHidden(elements.roomTable, !gameInterfaceActive);
+  setHidden(elements.pregamePanel, gameInterfaceActive);
 
   renderStatus();
-  renderUpcard(state.upcard);
-  renderTrumpControls(state, viewerSeat);
-  renderViewerHand(state, viewerSeat);
-  renderOpponentHand(state, viewerSeat, opponentSeat);
-  renderCurrentTrick(state);
-  renderTrickHistory(state);
+  if (isGamePage) {
+    renderUpcard(state.upcard);
+    renderTrumpControls(state, viewerSeat);
+    renderViewerHand(state, viewerSeat);
+    renderOpponentHand(state, viewerSeat, opponentSeat);
+    renderCurrentTrick(state);
+    renderTrickHistory(state);
+  }
 }
 
 function shouldShowStartSequence(view, state, playerCount) {
@@ -390,10 +431,11 @@ function shouldShowStartSequence(view, state, playerCount) {
 }
 
 function renderStartSequenceModal(showStartSequence, viewerSeat) {
+  if (!elements.coinFlipPanel) return;
   elements.coinFlipPanel.replaceChildren();
 
   if (!showStartSequence) {
-    elements.coinFlipPanel.hidden = true;
+    setHidden(elements.coinFlipPanel, true);
     return;
   }
 
@@ -426,7 +468,7 @@ function renderStartSequenceModal(showStartSequence, viewerSeat) {
   }
 
   elements.coinFlipPanel.append(card);
-  elements.coinFlipPanel.hidden = false;
+  setHidden(elements.coinFlipPanel, false);
 }
 
 function renderStatus() {
@@ -462,6 +504,7 @@ function renderStatus() {
 }
 
 function renderTrumpControls(state, viewerSeat) {
+  if (!elements.trumpPanel || !elements.trumpButtons || !elements.passButton || !elements.trumpHelp) return;
   const canAct = state.actionPhase === "selectingTrump" && viewerSeat === state.currentTurn;
   elements.trumpPanel.hidden = state.actionPhase !== "selectingTrump";
   elements.trumpButtons.replaceChildren();
@@ -482,6 +525,7 @@ function renderTrumpControls(state, viewerSeat) {
 }
 
 function renderViewerHand(state, viewerSeat) {
+  if (!elements.viewerHand) return;
   elements.viewerHand.replaceChildren();
 
   if (viewerSeat === "spectator") return;
@@ -499,6 +543,7 @@ function renderViewerHand(state, viewerSeat) {
 }
 
 function renderOpponentHand(state, viewerSeat, opponentSeat) {
+  if (!elements.opponentHand) return;
   elements.opponentHand.replaceChildren();
   const opponentSeated = roomView.players[opponentSeat];
   const count = viewerSeat === "spectator" || !opponentSeated ? 0 : state.handCounts[opponentSeat];
@@ -512,11 +557,13 @@ function renderOpponentHand(state, viewerSeat, opponentSeat) {
 }
 
 function renderUpcard(card) {
+  if (!elements.upcard) return;
   elements.upcard.className = `upcard ${card && isRed(card.suit) ? "red" : ""}`;
   elements.upcard.innerHTML = card ? cardMarkup(card) : "No cards dealt";
 }
 
 function renderCurrentTrick(state) {
+  if (!elements.currentTrick) return;
   elements.currentTrick.replaceChildren();
 
   for (const play of state.currentTrick) {
@@ -535,6 +582,7 @@ function renderCurrentTrick(state) {
 }
 
 function renderTrickHistory(state) {
+  if (!elements.trickHistory) return;
   elements.trickHistory.replaceChildren();
 
   for (const [index, trick] of state.completedTricks.entries()) {
@@ -545,12 +593,34 @@ function renderTrickHistory(state) {
   }
 }
 
+function setText(element, value) {
+  if (element) element.textContent = value;
+}
+
+function setHidden(element, hidden) {
+  if (!element) return;
+
+  element.hidden = hidden;
+  if (hidden) {
+    element.style.display = "none";
+    element.style.pointerEvents = "none";
+    return;
+  }
+
+  element.style.removeProperty("display");
+  element.style.removeProperty("pointer-events");
+}
+
+function setDisabled(element, disabled) {
+  if (element) element.disabled = disabled;
+}
+
 function cardMarkup(card) {
   return `<span><span class="rank">${card.rank}</span><span class="suit">${suitSymbol(card.suit)}</span></span>`;
 }
 
 function setStatus(message) {
-  elements.roomStatus.textContent = message;
+  setText(elements.roomStatus, message);
 }
 
 function seatName(seat) {

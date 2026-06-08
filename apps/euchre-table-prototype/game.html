@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>1v1 Euchre Game</title>
+    <link rel="stylesheet" href="./src/styles.css">
+  </head>
+  <body>
+    <main class="master-shell game-shell">
+      <header class="room-topbar">
+        <a class="button-link secondary-link" href="./home.html">Home</a>
+        <a class="button-link secondary-link" id="backToLobbyLink" href="./room.html">Lobby</a>
+        <span class="online-pill">● Online</span>
+      </header>
+
+      <section class="status compact-status" aria-live="polite">
+        <p id="roomStatus">Loading game.</p>
+      </section>
+
+      <div class="sr-only" aria-hidden="true">
+        <strong id="roomCode">-----</strong>
+        <strong id="viewerSeat">None</strong>
+        <strong id="playerStatus">0 / 2</strong>
+        <strong id="currentTurn">None</strong>
+        <strong id="trumpStatus">None</strong>
+        <strong id="matchStatus">Casual</strong>
+        <strong id="readyStatus">P1 No / P2 No</strong>
+        <strong id="coinFlipWinner">None</strong>
+        <span id="startingPositionTile"><strong id="startingPosition">None</strong></span>
+        <strong id="currentDealer">None</strong>
+        <strong id="roomLink"></strong>
+        <strong id="waitingNotice"></strong>
+        <strong id="player1Slot"></strong>
+        <strong id="player2Slot"></strong>
+        <strong id="pregameTargetScore">10</strong>
+      </div>
+
+      <section id="scoreband" class="scoreband" aria-label="Match score" hidden>
+        <div>
+          <span>Player 1</span>
+          <strong id="player1Score">0</strong>
+        </div>
+        <div>
+          <span>Target</span>
+          <strong id="targetScore">10</strong>
+        </div>
+        <div>
+          <span>Player 2</span>
+          <strong id="player2Score">0</strong>
+        </div>
+      </section>
+
+      <section id="roomTable" class="table-grid room-table" hidden>
+        <article class="panel player-panel">
+          <div class="panel-heading">
+            <h2>Your Hand</h2>
+            <span id="viewerTricks">0 tricks</span>
+          </div>
+          <div id="viewerHand" class="hand" aria-label="Your hand"></div>
+          <p id="spectatorNotice" class="muted-note" hidden>Spectator view is read-only and hidden hands are not shown.</p>
+        </article>
+
+        <article class="panel center-panel">
+          <div class="panel-heading">
+            <h2>Kitty / Upcard</h2>
+            <span id="kittyCount">0 cards</span>
+          </div>
+          <div id="upcard" class="upcard empty">No cards dealt</div>
+
+          <div id="trumpPanel" class="trump-panel">
+            <h3>Select Trump</h3>
+            <p id="trumpHelp">Waiting for room.</p>
+            <div id="trumpButtons" class="trump-buttons"></div>
+            <button id="passButton" class="secondary" type="button">Pass</button>
+          </div>
+
+          <div class="trick-area">
+            <h3>Current Trick</h3>
+            <div id="currentTrick" class="current-trick"></div>
+          </div>
+
+          <div class="history">
+            <h3>Completed Tricks</h3>
+            <ol id="trickHistory"></ol>
+          </div>
+        </article>
+
+        <article class="panel player-panel">
+          <div class="panel-heading">
+            <h2>Opponent</h2>
+            <span id="opponentTricks">0 tricks</span>
+          </div>
+          <div id="opponentHand" class="hand card-backs" aria-label="Opponent hand"></div>
+          <button id="nextHandButton" type="button" disabled>Start Next Hand</button>
+        </article>
+      </section>
+
+      <section id="coinFlipPanel" class="coin-modal" hidden></section>
+
+      <div hidden>
+        <section id="activeRoomControls"></section>
+        <section id="invitePanel"></section>
+        <button id="copyCodeButton" type="button"></button>
+        <button id="copySpectatorLinkButton" type="button"></button>
+        <button id="openInviteLinkButton" type="button"></button>
+        <input id="joinNameInput">
+        <button id="joinAsPlayer2Button" type="button"></button>
+        <button id="readyButton" type="button"></button>
+        <section id="pregamePanel"></section>
+      </div>
+    </main>
+
+    <script type="module" src="./src/room-client.js"></script>
+  </body>
+</html>

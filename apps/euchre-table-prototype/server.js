@@ -278,9 +278,14 @@ async function serveStatic(request, response) {
 }
 
 function publicRoutePath(pathname) {
+  if (pathname.startsWith("/src/")) {
+    return `/apps/euchre-table-prototype${pathname}`;
+  }
+
   return {
     "/home.html": "/apps/euchre-table-prototype/home.html",
     "/room.html": "/apps/euchre-table-prototype/room.html",
+    "/game.html": "/apps/euchre-table-prototype/game.html",
     "/rules.html": "/apps/euchre-table-prototype/rules.html",
     "/tournament.html": "/apps/euchre-table-prototype/tournament.html"
   }[pathname] ?? pathname;

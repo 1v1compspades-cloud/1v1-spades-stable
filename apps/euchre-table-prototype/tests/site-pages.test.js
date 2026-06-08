@@ -10,9 +10,9 @@ test("home screen has the main routes and actions", async () => {
   const html = await readText("home.html");
   const publicActions = html.match(/<section class="home-action-panel"[\s\S]*?<\/section>/)?.[0] ?? "";
 
-  assert.match(html, /1V1 Euchre Free Play/);
+  assert.match(html, /<title>1v1 Euchre<\/title>/);
   assert.match(html, /class="master-shell home-shell"/);
-  assert.match(html, /EUCHRE/);
+  assert.match(html, /<h1>1v1 Euchre<\/h1>/);
   assert.match(html, /Season 0 Preview/);
   assert.match(publicActions, /Create Room/);
   assert.match(publicActions, /href="\.\/room\.html\?action=create"/);
@@ -55,6 +55,7 @@ test("tournament screen has create, join, lobby, and bracket sections", async ()
 
 test("rules screen includes the core Euchre rule copy", async () => {
   const html = await readText("rules.html");
+  const css = await readText("src/styles.css");
 
   assert.match(html, /24-card deck/);
   assert.match(html, /right bower/);
@@ -70,10 +71,14 @@ test("rules screen includes the core Euchre rule copy", async () => {
   assert.match(html, /Fair Play/);
   assert.match(html, /Support/);
   assert.match(html, /hidden hands stay private/);
+  assert.match(css, /\.shell:not\(\.master-shell\) \.rules-panel/);
+  assert.match(css, /\.shell:not\(\.master-shell\) \.rules-list/);
+  assert.match(css, /color: var\(--ink\)/);
 });
 
 test("one-player room lobby exposes invite controls without start sequence or create/join controls", async () => {
   const html = await readText("room.html");
+  const css = await readText("src/styles.css");
 
   assert.doesNotMatch(html, /Create Room/);
   assert.doesNotMatch(html, /Join Room/);
@@ -85,6 +90,7 @@ test("one-player room lobby exposes invite controls without start sequence or cr
   assert.match(html, /class="room-code-display"/);
   assert.match(html, /Copy Invite Link/);
   assert.match(html, /Copy Spectator Link/);
+  assert.match(html, /Open Invite Link/);
   assert.match(html, /Invite Link/);
   assert.match(html, /Join as Player 2/);
   assert.match(html, /id="readyButton"/);
@@ -96,12 +102,19 @@ test("one-player room lobby exposes invite controls without start sequence or cr
   assert.match(html, /Hidden Hands/);
   assert.match(html, /Player 1 · Host/);
   assert.match(html, /Player 2/);
-  assert.match(html, /id="roomTable"/);
+  assert.doesNotMatch(html, /id="roomTable"/);
+  assert.doesNotMatch(html, /Your Hand/);
+  assert.doesNotMatch(html, /Kitty \/ Upcard/);
+  assert.doesNotMatch(html, /Current Trick/);
+  assert.doesNotMatch(html, /Completed Tricks/);
+  assert.doesNotMatch(html, /Opponent/);
+  assert.doesNotMatch(html, /No cards dealt/);
   assert.match(html, /id="coinFlipWinner"/);
   assert.match(html, /id="startingPosition"/);
   assert.match(html, /id="currentDealer"/);
   assert.match(html, /class="coin-modal"/);
-  assert.match(html, /Spectator view is read-only/);
+  assert.match(css, /\[hidden\]\s*\{[\s\S]*display: none !important/);
+  assert.match(css, /\[hidden\]\s*\{[\s\S]*pointer-events: none !important/);
   assert.equal((html.match(/id="createRoomButton"/g) ?? []).length, 0);
   assert.equal((html.match(/id="joinRoomButton"/g) ?? []).length, 0);
   assert.equal((html.match(/id="joinRoomCode"/g) ?? []).length, 0);
@@ -111,15 +124,36 @@ test("pre-match lobby keeps gameplay interface hidden", async () => {
   const html = await readText("room.html");
   const client = await readText("src/room-client.js");
 
-  assert.match(html, /id="roomTable" class="table-grid room-table" hidden/);
-  assert.match(html, /id="scoreband" class="scoreband" aria-label="Match score" hidden/);
+  assert.doesNotMatch(html, /id="roomTable"/);
+  assert.doesNotMatch(html, /id="scoreband"/);
+  assert.doesNotMatch(html, /No cards dealt/);
   assert.match(html, /id="pregamePanel" class="match-settings-panel"/);
   assert.match(html, /Player 1 · Host/);
   assert.match(html, /Waiting for player/);
   assert.match(html, /id="readyStatus"/);
-  assert.match(client, /elements\.roomTable\.hidden = !gameInterfaceActive/);
-  assert.match(client, /elements\.scoreband\.hidden = !gameInterfaceActive/);
-  assert.match(client, /const gameInterfaceActive = state\.phase === "playing"/);
+  assert.match(client, /setHidden\(elements\.roomTable, !gameInterfaceActive\)/);
+  assert.match(client, /setHidden\(elements\.scoreband, !gameInterfaceActive\)/);
+  assert.match(client, /const gameInterfaceActive = isGamePage && isGamePagePhase\(state\.phase\)/);
+});
+
+test("game screen owns gameplay interface and is guarded until start", async () => {
+  const html = await readText("game.html");
+  const client = await readText("src/room-client.js");
+
+  assert.match(html, /id="scoreband" class="scoreband" aria-label="Match score" hidden/);
+  assert.match(html, /id="roomTable" class="table-grid room-table" hidden/);
+  assert.match(html, /Your Hand/);
+  assert.match(html, /Kitty \/ Upcard/);
+  assert.match(html, /Current Trick/);
+  assert.match(html, /Completed Tricks/);
+  assert.match(html, /Opponent/);
+  assert.match(html, /No cards dealt/);
+  assert.match(client, /const gamePagePhases = \["playing", "hand_score", "next_round_countdown", "match_complete"\]/);
+  assert.match(client, /function isGamePagePhase\(phase\)/);
+  assert.match(client, /isRoomPage && isGamePagePhase\(phase\)/);
+  assert.match(client, /\.\/game\.html\?room=\$\{roomCode\}/);
+  assert.match(client, /isGamePage && !isGamePagePhase\(phase\)/);
+  assert.match(client, /\.\/room\.html\?room=\$\{roomCode\}/);
 });
 
 test("active room screen hides lobby create and join controls", async () => {
@@ -128,8 +162,8 @@ test("active room screen hides lobby create and join controls", async () => {
   assert.match(client, /urlParams\.get\("action"\) === "create"/);
   assert.match(client, /createRoomFromUi/);
   assert.match(client, /activeRoomControls: document\.querySelector\("#activeRoomControls"\)/);
-  assert.match(client, /elements\.activeRoomControls\.hidden = false/);
-  assert.match(client, /elements\.invitePanel\.hidden = false/);
+  assert.match(client, /setHidden\(elements\.activeRoomControls, false\)/);
+  assert.match(client, /setHidden\(elements\.invitePanel, false\)/);
   assert.doesNotMatch(client, /createRoomButton/);
   assert.doesNotMatch(client, /joinRoomButton/);
   assert.doesNotMatch(client, /joinRoomCode/);
@@ -139,6 +173,7 @@ test("active room screen hides lobby create and join controls", async () => {
   assert.match(client, /joinNameInput/);
   assert.match(client, /body: \{ displayName \}/);
   assert.match(client, /Trump: \$\{suitName\(activeTrumpSuit\(state\)\)\}/);
+  assert.match(client, /openInviteLinkButton/);
 });
 
 test("invite links use the public room route without the app subdirectory", async () => {
@@ -147,6 +182,7 @@ test("invite links use the public room route without the app subdirectory", asyn
   assert.match(client, /new URL\("\/room\.html", window\.location\.origin\)/);
   assert.match(client, /url\.search = `\?room=\$\{encodeURIComponent\(roomCode\)\}`/);
   assert.match(client, /url\.searchParams\.set\("view", "spectator"\)/);
+  assert.match(client, /window\.open\(roomLinkFor\(roomView\.roomCode\), "_blank", "noopener"\)/);
   assert.doesNotMatch(client, /roomLinkFor[\s\S]*\/apps\/euchre-table-prototype/);
 });
 
@@ -165,7 +201,13 @@ test("seated pregame players see Ready and spectators do not", async () => {
   assert.match(html, /id="readyButton" type="button" disabled>Ready Up<\/button>/);
   assert.match(client, /\["waiting_for_players", "pregame_settings", "ready_countdown"\]\.includes\(state\.phase\)/);
   assert.match(client, /viewerSeat !== "spectator"/);
-  assert.match(client, /elements\.readyButton\.hidden = !canReady/);
+  assert.match(client, /setHidden\(elements\.readyButton, !canReady\)/);
+  assert.match(client, /element\.style\.display = "none"/);
+  assert.match(client, /element\.style\.pointerEvents = "none"/);
+  assert.match(client, /element\.style\.removeProperty\("display"\)/);
+  assert.match(client, /element\.style\.removeProperty\("pointer-events"\)/);
+  assert.match(client, /elements\.readyButton\.onclick = canReady \? handleReadyClick : null/);
+  assert.match(client, /elements\.readyButton\.style\.pointerEvents = canReady \? "auto" : ""/);
   assert.match(client, /elements\.readyButton\.textContent = viewerReady \? "Ready \(Tap to Cancel\)" : "Ready Up"/);
   assert.match(client, /type: viewerReady \? "unready" : "ready"/);
 });
@@ -302,6 +344,7 @@ test("package scripts include local and production start commands", async () => 
   assert.equal(manifest.scripts["start:production"], "NODE_ENV=production node server.js");
   assert.match(manifest.scripts.test, /node --test/);
   assert.match(server, /process\.env\.PORT \?\? "5174"/);
+  assert.match(server, /"\/game\.html": "\/apps\/euchre-table-prototype\/game\.html"/);
 });
 
 test("server health check and root route work", async () => {
@@ -332,7 +375,19 @@ test("server health check and root route work", async () => {
 
     const home = await requestText(port, "/apps/euchre-table-prototype/home.html");
     assert.equal(home.statusCode, 200);
-    assert.match(home.body, /1V1 Euchre Free Play/);
+    assert.match(home.body, /<title>1v1 Euchre<\/title>/);
+
+    const game = await requestText(port, "/game.html");
+    assert.equal(game.statusCode, 200);
+    assert.match(game.body, /id="roomTable"/);
+
+    const publicCss = await requestText(port, "/src/styles.css");
+    assert.equal(publicCss.statusCode, 200);
+    assert.match(publicCss.body, /\[hidden\]/);
+
+    const publicRoomClient = await requestText(port, "/src/room-client.js");
+    assert.equal(publicRoomClient.statusCode, 200);
+    assert.match(publicRoomClient.body, /handleReadyClick/);
   } finally {
     server.kill();
   }
