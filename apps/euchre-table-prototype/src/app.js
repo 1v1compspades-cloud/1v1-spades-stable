@@ -101,7 +101,7 @@ function renderStatus() {
 
   if (match.hand.phase === "handComplete") {
     const points = match.hand.handScore.points;
-    elements.statusText.textContent = `Hand complete. Player 1 +${points.player1}, Player 2 +${points.player2}. Start a new hand.`;
+    elements.statusText.textContent = `Hand complete. ${playerName("player1")} +${points.player1}, ${playerName("player2")} +${points.player2}. Start a new hand.`;
     return;
   }
 
@@ -211,7 +211,7 @@ function showError(error) {
 }
 
 function playerName(player) {
-  return player === "player1" ? "Player 1" : "Player 2";
+  return player === "player1" ? "Host" : "Opponent";
 }
 
 function suitName(suit) {

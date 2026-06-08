@@ -23,7 +23,7 @@ export function createRoom({
   roomCode = generateRoomCode(),
   seatToken = generateSeatToken(),
   modeId = "communityCompetitive",
-  displayName = "Player 1",
+  displayName = "Host",
   coinFlipWinner = null,
   tournamentMatch = null
 } = {}) {
@@ -61,7 +61,7 @@ export function createRoom({
   });
 }
 
-export function joinRoom(room, { seatToken = generateSeatToken(), displayName = "Player 2" } = {}) {
+export function joinRoom(room, { seatToken = generateSeatToken(), displayName = "Opponent" } = {}) {
   const existingSeat = seatForToken(room, seatToken);
 
   if (existingSeat) {
@@ -277,7 +277,7 @@ export function sanitizeRoomForViewer(room, seatToken) {
       player2: Boolean(safeRoom.players.player2)
     },
     playerNames: {
-      player1: safeRoom.players.player1?.displayName ?? "Player 1",
+      player1: safeRoom.players.player1?.displayName ?? "Host",
       player2: safeRoom.players.player2?.displayName ?? null
     },
     playerReady: {
@@ -718,7 +718,7 @@ function ensureStartingDealerChosen(room) {
 
 function ensureBothPlayersSeated(room) {
   if (!room.players.player1 || !room.players.player2) {
-    throw new Error("Waiting for Player 2");
+    throw new Error("Waiting for opponent");
   }
 }
 

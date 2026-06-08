@@ -12,6 +12,7 @@ test("home screen has the main routes and actions", async () => {
 
   assert.match(html, /<title>1v1 Euchre<\/title>/);
   assert.match(html, /class="master-shell home-shell"/);
+  assert.match(html, /data-info-button/);
   assert.match(html, /<h1>1v1 Euchre<\/h1>/);
   assert.match(html, /Season 0 Preview/);
   assert.match(publicActions, /Create Room/);
@@ -34,6 +35,29 @@ test("home screen has the main routes and actions", async () => {
   assert.match(html, /Create Tournament/);
   assert.match(html, /Tournament settings/);
   assert.match(html, /Host tournament tools/);
+});
+
+test("shared info panel has Euchre help pages and Discord action", async () => {
+  const infoClient = await readText("src/info-panel.js");
+  const homeClient = await readText("src/home-client.js");
+  const roomClient = await readText("src/room-client.js");
+  const css = await readText("src/styles.css");
+
+  assert.match(infoClient, /DISCORD_INVITE_URL = "https:\/\/discord\.gg\/YOUR_INVITE"/);
+  assert.match(infoClient, /About 1v1 Euchre Freeplay/);
+  assert.match(infoClient, /How to Play/);
+  assert.match(infoClient, /Euchre Rules/);
+  assert.match(infoClient, /Scoring/);
+  assert.match(infoClient, /Lobby \/ Invite Help/);
+  assert.match(infoClient, /Discord \/ Community/);
+  assert.match(infoClient, /Join the Discord/);
+  assert.match(infoClient, /event\.key === "Escape"/);
+  assert.match(infoClient, /event\.target === overlay/);
+  assert.match(homeClient, /setupInfoPanel\(\)/);
+  assert.match(roomClient, /setupInfoPanel\(\)/);
+  assert.match(css, /\.info-overlay/);
+  assert.match(css, /\.info-panel-drawer/);
+  assert.match(css, /\.info-tabs/);
 });
 
 test("tournament screen has create, join, lobby, and bracket sections", async () => {
@@ -92,7 +116,7 @@ test("one-player room lobby exposes invite controls without start sequence or cr
   assert.match(html, /Copy Spectator Link/);
   assert.match(html, /Open Invite Link/);
   assert.match(html, /Invite Link/);
-  assert.match(html, /Join as Player 2/);
+  assert.match(html, /Join as Opponent/);
   assert.match(html, /id="readyButton"/);
   assert.match(html, /id="readyStatus"/);
   assert.match(html, /id="pregamePanel"/);
@@ -100,14 +124,16 @@ test("one-player room lobby exposes invite controls without start sequence or cr
   assert.match(html, /Race To/);
   assert.match(html, /Stick the Dealer/);
   assert.match(html, /Hidden Hands/);
-  assert.match(html, /Player 1 · Host/);
-  assert.match(html, /Player 2/);
+  assert.match(html, />Host<\/span>/);
+  assert.match(html, />Opponent<\/span>/);
+  assert.doesNotMatch(html, /Player 1/);
+  assert.doesNotMatch(html, /Player 2/);
   assert.doesNotMatch(html, /id="roomTable"/);
   assert.doesNotMatch(html, /Your Hand/);
   assert.doesNotMatch(html, /Kitty \/ Upcard/);
   assert.doesNotMatch(html, /Current Trick/);
   assert.doesNotMatch(html, /Completed Tricks/);
-  assert.doesNotMatch(html, /Opponent/);
+  assert.doesNotMatch(html, /Opponent Hand/);
   assert.doesNotMatch(html, /No cards dealt/);
   assert.match(html, /id="coinFlipWinner"/);
   assert.match(html, /id="startingPosition"/);
@@ -128,7 +154,7 @@ test("pre-match lobby keeps gameplay interface hidden", async () => {
   assert.doesNotMatch(html, /id="scoreband"/);
   assert.doesNotMatch(html, /No cards dealt/);
   assert.match(html, /id="pregamePanel" class="match-settings-panel"/);
-  assert.match(html, /Player 1 · Host/);
+  assert.match(html, />Host<\/span>/);
   assert.match(html, /Waiting for player/);
   assert.match(html, /id="readyStatus"/);
   assert.match(client, /setHidden\(elements\.roomTable, !gameInterfaceActive\)/);
@@ -142,12 +168,16 @@ test("game screen owns gameplay interface and is guarded until start", async () 
 
   assert.match(html, /id="scoreband" class="scoreband" aria-label="Match score" hidden/);
   assert.match(html, /id="roomTable" class="table-grid room-table" hidden/);
+  assert.match(html, /id="player1ScoreLabel">You/);
+  assert.match(html, /id="player2ScoreLabel">Opponent/);
   assert.match(html, /Your Hand/);
   assert.match(html, /Kitty \/ Upcard/);
   assert.match(html, /Current Trick/);
   assert.match(html, /Completed Tricks/);
   assert.match(html, /Opponent/);
   assert.match(html, /No cards dealt/);
+  assert.doesNotMatch(html, /Player 1/);
+  assert.doesNotMatch(html, /Player 2/);
   assert.match(client, /const gamePagePhases = \["playing", "hand_score", "next_round_countdown", "match_complete"\]/);
   assert.match(client, /function isGamePagePhase\(phase\)/);
   assert.match(client, /isRoomPage && isGamePagePhase\(phase\)/);

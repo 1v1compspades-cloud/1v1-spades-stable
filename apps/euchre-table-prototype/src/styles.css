@@ -942,6 +942,96 @@ body::before {
   width: auto;
 }
 
+.info-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.info-panel-drawer {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  width: min(760px, 100%);
+  max-height: min(760px, calc(100vh - 36px));
+  overflow: hidden;
+  border: 1px solid var(--master-line);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(22, 21, 18, 0.98), rgba(5, 5, 5, 0.98));
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.6);
+  color: var(--master-text);
+}
+
+.info-panel-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid var(--master-line-soft);
+}
+
+.info-panel-header h2 {
+  margin: 0;
+  color: var(--master-gold);
+  font-size: 1.45rem;
+}
+
+.info-close-button {
+  min-height: 38px;
+  border-color: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--master-text);
+}
+
+.info-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--master-line-soft);
+}
+
+.info-tabs button {
+  flex: 0 0 auto;
+  min-height: 38px;
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--master-muted);
+  white-space: nowrap;
+}
+
+.info-tabs button.active {
+  border-color: var(--master-gold-hot);
+  background: rgba(239, 183, 42, 0.16);
+  color: var(--master-gold);
+}
+
+.info-page {
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.info-page h3 {
+  margin-bottom: 14px;
+  color: var(--master-text);
+  font-size: 1.24rem;
+}
+
+.info-page p {
+  color: var(--master-muted);
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+.discord-action {
+  margin-top: 10px;
+  width: fit-content;
+}
+
 .online-pill {
   right: 16px;
   display: inline-grid;
@@ -1400,5 +1490,27 @@ body::before {
 
   .room-code-display {
     letter-spacing: 0.12em;
+  }
+
+  .info-overlay {
+    align-items: stretch;
+    padding: 12px;
+  }
+
+  .info-panel-drawer {
+    max-height: calc(100vh - 24px);
+  }
+
+  .info-panel-header,
+  .info-page {
+    padding: 18px;
+  }
+
+  .info-tabs {
+    padding: 12px 18px;
+  }
+
+  .discord-action {
+    width: 100%;
   }
 }

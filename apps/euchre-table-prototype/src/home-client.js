@@ -1,3 +1,5 @@
+import { setupInfoPanel } from "./info-panel.js";
+
 const quickMatchButton = document.querySelector("#quickMatchButton");
 const quickMatchStatus = document.querySelector("#quickMatchStatus");
 const homeJoinRoomCode = document.querySelector("#homeJoinRoomCode");
@@ -14,6 +16,8 @@ const homepageAdminControls = document.querySelector("#homepageAdminControls");
 const homepageAdminAccessKey = "euchreHomepageAdminUnlocked";
 const homepageSettingsKey = "euchreHomepageSettings";
 const homepageAdminCodeValue = "MEHDI";
+
+setupInfoPanel();
 
 const savedSettings = loadSettings();
 playerNameInput.value = savedSettings.playerName ?? "";

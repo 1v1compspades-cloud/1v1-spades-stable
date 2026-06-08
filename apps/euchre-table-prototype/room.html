@@ -9,6 +9,7 @@
   <body>
     <main class="master-shell room-shell">
       <header class="room-topbar">
+        <button class="info-button" data-info-button type="button" aria-label="Open info">☰ Info</button>
         <a class="button-link secondary-link" href="./home.html">Home</a>
         <span class="online-pill">● Online</span>
       </header>
@@ -32,13 +33,13 @@
           <div class="player-slots">
             <article class="player-slot">
               <div>
-                <span>Player 1 · Host</span>
+                <span>Host</span>
                 <strong id="player1Slot">Waiting</strong>
               </div>
             </article>
             <article class="player-slot empty-slot-card">
               <div>
-                <span>Player 2</span>
+                <span>Opponent</span>
                 <strong id="player2Slot">Waiting for player...</strong>
               </div>
             </article>
@@ -74,7 +75,7 @@
           </div>
           <p id="waitingNotice">Waiting for room setup.</p>
           <input id="joinNameInput" class="name-input" type="text" autocomplete="nickname" placeholder="Your name" hidden>
-          <button id="joinAsPlayer2Button" class="secondary" type="button" hidden>Join as Player 2</button>
+          <button id="joinAsPlayer2Button" class="secondary" type="button" hidden>Join as Opponent</button>
           <button id="readyButton" type="button" disabled>Ready Up</button>
         </section>
 
@@ -84,7 +85,7 @@
           <strong id="currentTurn">None</strong>
           <strong id="trumpStatus">None</strong>
           <strong id="matchStatus">Casual</strong>
-          <strong id="readyStatus">P1 No / P2 No</strong>
+          <strong id="readyStatus">Host No / Opponent No</strong>
           <strong id="coinFlipWinner">None</strong>
           <span id="startingPositionTile"><strong id="startingPosition">None</strong></span>
           <strong id="currentDealer">None</strong>

@@ -1,4 +1,5 @@
 import { cardsEqual } from "../../../packages/euchre-core/src/index.js";
+import { setupInfoPanel } from "./info-panel.js";
 import { cardLabel, suitSymbol } from "./table-state.js";
 
 const storageKey = "euchreRoomSeat";
@@ -31,6 +32,8 @@ const elements = {
   scoreband: document.querySelector("#scoreband"),
   player1Score: document.querySelector("#player1Score"),
   player2Score: document.querySelector("#player2Score"),
+  player1ScoreLabel: document.querySelector("#player1ScoreLabel"),
+  player2ScoreLabel: document.querySelector("#player2ScoreLabel"),
   targetScore: document.querySelector("#targetScore"),
   pregameTargetScore: document.querySelector("#pregameTargetScore"),
   player1Slot: document.querySelector("#player1Slot"),
@@ -38,7 +41,9 @@ const elements = {
   viewerTricks: document.querySelector("#viewerTricks"),
   opponentTricks: document.querySelector("#opponentTricks"),
   viewerHand: document.querySelector("#viewerHand"),
+  viewerHandTitle: document.querySelector("#viewerHandTitle"),
   opponentHand: document.querySelector("#opponentHand"),
+  opponentHandTitle: document.querySelector("#opponentHandTitle"),
   roomTable: document.querySelector("#roomTable"),
   pregamePanel: document.querySelector("#pregamePanel"),
   spectatorNotice: document.querySelector("#spectatorNotice"),
@@ -60,6 +65,8 @@ let session = loadSession();
 let roomView = null;
 let pollHandle = null;
 
+setupInfoPanel();
+
 async function createRoomFromUi() {
   const displayName = currentPlayerName();
   if (!displayName) {
@@ -73,7 +80,7 @@ async function createRoomFromUi() {
       body: { displayName }
     });
     setSession(result.room.roomCode, result.seatToken);
-    setRoom(result.room, "You are Player 1. Share the room code with Player 2.");
+    setRoom(result.room, "You are the host. Share the room link with your opponent.");
     window.history.replaceState(null, "", `./room.html?room=${encodeURIComponent(result.room.roomCode)}`);
   } catch (error) {
     setStatus(error.message);
@@ -383,10 +390,14 @@ function render() {
   setHidden(elements.startingPositionTile, gameInterfaceActive || !roomView.startingPositionChoice);
   setText(elements.player1Score, state.score.player1);
   setText(elements.player2Score, state.score.player2);
+  setText(elements.player1ScoreLabel, getPlayerDisplayName("player1"));
+  setText(elements.player2ScoreLabel, getPlayerDisplayName("player2"));
   setText(elements.targetScore, state.targetScore);
   setText(elements.pregameTargetScore, state.targetScore);
   setText(elements.player1Slot, roomView.players.player1 ? readySeatLabel("player1", roomView.playerReady, roomView.playerNames) : "Waiting");
   setText(elements.player2Slot, roomView.players.player2 ? readySeatLabel("player2", roomView.playerReady, roomView.playerNames) : "Waiting");
+  setText(elements.viewerHandTitle, viewerSeat === "spectator" ? "Spectator View" : handTitle(viewerSeat));
+  setText(elements.opponentHandTitle, viewerSeat === "spectator" ? "Hidden Hands" : handTitle(opponentSeat));
   setText(elements.kittyCount, `${state.kittyCount} cards`);
   setText(elements.viewerTricks, viewerSeat === "spectator" ? "0 tricks" : `${state.tricksWon[viewerSeat]} tricks`);
   setText(elements.opponentTricks, viewerSeat === "spectator" ? "0 tricks" : `${state.tricksWon[opponentSeat]} tricks`);
@@ -445,7 +456,7 @@ function renderStartSequenceModal(showStartSequence, viewerSeat) {
   card.innerHTML = `
     <p class="eyebrow">Start Sequence</p>
     <h2>Coin Flip</h2>
-    <p>${seatName(roomView.coinFlipWinner)} won the coin flip. ${canChoosePosition ? "Choose the starting position." : "Waiting for starting position choice."}</p>
+    <p>${getPlayerDisplayName(roomView.coinFlipWinner)} won the coin flip. ${canChoosePosition ? "Choose the starting position." : "Waiting for starting position choice."}</p>
   `;
 
   if (canChoosePosition) {
@@ -476,30 +487,28 @@ function renderStatus() {
   const playerCount = Number(roomView.players.player1) + Number(roomView.players.player2);
 
   if (state.winner) {
-    setStatus(`${seatName(state.winner)} wins the match.`);
+    setStatus(`${getPlayerDisplayName(state.winner)} wins the match.`);
   } else if (state.phase === "waiting_for_players") {
-    setStatus("Waiting for Player 2.");
+    setStatus("Waiting for opponent.");
   } else if (state.phase === "pregame_settings") {
     setStatus(`Waiting for both players. ${readyLabel(roomView.playerReady)}.`);
   } else if (state.phase === "ready_countdown") {
     setStatus(`Game starts in ${secondsUntil(state.countdownEndsAt)}.`);
   } else if (state.phase === "coin_flip") {
-    setStatus(`${seatName(roomView.coinFlipWinner)} won the coin flip and chooses dealer or non-dealer.`);
+    setStatus(`${getPlayerDisplayName(roomView.coinFlipWinner)} won the coin flip and chooses dealer or non-dealer.`);
   } else if (state.actionPhase === "selectingTrump") {
     if (roomView.viewerSeat === "spectator") {
       setStatus("Spectator view. This room is read-only for you.");
-    } else if (playerCount < 2 && roomView.viewerSeat === "player1") {
-      setStatus("You are Player 1. Waiting for Player 2.");
-    } else if (roomView.viewerSeat === "player2") {
-      setStatus(`You are Player 2. ${seatName(state.currentTurn)} to choose or pass trump.`);
+    } else if (playerCount < 2) {
+      setStatus("You are waiting for an opponent.");
     } else {
-      setStatus(`${seatName(state.currentTurn)} to choose or pass trump.`);
+      setStatus(`${getPlayerDisplayName(state.currentTurn)} to choose or pass trump.`);
     }
   } else if (state.actionPhase === "playing") {
-    setStatus(`${seatName(state.currentTurn)} to play. Trump: ${suitName(activeTrumpSuit(state))}.`);
+    setStatus(`${getPlayerDisplayName(state.currentTurn)} to play. Trump: ${suitName(activeTrumpSuit(state))}.`);
   } else if (state.phase === "next_round_countdown" || state.phase === "hand_score") {
     const points = state.handScore.points;
-    setStatus(`Hand complete. Player 1 +${points.player1}, Player 2 +${points.player2}. Next round starts in ${secondsUntil(state.nextRoundStartsAt)}.`);
+    setStatus(`Hand complete. ${scoreDeltaLabel(points)}. Next round starts in ${secondsUntil(state.nextRoundStartsAt)}.`);
   }
 }
 
@@ -511,7 +520,7 @@ function renderTrumpControls(state, viewerSeat) {
   elements.passButton.disabled = !canAct || state.trumpState.forcedDealerChoice;
   elements.trumpHelp.textContent = canAct
     ? "Choose trump or pass. Trump may be led immediately once chosen."
-    : `${seatName(state.currentTurn)} is choosing trump.`;
+    : `${getPlayerDisplayName(state.currentTurn)} is choosing trump.`;
 
   if (!canAct) return;
 
@@ -569,7 +578,7 @@ function renderCurrentTrick(state) {
   for (const play of state.currentTrick) {
     const div = document.createElement("div");
     div.className = `card ${isRed(play.card.suit) ? "red" : ""}`;
-    div.innerHTML = `<span>${seatName(play.player)}</span>${cardMarkup(play.card)}`;
+    div.innerHTML = `<span>${getPlayerDisplayName(play.player)}</span>${cardMarkup(play.card)}`;
     elements.currentTrick.append(div);
   }
 
@@ -587,8 +596,8 @@ function renderTrickHistory(state) {
 
   for (const [index, trick] of state.completedTricks.entries()) {
     const item = document.createElement("li");
-    const plays = trick.plays.map((play) => `${seatName(play.player)} ${cardLabel(play.card)}`).join(", ");
-    item.textContent = `Trick ${index + 1}: ${plays}. Winner: ${seatName(trick.winner)}.`;
+    const plays = trick.plays.map((play) => `${getPlayerDisplayName(play.player)} ${cardLabel(play.card)}`).join(", ");
+    item.textContent = `Trick ${index + 1}: ${plays}. Winner: ${getPlayerDisplayName(trick.winner)}.`;
     elements.trickHistory.append(item);
   }
 }
@@ -624,11 +633,30 @@ function setStatus(message) {
 }
 
 function seatName(seat) {
-  return {
-    player1: "Player 1",
-    player2: "Player 2",
-    spectator: "Spectator"
-  }[seat] ?? "None";
+  return getPlayerDisplayName(seat);
+}
+
+function getPlayerDisplayName(seat) {
+  if (seat === "spectator") return "Spectator";
+  if (!["player1", "player2"].includes(seat)) return "None";
+
+  const name = roomView?.playerNames?.[seat]?.trim();
+  if (name) return name;
+
+  if (roomView?.viewerSeat === seat) return "You";
+  if (roomView?.viewerSeat === "spectator") return seat === "player1" ? "Host" : "Opponent";
+  return seat === "player1" && !roomView?.viewerSeat ? "Host" : "Opponent";
+}
+
+function handTitle(seat) {
+  const name = getPlayerDisplayName(seat);
+  return name === "You" ? "Your Hand" : `${name}'s Hand`;
+}
+
+function scoreDeltaLabel(points = {}) {
+  return ["player1", "player2"]
+    .map((seat) => `${getPlayerDisplayName(seat)} +${points[seat] ?? 0}`)
+    .join(", ");
 }
 
 function waitingMessage(view, state, playerCount) {
@@ -642,7 +670,7 @@ function waitingMessage(view, state, playerCount) {
   }
 
   if (playerCount < 2) {
-    return "Waiting for Player 2.";
+    return "Waiting for opponent.";
   }
 
   if (state.phase === "pregame_settings") {
@@ -673,11 +701,11 @@ function waitingMessage(view, state, playerCount) {
 }
 
 function readyLabel(ready = {}) {
-  return `P1 ${ready.player1 ? "Ready" : "Not Ready"} / P2 ${ready.player2 ? "Ready" : "Not Ready"}`;
+  return `${getPlayerDisplayName("player1")} ${ready.player1 ? "Ready" : "Not Ready"} / ${getPlayerDisplayName("player2")} ${ready.player2 ? "Ready" : "Not Ready"}`;
 }
 
 function readySeatLabel(seat, ready = {}, names = {}) {
-  return `${names[seat] ?? seatName(seat)} ${ready[seat] ? "Ready" : "Not Ready"}`;
+  return `${names[seat] ?? getPlayerDisplayName(seat)} ${ready[seat] ? "Ready" : "Not Ready"}`;
 }
 
 function startingPositionLabel(choice) {
