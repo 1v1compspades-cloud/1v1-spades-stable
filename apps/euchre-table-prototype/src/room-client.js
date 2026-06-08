@@ -27,6 +27,7 @@ const elements = {
   joinAsPlayer2Button: document.querySelector("#joinAsPlayer2Button"),
   coinFlipPanel: document.querySelector("#coinFlipPanel"),
   readyButton: document.querySelector("#readyButton"),
+  scoreband: document.querySelector("#scoreband"),
   player1Score: document.querySelector("#player1Score"),
   player2Score: document.querySelector("#player2Score"),
   targetScore: document.querySelector("#targetScore"),
@@ -110,7 +111,11 @@ elements.nextHandButton.addEventListener("click", async () => {
 });
 
 elements.readyButton.addEventListener("click", async () => {
-  await sendAction({ type: "ready" });
+  const viewerSeat = roomView?.viewerSeat;
+  const viewerReady = viewerSeat && viewerSeat !== "spectator"
+    ? Boolean(roomView?.playerReady?.[viewerSeat])
+    : false;
+  await sendAction({ type: viewerReady ? "unready" : "ready" });
 });
 
 elements.joinAsPlayer2Button.addEventListener("click", async () => {
@@ -304,6 +309,7 @@ function render() {
     elements.coinFlipPanel.replaceChildren();
     elements.trumpPanel.hidden = true;
     elements.nextHandButton.disabled = true;
+    elements.scoreband.hidden = true;
     elements.copyCodeButton.disabled = true;
     elements.copySpectatorLinkButton.disabled = true;
     elements.joinAsPlayer2Button.hidden = true;
@@ -351,13 +357,16 @@ function render() {
   elements.opponentTricks.textContent = viewerSeat === "spectator" ? "0 tricks" : `${state.tricksWon[opponentSeat]} tricks`;
   elements.spectatorNotice.hidden = viewerSeat !== "spectator";
   const viewerReady = viewerSeat === "spectator" ? true : roomView.playerReady?.[viewerSeat];
+  const canReady = viewerSeat !== "spectator"
+    && ["waiting_for_players", "pregame_settings", "ready_countdown"].includes(state.phase);
   const showStartSequence = shouldShowStartSequence(roomView, state, playerCount);
   renderStartSequenceModal(showStartSequence, viewerSeat);
-  elements.readyButton.hidden = !["pregame_settings", "ready_countdown"].includes(state.phase) || viewerSeat === "spectator";
-  elements.readyButton.disabled = Boolean(viewerReady) || viewerSeat === "spectator";
-  elements.readyButton.textContent = viewerReady ? "Ready Set" : "Ready";
+  elements.readyButton.hidden = !canReady;
+  elements.readyButton.disabled = !canReady;
+  elements.readyButton.textContent = viewerReady ? "Ready (Tap to Cancel)" : "Ready Up";
   elements.nextHandButton.hidden = true;
   elements.nextHandButton.disabled = true;
+  elements.scoreband.hidden = !gameInterfaceActive;
   elements.roomTable.hidden = !gameInterfaceActive;
   elements.pregamePanel.hidden = gameInterfaceActive;
 

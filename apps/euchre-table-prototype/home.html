@@ -7,111 +7,76 @@
     <link rel="stylesheet" href="./src/styles.css">
   </head>
   <body>
-    <main class="shell home-shell">
-      <section class="home-hero">
-        <p class="eyebrow">Euchre Free Play</p>
-        <h1>1V1 Euchre Free Play</h1>
-        <p class="home-copy">Free-play competitive 1v1 Euchre for tester rooms and small community brackets.</p>
-        <p class="home-disclaimer">Free-play only. No cash games. No deposits. No wallets. No paid entries.</p>
-      </section>
+    <main class="master-shell home-shell">
+      <button class="info-button" type="button" aria-label="Open info">☰ Info</button>
 
-      <section class="home-player-panel" aria-label="Player setup">
-        <label for="playerNameInput">Player name</label>
-        <input id="playerNameInput" class="name-input" type="text" autocomplete="nickname" placeholder="PLAYER 1">
-      </section>
+      <section class="master-panel home-master-panel">
+        <p class="eyebrow">Season 0 Preview</p>
+        <h1>EUCHRE</h1>
+        <p class="home-copy">No partner. No excuses. Head-to-head euchre.</p>
+        <p class="home-subcopy">Create a room, send the code to your opponent, and play a live 1v1 match.</p>
 
-      <section class="home-settings-panel" aria-label="Euchre settings and rules">
-        <div class="settings-heading">
-          <div>
-            <p class="eyebrow">Match Settings</p>
-            <h2>Choose rules before starting</h2>
+        <label class="master-field" for="playerNameInput">
+          <span>Your Name</span>
+          <input id="playerNameInput" class="name-input" type="text" autocomplete="nickname" placeholder="Your name">
+        </label>
+
+        <section class="master-section" aria-label="Match mode">
+          <h2>Match mode</h2>
+          <input id="modeSelect" type="hidden" value="communityCompetitive">
+          <div class="mode-grid" aria-hidden="true">
+            <div class="mode-option selected">
+              <strong>Quick Match</strong>
+              <span>Single head-to-head match</span>
+            </div>
+            <div class="mode-option disabled">
+              <strong>King of the Table</strong>
+              <span>Winner stays, queue challengers</span>
+            </div>
           </div>
-          <span>Free-play only</span>
-        </div>
+          <p>Quick Match: one head-to-head game, first to the target wins.</p>
+        </section>
 
-        <div class="settings-grid">
-          <label class="setting-control" for="modeSelect">
-            <span>Mode</span>
-            <select id="modeSelect">
-              <option value="communityCompetitive" selected>Community Competitive</option>
-              <option value="classicCasual">Classic Casual</option>
-              <option value="fastGame">Fast Game</option>
-              <option value="practiceMode">Practice Mode</option>
-            </select>
-          </label>
+        <section class="master-section" aria-label="Match target">
+          <h2>Match target</h2>
+          <input id="stickDealerToggle" type="checkbox" checked hidden>
+          <select id="scoreLimitSelect" class="target-select" aria-label="Match target">
+            <option value="10" selected>10 pts</option>
+            <option value="5">5 pts</option>
+          </select>
+          <p>Stick the Dealer is on. Hidden hands are enforced.</p>
+        </section>
 
-          <label class="setting-control" for="scoreLimitSelect">
-            <span>Score limit</span>
-            <select id="scoreLimitSelect">
-              <option value="10" selected>First to 10</option>
-              <option value="5">Fast game, first to 5</option>
-            </select>
-          </label>
-
-          <label class="setting-toggle" for="stickDealerToggle">
-            <input id="stickDealerToggle" type="checkbox" checked>
-            <span>Stick the Dealer</span>
-          </label>
-        </div>
-
-        <ul class="rules-summary">
-          <li>24-card deck: 9, 10, J, Q, K, A.</li>
-          <li>Right bower is highest trump; left bower counts as trump.</li>
-          <li>Trump may be led immediately after selection.</li>
-          <li>Players must follow the led suit when possible.</li>
-        </ul>
-      </section>
-
-      <section class="home-action-panel" aria-label="Main actions">
-        <div class="home-actions">
-          <a id="createRoomLink" class="button-link" href="./room.html?action=create">Create Room</a>
-          <label class="home-join-control" for="homeJoinRoomCode">
-            <span>Room code</span>
-            <input id="homeJoinRoomCode" maxlength="8" autocomplete="off" placeholder="ABCDE">
-          </label>
-          <button id="homeJoinRoomButton" class="secondary" type="button">Join Room</button>
-          <button id="quickMatchButton" type="button">Quick Match</button>
-          <a class="button-link secondary-link" href="./rules.html">Rules</a>
-        </div>
-        <p id="quickMatchStatus" class="home-status" aria-live="polite"></p>
-      </section>
-
-      <section class="home-info-grid" aria-label="Launch information">
-        <article class="info-panel">
-          <h2>Fair Play</h2>
-          <p>Free-play only. Keep matches clean, finish hands in good faith, and use host controls only to recover tester events.</p>
-        </article>
-        <article class="info-panel">
-          <h2>Rules</h2>
-          <p>Two players, a 24-card deck, bowers handled as trump, immediate trump leads allowed, and first to 10 by default.</p>
-          <a class="text-link" href="./rules.html">Read the rules</a>
-        </article>
-        <article class="info-panel">
-          <h2>Community</h2>
-          <p>Discord/community link placeholder for tester coordination and support.</p>
-          <span class="disabled-link" aria-disabled="true">Discord coming soon</span>
-        </article>
-        <article class="info-panel">
-          <h2>Spectators</h2>
-          <p>Spectator views are read-only and keep hidden hands private while showing public match status.</p>
-        </article>
-      </section>
-
-      <section class="home-admin-panel" aria-label="Admin access">
-        <details>
-          <summary>Admin</summary>
-          <div class="admin-code-row">
-            <label for="homepageAdminCode">Code</label>
-            <input id="homepageAdminCode" class="admin-code-input" type="password" autocomplete="off">
-            <button id="unlockAdminButton" class="compact-button secondary" type="button">Unlock</button>
+        <section class="home-action-panel" aria-label="Main actions">
+          <div class="home-actions">
+            <a id="createRoomLink" class="button-link primary-action" href="./room.html?action=create">Create Room</a>
+            <label class="home-join-control" for="homeJoinRoomCode">
+              <span>Room code</span>
+              <input id="homeJoinRoomCode" maxlength="8" autocomplete="off" placeholder="ABCDE">
+            </label>
+            <button id="homeJoinRoomButton" class="secondary join-action" type="button">Join Match</button>
           </div>
-          <p id="homepageAdminStatus" class="admin-status" aria-live="polite"></p>
-          <div id="homepageAdminControls" class="homepage-admin-controls" hidden>
-            <a class="button-link" href="./tournament.html">Create Tournament</a>
-            <a class="button-link secondary-link" href="./tournament.html">Tournament settings</a>
-            <a class="button-link secondary-link" href="./tournament.html">Host tournament tools</a>
-          </div>
-        </details>
+          <button id="quickMatchButton" class="ghost-action" type="button">Quick Match</button>
+          <a class="text-link rules-link" href="./rules.html">Rules</a>
+          <p id="quickMatchStatus" class="home-status" aria-live="polite"></p>
+        </section>
+
+        <section class="home-admin-panel" aria-label="Admin access">
+          <details>
+            <summary>Admin</summary>
+            <div class="admin-code-row">
+              <label for="homepageAdminCode">Code</label>
+              <input id="homepageAdminCode" class="admin-code-input" type="password" autocomplete="off">
+              <button id="unlockAdminButton" class="compact-button secondary" type="button">Unlock</button>
+            </div>
+            <p id="homepageAdminStatus" class="admin-status" aria-live="polite"></p>
+            <div id="homepageAdminControls" class="homepage-admin-controls" hidden>
+              <a class="button-link" href="./tournament.html">Create Tournament</a>
+              <a class="button-link secondary-link" href="./tournament.html">Tournament settings</a>
+              <a class="button-link secondary-link" href="./tournament.html">Host tournament tools</a>
+            </div>
+          </details>
+        </section>
       </section>
     </main>
 

@@ -11,27 +11,23 @@ test("home screen has the main routes and actions", async () => {
   const publicActions = html.match(/<section class="home-action-panel"[\s\S]*?<\/section>/)?.[0] ?? "";
 
   assert.match(html, /1V1 Euchre Free Play/);
+  assert.match(html, /class="master-shell home-shell"/);
+  assert.match(html, /EUCHRE/);
+  assert.match(html, /Season 0 Preview/);
   assert.match(publicActions, /Create Room/);
   assert.match(publicActions, /href="\.\/room\.html\?action=create"/);
-  assert.match(publicActions, /Join Room/);
+  assert.match(publicActions, /Join Match/);
   assert.match(publicActions, /id="homeJoinRoomCode"/);
   assert.match(publicActions, /id="homeJoinRoomButton"/);
   assert.match(publicActions, /Quick Match/);
   assert.match(publicActions, /Rules/);
   assert.doesNotMatch(publicActions, /Create Tournament/);
-  assert.match(html, /Player name/);
-  assert.match(html, /Match Settings/);
-  assert.match(html, /Mode/);
-  assert.match(html, /Community Competitive/);
-  assert.match(html, /Score limit/);
-  assert.match(html, /Stick the Dealer/);
-  assert.match(html, /Trump may be led immediately/);
-  assert.match(html, /Free-play only/);
-  assert.match(html, /No cash games\. No deposits\. No wallets\. No paid entries\./);
-  assert.match(html, /Free-play competitive 1v1 Euchre/);
-  assert.match(html, /Fair Play/);
-  assert.match(html, /Discord\/community link placeholder/);
-  assert.match(html, /Spectator views are read-only/);
+  assert.match(html, /Your Name/);
+  assert.match(html, /Match mode/);
+  assert.match(html, /Quick Match: one head-to-head game/);
+  assert.match(html, /Match target/);
+  assert.match(html, /Stick the Dealer is on/);
+  assert.match(html, /Hidden hands are enforced/);
   assert.match(html, /id="homepageAdminCode"/);
   assert.match(html, /id="homepageAdminControls" class="homepage-admin-controls" hidden/);
   assert.match(html, /class="home-admin-panel"/);
@@ -81,11 +77,12 @@ test("one-player room lobby exposes invite controls without start sequence or cr
 
   assert.doesNotMatch(html, /Create Room/);
   assert.doesNotMatch(html, /Join Room/);
-  assert.doesNotMatch(html, /Room Code/);
   assert.doesNotMatch(html, /Be Dealer/);
   assert.doesNotMatch(html, /Be Non-Dealer/);
   assert.doesNotMatch(html, /Coin Flip/);
-  assert.match(html, /id="activeRoomControls" class="controls"/);
+  assert.match(html, /id="activeRoomControls" class="master-panel lobby-panel"/);
+  assert.match(html, /Room Code/);
+  assert.match(html, /class="room-code-display"/);
   assert.match(html, /Copy Invite Link/);
   assert.match(html, /Copy Spectator Link/);
   assert.match(html, /Invite Link/);
@@ -93,12 +90,12 @@ test("one-player room lobby exposes invite controls without start sequence or cr
   assert.match(html, /id="readyButton"/);
   assert.match(html, /id="readyStatus"/);
   assert.match(html, /id="pregamePanel"/);
-  assert.match(html, /Opening Room/);
-  assert.match(html, /Match Type/);
-  assert.match(html, /Target Score/);
+  assert.match(html, /Match Settings/);
+  assert.match(html, /Race To/);
   assert.match(html, /Stick the Dealer/);
-  assert.match(html, /Player 1 Slot/);
-  assert.match(html, /Player 2 Slot/);
+  assert.match(html, /Hidden Hands/);
+  assert.match(html, /Player 1 · Host/);
+  assert.match(html, /Player 2/);
   assert.match(html, /id="roomTable"/);
   assert.match(html, /id="coinFlipWinner"/);
   assert.match(html, /id="startingPosition"/);
@@ -112,12 +109,17 @@ test("one-player room lobby exposes invite controls without start sequence or cr
 
 test("pre-match lobby keeps gameplay interface hidden", async () => {
   const html = await readText("room.html");
+  const client = await readText("src/room-client.js");
 
   assert.match(html, /id="roomTable" class="table-grid room-table" hidden/);
-  assert.match(html, /id="pregamePanel" class="panel pregame-panel"/);
-  assert.match(html, /Player 1 Slot/);
-  assert.match(html, /Player 2 Slot/);
+  assert.match(html, /id="scoreband" class="scoreband" aria-label="Match score" hidden/);
+  assert.match(html, /id="pregamePanel" class="match-settings-panel"/);
+  assert.match(html, /Player 1 · Host/);
+  assert.match(html, /Waiting for player/);
   assert.match(html, /id="readyStatus"/);
+  assert.match(client, /elements\.roomTable\.hidden = !gameInterfaceActive/);
+  assert.match(client, /elements\.scoreband\.hidden = !gameInterfaceActive/);
+  assert.match(client, /const gameInterfaceActive = state\.phase === "playing"/);
 });
 
 test("active room screen hides lobby create and join controls", async () => {
@@ -154,6 +156,18 @@ test("spectator invite opens read-only room view instead of taking Player 2 seat
   assert.match(client, /urlParams\.get\("view"\) === "spectator"/);
   assert.match(client, /viewRoomAsSpectator\(urlRoomCode\.toUpperCase\(\)\)/);
   assert.match(client, /Spectator View\. Hidden hands stay private\./);
+});
+
+test("seated pregame players see Ready and spectators do not", async () => {
+  const html = await readText("room.html");
+  const client = await readText("src/room-client.js");
+
+  assert.match(html, /id="readyButton" type="button" disabled>Ready Up<\/button>/);
+  assert.match(client, /\["waiting_for_players", "pregame_settings", "ready_countdown"\]\.includes\(state\.phase\)/);
+  assert.match(client, /viewerSeat !== "spectator"/);
+  assert.match(client, /elements\.readyButton\.hidden = !canReady/);
+  assert.match(client, /elements\.readyButton\.textContent = viewerReady \? "Ready \(Tap to Cancel\)" : "Ready Up"/);
+  assert.match(client, /type: viewerReady \? "unready" : "ready"/);
 });
 
 test("dealer choice buttons are coin-flip only and hide after selection", async () => {
@@ -362,7 +376,8 @@ test("public room invite route serves room and lets Player 2 join by invite code
 
     const invitePage = await requestText(port, invitePath);
     assert.equal(invitePage.statusCode, 200);
-    assert.match(invitePage.body, /Private Euchre Room/);
+    assert.match(invitePage.body, /master-shell room-shell/);
+    assert.match(invitePage.body, /room-code-display/);
 
     const blankJoin = await requestJson(port, `/api/rooms/${roomCode}/join`, {
       method: "POST",

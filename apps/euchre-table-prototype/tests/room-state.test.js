@@ -148,12 +148,29 @@ test("ready is allowed before coin flip and dealer choice", () => {
   assert.equal(room.firstDealer, null);
 });
 
-test("Player 1 alone cannot ready, start, or deal cards", () => {
-  const room = createRoom({ roomCode: "ABCDE", seatToken: "host-token" });
+test("Player 1 alone can ready without starting countdown, coin flip, or deal", () => {
+  let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token" });
 
-  assert.throws(() => applyRoomAction(room, { seatToken: "host-token", type: "ready" }), /Ready is only available/);
+  room = applyRoomAction(room, { seatToken: "host-token", type: "ready" });
+
+  assert.equal(room.playerReady.player1, true);
+  assert.equal(room.playerReady.player2, false);
   assert.equal(room.gameState.phase, "waiting_for_players");
+  assert.equal(room.countdownStartedAt, null);
+  assert.equal(room.countdownEndsAt, null);
   assert.equal(room.gameState.hands.player1.length, 0);
+  assert.equal(room.gameState.hands.player2.length, 0);
+  assert.equal(room.coinFlipWinner, null);
+});
+
+test("Player 1 can unready before Player 2 joins", () => {
+  let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token" });
+  room = applyRoomAction(room, { seatToken: "host-token", type: "ready" });
+  room = applyRoomAction(room, { seatToken: "host-token", type: "unready" });
+
+  assert.equal(room.playerReady.player1, false);
+  assert.equal(room.gameState.phase, "waiting_for_players");
+  assert.equal(room.countdownEndsAt, null);
   assert.equal(room.coinFlipWinner, null);
 });
 
@@ -201,6 +218,25 @@ test("Player 1 ready without Player 2 ready does not deal cards", () => {
   assert.equal(room.gameState.phase, "pregame_settings");
   assert.equal(room.gameState.hands.player1.length, 0);
   assert.equal(room.countdownEndsAt, null);
+});
+
+test("Player 1 ready before Player 2 joins waits for Player 2 ready to start countdown", () => {
+  let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", coinFlipWinner: "player1" });
+
+  room = applyRoomAction(room, { seatToken: "host-token", type: "ready" });
+  room = joinRoom(room, { seatToken: "guest-token" }).room;
+
+  assert.equal(room.playerReady.player1, true);
+  assert.equal(room.playerReady.player2, false);
+  assert.equal(room.gameState.phase, "pregame_settings");
+  assert.equal(room.countdownEndsAt, null);
+  assert.equal(room.coinFlipWinner, null);
+
+  room = applyRoomAction(room, { seatToken: "guest-token", type: "ready" });
+
+  assert.equal(room.gameState.phase, "ready_countdown");
+  assert.equal(Boolean(room.countdownEndsAt), true);
+  assert.equal(room.coinFlipWinner, null);
 });
 
 test("both players ready triggers countdown without dealing immediately", () => {

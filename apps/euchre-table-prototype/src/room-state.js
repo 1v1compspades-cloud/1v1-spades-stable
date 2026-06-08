@@ -118,7 +118,6 @@ export function applyRoomAction(room, { seatToken, type, suit, position, card, d
 
   if (type === "ready") {
     ensurePregameOrCountdown(gameState);
-    ensureBothPlayersSeated(room);
 
     const nextReady = {
       ...room.playerReady,
@@ -128,6 +127,23 @@ export function applyRoomAction(room, { seatToken, type, suit, position, card, d
     return maybeStartReadyCountdown(syncRoomFields({
       ...room,
       playerReady: nextReady,
+      updatedAt: new Date().toISOString()
+    }));
+  }
+
+  if (type === "unready") {
+    ensurePregameOrCountdown(gameState);
+
+    const nextReady = {
+      ...room.playerReady,
+      [seat]: false
+    };
+
+    return maybeStartReadyCountdown(syncRoomFields({
+      ...room,
+      playerReady: nextReady,
+      countdownStartedAt: null,
+      countdownEndsAt: null,
       updatedAt: new Date().toISOString()
     }));
   }
@@ -761,7 +777,7 @@ function ensurePhase(gameState, phase) {
 }
 
 function ensurePregameOrCountdown(gameState) {
-  if (!["pregame_settings", "ready_countdown"].includes(gameState.phase)) {
+  if (!["waiting_for_players", "pregame_settings", "ready_countdown"].includes(gameState.phase)) {
     throw new Error("Ready is only available before the first hand");
   }
 }
