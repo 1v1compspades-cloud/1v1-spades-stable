@@ -3,6 +3,7 @@ import { setupInfoPanel } from "./info-panel.js";
 import { cardLabel, suitSymbol } from "./table-state.js";
 
 const storageKey = "euchreRoomSeat";
+const roomSessionsKey = "euchreRoomSeatsByRoom";
 const homepageSettingsKey = "euchreHomepageSettings";
 const elements = {
   activeRoomControls: document.querySelector("#activeRoomControls"),
@@ -58,10 +59,11 @@ const elements = {
 };
 
 const urlParams = new URL(window.location.href).searchParams;
+const urlRoomCode = urlParams.get("room")?.toUpperCase() ?? null;
 const gamePagePhases = ["playing", "hand_score", "next_round_countdown", "match_complete"];
 const isGamePage = window.location.pathname.endsWith("/game.html");
 const isRoomPage = window.location.pathname.endsWith("/room.html") || !isGamePage;
-let session = loadSession();
+let session = null;
 let roomView = null;
 let pollHandle = null;
 
@@ -159,19 +161,24 @@ window.addEventListener("beforeunload", () => {
 });
 
 if (urlParams.get("action") === "create") {
-  localStorage.removeItem(storageKey);
+  clearCurrentSession();
   session = null;
   createRoomFromUi();
-} else if (session?.roomCode && session?.seatToken) {
-  refreshRoom("Reconnected from this browser.");
-} else {
-  const urlRoomCode = urlParams.get("room");
-  if (urlRoomCode) {
-    if (urlParams.get("view") === "spectator") {
-      viewRoomAsSpectator(urlRoomCode.toUpperCase());
+} else if (urlRoomCode) {
+  if (urlParams.get("view") === "spectator") {
+    viewRoomAsSpectator(urlRoomCode);
+  } else {
+    session = loadSession(urlRoomCode);
+    if (session?.roomCode && session?.seatToken) {
+      refreshRoom("Game restored.");
     } else {
-      autoJoinRoom(urlRoomCode.toUpperCase());
+      autoJoinRoom(urlRoomCode);
     }
+  }
+} else {
+  session = loadLastSession();
+  if (session?.roomCode && session?.seatToken) {
+    refreshRoom("Game restored.");
   }
 }
 
@@ -204,13 +211,20 @@ async function refreshRoom(status) {
     const result = await api(`/api/rooms/${session.roomCode}?seatToken=${encodeURIComponent(session.seatToken ?? "")}`);
     setRoom(result.room, status);
   } catch (error) {
-    localStorage.removeItem(storageKey);
+    clearStoredSession(session?.roomCode);
     session = null;
     setStatus(`${error.message}. Create a room or enter a room code to continue.`);
   }
 }
 
 async function autoJoinRoom(roomCode) {
+  const storedSession = loadSession(roomCode);
+  if (storedSession?.seatToken) {
+    session = storedSession;
+    await refreshRoom("Game restored.");
+    return;
+  }
+
   const displayName = currentPlayerName();
   if (!displayName) {
     await viewRoomAsSpectator(roomCode, "Enter your name to continue.");
@@ -259,10 +273,10 @@ async function api(path, { method = "GET", body } = {}) {
 
 function setRoom(nextRoom, status) {
   roomView = nextRoom;
-  if (status) setStatus(status);
   startPolling();
   if (redirectForPage(nextRoom)) return;
   render();
+  if (status) setStatus(status);
 }
 
 function redirectForPage(nextRoom) {
@@ -285,20 +299,73 @@ function redirectForPage(nextRoom) {
 }
 
 function setSession(roomCode, seatToken) {
-  session = { roomCode, seatToken };
+  const normalizedRoomCode = roomCode?.toUpperCase();
+  session = {
+    roomCode: normalizedRoomCode,
+    seatToken,
+    updatedAt: new Date().toISOString()
+  };
   localStorage.setItem(storageKey, JSON.stringify(session));
+
+  const sessions = loadSessionMap();
+  sessions[normalizedRoomCode] = session;
+  localStorage.setItem(roomSessionsKey, JSON.stringify(sessions));
 }
 
 function isGamePagePhase(phase) {
   return gamePagePhases.includes(phase);
 }
 
-function loadSession() {
+function loadSession(roomCode) {
+  const normalizedRoomCode = roomCode?.toUpperCase();
+  const sessions = loadSessionMap();
+  const matchingSession = normalizedRoomCode ? sessions[normalizedRoomCode] : null;
+
+  if (matchingSession?.roomCode && matchingSession?.seatToken) {
+    return matchingSession;
+  }
+
   try {
-    return JSON.parse(localStorage.getItem(storageKey));
+    const stored = JSON.parse(localStorage.getItem(storageKey));
+    if (!stored?.roomCode || !stored?.seatToken) return null;
+    if (normalizedRoomCode && stored.roomCode !== normalizedRoomCode) return null;
+    return stored;
   } catch {
     return null;
   }
+}
+
+function loadLastSession() {
+  const currentSession = loadSession();
+  if (currentSession?.roomCode && currentSession?.seatToken) return currentSession;
+
+  const sessions = Object.values(loadSessionMap())
+    .filter((candidate) => candidate?.roomCode && candidate?.seatToken)
+    .sort((a, b) => Date.parse(b.updatedAt ?? 0) - Date.parse(a.updatedAt ?? 0));
+  return sessions[0] ?? null;
+}
+
+function loadSessionMap() {
+  try {
+    const sessions = JSON.parse(localStorage.getItem(roomSessionsKey));
+    return sessions && typeof sessions === "object" && !Array.isArray(sessions) ? sessions : {};
+  } catch {
+    return {};
+  }
+}
+
+function clearCurrentSession() {
+  localStorage.removeItem(storageKey);
+}
+
+function clearStoredSession(roomCode) {
+  clearCurrentSession();
+  if (!roomCode) return;
+
+  const normalizedRoomCode = roomCode.toUpperCase();
+  const sessions = loadSessionMap();
+  delete sessions[normalizedRoomCode];
+  localStorage.setItem(roomSessionsKey, JSON.stringify(sessions));
 }
 
 function currentPlayerName() {

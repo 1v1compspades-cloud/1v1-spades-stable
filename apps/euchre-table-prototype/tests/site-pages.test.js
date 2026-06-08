@@ -1,10 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { readFile, access } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import http from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const appRoot = new URL("../", import.meta.url);
+const adminKey = "Zxcvfdsaqwer1287!";
 
 test("home screen has the main routes and actions", async () => {
   const html = await readText("home.html");
@@ -257,11 +260,26 @@ test("invite links use the public room route without the app subdirectory", asyn
   assert.doesNotMatch(client, /roomLinkFor[\s\S]*\/apps\/euchre-table-prototype/);
 });
 
+test("room client restores stored seat sessions by room code", async () => {
+  const client = await readText("src/room-client.js");
+
+  assert.match(client, /roomSessionsKey = "euchreRoomSeatsByRoom"/);
+  assert.match(client, /urlRoomCode = urlParams\.get\("room"\)\?\.toUpperCase\(\) \?\? null/);
+  assert.match(client, /session = loadSession\(urlRoomCode\)/);
+  assert.match(client, /refreshRoom\("Game restored\."\)/);
+  assert.match(client, /function loadLastSession\(\)/);
+  assert.match(client, /function loadSessionMap\(\)/);
+  assert.match(client, /sessions\[normalizedRoomCode\] = session/);
+  assert.match(client, /viewRoomAsSpectator\(urlRoomCode\)/);
+  assert.match(client, /Spectator View\. Both player seats are already taken\./);
+  assert.match(client, /render\(\);\n  if \(status\) setStatus\(status\);/);
+});
+
 test("spectator invite opens read-only room view instead of taking Player 2 seat", async () => {
   const client = await readText("src/room-client.js");
 
   assert.match(client, /urlParams\.get\("view"\) === "spectator"/);
-  assert.match(client, /viewRoomAsSpectator\(urlRoomCode\.toUpperCase\(\)\)/);
+  assert.match(client, /viewRoomAsSpectator\(urlRoomCode\)/);
   assert.match(client, /Spectator View\. Hidden hands stay private\./);
 });
 
@@ -421,114 +439,404 @@ test("package scripts include local and production start commands", async () => 
 });
 
 test("server health check and root route work", async () => {
-  const port = 5198;
-  const server = spawn(process.execPath, ["server.js"], {
-    cwd: new URL(".", appRoot),
-    env: {
-      ...process.env,
-      HOST: "127.0.0.1",
-      PORT: String(port),
-      NODE_ENV: "production"
-    },
-    stdio: ["ignore", "pipe", "pipe"]
+  await withTempStateFile(async (stateFile) => {
+    const port = 5198;
+    const server = await startTestServer(port, stateFile);
+
+    try {
+      const health = await requestJson(port, "/healthz");
+      assert.equal(health.statusCode, 200);
+      assert.deepEqual(health.body, {
+        ok: true,
+        app: "1v1-euchre-freeplay"
+      });
+
+      const root = await requestText(port, "/");
+      assert.equal(root.statusCode, 302);
+      assert.equal(root.headers.location, "/apps/euchre-table-prototype/home.html");
+
+      const home = await requestText(port, "/apps/euchre-table-prototype/home.html");
+      assert.equal(home.statusCode, 200);
+      assert.match(home.body, /<title>1v1 Euchre<\/title>/);
+
+      const game = await requestText(port, "/game.html");
+      assert.equal(game.statusCode, 200);
+      assert.match(game.body, /id="roomTable"/);
+
+      const publicCss = await requestText(port, "/src/styles.css");
+      assert.equal(publicCss.statusCode, 200);
+      assert.match(publicCss.body, /\[hidden\]/);
+
+      const publicRoomClient = await requestText(port, "/src/room-client.js");
+      assert.equal(publicRoomClient.statusCode, 200);
+      assert.match(publicRoomClient.body, /handleReadyClick/);
+    } finally {
+      await stopServer(server);
+    }
   });
-
-  try {
-    await waitForServer(server, port);
-    const health = await requestJson(port, "/healthz");
-    assert.equal(health.statusCode, 200);
-    assert.deepEqual(health.body, {
-      ok: true,
-      app: "1v1-euchre-freeplay"
-    });
-
-    const root = await requestText(port, "/");
-    assert.equal(root.statusCode, 302);
-    assert.equal(root.headers.location, "/apps/euchre-table-prototype/home.html");
-
-    const home = await requestText(port, "/apps/euchre-table-prototype/home.html");
-    assert.equal(home.statusCode, 200);
-    assert.match(home.body, /<title>1v1 Euchre<\/title>/);
-
-    const game = await requestText(port, "/game.html");
-    assert.equal(game.statusCode, 200);
-    assert.match(game.body, /id="roomTable"/);
-
-    const publicCss = await requestText(port, "/src/styles.css");
-    assert.equal(publicCss.statusCode, 200);
-    assert.match(publicCss.body, /\[hidden\]/);
-
-    const publicRoomClient = await requestText(port, "/src/room-client.js");
-    assert.equal(publicRoomClient.statusCode, 200);
-    assert.match(publicRoomClient.body, /handleReadyClick/);
-  } finally {
-    server.kill();
-  }
 });
 
 test("public room invite route serves room and lets Player 2 join by invite code", async () => {
-  const port = 5199;
-  const server = spawn(process.execPath, ["server.js"], {
-    cwd: new URL(".", appRoot),
-    env: {
-      ...process.env,
-      HOST: "127.0.0.1",
-      PORT: String(port),
-      NODE_ENV: "production"
-    },
-    stdio: ["ignore", "pipe", "pipe"]
+  await withTempStateFile(async (stateFile) => {
+    const port = 5199;
+    const server = await startTestServer(port, stateFile);
+
+    try {
+      const blankCreate = await requestJson(port, "/api/rooms", {
+        method: "POST",
+        body: { displayName: "   " }
+      });
+      assert.equal(blankCreate.statusCode, 400);
+      assert.equal(blankCreate.body.error, "Enter your name to continue.");
+
+      const created = await requestJson(port, "/api/rooms", {
+        method: "POST",
+        body: { displayName: "Alice" }
+      });
+      const roomCode = created.body.room.roomCode;
+      const invitePath = `/room.html?room=${encodeURIComponent(roomCode)}`;
+
+      assert.equal(created.statusCode, 201);
+      assert.equal(created.body.room.players.player1, true);
+      assert.equal(created.body.room.players.player2, false);
+      assert.equal(created.body.room.playerNames.player1, "Alice");
+      assert.equal(created.body.room.coinFlipWinner, null);
+      assert.equal(invitePath.includes("/apps/euchre-table-prototype"), false);
+
+      const invitePage = await requestText(port, invitePath);
+      assert.equal(invitePage.statusCode, 200);
+      assert.match(invitePage.body, /master-shell room-shell/);
+      assert.match(invitePage.body, /room-code-display/);
+
+      const blankJoin = await requestJson(port, `/api/rooms/${roomCode}/join`, {
+        method: "POST",
+        body: { displayName: "" }
+      });
+      assert.equal(blankJoin.statusCode, 400);
+      assert.equal(blankJoin.body.error, "Enter your name to continue.");
+
+      const joined = await requestJson(port, `/api/rooms/${roomCode}/join`, {
+        method: "POST",
+        body: { displayName: "Bob" }
+      });
+
+      assert.equal(joined.statusCode, 200);
+      assert.equal(joined.body.seat, "player2");
+      assert.equal(joined.body.room.viewerSeat, "player2");
+      assert.equal(joined.body.room.players.player2, true);
+      assert.equal(joined.body.room.playerNames.player2, "Bob");
+      assert.equal(joined.body.room.coinFlipWinner, null);
+      assert.equal(joined.body.room.gameState.phase, "pregame_settings");
+    } finally {
+      await stopServer(server);
+    }
   });
+});
 
-  try {
-    await waitForServer(server, port);
-    const blankCreate = await requestJson(port, "/api/rooms", {
-      method: "POST",
-      body: { displayName: "   " }
-    });
-    assert.equal(blankCreate.statusCode, 400);
-    assert.equal(blankCreate.body.error, "Enter your name to continue.");
+test("persistence reload keeps active room state", async () => {
+  await withTempStateFile(async (stateFile) => {
+    const port = 5200;
+    let server = await startTestServer(port, stateFile);
+    let roomCode;
+    let seatToken;
+    let guestToken;
 
-    const created = await requestJson(port, "/api/rooms", {
-      method: "POST",
-      body: { displayName: "Alice" }
-    });
-    const roomCode = created.body.room.roomCode;
-    const invitePath = `/room.html?room=${encodeURIComponent(roomCode)}`;
+    try {
+      const created = await requestJson(port, "/api/rooms", {
+        method: "POST",
+        body: { displayName: "Alice" }
+      });
+      roomCode = created.body.room.roomCode;
+      seatToken = created.body.seatToken;
 
-    assert.equal(created.statusCode, 201);
-    assert.equal(created.body.room.players.player1, true);
-    assert.equal(created.body.room.players.player2, false);
-    assert.equal(created.body.room.playerNames.player1, "Alice");
-    assert.equal(created.body.room.coinFlipWinner, null);
-    assert.equal(invitePath.includes("/apps/euchre-table-prototype"), false);
+      const joined = await requestJson(port, `/api/rooms/${roomCode}/join`, {
+        method: "POST",
+        body: { displayName: "Bob" }
+      });
+      guestToken = joined.body.seatToken;
+      assert.equal(joined.body.room.players.player2, true);
+    } finally {
+      await stopServer(server);
+    }
 
-    const invitePage = await requestText(port, invitePath);
-    assert.equal(invitePage.statusCode, 200);
-    assert.match(invitePage.body, /master-shell room-shell/);
-    assert.match(invitePage.body, /room-code-display/);
+    server = await startTestServer(port, stateFile);
+    try {
+      const loaded = await requestJson(port, `/api/rooms/${roomCode}?seatToken=${encodeURIComponent(seatToken)}`);
+      assert.equal(loaded.statusCode, 200);
+      assert.equal(loaded.body.room.roomCode, roomCode);
+      assert.equal(loaded.body.room.viewerSeat, "player1");
+      assert.equal(loaded.body.room.players.player1, true);
+      assert.equal(loaded.body.room.players.player2, true);
+      assert.equal(loaded.body.room.playerNames.player1, "Alice");
+      assert.equal(loaded.body.room.playerNames.player2, "Bob");
 
-    const blankJoin = await requestJson(port, `/api/rooms/${roomCode}/join`, {
-      method: "POST",
-      body: { displayName: "" }
-    });
-    assert.equal(blankJoin.statusCode, 400);
-    assert.equal(blankJoin.body.error, "Enter your name to continue.");
+      const hostReconnect = await requestJson(port, `/api/rooms/${roomCode}/join`, {
+        method: "POST",
+        body: { seatToken, displayName: "Alice Again" }
+      });
+      assert.equal(hostReconnect.statusCode, 200);
+      assert.equal(hostReconnect.body.seat, "player1");
+      assert.equal(hostReconnect.body.room.viewerSeat, "player1");
+      assert.equal(hostReconnect.body.room.playerNames.player1, "Alice");
 
-    const joined = await requestJson(port, `/api/rooms/${roomCode}/join`, {
-      method: "POST",
-      body: { displayName: "Bob" }
-    });
+      const guestReconnect = await requestJson(port, `/api/rooms/${roomCode}/join`, {
+        method: "POST",
+        body: { seatToken: guestToken, displayName: "Bob Again" }
+      });
+      assert.equal(guestReconnect.statusCode, 200);
+      assert.equal(guestReconnect.body.seat, "player2");
+      assert.equal(guestReconnect.body.room.viewerSeat, "player2");
+      assert.equal(guestReconnect.body.room.playerNames.player2, "Bob");
 
-    assert.equal(joined.statusCode, 200);
-    assert.equal(joined.body.seat, "player2");
-    assert.equal(joined.body.room.viewerSeat, "player2");
-    assert.equal(joined.body.room.players.player2, true);
-    assert.equal(joined.body.room.playerNames.player2, "Bob");
-    assert.equal(joined.body.room.coinFlipWinner, null);
-    assert.equal(joined.body.room.gameState.phase, "pregame_settings");
-  } finally {
-    server.kill();
-  }
+      const seatSteal = await requestJson(port, `/api/rooms/${roomCode}/join`, {
+        method: "POST",
+        body: { seatToken: "third-token", displayName: "Seat Stealer" }
+      });
+      assert.equal(seatSteal.statusCode, 409);
+      assert.match(seatSteal.body.error, /two seated players/);
+
+      const spectator = await requestJson(port, `/api/rooms/${roomCode}?seatToken=third-token`);
+      assert.equal(spectator.statusCode, 200);
+      assert.equal(spectator.body.room.viewerSeat, "spectator");
+      assert.equal("hands" in spectator.body.room.gameState, false);
+      assert.deepEqual(spectator.body.room.gameState.viewerHand, []);
+      assert.deepEqual(spectator.body.room.gameState.playableCards, []);
+    } finally {
+      await stopServer(server);
+    }
+  });
+});
+
+test("persistence reload keeps tournament bracket and winner advancement", async () => {
+  await withTempStateFile(async (stateFile) => {
+    const port = 5201;
+    let server = await startTestServer(port, stateFile);
+    let tournamentCode;
+    let roundOneWinnerId;
+
+    try {
+      const created = await requestJson(port, "/api/tournaments", {
+        method: "POST",
+        body: { bracketSize: 4 }
+      });
+      tournamentCode = created.body.tournament.tournamentCode;
+
+      for (const displayName of ["A", "B", "C", "D"]) {
+        const joined = await requestJson(port, `/api/tournaments/${tournamentCode}/join`, {
+          method: "POST",
+          body: { displayName }
+        });
+        assert.equal(joined.statusCode, 200);
+      }
+
+      const started = await requestJson(port, `/api/tournaments/${tournamentCode}/admin/start`, {
+        method: "POST",
+        body: { adminKey }
+      });
+      const match = started.body.tournament.bracket.rounds[0].matches[0];
+      roundOneWinnerId = match.player1.id;
+      assert.equal(started.body.tournament.bracket.rounds[0].matches.length, 2);
+    } finally {
+      await stopServer(server);
+    }
+
+    server = await startTestServer(port, stateFile);
+    try {
+      const loaded = await requestJson(port, `/api/tournaments/${tournamentCode}`);
+      assert.equal(loaded.statusCode, 200);
+      assert.equal(loaded.body.tournament.bracket.rounds.length, 2);
+      assert.equal(loaded.body.tournament.bracket.rounds[0].matches[0].status, "active");
+
+      const reported = await requestJson(port, `/api/tournaments/${tournamentCode}/admin/matches/r1m1/winner`, {
+        method: "POST",
+        body: {
+          adminKey,
+          round: 1,
+          winnerId: roundOneWinnerId,
+          source: "admin_mark_winner"
+        }
+      });
+      assert.equal(reported.body.tournament.bracket.rounds[1].matches[0].player1.id, roundOneWinnerId);
+    } finally {
+      await stopServer(server);
+    }
+
+    server = await startTestServer(port, stateFile);
+    let championId;
+    try {
+      const reloaded = await requestJson(port, `/api/tournaments/${tournamentCode}`);
+      assert.equal(reloaded.statusCode, 200);
+      assert.equal(reloaded.body.tournament.bracket.rounds[1].matches[0].player1.id, roundOneWinnerId);
+      assert.equal(reloaded.body.tournament.resultLog[0].matchId, "r1m1");
+
+      const secondMatch = reloaded.body.tournament.bracket.rounds[0].matches[1];
+      const secondWinnerId = secondMatch.player1.id;
+      const secondReported = await requestJson(port, `/api/tournaments/${tournamentCode}/admin/matches/r1m2/winner`, {
+        method: "POST",
+        body: {
+          adminKey,
+          round: 1,
+          winnerId: secondWinnerId,
+          source: "admin_mark_winner"
+        }
+      });
+      const finalMatch = secondReported.body.tournament.bracket.rounds[1].matches[0];
+      championId = finalMatch.player1.id;
+
+      const finalReported = await requestJson(port, `/api/tournaments/${tournamentCode}/admin/matches/r2m1/winner`, {
+        method: "POST",
+        body: {
+          adminKey,
+          round: 2,
+          winnerId: championId,
+          source: "admin_mark_winner"
+        }
+      });
+      assert.equal(finalReported.body.tournament.status, "complete");
+    } finally {
+      await stopServer(server);
+    }
+
+    server = await startTestServer(port, stateFile);
+    try {
+      const championReloaded = await requestJson(port, `/api/tournaments/${tournamentCode}`);
+      assert.equal(championReloaded.statusCode, 200);
+      assert.equal(championReloaded.body.tournament.status, "complete");
+      assert.equal(championReloaded.body.tournament.winner.id, championId);
+      assert.equal(championReloaded.body.tournament.resultLog.length, 3);
+    } finally {
+      await stopServer(server);
+    }
+  });
+});
+
+test("persistence reload keeps a 64-player tournament bracket", async () => {
+  await withTempStateFile(async (stateFile) => {
+    const port = 5202;
+    let server = await startTestServer(port, stateFile);
+    let tournamentCode;
+
+    try {
+      const created = await requestJson(port, "/api/tournaments", {
+        method: "POST",
+        body: { bracketSize: 64 }
+      });
+      tournamentCode = created.body.tournament.tournamentCode;
+
+      for (let index = 1; index <= 64; index += 1) {
+        const joined = await requestJson(port, `/api/tournaments/${tournamentCode}/join`, {
+          method: "POST",
+          body: { displayName: `Player ${index}` }
+        });
+        assert.equal(joined.statusCode, 200);
+      }
+
+      const started = await requestJson(port, `/api/tournaments/${tournamentCode}/admin/start`, {
+        method: "POST",
+        body: { adminKey }
+      });
+      assert.equal(started.body.tournament.bracket.rounds[0].matches.length, 32);
+    } finally {
+      await stopServer(server);
+    }
+
+    server = await startTestServer(port, stateFile);
+    try {
+      const loaded = await requestJson(port, `/api/tournaments/${tournamentCode}`);
+      assert.equal(loaded.statusCode, 200);
+      assert.equal(loaded.body.tournament.bracketSize, 64);
+      assert.deepEqual(loaded.body.tournament.bracket.rounds.map((round) => round.matches.length), [32, 16, 8, 4, 2, 1]);
+      assert.equal(loaded.body.tournament.bracket.rounds[0].matches.every((match) => match.status === "active"), true);
+      assert.equal("admin" in loaded.body.tournament, false);
+    } finally {
+      await stopServer(server);
+    }
+  });
+});
+
+test("persistence reload keeps hidden hands protected", async () => {
+  await withTempStateFile(async (stateFile) => {
+    const port = 5203;
+    let server = await startTestServer(port, stateFile);
+    let roomCode;
+    let hostToken;
+    let guestToken;
+
+    try {
+      const created = await requestJson(port, "/api/rooms", {
+        method: "POST",
+        body: { displayName: "Alice" }
+      });
+      roomCode = created.body.room.roomCode;
+      hostToken = created.body.seatToken;
+
+      const joined = await requestJson(port, `/api/rooms/${roomCode}/join`, {
+        method: "POST",
+        body: { displayName: "Bob" }
+      });
+      guestToken = joined.body.seatToken;
+
+      await requestJson(port, `/api/rooms/${roomCode}/actions`, {
+        method: "POST",
+        body: { seatToken: hostToken, type: "ready" }
+      });
+      const ready = await requestJson(port, `/api/rooms/${roomCode}/actions`, {
+        method: "POST",
+        body: { seatToken: guestToken, type: "ready" }
+      });
+      await delayUntilCountdownEnds(ready.body.room.countdownEndsAt);
+
+      const coin = await requestJson(port, `/api/rooms/${roomCode}?seatToken=${encodeURIComponent(hostToken)}`);
+      const winnerToken = coin.body.room.coinFlipWinner === "player1" ? hostToken : guestToken;
+      const started = await requestJson(port, `/api/rooms/${roomCode}/actions`, {
+        method: "POST",
+        body: {
+          seatToken: winnerToken,
+          type: "chooseStartingPosition",
+          position: "dealer"
+        }
+      });
+      assert.equal(started.body.room.gameState.handCounts.player1, 5);
+    } finally {
+      await stopServer(server);
+    }
+
+    server = await startTestServer(port, stateFile);
+    try {
+      const spectator = await requestJson(port, `/api/rooms/${roomCode}`);
+      assert.equal(spectator.statusCode, 200);
+      assert.equal(spectator.body.room.viewerSeat, "spectator");
+      assert.equal("hands" in spectator.body.room.gameState, false);
+      assert.deepEqual(spectator.body.room.gameState.viewerHand, []);
+      assert.deepEqual(spectator.body.room.gameState.playableCards, []);
+      assert.equal(spectator.body.room.gameState.handCounts.player1, 5);
+      assert.equal(spectator.body.room.gameState.handCounts.player2, 5);
+    } finally {
+      await stopServer(server);
+    }
+  });
+});
+
+test("corrupt persistence file does not crash server", async () => {
+  await withTempStateFile(async (stateFile) => {
+    await writeFile(stateFile, "{not valid json", "utf8");
+    const port = 5204;
+    const server = await startTestServer(port, stateFile);
+
+    try {
+      const health = await requestJson(port, "/healthz");
+      assert.equal(health.statusCode, 200);
+
+      const created = await requestJson(port, "/api/rooms", {
+        method: "POST",
+        body: { displayName: "Alice" }
+      });
+      assert.equal(created.statusCode, 201);
+      assert.equal(created.body.room.players.player1, true);
+    } finally {
+      await stopServer(server);
+    }
+  });
 });
 
 test("app-facing files avoid restricted commerce wording except approved disclaimers", async () => {
@@ -598,6 +906,59 @@ test("user-facing pages do not contain local-only links", async () => {
 
 async function readText(path) {
   return readFile(new URL(path, appRoot), "utf8");
+}
+
+async function withTempStateFile(callback) {
+  const dir = await mkdtemp(join(tmpdir(), "euchre-state-"));
+  const stateFile = join(dir, "state.json");
+
+  try {
+    return await callback(stateFile);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+async function startTestServer(port, stateFile) {
+  const server = spawn(process.execPath, ["server.js"], {
+    cwd: new URL(".", appRoot),
+    env: {
+      ...process.env,
+      HOST: "127.0.0.1",
+      PORT: String(port),
+      NODE_ENV: "production",
+      EUCHRE_STATE_FILE: stateFile
+    },
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+
+  await waitForServer(server, port);
+  return server;
+}
+
+function stopServer(server) {
+  if (!server || server.exitCode !== null || server.signalCode) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    server.once("exit", done);
+    server.kill();
+    setTimeout(done, 500);
+  });
+}
+
+function delayUntilCountdownEnds(countdownEndsAt) {
+  const delayMs = Math.max(0, Date.parse(countdownEndsAt) - Date.now() + 80);
+  return new Promise((resolve) => {
+    setTimeout(resolve, delayMs);
+  });
 }
 
 function waitForServer(server, port) {

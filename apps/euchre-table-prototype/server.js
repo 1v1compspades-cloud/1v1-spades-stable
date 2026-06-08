@@ -10,6 +10,11 @@ import {
   sanitizeRoomForViewer
 } from "./src/room-state.js";
 import {
+  defaultPersistenceFile,
+  loadPersistedState,
+  savePersistedState
+} from "./src/persistence.js";
+import {
   adminRecordMatchWinner,
   createTournament,
   exportTournamentBackup,
@@ -28,8 +33,10 @@ const port = Number.parseInt(process.env.PORT ?? "5174", 10);
 const host = process.env.HOST ?? "0.0.0.0";
 const appDir = fileURLToPath(new URL(".", import.meta.url));
 const rootDir = resolve(join(appDir, "../.."));
-const rooms = new Map();
-const tournaments = new Map();
+const persistenceFile = defaultPersistenceFile(appDir);
+const persistedState = loadPersistedState(persistenceFile);
+const rooms = persistedState.rooms;
+const tournaments = persistedState.tournaments;
 
 const server = createServer(async (request, response) => {
   try {
@@ -68,6 +75,7 @@ async function handleApi(request, response) {
     const body = await readJson(request);
     const room = createUniqueRoom({ displayName: requiredDisplayName(body.displayName) });
     rooms.set(room.roomCode, room);
+    persistState();
     const seatToken = room.players.player1.seatToken;
 
     sendJson(response, 201, {
@@ -92,6 +100,7 @@ async function handleApi(request, response) {
       bracketSize: Number(body.bracketSize ?? 4)
     });
     tournaments.set(tournament.tournamentCode, tournament);
+    persistState();
 
     sendJson(response, 201, {
       adminKey: tournament.adminKey,
@@ -118,6 +127,7 @@ async function handleApi(request, response) {
         displayName: body.displayName
       });
       tournaments.set(tournamentCode, nextTournament);
+      persistState();
 
       sendJson(response, 200, {
         tournament: sanitizeTournamentForViewer(nextTournament)
@@ -141,6 +151,7 @@ async function handleApi(request, response) {
         createMatchRoom: createTournamentMatchRoom
       });
       tournaments.set(tournamentCode, nextTournament);
+      persistState();
       sendJson(response, 200, {
         tournament: sanitizeTournamentForAdmin(nextTournament, body.adminKey)
       });
@@ -153,6 +164,7 @@ async function handleApi(request, response) {
         adminKey: body.adminKey
       });
       tournaments.set(tournamentCode, nextTournament);
+      persistState();
       sendJson(response, 200, {
         tournament: sanitizeTournamentForAdmin(nextTournament, body.adminKey)
       });
@@ -191,6 +203,7 @@ async function handleApi(request, response) {
         createMatchRoom: createTournamentMatchRoom
       });
       tournaments.set(tournamentCode, nextTournament);
+      persistState();
 
       sendJson(response, 200, {
         tournament: sanitizeTournamentForAdmin(nextTournament, body.adminKey)
@@ -249,7 +262,12 @@ function advanceAndSaveRoom(room) {
   const nextRoom = advanceRoomClock(room);
   rooms.set(nextRoom.roomCode, nextRoom);
   syncTournamentFromRoom(nextRoom);
+  persistState();
   return nextRoom;
+}
+
+function persistState() {
+  savePersistedState(persistenceFile, { rooms, tournaments });
 }
 
 async function serveStatic(request, response) {

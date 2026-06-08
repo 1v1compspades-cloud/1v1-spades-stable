@@ -565,6 +565,37 @@ test("refresh rejoin keeps the same player seat by token", () => {
   assert.equal(rejoined.room.players.player1.seatToken, "host-token");
 });
 
+test("reconnect restores active match state and prevents seat stealing", () => {
+  let room = createStartedRoom();
+  room = applyRoomAction(room, { seatToken: "host-token", type: "chooseTrump", suit: "hearts" });
+  room = applyRoomAction(room, { seatToken: "host-token", type: "playCard", card: { rank: "J", suit: "diamonds" } });
+
+  const restoredHost = joinRoom(room, { seatToken: "host-token", displayName: "Not Host" });
+  const restoredGuest = joinRoom(restoredHost.room, { seatToken: "guest-token", displayName: "Not Guest" });
+  const hostView = sanitizeRoomForViewer(restoredGuest.room, "host-token");
+  const guestView = sanitizeRoomForViewer(restoredGuest.room, "guest-token");
+
+  assert.equal(restoredHost.seat, "player1");
+  assert.equal(restoredGuest.seat, "player2");
+  assert.equal(hostView.viewerSeat, "player1");
+  assert.equal(guestView.viewerSeat, "player2");
+  assert.equal(hostView.gameState.phase, "playing");
+  assert.equal(hostView.gameState.actionPhase, "playing");
+  assert.equal(hostView.gameState.trumpSuit, "hearts");
+  assert.equal(hostView.gameState.dealer, "player2");
+  assert.equal(hostView.gameState.handNumber, 1);
+  assert.equal(hostView.gameState.currentTurn, "player2");
+  assert.equal(hostView.gameState.currentTrick.length, 1);
+  assert.equal(hostView.gameState.viewerHand.length, 4);
+  assert.equal(guestView.gameState.viewerHand.length, 5);
+
+  assert.throws(() => joinRoom(restoredGuest.room, { seatToken: "third-token", displayName: "Seat Thief" }), /two seated players/);
+  const spectatorView = sanitizeRoomForViewer(restoredGuest.room, "third-token");
+  assert.equal(spectatorView.viewerSeat, "spectator");
+  assert.deepEqual(spectatorView.gameState.viewerHand, []);
+  assert.deepEqual(spectatorView.gameState.playableCards, []);
+});
+
 test("room state has no restricted commerce fields", () => {
   const room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", deck: fixedDeck });
   const restricted = [
