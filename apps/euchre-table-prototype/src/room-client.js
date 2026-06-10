@@ -5,6 +5,7 @@ import { cardLabel, suitSymbol } from "./table-state.js";
 const storageKey = "euchreRoomSeat";
 const roomSessionsKey = "euchreRoomSeatsByRoom";
 const roomSeatTokenPrefix = "euchre.room.";
+const guestPlayerIdKey = "euchre.guestPlayerId";
 const homepageSettingsKey = "euchreHomepageSettings";
 const elements = {
   activeRoomControls: document.querySelector("#activeRoomControls"),
@@ -85,6 +86,7 @@ async function createRoomFromUi() {
       method: "POST",
       body: {
         displayName,
+        playerId: getGuestPlayerId(),
         matchSettings
       }
     });
@@ -154,7 +156,11 @@ elements.joinAsPlayer2Button?.addEventListener("click", async () => {
   try {
     const result = await api(`/api/rooms/${roomView.roomCode}/join`, {
       method: "POST",
-      body: { displayName }
+      body: {
+        displayName,
+        playerId: getGuestPlayerId(),
+        seatToken: session?.seatToken
+      }
     });
     setSession(result.room.roomCode, result.seatToken);
     setRoom(result.room, `You are ${seatName(result.seat)}.`);
@@ -202,6 +208,7 @@ async function sendAction(action) {
       method: "POST",
       body: {
         seatToken: session.seatToken,
+        playerId: getGuestPlayerId(),
         ...action
       }
     });
@@ -215,7 +222,11 @@ async function refreshRoom(status) {
   if (!session?.roomCode) return;
 
   try {
-    const result = await api(`/api/rooms/${session.roomCode}?seatToken=${encodeURIComponent(session.seatToken ?? "")}`);
+    const query = new URLSearchParams({
+      seatToken: session.seatToken ?? "",
+      playerId: getGuestPlayerId()
+    });
+    const result = await api(`/api/rooms/${session.roomCode}?${query.toString()}`);
     if (session.seatToken && result.room.viewerSeat === "spectator") {
       const roomCode = session.roomCode;
       clearStoredSession(roomCode);
@@ -245,10 +256,11 @@ async function autoJoinRoom(roomCode) {
 async function viewRoomAsSpectator(roomCode, status = "Spectator View. Hidden hands stay private.", { useStoredToken = true } = {}) {
   try {
     const storedSession = useStoredToken ? loadSession(roomCode) : null;
-    const tokenQuery = storedSession?.seatToken
-      ? `?seatToken=${encodeURIComponent(storedSession.seatToken)}`
-      : "";
-    const result = await api(`/api/rooms/${roomCode}${tokenQuery}`);
+    const query = new URLSearchParams({ playerId: getGuestPlayerId() });
+    if (storedSession?.seatToken) {
+      query.set("seatToken", storedSession.seatToken);
+    }
+    const result = await api(`/api/rooms/${roomCode}?${query.toString()}`);
     if (storedSession?.seatToken && result.room.viewerSeat !== "spectator") {
       session = storedSession;
     }
@@ -305,6 +317,7 @@ function setSession(roomCode, seatToken) {
   session = {
     roomCode: normalizedRoomCode,
     seatToken,
+    playerId: getGuestPlayerId(),
     updatedAt: new Date().toISOString()
   };
   localStorage.setItem(roomSeatTokenKey(normalizedRoomCode), seatToken);
@@ -327,6 +340,7 @@ function loadSession(roomCode) {
       return {
         roomCode: normalizedRoomCode,
         seatToken: roomSeatToken,
+        playerId: getGuestPlayerId(),
         updatedAt: new Date().toISOString()
       };
     }
@@ -343,7 +357,10 @@ function loadSession(roomCode) {
     const stored = JSON.parse(localStorage.getItem(storageKey));
     if (!stored?.roomCode || !stored?.seatToken) return null;
     if (normalizedRoomCode && stored.roomCode !== normalizedRoomCode) return null;
-    return stored;
+    return {
+      ...stored,
+      playerId: stored.playerId ?? getGuestPlayerId()
+    };
   } catch {
     return null;
   }
@@ -385,6 +402,17 @@ function clearStoredSession(roomCode) {
 
 function roomSeatTokenKey(roomCode) {
   return `${roomSeatTokenPrefix}${roomCode}.seatToken`;
+}
+
+function getGuestPlayerId() {
+  const existingPlayerId = localStorage.getItem(guestPlayerIdKey);
+  if (existingPlayerId) return existingPlayerId;
+
+  const playerId = typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `guest-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  localStorage.setItem(guestPlayerIdKey, playerId);
+  return playerId;
 }
 
 function currentPlayerName() {

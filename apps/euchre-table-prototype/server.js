@@ -82,6 +82,7 @@ async function handleApi(request, response) {
     });
     const room = createUniqueRoom({
       displayName: requiredDisplayName(body.displayName),
+      playerId: body.playerId,
       matchSettings
     });
     console.log("[raceTo] saved room matchSettings", {
@@ -266,6 +267,7 @@ async function handleApi(request, response) {
       const viewerSeat = getViewerSeat(room, body.seatToken);
       const result = joinRoom(room, {
         seatToken: body.seatToken,
+        playerId: body.playerId,
         displayName: viewerSeat === "spectator"
           ? requiredDisplayName(body.displayName)
           : body.displayName
@@ -345,9 +347,9 @@ function publicRoutePath(pathname) {
   }[pathname] ?? pathname;
 }
 
-function createUniqueRoom({ displayName, matchSettings } = {}) {
+function createUniqueRoom({ displayName, playerId, matchSettings } = {}) {
   for (let attempts = 0; attempts < 20; attempts += 1) {
-    const room = createRoom({ displayName, matchSettings });
+    const room = createRoom({ displayName, playerId, matchSettings });
     if (!rooms.has(room.roomCode)) return room;
   }
 

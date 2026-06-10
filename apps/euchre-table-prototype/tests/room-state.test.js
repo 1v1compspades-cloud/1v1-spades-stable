@@ -649,6 +649,27 @@ test("host reconnect with saved token does not become opponent", () => {
   assert.equal(rejoined.room.players.player2, null);
 });
 
+test("stable playerId blocks the same browser from taking opponent seat", () => {
+  const room = createRoom({
+    roomCode: "ABCDE",
+    seatToken: "host-token",
+    playerId: "host-player",
+    displayName: "Mehdi"
+  });
+
+  const restored = joinRoom(room, { seatToken: "host-token", playerId: "host-player", displayName: "Different" });
+  assert.equal(restored.seat, "player1");
+  assert.equal(restored.room.players.player2, null);
+  assert.throws(
+    () => joinRoom(room, { seatToken: "new-token", playerId: "host-player", displayName: "Opponent" }),
+    /already seated/
+  );
+  assert.throws(
+    () => joinRoom(room, { playerId: "host-player", displayName: "Opponent" }),
+    /already seated/
+  );
+});
+
 test("same display name cannot occupy both seats without a valid existing token", () => {
   const room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", displayName: "Mehdi" });
 
@@ -698,6 +719,22 @@ test("spectator cannot ready up or act as player", () => {
     () => applyRoomAction(room, { seatToken: "spectator-token", type: "chooseTrump", suit: "hearts" }),
     /Join this room before taking a player action/
   );
+});
+
+test("ready and game actions require the matching playerId when a seat has one", () => {
+  let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", playerId: "host-player" });
+
+  assert.throws(
+    () => applyRoomAction(room, { seatToken: "host-token", playerId: "guest-player", type: "ready" }),
+    /Player identity does not match/
+  );
+  assert.throws(
+    () => applyRoomAction(room, { seatToken: "host-token", type: "ready" }),
+    /Player identity does not match/
+  );
+
+  room = applyRoomAction(room, { seatToken: "host-token", playerId: "host-player", type: "ready" });
+  assert.equal(room.playerReady.player1, true);
 });
 
 test("room state has no restricted commerce fields", () => {

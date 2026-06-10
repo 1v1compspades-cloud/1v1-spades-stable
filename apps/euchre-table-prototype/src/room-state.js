@@ -24,6 +24,7 @@ export function createRoom({
   seatToken = generateSeatToken(),
   modeId = "communityCompetitive",
   displayName = "Host",
+  playerId,
   coinFlipWinner = null,
   tournamentMatch = null,
   matchSettings,
@@ -49,6 +50,7 @@ export function createRoom({
       player1: {
         seat: "player1",
         seatToken,
+        playerId: normalizePlayerId(playerId),
         connected: true,
         displayName: name
       },
@@ -73,7 +75,7 @@ export function createRoom({
   });
 }
 
-export function joinRoom(room, { seatToken, displayName = "Opponent" } = {}) {
+export function joinRoom(room, { seatToken, displayName = "Opponent", playerId } = {}) {
   const existingSeat = seatForToken(room, seatToken);
 
   if (existingSeat) {
@@ -82,6 +84,12 @@ export function joinRoom(room, { seatToken, displayName = "Opponent" } = {}) {
       seat: existingSeat,
       seatToken: room.players[existingSeat].seatToken
     };
+  }
+
+  const normalizedPlayerId = normalizePlayerId(playerId);
+
+  if (playerIdMatchesSeatedPlayer(room, normalizedPlayerId)) {
+    throw roomError(409, "This device is already seated in this room");
   }
 
   const name = normalizeDisplayName(displayName);
@@ -100,41 +108,44 @@ export function joinRoom(room, { seatToken, displayName = "Opponent" } = {}) {
 
   const nextSeatToken = seatToken || generateSeatToken();
   return {
-      room: syncRoomFields({
-        ...room,
-        players: {
-          ...room.players,
-          player2: {
-            seat: "player2",
-            seatToken: nextSeatToken,
-            connected: true,
-            displayName: name
-          }
-        },
-        countdownStartedAt: null,
-        countdownEndsAt: null,
-        gameState: {
-          ...room.gameState,
-          phase: "pregame_settings",
-          actionPhase: "pregame_settings"
-        },
-        updatedAt: new Date().toISOString()
-      }),
-      seat: "player2",
-      seatToken: nextSeatToken
-    };
+    room: syncRoomFields({
+      ...room,
+      players: {
+        ...room.players,
+        player2: {
+          seat: "player2",
+          seatToken: nextSeatToken,
+          playerId: normalizedPlayerId,
+          connected: true,
+          displayName: name
+        }
+      },
+      countdownStartedAt: null,
+      countdownEndsAt: null,
+      gameState: {
+        ...room.gameState,
+        phase: "pregame_settings",
+        actionPhase: "pregame_settings"
+      },
+      updatedAt: new Date().toISOString()
+    }),
+    seat: "player2",
+    seatToken: nextSeatToken
+  };
 }
 
 export function getViewerSeat(room, seatToken) {
   return seatForToken(room, seatToken) ?? "spectator";
 }
 
-export function applyRoomAction(room, { seatToken, type, suit, position, card, deck }) {
+export function applyRoomAction(room, { seatToken, playerId, type, suit, position, card, deck }) {
   const seat = seatForToken(room, seatToken);
 
   if (!seat) {
     throw roomError(403, "Join this room before taking a player action");
   }
+
+  ensurePlayerIdentity(room, seat, playerId);
 
   const gameState = room.gameState;
 
@@ -853,6 +864,13 @@ function seatForToken(room, seatToken) {
   return null;
 }
 
+function playerIdMatchesSeatedPlayer(room, playerId) {
+  const normalizedPlayerId = normalizePlayerId(playerId);
+  if (!normalizedPlayerId) return false;
+
+  return ["player1", "player2"].some((seat) => room.players[seat]?.playerId === normalizedPlayerId);
+}
+
 function displayNameMatchesSeatedPlayer(room, displayName) {
   const normalizedName = normalizeDisplayName(displayName).toLowerCase();
   if (!normalizedName) return false;
@@ -864,6 +882,16 @@ function displayNameMatchesSeatedPlayer(room, displayName) {
     const seatedName = normalizeDisplayName(seatedDisplayName).toLowerCase();
     return seatedName === normalizedName;
   });
+}
+
+function ensurePlayerIdentity(room, seat, playerId) {
+  const expectedPlayerId = room.players[seat]?.playerId;
+  if (!expectedPlayerId) return;
+
+  const providedPlayerId = normalizePlayerId(playerId);
+  if (!providedPlayerId || providedPlayerId !== expectedPlayerId) {
+    throw roomError(403, "Player identity does not match this seat");
+  }
 }
 
 function markConnected(room, seat) {
@@ -904,6 +932,11 @@ function normalizeDisplayName(displayName) {
     throw roomError(400, "Enter your name to continue.");
   }
   return name.slice(0, 32);
+}
+
+function normalizePlayerId(playerId) {
+  const id = String(playerId ?? "").trim();
+  return id ? id.slice(0, 120) : null;
 }
 
 function removeCard(hand, card) {
