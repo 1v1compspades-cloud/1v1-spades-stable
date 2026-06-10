@@ -322,7 +322,7 @@ async function serveStatic(request, response) {
   response.writeHead(200, {
     "Content-Type": contentType(filePath),
     "Cache-Control": cacheControl(filePath),
-    "X-Spadescomp-Build": buildId
+    "X-1v1Euchre-Build": buildId
   });
   createReadStream(filePath).pipe(response);
 }
