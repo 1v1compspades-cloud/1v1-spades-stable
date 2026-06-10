@@ -6,6 +6,7 @@ import {
   advanceRoomClock,
   applyRoomAction,
   createRoom,
+  getViewerSeat,
   joinRoom,
   sanitizeRoomForViewer
 } from "./src/room-state.js";
@@ -262,9 +263,12 @@ async function handleApi(request, response) {
 
     if (request.method === "POST" && segments[3] === "join") {
       const body = await readJson(request);
+      const viewerSeat = getViewerSeat(room, body.seatToken);
       const result = joinRoom(room, {
         seatToken: body.seatToken,
-        displayName: requiredDisplayName(body.displayName)
+        displayName: viewerSeat === "spectator"
+          ? requiredDisplayName(body.displayName)
+          : body.displayName
       });
       const nextRoom = advanceAndSaveRoom(result.room);
       sendJson(response, 200, {

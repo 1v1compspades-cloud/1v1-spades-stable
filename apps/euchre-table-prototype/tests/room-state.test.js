@@ -640,6 +640,22 @@ test("refresh rejoin keeps the same player seat by token", () => {
   assert.equal(rejoined.room.players.player1.seatToken, "host-token");
 });
 
+test("host reconnect with saved token does not become opponent", () => {
+  const room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", displayName: "Mehdi" });
+  const rejoined = joinRoom(room, { seatToken: "host-token" });
+
+  assert.equal(rejoined.seat, "player1");
+  assert.equal(rejoined.seatToken, "host-token");
+  assert.equal(rejoined.room.players.player2, null);
+});
+
+test("same display name cannot occupy both seats without a valid existing token", () => {
+  const room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", displayName: "Mehdi" });
+
+  assert.throws(() => joinRoom(room, { displayName: " mehdi " }), /already seated/);
+  assert.throws(() => joinRoom(room, { seatToken: "new-token", displayName: "Mehdi" }), /already seated/);
+});
+
 test("reconnect restores active match state and prevents seat stealing", () => {
   let room = createStartedRoom();
   room = applyRoomAction(room, { seatToken: "host-token", type: "chooseTrump", suit: "hearts" });
@@ -669,6 +685,19 @@ test("reconnect restores active match state and prevents seat stealing", () => {
   assert.equal(spectatorView.viewerSeat, "spectator");
   assert.deepEqual(spectatorView.gameState.viewerHand, []);
   assert.deepEqual(spectatorView.gameState.playableCards, []);
+});
+
+test("spectator cannot ready up or act as player", () => {
+  const room = createRoom({ roomCode: "ABCDE", seatToken: "host-token" });
+
+  assert.throws(
+    () => applyRoomAction(room, { seatToken: "spectator-token", type: "ready" }),
+    /Join this room before taking a player action/
+  );
+  assert.throws(
+    () => applyRoomAction(room, { seatToken: "spectator-token", type: "chooseTrump", suit: "hearts" }),
+    /Join this room before taking a player action/
+  );
 });
 
 test("room state has no restricted commerce fields", () => {

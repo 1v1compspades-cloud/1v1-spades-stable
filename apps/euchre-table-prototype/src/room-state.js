@@ -73,27 +73,40 @@ export function createRoom({
   });
 }
 
-export function joinRoom(room, { seatToken = generateSeatToken(), displayName = "Opponent" } = {}) {
+export function joinRoom(room, { seatToken, displayName = "Opponent" } = {}) {
   const existingSeat = seatForToken(room, seatToken);
 
   if (existingSeat) {
     return {
       room: markConnected(room, existingSeat),
       seat: existingSeat,
-      seatToken
+      seatToken: room.players[existingSeat].seatToken
     };
   }
 
-  if (!room.players.player2) {
-    const name = normalizeDisplayName(displayName);
-    return {
+  const name = normalizeDisplayName(displayName);
+
+  if (!name) {
+    throw roomError(400, "Enter a player name");
+  }
+
+  if (room.players.player2) {
+    throw roomError(409, "Room already has two seated players");
+  }
+
+  if (displayNameMatchesSeatedPlayer(room, name)) {
+    throw roomError(409, "That player is already seated in this room");
+  }
+
+  const nextSeatToken = seatToken || generateSeatToken();
+  return {
       room: syncRoomFields({
         ...room,
         players: {
           ...room.players,
           player2: {
             seat: "player2",
-            seatToken,
+            seatToken: nextSeatToken,
             connected: true,
             displayName: name
           }
@@ -108,11 +121,8 @@ export function joinRoom(room, { seatToken = generateSeatToken(), displayName = 
         updatedAt: new Date().toISOString()
       }),
       seat: "player2",
-      seatToken
+      seatToken: nextSeatToken
     };
-  }
-
-  throw roomError(409, "Room already has two seated players");
 }
 
 export function getViewerSeat(room, seatToken) {
@@ -841,6 +851,19 @@ function seatForToken(room, seatToken) {
   }
 
   return null;
+}
+
+function displayNameMatchesSeatedPlayer(room, displayName) {
+  const normalizedName = normalizeDisplayName(displayName).toLowerCase();
+  if (!normalizedName) return false;
+
+  return ["player1", "player2"].some((seat) => {
+    const seatedDisplayName = room.players[seat]?.displayName;
+    if (!seatedDisplayName) return false;
+
+    const seatedName = normalizeDisplayName(seatedDisplayName).toLowerCase();
+    return seatedName === normalizedName;
+  });
 }
 
 function markConnected(room, seat) {

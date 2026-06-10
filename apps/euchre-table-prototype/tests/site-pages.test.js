@@ -271,15 +271,20 @@ test("invite links use the public room route without the app subdirectory", asyn
 test("room client restores stored seat sessions by room code", async () => {
   const client = await readText("src/room-client.js");
 
+  assert.match(client, /roomSeatTokenPrefix = "euchre\.room\."/);
+  assert.match(client, /function roomSeatTokenKey\(roomCode\)/);
+  assert.match(client, /localStorage\.setItem\(roomSeatTokenKey\(normalizedRoomCode\), seatToken\)/);
+  assert.match(client, /localStorage\.getItem\(roomSeatTokenKey\(normalizedRoomCode\)\)/);
   assert.match(client, /roomSessionsKey = "euchreRoomSeatsByRoom"/);
   assert.match(client, /urlRoomCode = urlParams\.get\("room"\)\?\.toUpperCase\(\) \?\? null/);
   assert.match(client, /session = loadSession\(urlRoomCode\)/);
   assert.match(client, /refreshRoom\("Game restored\."\)/);
+  assert.match(client, /Session not recognized\. Join as opponent or watch as spectator\./);
   assert.match(client, /function loadLastSession\(\)/);
   assert.match(client, /function loadSessionMap\(\)/);
   assert.match(client, /sessions\[normalizedRoomCode\] = session/);
-  assert.match(client, /viewRoomAsSpectator\(urlRoomCode\)/);
-  assert.match(client, /Spectator View\. Both player seats are already taken\./);
+  assert.match(client, /Choose Join as Opponent to take the open seat, or watch as spectator\./);
+  assert.doesNotMatch(client, /function autoJoinRoom[\s\S]*body: \{ displayName \}/);
   assert.match(client, /render\(\);\n  if \(status\) setStatus\(status\);/);
 });
 
@@ -287,7 +292,7 @@ test("spectator invite opens read-only room view instead of taking Player 2 seat
   const client = await readText("src/room-client.js");
 
   assert.match(client, /urlParams\.get\("view"\) === "spectator"/);
-  assert.match(client, /viewRoomAsSpectator\(urlRoomCode\)/);
+  assert.match(client, /viewRoomAsSpectator\(urlRoomCode, "Spectator View\. Hidden hands stay private\.", \{ useStoredToken: false \}\)/);
   assert.match(client, /Spectator View\. Hidden hands stay private\./);
 });
 
@@ -528,6 +533,13 @@ test("public room invite route serves room and lets Player 2 join by invite code
       assert.equal(blankJoin.statusCode, 400);
       assert.equal(blankJoin.body.error, "Enter your name to continue.");
 
+      const duplicateOpenSeat = await requestJson(port, `/api/rooms/${roomCode}/join`, {
+        method: "POST",
+        body: { displayName: "alice" }
+      });
+      assert.equal(duplicateOpenSeat.statusCode, 409);
+      assert.match(duplicateOpenSeat.body.error, /already seated/);
+
       const joined = await requestJson(port, `/api/rooms/${roomCode}/join`, {
         method: "POST",
         body: { displayName: "Bob" }
@@ -679,6 +691,19 @@ test("persistence reload keeps active room state", async () => {
       assert.equal(loaded.body.room.playerNames.player1, "Alice");
       assert.equal(loaded.body.room.playerNames.player2, "Bob");
 
+      const guestLoaded = await requestJson(port, `/api/rooms/${roomCode}?seatToken=${encodeURIComponent(guestToken)}`);
+      assert.equal(guestLoaded.statusCode, 200);
+      assert.equal(guestLoaded.body.room.viewerSeat, "player2");
+
+      const hostTokenOnlyReconnect = await requestJson(port, `/api/rooms/${roomCode}/join`, {
+        method: "POST",
+        body: { seatToken }
+      });
+      assert.equal(hostTokenOnlyReconnect.statusCode, 200);
+      assert.equal(hostTokenOnlyReconnect.body.seat, "player1");
+      assert.equal(hostTokenOnlyReconnect.body.room.viewerSeat, "player1");
+      assert.equal(hostTokenOnlyReconnect.body.room.players.player2, true);
+
       const hostReconnect = await requestJson(port, `/api/rooms/${roomCode}/join`, {
         method: "POST",
         body: { seatToken, displayName: "Alice Again" }
@@ -696,6 +721,20 @@ test("persistence reload keeps active room state", async () => {
       assert.equal(guestReconnect.body.seat, "player2");
       assert.equal(guestReconnect.body.room.viewerSeat, "player2");
       assert.equal(guestReconnect.body.room.playerNames.player2, "Bob");
+
+      const duplicateNameJoin = await requestJson(port, `/api/rooms/${roomCode}/join`, {
+        method: "POST",
+        body: { displayName: "Alice" }
+      });
+      assert.equal(duplicateNameJoin.statusCode, 409);
+      assert.match(duplicateNameJoin.body.error, /two seated players/);
+
+      const blankNewJoin = await requestJson(port, `/api/rooms/${roomCode}/join`, {
+        method: "POST",
+        body: { displayName: "   " }
+      });
+      assert.equal(blankNewJoin.statusCode, 400);
+      assert.equal(blankNewJoin.body.error, "Enter your name to continue.");
 
       const seatSteal = await requestJson(port, `/api/rooms/${roomCode}/join`, {
         method: "POST",

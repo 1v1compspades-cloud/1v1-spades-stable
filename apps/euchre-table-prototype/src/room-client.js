@@ -4,6 +4,7 @@ import { cardLabel, suitSymbol } from "./table-state.js";
 
 const storageKey = "euchreRoomSeat";
 const roomSessionsKey = "euchreRoomSeatsByRoom";
+const roomSeatTokenPrefix = "euchre.room.";
 const homepageSettingsKey = "euchreHomepageSettings";
 const elements = {
   activeRoomControls: document.querySelector("#activeRoomControls"),
@@ -172,7 +173,7 @@ if (urlParams.get("action") === "create") {
   createRoomFromUi();
 } else if (urlRoomCode) {
   if (urlParams.get("view") === "spectator") {
-    viewRoomAsSpectator(urlRoomCode);
+    viewRoomAsSpectator(urlRoomCode, "Spectator View. Hidden hands stay private.", { useStoredToken: false });
   } else {
     session = loadSession(urlRoomCode);
     if (session?.roomCode && session?.seatToken) {
@@ -215,6 +216,13 @@ async function refreshRoom(status) {
 
   try {
     const result = await api(`/api/rooms/${session.roomCode}?seatToken=${encodeURIComponent(session.seatToken ?? "")}`);
+    if (session.seatToken && result.room.viewerSeat === "spectator") {
+      const roomCode = session.roomCode;
+      clearStoredSession(roomCode);
+      session = null;
+      setRoom(result.room, "Session not recognized. Join as opponent or watch as spectator.");
+      return;
+    }
     setRoom(result.room, status);
   } catch (error) {
     clearStoredSession(session?.roomCode);
@@ -231,31 +239,19 @@ async function autoJoinRoom(roomCode) {
     return;
   }
 
-  const displayName = currentPlayerName();
-  if (!displayName) {
-    await viewRoomAsSpectator(roomCode, "Enter your name to continue.");
-    return;
-  }
-
-  try {
-    const result = await api(`/api/rooms/${roomCode}/join`, {
-      method: "POST",
-      body: { displayName }
-    });
-    setSession(result.room.roomCode, result.seatToken);
-    setRoom(result.room, `You are ${seatName(result.seat)}.`);
-  } catch (error) {
-    try {
-      await viewRoomAsSpectator(roomCode, "Spectator View. Both player seats are already taken.");
-    } catch {
-      setStatus(error.message);
-    }
-  }
+  await viewRoomAsSpectator(roomCode, "Choose Join as Opponent to take the open seat, or watch as spectator.");
 }
 
-async function viewRoomAsSpectator(roomCode, status = "Spectator View. Hidden hands stay private.") {
+async function viewRoomAsSpectator(roomCode, status = "Spectator View. Hidden hands stay private.", { useStoredToken = true } = {}) {
   try {
-    const result = await api(`/api/rooms/${roomCode}`);
+    const storedSession = useStoredToken ? loadSession(roomCode) : null;
+    const tokenQuery = storedSession?.seatToken
+      ? `?seatToken=${encodeURIComponent(storedSession.seatToken)}`
+      : "";
+    const result = await api(`/api/rooms/${roomCode}${tokenQuery}`);
+    if (storedSession?.seatToken && result.room.viewerSeat !== "spectator") {
+      session = storedSession;
+    }
     setRoom(result.room, status);
   } catch (error) {
     setStatus(error.message);
@@ -311,6 +307,7 @@ function setSession(roomCode, seatToken) {
     seatToken,
     updatedAt: new Date().toISOString()
   };
+  localStorage.setItem(roomSeatTokenKey(normalizedRoomCode), seatToken);
   localStorage.setItem(storageKey, JSON.stringify(session));
 
   const sessions = loadSessionMap();
@@ -324,6 +321,17 @@ function isGamePagePhase(phase) {
 
 function loadSession(roomCode) {
   const normalizedRoomCode = roomCode?.toUpperCase();
+  if (normalizedRoomCode) {
+    const roomSeatToken = localStorage.getItem(roomSeatTokenKey(normalizedRoomCode));
+    if (roomSeatToken) {
+      return {
+        roomCode: normalizedRoomCode,
+        seatToken: roomSeatToken,
+        updatedAt: new Date().toISOString()
+      };
+    }
+  }
+
   const sessions = loadSessionMap();
   const matchingSession = normalizedRoomCode ? sessions[normalizedRoomCode] : null;
 
@@ -369,9 +377,14 @@ function clearStoredSession(roomCode) {
   if (!roomCode) return;
 
   const normalizedRoomCode = roomCode.toUpperCase();
+  localStorage.removeItem(roomSeatTokenKey(normalizedRoomCode));
   const sessions = loadSessionMap();
   delete sessions[normalizedRoomCode];
   localStorage.setItem(roomSessionsKey, JSON.stringify(sessions));
+}
+
+function roomSeatTokenKey(roomCode) {
+  return `${roomSeatTokenPrefix}${roomCode}.seatToken`;
 }
 
 function currentPlayerName() {
