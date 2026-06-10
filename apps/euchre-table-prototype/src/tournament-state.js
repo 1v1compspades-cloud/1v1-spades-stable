@@ -7,14 +7,17 @@ export const VALID_BRACKET_SIZES = Object.freeze([4, 8, 16, 32, 64]);
 export function createTournament({
   tournamentCode = generateTournamentCode(),
   adminKey = generateAdminKey(),
-  bracketSize = 4
+  bracketSize = 4,
+  matchSettings
 } = {}) {
   assertBracketSize(bracketSize);
+  const settings = resolveTournamentMatchSettings(matchSettings);
 
   return {
     tournamentCode,
     adminKey,
     bracketSize,
+    matchSettings: settings,
     players: [],
     status: "lobby",
     bracket: null,
@@ -124,6 +127,7 @@ export function generateBracket(tournament, { createMatchRoom = defaultCreateMat
 
   const rounds = buildEmptyRounds(tournament.bracketSize);
   const firstRoundMatchCount = tournament.bracketSize / 2;
+  const matchSettings = resolveTournamentMatchSettings(tournament.matchSettings);
 
   for (let index = 0; index < firstRoundMatchCount; index += 1) {
     const player1 = tournament.players[index * 2];
@@ -133,7 +137,8 @@ export function generateBracket(tournament, { createMatchRoom = defaultCreateMat
       round: 1,
       matchNumber: index + 1,
       player1,
-      player2
+      player2,
+      matchSettings
     });
 
     rounds[0].matches[index] = {
@@ -151,6 +156,7 @@ export function generateBracket(tournament, { createMatchRoom = defaultCreateMat
 
   return {
     ...tournament,
+    matchSettings,
     status: "bracket",
     bracket: {
       rounds
@@ -188,6 +194,7 @@ export function recordMatchWinner(tournament, { round, matchId, winnerId, source
   match.resultSource = source;
   match.locked = true;
   match.status = source === "admin_forfeit" ? "forfeited" : "complete";
+  const matchSettings = resolveTournamentMatchSettings(tournament.matchSettings);
 
   const nextRound = rounds[roundIndex + 1];
   if (nextRound) {
@@ -202,7 +209,8 @@ export function recordMatchWinner(tournament, { round, matchId, winnerId, source
         round: target.round,
         matchNumber: target.matchNumber,
         player1: target.player1,
-        player2: target.player2
+        player2: target.player2,
+        matchSettings
       });
       target.roomCode = room.roomCode;
       target.roomLink = `./room.html?room=${room.roomCode}`;
@@ -218,6 +226,7 @@ export function recordMatchWinner(tournament, { round, matchId, winnerId, source
 
   return {
     ...tournament,
+    matchSettings,
     status,
     bracket: { rounds },
     winner: finalMatch.winner ?? null,
@@ -361,10 +370,32 @@ function buildEmptyRounds(bracketSize) {
   return rounds;
 }
 
-function defaultCreateMatchRoom({ tournamentCode, round, matchNumber }) {
+function defaultCreateMatchRoom({ tournamentCode, round, matchNumber, matchSettings }) {
   return createRoom({
-    roomCode: `${tournamentCode.slice(0, 3)}${round}${matchNumber}`
+    roomCode: `${tournamentCode.slice(0, 3)}${round}${matchNumber}`,
+    matchSettings: matchSettings ?? {
+      modeId: "tournamentMode",
+      raceTo: 10,
+      stickTheDealer: true
+    }
   });
+}
+
+function resolveTournamentMatchSettings(matchSettings = {}) {
+  const raceTo = Number.parseInt(String(
+    matchSettings.raceTo
+      ?? matchSettings.matchTarget
+      ?? matchSettings.targetScore
+      ?? matchSettings.scoreLimit
+      ?? matchSettings.winningScore
+      ?? ""
+  ), 10);
+
+  return {
+    modeId: matchSettings.modeId ?? "tournamentMode",
+    raceTo: [5, 10].includes(raceTo) ? raceTo : 10,
+    stickTheDealer: typeof matchSettings.stickTheDealer === "boolean" ? matchSettings.stickTheDealer : true
+  };
 }
 
 function normalizeName(name) {

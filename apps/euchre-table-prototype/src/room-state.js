@@ -25,14 +25,26 @@ export function createRoom({
   modeId = "communityCompetitive",
   displayName = "Host",
   coinFlipWinner = null,
-  tournamentMatch = null
+  tournamentMatch = null,
+  matchSettings,
+  targetScore,
+  raceTo,
+  stickTheDealer
 } = {}) {
-  const mode = GAME_MODES[modeId] ?? GAME_MODES.communityCompetitive;
-  const gameState = createWaitingGameState({ mode, modeId: mode.id });
+  const settings = resolveMatchSettings({
+    modeId,
+    matchSettings,
+    targetScore,
+    raceTo,
+    stickTheDealer
+  });
+  const mode = modeForMatchSettings(settings);
+  const gameState = createWaitingGameState({ mode, modeId: settings.modeId });
   const name = normalizeDisplayName(displayName);
 
   return syncRoomFields({
     roomCode,
+    matchSettings: settings,
     players: {
       player1: {
         seat: "player1",
@@ -171,7 +183,7 @@ export function applyRoomAction(room, { seatToken, type, suit, position, card, d
       gameState: startHand({
         ...gameState,
         dealer: firstDealer
-      }, { deck }),
+      }, { deck, matchSettings: room.matchSettings }),
       updatedAt: new Date().toISOString()
     });
   }
@@ -220,7 +232,7 @@ export function applyRoomAction(room, { seatToken, type, suit, position, card, d
               result: "redeal"
             }
           ]
-        }, { deck }),
+        }, { deck, matchSettings: room.matchSettings }),
         updatedAt: new Date().toISOString()
       });
     }
@@ -255,7 +267,7 @@ export function applyRoomAction(room, { seatToken, type, suit, position, card, d
 
     return syncRoomFields({
       ...room,
-      gameState: startHand(gameState, { deck }),
+      gameState: startHand(gameState, { deck, matchSettings: room.matchSettings }),
       updatedAt: new Date().toISOString()
     });
   }
@@ -291,6 +303,9 @@ export function sanitizeRoomForViewer(room, seatToken) {
     countdownEndsAt: safeRoom.countdownEndsAt,
     nextHandStartsAt: safeRoom.nextHandStartsAt,
     nextRoundStartsAt: safeRoom.nextRoundStartsAt,
+    matchSettings: {
+      ...safeRoom.matchSettings
+    },
     tournamentMatch: safeRoom.tournamentMatch
       ? sanitizeTournamentMatch(safeRoom.tournamentMatch, state)
       : null,
@@ -299,7 +314,7 @@ export function sanitizeRoomForViewer(room, seatToken) {
       actionPhase: state.actionPhase,
       modeId: state.modeId,
       score: state.score,
-      targetScore: state.mode.targetScore,
+      targetScore: safeRoom.matchSettings.raceTo,
       winner: state.winner,
       currentTurn: state.currentTurn,
       dealer: state.dealer,
@@ -383,7 +398,7 @@ export function advanceRoomClock(room, { now = Date.now(), deck } = {}) {
       ...room,
       nextHandStartsAt: null,
       nextRoundStartsAt: null,
-      gameState: startHand(room.gameState, { deck }),
+      gameState: startHand(room.gameState, { deck, matchSettings: room.matchSettings }),
       updatedAt: new Date().toISOString()
     });
   }
@@ -444,7 +459,13 @@ export function availableTrumpSuits(trumpState) {
   return [trumpState.upcardSuit];
 }
 
-function startHand(previousState, { deck = shuffleDeck(createDeck()) } = {}) {
+function startHand(previousState, { deck = shuffleDeck(createDeck()), matchSettings } = {}) {
+  const settings = resolveMatchSettings({
+    modeId: matchSettings?.modeId ?? previousState.modeId,
+    raceTo: matchSettings?.raceTo ?? previousState.mode?.targetScore,
+    stickTheDealer: matchSettings?.stickTheDealer ?? previousState.mode?.stickTheDealer
+  });
+  const mode = modeForMatchSettings(settings);
   const dealer = previousState.handNumber === 0
     ? previousState.dealer
     : otherPlayer(previousState.dealer);
@@ -452,16 +473,16 @@ function startHand(previousState, { deck = shuffleDeck(createDeck()) } = {}) {
   const trumpState = createTrumpSelection({
     dealer,
     upcardSuit: dealt.upcard.suit,
-    mode: previousState.mode
+    mode
   });
 
   return {
-    modeId: previousState.modeId,
-    mode: previousState.mode,
+    modeId: settings.modeId,
+    mode,
     phase: "playing",
     actionPhase: "selectingTrump",
     score: previousState.score,
-    winner: getMatchWinner(previousState.score, previousState.mode.targetScore),
+    winner: getMatchWinner(previousState.score, settings.raceTo),
     dealer,
     handNumber: previousState.handNumber + 1,
     hands: {
@@ -556,7 +577,7 @@ function playCardForRoom(room, player, card) {
   if (completedTricks.length === 5) {
     const handScore = scoreHand({ maker: state.maker, tricksWon });
     const score = applyScore(state.score, handScore);
-    const winner = getMatchWinner(score, state.mode.targetScore);
+    const winner = getMatchWinner(score, targetScoreForRoom(room));
     const handSummary = {
       handNumber: state.handNumber,
       maker: state.maker,
@@ -632,7 +653,17 @@ function applyDealerPickupIfNeeded(state, trumpState) {
 }
 
 function syncRoomFields(room) {
-  const guardedRoom = guardWaitingForPlayers(room);
+  const matchSettings = resolveMatchSettings({
+    modeId: room.matchSettings?.modeId ?? room.gameState?.modeId,
+    raceTo: room.matchSettings?.raceTo ?? room.gameState?.mode?.targetScore,
+    stickTheDealer: room.matchSettings?.stickTheDealer ?? room.gameState?.mode?.stickTheDealer
+  });
+  const roomWithSettings = {
+    ...room,
+    matchSettings,
+    gameState: normalizeGameStateForMatchSettings(room.gameState, matchSettings)
+  };
+  const guardedRoom = guardWaitingForPlayers(roomWithSettings);
 
   return {
     ...guardedRoom,
@@ -650,6 +681,68 @@ function syncRoomFields(room) {
     score: guardedRoom.gameState.score,
     handHistory: guardedRoom.gameState.handHistory
   };
+}
+
+function resolveMatchSettings({
+  modeId = "communityCompetitive",
+  matchSettings,
+  targetScore,
+  raceTo,
+  stickTheDealer
+} = {}) {
+  const requestedModeId = matchSettings?.modeId ?? modeId;
+  const baseMode = GAME_MODES[requestedModeId] ?? GAME_MODES.communityCompetitive;
+  const requestedRaceTo = Number.parseInt(String(
+    matchSettings?.raceTo
+      ?? matchSettings?.matchTarget
+      ?? matchSettings?.targetScore
+      ?? matchSettings?.scoreLimit
+      ?? matchSettings?.winningScore
+      ?? raceTo
+      ?? targetScore
+      ?? ""
+  ), 10);
+  const defaultRaceTo = baseMode.id === "fastGame" ? 5 : 10;
+  const normalizedRaceTo = [5, 10].includes(requestedRaceTo) ? requestedRaceTo : defaultRaceTo;
+  const requestedStickTheDealer = matchSettings?.stickTheDealer ?? stickTheDealer;
+
+  return {
+    modeId: baseMode.id,
+    raceTo: normalizedRaceTo,
+    stickTheDealer: typeof requestedStickTheDealer === "boolean"
+      ? requestedStickTheDealer
+      : baseMode.stickTheDealer
+  };
+}
+
+function modeForMatchSettings(matchSettings) {
+  const baseMode = GAME_MODES[matchSettings.modeId] ?? GAME_MODES.communityCompetitive;
+
+  return {
+    ...baseMode,
+    targetScore: matchSettings.raceTo,
+    stickTheDealer: matchSettings.stickTheDealer
+  };
+}
+
+function normalizeGameStateForMatchSettings(gameState, matchSettings) {
+  const mode = modeForMatchSettings(matchSettings);
+
+  return {
+    ...gameState,
+    modeId: matchSettings.modeId,
+    mode,
+    trumpState: gameState.trumpState
+      ? {
+          ...gameState.trumpState,
+          mode
+        }
+      : null
+  };
+}
+
+function targetScoreForRoom(room) {
+  return room.matchSettings?.raceTo ?? room.gameState?.mode?.targetScore ?? 10;
 }
 
 function guardWaitingForPlayers(room) {

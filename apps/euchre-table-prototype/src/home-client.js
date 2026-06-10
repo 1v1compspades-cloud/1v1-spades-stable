@@ -29,6 +29,8 @@ if (sessionStorage.getItem(homepageAdminAccessKey) === "true") {
   showAdminControls("Admin tournament controls unlocked.");
 }
 
+syncCreateRoomHref();
+
 quickMatchButton.addEventListener("click", async () => {
   quickMatchButton.disabled = true;
   saveSettings();
@@ -50,7 +52,9 @@ createRoomLink.addEventListener("click", (event) => {
   if (!playerName) return;
 
   saveSettings();
-  window.location.href = `./room.html?action=create&name=${encodeURIComponent(playerName)}`;
+  const settings = currentMatchSettings();
+  console.debug("[raceTo] selected before create", { raceTo: settings.raceTo, modeId: settings.modeId });
+  window.location.href = createRoomUrl(playerName, settings);
 });
 
 homeJoinRoomButton.addEventListener("click", () => {
@@ -68,10 +72,10 @@ homeJoinRoomButton.addEventListener("click", () => {
   window.location.href = `./room.html?room=${encodeURIComponent(roomCode)}&name=${encodeURIComponent(playerName)}`;
 });
 
-playerNameInput.addEventListener("input", saveSettings);
-modeSelect.addEventListener("change", saveSettings);
-scoreLimitSelect.addEventListener("change", saveSettings);
-stickDealerToggle.addEventListener("change", saveSettings);
+playerNameInput.addEventListener("input", handleSettingsChange);
+modeSelect.addEventListener("change", handleSettingsChange);
+scoreLimitSelect.addEventListener("change", handleSettingsChange);
+stickDealerToggle.addEventListener("change", handleSettingsChange);
 
 document.querySelectorAll(".home-actions a").forEach((link) => {
   link.addEventListener("click", saveSettings);
@@ -94,12 +98,50 @@ function showAdminControls(message) {
 }
 
 function saveSettings() {
+  const settings = currentMatchSettings();
   localStorage.setItem(homepageSettingsKey, JSON.stringify({
     playerName: playerNameInput.value.trim(),
-    modeId: modeSelect.value,
-    targetScore: scoreLimitSelect.value,
-    stickTheDealer: stickDealerToggle.checked
+    modeId: settings.modeId,
+    targetScore: String(settings.raceTo),
+    raceTo: settings.raceTo,
+    stickTheDealer: settings.stickTheDealer
   }));
+}
+
+function handleSettingsChange() {
+  saveSettings();
+  syncCreateRoomHref();
+}
+
+function syncCreateRoomHref() {
+  createRoomLink.href = createRoomUrl(playerNameInput.value.trim());
+}
+
+function createRoomUrl(playerName, settings = currentMatchSettings()) {
+  const url = new URL("./room.html", window.location.href);
+  url.searchParams.set("action", "create");
+  if (playerName) {
+    url.searchParams.set("name", playerName);
+  }
+  url.searchParams.set("modeId", settings.modeId);
+  url.searchParams.set("raceTo", String(settings.raceTo));
+  url.searchParams.set("stickTheDealer", String(settings.stickTheDealer));
+  return url.toString();
+}
+
+function currentMatchSettings() {
+  const modeId = modeSelect.value || "communityCompetitive";
+  return {
+    modeId,
+    raceTo: normalizeRaceTo(scoreLimitSelect.value, modeId),
+    stickTheDealer: stickDealerToggle.checked
+  };
+}
+
+function normalizeRaceTo(value, modeId) {
+  const raceTo = Number.parseInt(String(value ?? ""), 10);
+  if ([5, 10].includes(raceTo)) return raceTo;
+  return modeId === "fastGame" ? 5 : 10;
 }
 
 function requiredPlayerName() {

@@ -40,6 +40,11 @@ test("creates a room with no cards dealt and no coin flip before Player 2 joins"
   const room = createRoom({ roomCode: "ABCDE", seatToken: "host-token" });
 
   assert.equal(room.roomCode, "ABCDE");
+  assert.deepEqual(room.matchSettings, {
+    modeId: "communityCompetitive",
+    raceTo: 10,
+    stickTheDealer: true
+  });
   assert.equal(room.players.player1.seatToken, "host-token");
   assert.equal(room.players.player2, null);
   assert.equal(room.coinFlipWinner, null);
@@ -49,6 +54,76 @@ test("creates a room with no cards dealt and no coin flip before Player 2 joins"
   assert.equal(room.gameState.phase, "waiting_for_players");
   assert.deepEqual(room.gameState.hands.player1, []);
   assert.deepEqual(room.gameState.hands.player2, []);
+});
+
+test("Race To defaults to 5 for Fast Game and 10 otherwise", () => {
+  const fastRoom = createRoom({ roomCode: "FAST5", modeId: "fastGame" });
+  const regularRoom = createRoom({ roomCode: "TEN10", modeId: "communityCompetitive" });
+
+  assert.equal(fastRoom.matchSettings.raceTo, 5);
+  assert.equal(fastRoom.gameState.mode.targetScore, 5);
+  assert.equal(sanitizeRoomForViewer(fastRoom, fastRoom.players.player1.seatToken).gameState.targetScore, 5);
+  assert.equal(regularRoom.matchSettings.raceTo, 10);
+  assert.equal(regularRoom.gameState.mode.targetScore, 10);
+  assert.equal(sanitizeRoomForViewer(regularRoom, regularRoom.players.player1.seatToken).gameState.targetScore, 10);
+});
+
+test("explicit Race To 5 is saved on the room and ends match at 5", () => {
+  let room = createStartedRoom({
+    matchSettings: {
+      modeId: "communityCompetitive",
+      raceTo: 5,
+      stickTheDealer: true
+    }
+  });
+  const view = sanitizeRoomForViewer(room, "host-token");
+
+  assert.equal(room.matchSettings.raceTo, 5);
+  assert.equal(room.gameState.mode.targetScore, 5);
+  assert.equal(view.matchSettings.raceTo, 5);
+  assert.equal(view.gameState.targetScore, 5);
+
+  room = {
+    ...room,
+    gameState: {
+      ...room.gameState,
+      score: { player1: 0, player2: 3 }
+    }
+  };
+  room = applyRoomAction(room, { seatToken: "host-token", type: "chooseTrump", suit: "hearts" });
+  room = playFixedHand(room);
+
+  assert.equal(room.gameState.phase, "match_complete");
+  assert.equal(room.gameState.winner, "player2");
+  assert.deepEqual(room.gameState.score, { player1: 0, player2: 5 });
+  assert.equal(room.nextRoundStartsAt, null);
+});
+
+test("explicit Race To 10 does not end match at 5", () => {
+  let room = createStartedRoom({
+    matchSettings: {
+      modeId: "communityCompetitive",
+      raceTo: 10,
+      stickTheDealer: true
+    }
+  });
+
+  assert.equal(sanitizeRoomForViewer(room, "host-token").gameState.targetScore, 10);
+
+  room = {
+    ...room,
+    gameState: {
+      ...room.gameState,
+      score: { player1: 0, player2: 3 }
+    }
+  };
+  room = applyRoomAction(room, { seatToken: "host-token", type: "chooseTrump", suit: "hearts" });
+  room = playFixedHand(room);
+
+  assert.equal(room.gameState.phase, "next_round_countdown");
+  assert.equal(room.gameState.winner, null);
+  assert.deepEqual(room.gameState.score, { player1: 0, player2: 5 });
+  assert.equal(Boolean(room.nextRoundStartsAt), true);
 });
 
 test("joins second player and supports reconnect by seat token", () => {
@@ -608,20 +683,20 @@ test("room state has no restricted commerce fields", () => {
   assert.equal(noRestrictedFields(room, restricted), true);
 });
 
-function createReadyCountdownRoom() {
-  let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", coinFlipWinner: "player1" });
+function createReadyCountdownRoom(options = {}) {
+  let room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", coinFlipWinner: "player1", ...options });
   room = joinRoom(room, { seatToken: "guest-token" }).room;
   room = applyRoomAction(room, { seatToken: "host-token", type: "ready" });
   return applyRoomAction(room, { seatToken: "guest-token", type: "ready" });
 }
 
-function createCoinFlipRoom() {
-  const room = createReadyCountdownRoom();
+function createCoinFlipRoom(options = {}) {
+  const room = createReadyCountdownRoom(options);
   return advanceRoomClock(room, { now: Date.parse(room.countdownEndsAt) + 1, deck: fixedDeck });
 }
 
-function createStartedRoom() {
-  let room = createCoinFlipRoom();
+function createStartedRoom(options = {}) {
+  let room = createCoinFlipRoom(options);
   return applyRoomAction(room, {
     seatToken: "host-token",
     type: "chooseStartingPosition",

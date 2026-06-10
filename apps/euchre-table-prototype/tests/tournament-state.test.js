@@ -205,6 +205,45 @@ test("records match winner and advances winner to final", () => {
   assert.equal(tournament.resultLog[1].source, "game_complete");
 });
 
+test("generated tournament match rooms inherit Race To 5", () => {
+  let tournament = createTournament({
+    tournamentCode: "FAST5",
+    adminKey: TOURNAMENT_ADMIN_KEY,
+    bracketSize: 4,
+    matchSettings: {
+      modeId: "tournamentMode",
+      raceTo: 5,
+      stickTheDealer: true
+    }
+  });
+  for (const displayName of ["A", "B", "C", "D"]) {
+    tournament = joinTournament(tournament, { displayName });
+  }
+
+  const createdRooms = [];
+  const createMatchRoom = ({ round, matchNumber, matchSettings }) => {
+    createdRooms.push({ round, matchNumber, matchSettings });
+    return { roomCode: `ROOM${round}${matchNumber}` };
+  };
+
+  tournament = startTournament(tournament, {
+    adminKey: TOURNAMENT_ADMIN_KEY,
+    createMatchRoom
+  });
+
+  assert.equal(tournament.matchSettings.raceTo, 5);
+  assert.equal(createdRooms.length, 2);
+  assert.equal(createdRooms.every((room) => room.matchSettings.raceTo === 5), true);
+
+  const firstWinner = tournament.bracket.rounds[0].matches[0].player1;
+  const secondWinner = tournament.bracket.rounds[0].matches[1].player1;
+  tournament = recordMatchWinner(tournament, { round: 1, matchId: "r1m1", winnerId: firstWinner.id, createMatchRoom });
+  tournament = recordMatchWinner(tournament, { round: 1, matchId: "r1m2", winnerId: secondWinner.id, createMatchRoom });
+
+  assert.equal(createdRooms[2].round, 2);
+  assert.equal(createdRooms[2].matchSettings.raceTo, 5);
+});
+
 test("champion appears after final match completes", () => {
   let tournament = createTournament({ tournamentCode: "EUCHRE", adminKey: "HOSTKEY", bracketSize: 4 });
   for (const displayName of ["A", "B", "C", "D"]) {

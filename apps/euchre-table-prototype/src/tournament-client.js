@@ -2,6 +2,7 @@ const storageKey = "euchreTournamentView";
 const elements = {
   status: document.querySelector("#tournamentStatus"),
   bracketSize: document.querySelector("#bracketSize"),
+  raceTo: document.querySelector("#tournamentRaceTo"),
   createButton: document.querySelector("#createTournamentButton"),
   adminKeyReveal: document.querySelector("#adminKeyReveal"),
   adminKeyOnce: document.querySelector("#adminKeyOnce"),
@@ -37,7 +38,14 @@ elements.createButton.addEventListener("click", async () => {
   try {
     const result = await api("/api/tournaments", {
       method: "POST",
-      body: { bracketSize: Number(elements.bracketSize.value) }
+      body: {
+        bracketSize: Number(elements.bracketSize.value),
+        matchSettings: {
+          modeId: "tournamentMode",
+          raceTo: Number(elements.raceTo.value),
+          stickTheDealer: true
+        }
+      }
     });
     showHostAccessNotice();
     verifiedAdminKey = result.adminKey;

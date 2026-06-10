@@ -29,6 +29,7 @@ import {
 } from "./src/tournament-state.js";
 
 const appName = "1v1-euchre-freeplay";
+const buildId = "race-to-5-proof-2026-06-10";
 const port = Number.parseInt(process.env.PORT ?? "5174", 10);
 const host = process.env.HOST ?? "0.0.0.0";
 const appDir = fileURLToPath(new URL(".", import.meta.url));
@@ -73,7 +74,19 @@ async function handleApi(request, response) {
 
   if (request.method === "POST" && url.pathname === "/api/rooms") {
     const body = await readJson(request);
-    const room = createUniqueRoom({ displayName: requiredDisplayName(body.displayName) });
+    const matchSettings = createMatchSettingsFromBody(body);
+    console.log("[raceTo] create room API received", {
+      raceTo: matchSettings.raceTo,
+      modeId: matchSettings.modeId
+    });
+    const room = createUniqueRoom({
+      displayName: requiredDisplayName(body.displayName),
+      matchSettings
+    });
+    console.log("[raceTo] saved room matchSettings", {
+      roomCode: room.roomCode,
+      matchSettings: room.matchSettings
+    });
     rooms.set(room.roomCode, room);
     persistState();
     const seatToken = room.players.player1.seatToken;
@@ -94,10 +107,27 @@ async function handleApi(request, response) {
     return;
   }
 
+  if (request.method === "GET" && segments[1] === "debug" && segments[2] === "rooms" && segments[3] && segments[4] === "settings") {
+    const roomCode = segments[3].toUpperCase();
+    const room = rooms.get(roomCode);
+    if (!room) throw httpError(404, "Room not found");
+
+    const safeRoom = sanitizeRoomForViewer(room, null);
+    sendJson(response, 200, {
+      roomCode,
+      matchSettings: safeRoom.matchSettings,
+      gameStateTargetScore: safeRoom.gameState.targetScore,
+      raceTo: safeRoom.matchSettings?.raceTo ?? safeRoom.gameState?.targetScore ?? null,
+      legacyModeTargetScore: room.gameState?.mode?.targetScore ?? null
+    });
+    return;
+  }
+
   if (request.method === "POST" && url.pathname === "/api/tournaments") {
     const body = await readJson(request);
     const tournament = createUniqueTournament({
-      bracketSize: Number(body.bracketSize ?? 4)
+      bracketSize: Number(body.bracketSize ?? 4),
+      matchSettings: createMatchSettingsFromBody(body)
     });
     tournaments.set(tournament.tournamentCode, tournament);
     persistState();
@@ -290,7 +320,9 @@ async function serveStatic(request, response) {
   }
 
   response.writeHead(200, {
-    "Content-Type": contentType(filePath)
+    "Content-Type": contentType(filePath),
+    "Cache-Control": cacheControl(filePath),
+    "X-Spadescomp-Build": buildId
   });
   createReadStream(filePath).pipe(response);
 }
@@ -309,25 +341,44 @@ function publicRoutePath(pathname) {
   }[pathname] ?? pathname;
 }
 
-function createUniqueRoom({ displayName } = {}) {
+function createUniqueRoom({ displayName, matchSettings } = {}) {
   for (let attempts = 0; attempts < 20; attempts += 1) {
-    const room = createRoom({ displayName });
+    const room = createRoom({ displayName, matchSettings });
     if (!rooms.has(room.roomCode)) return room;
   }
 
   throw httpError(500, "Could not generate a unique room code");
 }
 
-function createUniqueTournament({ bracketSize }) {
+function createMatchSettingsFromBody(body = {}) {
+  const nestedSettings = body.matchSettings ?? body.settings ?? {};
+
+  return {
+    modeId: nestedSettings.modeId ?? body.modeId ?? body.mode,
+    raceTo: nestedSettings.raceTo
+      ?? nestedSettings.matchTarget
+      ?? nestedSettings.targetScore
+      ?? nestedSettings.scoreLimit
+      ?? nestedSettings.winningScore
+      ?? body.raceTo
+      ?? body.matchTarget
+      ?? body.targetScore
+      ?? body.scoreLimit
+      ?? body.winningScore,
+    stickTheDealer: nestedSettings.stickTheDealer ?? body.stickTheDealer
+  };
+}
+
+function createUniqueTournament({ bracketSize, matchSettings }) {
   for (let attempts = 0; attempts < 20; attempts += 1) {
-    const tournament = createTournament({ bracketSize });
+    const tournament = createTournament({ bracketSize, matchSettings });
     if (!tournaments.has(tournament.tournamentCode)) return tournament;
   }
 
   throw httpError(500, "Could not generate a unique tournament code");
 }
 
-function createTournamentMatchRoom({ tournamentCode, round, matchNumber, player1, player2 }) {
+function createTournamentMatchRoom({ tournamentCode, round, matchNumber, player1, player2, matchSettings }) {
   const baseRoomCode = `${tournamentCode.slice(0, 4)}${round}${matchNumber}`;
   let roomCode = baseRoomCode;
   let suffix = 1;
@@ -339,6 +390,7 @@ function createTournamentMatchRoom({ tournamentCode, round, matchNumber, player1
 
   const room = createRoom({
     roomCode,
+    matchSettings,
     tournamentMatch: {
       tournamentCode,
       round,
@@ -417,4 +469,12 @@ function contentType(filePath) {
     ".js": "text/javascript; charset=utf-8",
     ".json": "application/json; charset=utf-8"
   }[extname(filePath)] ?? "application/octet-stream";
+}
+
+function cacheControl(filePath) {
+  if ([".html", ".js", ".css"].includes(extname(filePath))) {
+    return "no-store, max-age=0";
+  }
+
+  return "no-cache";
 }

@@ -66,6 +66,7 @@ const isRoomPage = window.location.pathname.endsWith("/room.html") || !isGamePag
 let session = null;
 let roomView = null;
 let pollHandle = null;
+let lastRaceToDebugKey = null;
 
 setupInfoPanel();
 
@@ -77,9 +78,14 @@ async function createRoomFromUi() {
   }
 
   try {
+    const matchSettings = currentMatchSettings();
+    console.debug("[raceTo] create room request body", { matchSettings });
     const result = await api("/api/rooms", {
       method: "POST",
-      body: { displayName }
+      body: {
+        displayName,
+        matchSettings
+      }
     });
     setSession(result.room.roomCode, result.seatToken);
     setRoom(result.room, "You are the host. Share the room link with your opponent.");
@@ -376,11 +382,55 @@ function currentPlayerName() {
   }
 
   try {
-    const settings = JSON.parse(localStorage.getItem(homepageSettingsKey));
+    const settings = loadHomepageSettings();
     return settings?.playerName?.trim() || null;
   } catch {
     return null;
   }
+}
+
+function currentMatchSettings() {
+  const settings = loadHomepageSettings();
+  const modeId = urlParams.get("modeId") ?? urlParams.get("mode") ?? settings.modeId ?? "communityCompetitive";
+  const requestedRaceTo = urlParams.get("raceTo") ?? settings.raceTo ?? settings.targetScore;
+  const hasRaceTo = requestedRaceTo !== undefined
+    && requestedRaceTo !== null
+    && String(requestedRaceTo).trim() !== "";
+  const matchSettings = {
+    modeId,
+    raceTo: hasRaceTo ? normalizeRaceTo(requestedRaceTo, modeId) : defaultRaceTo(modeId),
+    stickTheDealer: normalizeBoolean(urlParams.get("stickTheDealer"), settings.stickTheDealer ?? true)
+  };
+  console.debug("[raceTo] room page create settings", {
+    urlRaceTo: urlParams.get("raceTo"),
+    storedRaceTo: settings.raceTo,
+    targetScore: settings.targetScore,
+    matchSettings
+  });
+  return matchSettings;
+}
+
+function loadHomepageSettings() {
+  try {
+    return JSON.parse(localStorage.getItem(homepageSettingsKey)) ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function normalizeRaceTo(value, modeId) {
+  const raceTo = Number.parseInt(String(value ?? ""), 10);
+  return [5, 10].includes(raceTo) ? raceTo : defaultRaceTo(modeId);
+}
+
+function defaultRaceTo(modeId) {
+  return modeId === "fastGame" ? 5 : 10;
+}
+
+function normalizeBoolean(value, fallback) {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return fallback;
 }
 
 function fallbackJoinName() {
@@ -432,6 +482,17 @@ function render() {
   const playerCount = Number(roomView.players.player1) + Number(roomView.players.player2);
   const gameInterfaceActive = isGamePage && isGamePagePhase(state.phase);
   const trumpSuit = activeTrumpSuit(state);
+  const raceTo = roomView.matchSettings?.raceTo ?? state.targetScore ?? 10;
+  const raceToDebugKey = `${roomView.roomCode}:${roomView.matchSettings?.raceTo}:${state.targetScore}`;
+  if (raceToDebugKey !== lastRaceToDebugKey) {
+    console.debug("[raceTo] lobby loaded room", {
+      roomCode: roomView.roomCode,
+      matchSettings: roomView.matchSettings,
+      targetScore: state.targetScore,
+      displayedRaceTo: raceTo
+    });
+    lastRaceToDebugKey = raceToDebugKey;
+  }
 
   setHidden(elements.activeRoomControls, false);
   setHidden(elements.invitePanel, false);
@@ -459,8 +520,8 @@ function render() {
   setText(elements.player2Score, state.score.player2);
   setText(elements.player1ScoreLabel, getPlayerDisplayName("player1"));
   setText(elements.player2ScoreLabel, getPlayerDisplayName("player2"));
-  setText(elements.targetScore, state.targetScore);
-  setText(elements.pregameTargetScore, state.targetScore);
+  setText(elements.targetScore, raceTo);
+  setText(elements.pregameTargetScore, raceTo);
   setText(elements.player1Slot, roomView.players.player1 ? readySeatLabel("player1", roomView.playerReady, roomView.playerNames) : "Waiting");
   setText(elements.player2Slot, roomView.players.player2 ? readySeatLabel("player2", roomView.playerReady, roomView.playerNames) : "Waiting");
   setText(elements.viewerHandTitle, viewerSeat === "spectator" ? "Spectator View" : handTitle(viewerSeat));

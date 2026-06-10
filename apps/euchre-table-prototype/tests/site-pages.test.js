@@ -128,6 +128,7 @@ test("one-player room lobby exposes invite controls without start sequence or cr
   assert.match(html, /id="pregamePanel"/);
   assert.match(html, /Match Settings/);
   assert.match(html, /Race To/);
+  assert.doesNotMatch(html, /id="pregameTargetScore">10<\/strong>/);
   assert.match(html, /Stick the Dealer/);
   assert.match(html, /Hidden Hands/);
   assert.match(html, />Host<\/span>/);
@@ -160,6 +161,7 @@ test("pre-match lobby keeps gameplay interface hidden", async () => {
   assert.doesNotMatch(html, /id="scoreband"/);
   assert.doesNotMatch(html, /No cards dealt/);
   assert.match(html, /id="pregamePanel" class="match-settings-panel"/);
+  assert.doesNotMatch(html, /id="pregameTargetScore">10<\/strong>/);
   assert.match(html, />Host<\/span>/);
   assert.match(html, /Waiting for player/);
   assert.match(html, /id="readyStatus"/);
@@ -174,6 +176,8 @@ test("game screen owns gameplay interface and is guarded until start", async () 
 
   assert.match(html, /id="scoreband" class="scoreband" aria-label="Match score" hidden/);
   assert.match(html, /id="roomTable" class="table-grid room-table" hidden/);
+  assert.doesNotMatch(html, /id="pregameTargetScore">10<\/strong>/);
+  assert.doesNotMatch(html, /id="targetScore">10<\/strong>/);
   assert.match(html, /id="player1ScoreLabel">You/);
   assert.match(html, /id="player2ScoreLabel">Opponent/);
   assert.match(html, /Your Hand/);
@@ -245,7 +249,11 @@ test("active room screen hides lobby create and join controls", async () => {
   assert.match(client, /spectatorLinkFor/);
   assert.match(client, /joinAsPlayer2Button/);
   assert.match(client, /joinNameInput/);
-  assert.match(client, /body: \{ displayName \}/);
+  assert.match(client, /const matchSettings = currentMatchSettings\(\)/);
+  assert.match(client, /body: \{[\s\S]*displayName,[\s\S]*matchSettings[\s\S]*\}/);
+  assert.match(client, /requestedRaceTo = urlParams\.get\("raceTo"\) \?\? settings\.raceTo \?\? settings\.targetScore/);
+  assert.match(client, /const raceTo = roomView\.matchSettings\?\.raceTo \?\? state\.targetScore \?\? 10/);
+  assert.match(client, /setText\(elements\.pregameTargetScore, raceTo\)/);
   assert.match(client, /Trump: \$\{suitName\(activeTrumpSuit\(state\)\)\}/);
   assert.match(client, /openInviteLinkButton/);
 });
@@ -328,7 +336,12 @@ test("home join room button opens room by code", async () => {
   assert.match(client, /createRoomLink\.addEventListener/);
   assert.match(client, /requiredPlayerName\(\)/);
   assert.match(client, /Enter your name to continue\./);
-  assert.match(client, /action=create&name=\$\{encodeURIComponent\(playerName\)\}/);
+  assert.match(client, /syncCreateRoomHref\(\)/);
+  assert.match(client, /createRoomLink\.href = createRoomUrl\(playerNameInput\.value\.trim\(\)\)/);
+  assert.match(client, /url\.searchParams\.set\("action", "create"\)/);
+  assert.match(client, /url\.searchParams\.set\("modeId", settings\.modeId\)/);
+  assert.match(client, /url\.searchParams\.set\("raceTo", String\(settings\.raceTo\)\)/);
+  assert.match(client, /url\.searchParams\.set\("stickTheDealer", String\(settings\.stickTheDealer\)\)/);
   assert.match(client, /homeJoinRoomButton\.addEventListener/);
   assert.match(client, /homeJoinRoomCode\.value\.trim\(\)\.toUpperCase\(\)/);
   assert.match(client, /\.\/room\.html\?room=\$\{encodeURIComponent\(roomCode\)\}&name=\$\{encodeURIComponent\(playerName\)\}/);
@@ -527,6 +540,102 @@ test("public room invite route serves room and lets Player 2 join by invite code
       assert.equal(joined.body.room.playerNames.player2, "Bob");
       assert.equal(joined.body.room.coinFlipWinner, null);
       assert.equal(joined.body.room.gameState.phase, "pregame_settings");
+    } finally {
+      await stopServer(server);
+    }
+  });
+});
+
+test("room creation stores and exposes selected Race To values", async () => {
+  await withTempStateFile(async (stateFile) => {
+    const port = 5205;
+    const server = await startTestServer(port, stateFile);
+
+    try {
+      const raceToFive = await requestJson(port, "/api/rooms", {
+        method: "POST",
+        body: {
+          displayName: "Alice",
+          matchSettings: {
+            modeId: "communityCompetitive",
+            raceTo: 5,
+            stickTheDealer: true
+          }
+        }
+      });
+
+      assert.equal(raceToFive.statusCode, 201);
+      assert.equal(raceToFive.body.room.matchSettings.raceTo, 5);
+      assert.equal(raceToFive.body.room.gameState.targetScore, 5);
+
+      const loadedFive = await requestJson(port, `/api/rooms/${raceToFive.body.room.roomCode}`);
+      assert.equal(loadedFive.statusCode, 200);
+      assert.equal(loadedFive.body.room.matchSettings.raceTo, 5);
+      assert.equal(loadedFive.body.room.gameState.targetScore, 5);
+
+      const raceToTen = await requestJson(port, "/api/rooms", {
+        method: "POST",
+        body: {
+          displayName: "Bob",
+          matchSettings: {
+            modeId: "communityCompetitive",
+            raceTo: 10,
+            stickTheDealer: true
+          }
+        }
+      });
+
+      assert.equal(raceToTen.statusCode, 201);
+      assert.equal(raceToTen.body.room.matchSettings.raceTo, 10);
+      assert.equal(raceToTen.body.room.gameState.targetScore, 10);
+
+      const loadedTen = await requestJson(port, `/api/rooms/${raceToTen.body.room.roomCode}`);
+      assert.equal(loadedTen.statusCode, 200);
+      assert.equal(loadedTen.body.room.matchSettings.raceTo, 10);
+      assert.equal(loadedTen.body.room.gameState.targetScore, 10);
+    } finally {
+      await stopServer(server);
+    }
+  });
+});
+
+test("generated tournament match rooms inherit Race To 5", async () => {
+  await withTempStateFile(async (stateFile) => {
+    const port = 5206;
+    const server = await startTestServer(port, stateFile);
+
+    try {
+      const created = await requestJson(port, "/api/tournaments", {
+        method: "POST",
+        body: {
+          bracketSize: 4,
+          matchSettings: {
+            modeId: "tournamentMode",
+            raceTo: 5,
+            stickTheDealer: true
+          }
+        }
+      });
+      const tournamentCode = created.body.tournament.tournamentCode;
+
+      for (const displayName of ["A", "B", "C", "D"]) {
+        const joined = await requestJson(port, `/api/tournaments/${tournamentCode}/join`, {
+          method: "POST",
+          body: { displayName }
+        });
+        assert.equal(joined.statusCode, 200);
+      }
+
+      const started = await requestJson(port, `/api/tournaments/${tournamentCode}/admin/start`, {
+        method: "POST",
+        body: { adminKey }
+      });
+      const firstRoundMatch = started.body.tournament.bracket.rounds[0].matches[0];
+      const firstRoundRoom = await requestJson(port, `/api/rooms/${firstRoundMatch.roomCode}`);
+
+      assert.equal(firstRoundRoom.statusCode, 200);
+      assert.equal(firstRoundRoom.body.room.matchSettings.raceTo, 5);
+      assert.equal(firstRoundRoom.body.room.gameState.targetScore, 5);
     } finally {
       await stopServer(server);
     }

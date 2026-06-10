@@ -34,6 +34,11 @@
             <option value="32">32 players</option>
             <option value="64">64 players</option>
           </select>
+          <label for="tournamentRaceTo">Race to</label>
+          <select id="tournamentRaceTo">
+            <option value="10">10 points</option>
+            <option value="5">5 points</option>
+          </select>
           <button id="createTournamentButton" type="button">Create Tournament</button>
           <div id="adminKeyReveal" class="admin-key-reveal" hidden>
             <span>Host access</span>
@@ -121,6 +126,6 @@
       </section>
     </main>
 
-    <script type="module" src="./src/tournament-client.js"></script>
+    <script type="module" src="./src/tournament-client.js?v=race-to-source-v3"></script>
   </body>
 </html>
