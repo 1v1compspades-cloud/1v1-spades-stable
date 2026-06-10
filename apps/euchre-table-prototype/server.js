@@ -6,6 +6,7 @@ import {
   advanceRoomClock,
   applyRoomAction,
   createRoom,
+  getViewerIdentity,
   getViewerSeat,
   joinRoom,
   sanitizeRoomForViewer
@@ -256,15 +257,22 @@ async function handleApi(request, response) {
 
     if (request.method === "GET" && segments.length === 3) {
       const seatToken = url.searchParams.get("seatToken");
+      const playerId = url.searchParams.get("playerId");
+      const viewerIdentity = getViewerIdentity(room, { seatToken, playerId });
       sendJson(response, 200, {
-        room: sanitizeRoomForViewer(room, seatToken)
+        viewerSeat: viewerIdentity.seat,
+        alreadySeated: viewerIdentity.seat !== "spectator",
+        seat: viewerIdentity.seat === "spectator" ? null : viewerIdentity.seat,
+        seatToken: viewerIdentity.restoredBy === "playerId" ? viewerIdentity.seatToken : undefined,
+        restoredBy: viewerIdentity.restoredBy,
+        room: sanitizeRoomForViewer(room, { seatToken, playerId })
       });
       return;
     }
 
     if (request.method === "POST" && segments[3] === "join") {
       const body = await readJson(request);
-      const viewerSeat = getViewerSeat(room, body.seatToken);
+      const viewerSeat = getViewerSeat(room, body.seatToken, body.playerId);
       const result = joinRoom(room, {
         seatToken: body.seatToken,
         playerId: body.playerId,
@@ -285,7 +293,7 @@ async function handleApi(request, response) {
       const body = await readJson(request);
       const nextRoom = advanceAndSaveRoom(applyRoomAction(room, body));
       sendJson(response, 200, {
-        room: sanitizeRoomForViewer(nextRoom, body.seatToken)
+        room: sanitizeRoomForViewer(nextRoom, body.seatToken, body.playerId)
       });
       return;
     }

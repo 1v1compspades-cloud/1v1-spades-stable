@@ -227,6 +227,9 @@ async function refreshRoom(status) {
       playerId: getGuestPlayerId()
     });
     const result = await api(`/api/rooms/${session.roomCode}?${query.toString()}`);
+    if (result.seatToken && result.room.viewerSeat !== "spectator") {
+      setSession(result.room.roomCode, result.seatToken);
+    }
     if (session.seatToken && result.room.viewerSeat === "spectator") {
       const roomCode = session.roomCode;
       clearStoredSession(roomCode);
@@ -261,7 +264,9 @@ async function viewRoomAsSpectator(roomCode, status = "Spectator View. Hidden ha
       query.set("seatToken", storedSession.seatToken);
     }
     const result = await api(`/api/rooms/${roomCode}?${query.toString()}`);
-    if (storedSession?.seatToken && result.room.viewerSeat !== "spectator") {
+    if (result.seatToken && result.room.viewerSeat !== "spectator") {
+      setSession(result.room.roomCode, result.seatToken);
+    } else if (storedSession?.seatToken && result.room.viewerSeat !== "spectator") {
       session = storedSession;
     }
     setRoom(result.room, status);
@@ -552,7 +557,7 @@ function render() {
   setDisabled(elements.copyCodeButton, false);
   setDisabled(elements.copySpectatorLinkButton, false);
   setDisabled(elements.openInviteLinkButton, false);
-  const showJoinFallback = viewerSeat === "spectator" && !roomView.players.player2;
+  const showJoinFallback = viewerSeat === "spectator" && roomView.alreadySeated !== true && !roomView.players.player2;
   setHidden(elements.joinAsPlayer2Button, !showJoinFallback);
   setHidden(elements.joinNameInput, !showJoinFallback);
   setHidden(elements.coinFlipWinner?.closest("div"), gameInterfaceActive);

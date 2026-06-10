@@ -134,8 +134,34 @@ export function joinRoom(room, { seatToken, displayName = "Opponent", playerId }
   };
 }
 
-export function getViewerSeat(room, seatToken) {
-  return seatForToken(room, seatToken) ?? "spectator";
+export function getViewerSeat(room, seatToken, playerId) {
+  return getViewerIdentity(room, { seatToken, playerId }).seat;
+}
+
+export function getViewerIdentity(room, { seatToken, playerId } = {}) {
+  const tokenSeat = seatForToken(room, seatToken);
+  if (tokenSeat) {
+    return {
+      seat: tokenSeat,
+      seatToken: room.players[tokenSeat].seatToken,
+      restoredBy: "seatToken"
+    };
+  }
+
+  const playerIdSeat = seatForPlayerId(room, playerId);
+  if (playerIdSeat) {
+    return {
+      seat: playerIdSeat,
+      seatToken: room.players[playerIdSeat].seatToken,
+      restoredBy: "playerId"
+    };
+  }
+
+  return {
+    seat: "spectator",
+    seatToken: null,
+    restoredBy: "spectator"
+  };
 }
 
 export function applyRoomAction(room, { seatToken, playerId, type, suit, position, card, deck }) {
@@ -296,15 +322,18 @@ export function applyRoomAction(room, { seatToken, playerId, type, suit, positio
   throw new Error(`Unsupported room action: ${type}`);
 }
 
-export function sanitizeRoomForViewer(room, seatToken) {
+export function sanitizeRoomForViewer(room, seatToken, playerId) {
   const safeRoom = syncRoomFields(room);
-  const viewerSeat = getViewerSeat(safeRoom, seatToken);
+  const viewerIdentity = getViewerIdentity(safeRoom, normalizeViewerIdentity(seatToken, playerId));
+  const viewerSeat = viewerIdentity.seat;
+  const alreadySeated = viewerSeat !== "spectator";
   const state = safeRoom.gameState;
   const viewerHand = viewerSeat === "spectator" ? [] : [...state.hands[viewerSeat]];
 
   return {
     roomCode: safeRoom.roomCode,
     viewerSeat,
+    alreadySeated,
     players: {
       player1: Boolean(safeRoom.players.player1),
       player2: Boolean(safeRoom.players.player2)
@@ -862,6 +891,33 @@ function seatForToken(room, seatToken) {
   }
 
   return null;
+}
+
+function seatForPlayerId(room, playerId) {
+  const normalizedPlayerId = normalizePlayerId(playerId);
+  if (!normalizedPlayerId) return null;
+
+  for (const seat of ["player1", "player2"]) {
+    if (room.players[seat]?.playerId === normalizedPlayerId) {
+      return seat;
+    }
+  }
+
+  return null;
+}
+
+function normalizeViewerIdentity(seatTokenOrIdentity, playerId) {
+  if (seatTokenOrIdentity && typeof seatTokenOrIdentity === "object") {
+    return {
+      seatToken: seatTokenOrIdentity.seatToken,
+      playerId: seatTokenOrIdentity.playerId
+    };
+  }
+
+  return {
+    seatToken: seatTokenOrIdentity,
+    playerId
+  };
 }
 
 function playerIdMatchesSeatedPlayer(room, playerId) {

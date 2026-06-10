@@ -670,6 +670,20 @@ test("stable playerId blocks the same browser from taking opponent seat", () => 
   );
 });
 
+test("manual URL reload with saved playerId restores existing seat", () => {
+  const room = createRoom({
+    roomCode: "ABCDE",
+    seatToken: "host-token",
+    playerId: "host-player",
+    displayName: "Mehdi",
+    deck: fixedDeck
+  });
+
+  const restoredByPlayerId = sanitizeRoomForViewer(room, { playerId: "host-player" });
+  assert.equal(restoredByPlayerId.viewerSeat, "player1");
+  assert.equal(restoredByPlayerId.alreadySeated, true);
+});
+
 test("same display name cannot occupy both seats without a valid existing token", () => {
   const room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", displayName: "Mehdi" });
 

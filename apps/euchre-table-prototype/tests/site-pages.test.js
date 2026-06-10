@@ -288,6 +288,9 @@ test("room client restores stored seat sessions by room code", async () => {
   assert.match(client, /sessions\[normalizedRoomCode\] = session/);
   assert.match(client, /playerId: getGuestPlayerId\(\)/);
   assert.match(client, /new URLSearchParams\(\{[\s\S]*playerId: getGuestPlayerId\(\)/);
+  assert.match(client, /if \(result\.seatToken && result\.room\.viewerSeat !== "spectator"\)/);
+  assert.match(client, /setSession\(result\.room\.roomCode, result\.seatToken\)/);
+  assert.match(client, /showJoinFallback = viewerSeat === "spectator" && roomView\.alreadySeated !== true && !roomView\.players\.player2/);
   assert.match(client, /Choose Join as Opponent to take the open seat, or watch as spectator\./);
   assert.doesNotMatch(client, /function autoJoinRoom[\s\S]*body: \{ displayName \}/);
   assert.match(client, /render\(\);\n  if \(status\) setStatus\(status\);/);
@@ -701,6 +704,16 @@ test("persistence reload keeps active room state", async () => {
 
     server = await startTestServer(port, stateFile);
     try {
+      const restoredByPlayerId = await requestJson(port, `/api/rooms/${roomCode}?playerId=alice-player`);
+      assert.equal(restoredByPlayerId.statusCode, 200);
+      assert.equal(restoredByPlayerId.body.viewerSeat, "player1");
+      assert.equal(restoredByPlayerId.body.alreadySeated, true);
+      assert.equal(restoredByPlayerId.body.room.viewerSeat, "player1");
+      assert.equal(restoredByPlayerId.body.room.alreadySeated, true);
+      assert.equal(restoredByPlayerId.body.seat, "player1");
+      assert.equal(restoredByPlayerId.body.seatToken, seatToken);
+      assert.equal(restoredByPlayerId.body.restoredBy, "playerId");
+
       const loaded = await requestJson(port, `/api/rooms/${roomCode}?seatToken=${encodeURIComponent(seatToken)}&playerId=alice-player`);
       assert.equal(loaded.statusCode, 200);
       assert.equal(loaded.body.room.roomCode, roomCode);
