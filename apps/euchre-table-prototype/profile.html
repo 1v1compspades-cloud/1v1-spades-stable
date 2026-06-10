@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Profile - 1v1 Euchre</title>
+    <link rel="stylesheet" href="./src/styles.css">
+  </head>
+  <body>
+    <main class="master-shell home-shell">
+      <button class="info-button" data-info-button type="button" aria-label="Open info">☰ Info</button>
+
+      <section class="master-panel home-master-panel">
+        <p class="eyebrow">Profile</p>
+        <h1>1v1 Euchre</h1>
+        <p class="home-copy">Keep your display name steady across rooms.</p>
+
+        <form id="profileForm" class="profile-form">
+          <label class="master-field" for="profileDisplayName">
+            <span>Display Name</span>
+            <input id="profileDisplayName" class="name-input" type="text" autocomplete="nickname" placeholder="Your display name">
+          </label>
+
+          <label class="master-field" for="profileUsername">
+            <span>Username</span>
+            <input id="profileUsername" class="name-input" type="text" autocomplete="username" placeholder="username">
+          </label>
+
+          <button id="saveProfileButton" class="primary-action" type="submit">Save Profile</button>
+        </form>
+
+        <section class="match-settings-panel" aria-label="Current profile">
+          <h2>Account</h2>
+          <div class="match-settings-grid">
+            <div>
+              <span>Display</span>
+              <strong id="profileDisplayValue">Guest</strong>
+            </div>
+            <div>
+              <span>Username</span>
+              <strong id="profileUsernameValue">Guest</strong>
+            </div>
+          </div>
+          <p id="profileStatus" class="home-status" aria-live="polite"></p>
+        </section>
+
+        <a class="button-link secondary-link" href="./home.html">Home</a>
+      </section>
+    </main>
+
+    <script type="module" src="./src/profile-client.js"></script>
+  </body>
+</html>

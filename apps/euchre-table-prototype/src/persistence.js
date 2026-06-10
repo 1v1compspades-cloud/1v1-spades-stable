@@ -16,7 +16,8 @@ export function loadPersistedState(filePath) {
     const parsed = JSON.parse(readFileSync(filePath, "utf8"));
     return {
       rooms: mapFromRecord(parsed.rooms),
-      tournaments: mapFromRecord(parsed.tournaments)
+      tournaments: mapFromRecord(parsed.tournaments),
+      accounts: mapFromRecord(parsed.accounts)
     };
   } catch (error) {
     console.warn(`Could not load persisted Euchre state: ${error.message}`);
@@ -24,7 +25,7 @@ export function loadPersistedState(filePath) {
   }
 }
 
-export function savePersistedState(filePath, { rooms, tournaments }) {
+export function savePersistedState(filePath, { rooms, tournaments, accounts }) {
   if (!filePath) return;
 
   mkdirSync(dirname(filePath), { recursive: true });
@@ -33,7 +34,8 @@ export function savePersistedState(filePath, { rooms, tournaments }) {
     version: PERSISTENCE_VERSION,
     savedAt: new Date().toISOString(),
     rooms: Object.fromEntries(rooms),
-    tournaments: Object.fromEntries(tournaments)
+    tournaments: Object.fromEntries(tournaments),
+    accounts: Object.fromEntries(accounts ?? new Map())
   };
 
   writeFileSync(tempPath, JSON.stringify(payload, null, 2));
@@ -43,7 +45,8 @@ export function savePersistedState(filePath, { rooms, tournaments }) {
 function emptyState() {
   return {
     rooms: new Map(),
-    tournaments: new Map()
+    tournaments: new Map(),
+    accounts: new Map()
   };
 }
 

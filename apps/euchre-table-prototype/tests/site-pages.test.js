@@ -24,6 +24,7 @@ test("home screen has the main routes and actions", async () => {
   assert.match(publicActions, /id="homeJoinRoomCode"/);
   assert.match(publicActions, /id="homeJoinRoomButton"/);
   assert.match(publicActions, /Quick Match/);
+  assert.match(publicActions, /Profile/);
   assert.match(publicActions, /Rules/);
   assert.doesNotMatch(publicActions, /Create Tournament/);
   assert.match(html, /Your Name/);
@@ -104,6 +105,21 @@ test("rules screen includes the core Euchre rule copy", async () => {
   assert.match(css, /\.shell:not\(\.master-shell\) \.rules-panel/);
   assert.match(css, /\.shell:not\(\.master-shell\) \.rules-list/);
   assert.match(css, /color: var\(--ink\)/);
+});
+
+test("profile screen supports lightweight account upgrade", async () => {
+  const html = await readText("profile.html");
+  const client = await readText("src/profile-client.js");
+
+  assert.match(html, /Profile - 1v1 Euchre/);
+  assert.match(html, /id="profileForm"/);
+  assert.match(html, /id="profileDisplayName"/);
+  assert.match(html, /id="profileUsername"/);
+  assert.match(html, /Save Profile/);
+  assert.match(client, /accountProfileKey = "euchre\.accountProfile"/);
+  assert.match(client, /\/api\/accounts\/upgrade/);
+  assert.match(client, /\/api\/profile\?accountId=/);
+  assert.match(client, /playerId: getGuestPlayerId\(\)/);
 });
 
 test("one-player room lobby exposes invite controls without start sequence or create/join controls", async () => {
@@ -279,6 +295,7 @@ test("room client restores stored seat sessions by room code", async () => {
   assert.match(client, /localStorage\.setItem\(guestPlayerIdKey, playerId\)/);
   assert.match(client, /localStorage\.getItem\(roomSeatTokenKey\(normalizedRoomCode\)\)/);
   assert.match(client, /roomSessionsKey = "euchreRoomSeatsByRoom"/);
+  assert.match(client, /accountProfileKey = "euchre\.accountProfile"/);
   assert.match(client, /urlRoomCode = urlParams\.get\("room"\)\?\.toUpperCase\(\) \?\? null/);
   assert.match(client, /session = loadSession\(urlRoomCode\)/);
   assert.match(client, /refreshRoom\("Game restored\."\)/);
@@ -286,8 +303,10 @@ test("room client restores stored seat sessions by room code", async () => {
   assert.match(client, /function loadLastSession\(\)/);
   assert.match(client, /function loadSessionMap\(\)/);
   assert.match(client, /sessions\[normalizedRoomCode\] = session/);
+  assert.match(client, /function currentIdentityPayload\(\)/);
   assert.match(client, /playerId: getGuestPlayerId\(\)/);
-  assert.match(client, /new URLSearchParams\(\{[\s\S]*playerId: getGuestPlayerId\(\)/);
+  assert.match(client, /accountId: getAccountId\(\)/);
+  assert.match(client, /new URLSearchParams\(currentIdentityPayload\(\)\)/);
   assert.match(client, /if \(result\.seatToken && result\.room\.viewerSeat !== "spectator"\)/);
   assert.match(client, /setSession\(result\.room\.roomCode, result\.seatToken\)/);
   assert.match(client, /showJoinFallback = viewerSeat === "spectator" && roomView\.alreadySeated !== true && !roomView\.players\.player2/);
@@ -489,6 +508,10 @@ test("server health check and root route work", async () => {
       assert.equal(game.statusCode, 200);
       assert.match(game.body, /id="roomTable"/);
 
+      const profile = await requestText(port, "/profile.html");
+      assert.equal(profile.statusCode, 200);
+      assert.match(profile.body, /id="profileForm"/);
+
       const publicCss = await requestText(port, "/src/styles.css");
       assert.equal(publicCss.statusCode, 200);
       assert.match(publicCss.body, /\[hidden\]/);
@@ -574,6 +597,99 @@ test("public room invite route serves room and lets Player 2 join by invite code
       });
       assert.equal(spectatorReady.statusCode, 403);
       assert.match(spectatorReady.body.error, /Join this room before taking a player action/);
+    } finally {
+      await stopServer(server);
+    }
+  });
+});
+
+test("account profiles upgrade guests and protect room seats", async () => {
+  await withTempStateFile(async (stateFile) => {
+    const port = 5207;
+    let server = await startTestServer(port, stateFile);
+    let accountId;
+    let roomCode;
+    let hostToken;
+
+    try {
+      const guestRoom = await requestJson(port, "/api/rooms", {
+        method: "POST",
+        body: { displayName: "Guest Alice", playerId: "guest-alice" }
+      });
+      assert.equal(guestRoom.statusCode, 201);
+      assert.equal(guestRoom.body.room.playerNames.player1, "Guest Alice");
+
+      const upgraded = await requestJson(port, "/api/accounts/upgrade", {
+        method: "POST",
+        body: {
+          playerId: "guest-alice",
+          username: "mehdi_zerrad",
+          displayName: "Mehdi Zerrad"
+        }
+      });
+      assert.equal(upgraded.statusCode, 201);
+      assert.equal(upgraded.body.account.username, "mehdi_zerrad");
+      assert.equal(upgraded.body.account.displayName, "Mehdi Zerrad");
+      assert.ok(upgraded.body.account.createdAt);
+      accountId = upgraded.body.account.accountId;
+
+      const profile = await requestJson(port, `/api/profile?accountId=${encodeURIComponent(accountId)}`);
+      assert.equal(profile.statusCode, 200);
+      assert.deepEqual(profile.body.account, upgraded.body.account);
+
+      const accountRoom = await requestJson(port, "/api/rooms", {
+        method: "POST",
+        body: {
+          displayName: "",
+          playerId: "account-device",
+          accountId
+        }
+      });
+      assert.equal(accountRoom.statusCode, 201);
+      assert.equal(accountRoom.body.room.viewerSeat, "player1");
+      assert.equal(accountRoom.body.room.playerNames.player1, "Mehdi Zerrad");
+      roomCode = accountRoom.body.room.roomCode;
+      hostToken = accountRoom.body.seatToken;
+
+      const accountReconnect = await requestJson(port, `/api/rooms/${roomCode}?accountId=${encodeURIComponent(accountId)}`);
+      assert.equal(accountReconnect.statusCode, 200);
+      assert.equal(accountReconnect.body.viewerSeat, "player1");
+      assert.equal(accountReconnect.body.alreadySeated, true);
+      assert.equal(accountReconnect.body.restoredBy, "accountId");
+      assert.equal(accountReconnect.body.seatToken, hostToken);
+      assert.equal(accountReconnect.body.room.viewerSeat, "player1");
+
+      const duplicateAccountJoin = await requestJson(port, `/api/rooms/${roomCode}/join`, {
+        method: "POST",
+        body: {
+          displayName: "Another Mehdi",
+          playerId: "second-device",
+          accountId
+        }
+      });
+      assert.equal(duplicateAccountJoin.statusCode, 409);
+      assert.match(duplicateAccountJoin.body.error, /account is already seated/);
+
+      const guestJoin = await requestJson(port, `/api/rooms/${roomCode}/join`, {
+        method: "POST",
+        body: {
+          displayName: "Guest Bob",
+          playerId: "guest-bob"
+        }
+      });
+      assert.equal(guestJoin.statusCode, 200);
+      assert.equal(guestJoin.body.seat, "player2");
+      assert.equal(guestJoin.body.room.playerNames.player2, "Guest Bob");
+    } finally {
+      await stopServer(server);
+    }
+
+    server = await startTestServer(port, stateFile);
+    try {
+      const reloadedProfile = await requestJson(port, `/api/accounts/${encodeURIComponent(accountId)}`);
+      assert.equal(reloadedProfile.statusCode, 200);
+      assert.equal(reloadedProfile.body.account.displayName, "Mehdi Zerrad");
+      assert.equal(reloadedProfile.body.account.username, "mehdi_zerrad");
     } finally {
       await stopServer(server);
     }

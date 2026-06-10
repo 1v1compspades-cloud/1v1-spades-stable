@@ -6,6 +6,7 @@ const storageKey = "euchreRoomSeat";
 const roomSessionsKey = "euchreRoomSeatsByRoom";
 const roomSeatTokenPrefix = "euchre.room.";
 const guestPlayerIdKey = "euchre.guestPlayerId";
+const accountProfileKey = "euchre.accountProfile";
 const homepageSettingsKey = "euchreHomepageSettings";
 const elements = {
   activeRoomControls: document.querySelector("#activeRoomControls"),
@@ -86,7 +87,7 @@ async function createRoomFromUi() {
       method: "POST",
       body: {
         displayName,
-        playerId: getGuestPlayerId(),
+        ...currentIdentityPayload(),
         matchSettings
       }
     });
@@ -158,7 +159,7 @@ elements.joinAsPlayer2Button?.addEventListener("click", async () => {
       method: "POST",
       body: {
         displayName,
-        playerId: getGuestPlayerId(),
+        ...currentIdentityPayload(),
         seatToken: session?.seatToken
       }
     });
@@ -208,7 +209,7 @@ async function sendAction(action) {
       method: "POST",
       body: {
         seatToken: session.seatToken,
-        playerId: getGuestPlayerId(),
+        ...currentIdentityPayload(),
         ...action
       }
     });
@@ -224,7 +225,7 @@ async function refreshRoom(status) {
   try {
     const query = new URLSearchParams({
       seatToken: session.seatToken ?? "",
-      playerId: getGuestPlayerId()
+      ...currentIdentityPayload()
     });
     const result = await api(`/api/rooms/${session.roomCode}?${query.toString()}`);
     if (result.seatToken && result.room.viewerSeat !== "spectator") {
@@ -259,7 +260,7 @@ async function autoJoinRoom(roomCode) {
 async function viewRoomAsSpectator(roomCode, status = "Spectator View. Hidden hands stay private.", { useStoredToken = true } = {}) {
   try {
     const storedSession = useStoredToken ? loadSession(roomCode) : null;
-    const query = new URLSearchParams({ playerId: getGuestPlayerId() });
+    const query = new URLSearchParams(currentIdentityPayload());
     if (storedSession?.seatToken) {
       query.set("seatToken", storedSession.seatToken);
     }
@@ -323,6 +324,7 @@ function setSession(roomCode, seatToken) {
     roomCode: normalizedRoomCode,
     seatToken,
     playerId: getGuestPlayerId(),
+    accountId: getAccountId(),
     updatedAt: new Date().toISOString()
   };
   localStorage.setItem(roomSeatTokenKey(normalizedRoomCode), seatToken);
@@ -346,6 +348,7 @@ function loadSession(roomCode) {
         roomCode: normalizedRoomCode,
         seatToken: roomSeatToken,
         playerId: getGuestPlayerId(),
+        accountId: getAccountId(),
         updatedAt: new Date().toISOString()
       };
     }
@@ -364,7 +367,8 @@ function loadSession(roomCode) {
     if (normalizedRoomCode && stored.roomCode !== normalizedRoomCode) return null;
     return {
       ...stored,
-      playerId: stored.playerId ?? getGuestPlayerId()
+      playerId: stored.playerId ?? getGuestPlayerId(),
+      accountId: stored.accountId ?? getAccountId()
     };
   } catch {
     return null;
@@ -418,6 +422,23 @@ function getGuestPlayerId() {
     : `guest-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   localStorage.setItem(guestPlayerIdKey, playerId);
   return playerId;
+}
+
+function currentIdentityPayload() {
+  const accountId = getAccountId();
+  return {
+    playerId: getGuestPlayerId(),
+    ...(accountId ? { accountId } : {})
+  };
+}
+
+function getAccountId() {
+  try {
+    const account = JSON.parse(localStorage.getItem(accountProfileKey));
+    return account?.accountId ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function currentPlayerName() {

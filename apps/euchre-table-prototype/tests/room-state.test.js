@@ -768,6 +768,36 @@ test("stable playerId blocks the same browser from taking opponent seat", () => 
   );
 });
 
+test("account identity attaches to seats and cannot occupy both seats", () => {
+  const room = createRoom({
+    roomCode: "ABCDE",
+    seatToken: "host-token",
+    playerId: "host-player",
+    accountId: "account-host",
+    displayName: "Account Host"
+  });
+
+  assert.equal(room.players.player1.accountId, "account-host");
+  assert.equal(sanitizeRoomForViewer(room, { accountId: "account-host" }).viewerSeat, "player1");
+  assert.throws(
+    () => joinRoom(room, {
+      seatToken: "guest-token",
+      playerId: "other-player",
+      accountId: "account-host",
+      displayName: "Other Host"
+    }),
+    /account is already seated/
+  );
+
+  const joined = joinRoom(room, {
+    seatToken: "guest-token",
+    playerId: "guest-player",
+    accountId: "account-guest",
+    displayName: "Account Guest"
+  });
+  assert.equal(joined.room.players.player2.accountId, "account-guest");
+});
+
 test("manual URL reload with saved playerId restores existing seat", () => {
   const room = createRoom({
     roomCode: "ABCDE",

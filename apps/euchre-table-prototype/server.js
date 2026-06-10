@@ -3,6 +3,11 @@ import { createServer } from "node:http";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  createOrUpgradeAccount,
+  getAccount,
+  sanitizeAccount
+} from "./src/account-state.js";
+import {
   advanceRoomClock,
   applyRoomAction,
   createRoom,
@@ -40,6 +45,7 @@ const persistenceFile = defaultPersistenceFile(appDir);
 const persistedState = loadPersistedState(persistenceFile);
 const rooms = persistedState.rooms;
 const tournaments = persistedState.tournaments;
+const accounts = persistedState.accounts;
 
 const server = createServer(async (request, response) => {
   try {
@@ -77,13 +83,15 @@ async function handleApi(request, response) {
   if (request.method === "POST" && url.pathname === "/api/rooms") {
     const body = await readJson(request);
     const matchSettings = createMatchSettingsFromBody(body);
+    const account = accountForRequest(body.accountId);
     console.log("[raceTo] create room API received", {
       raceTo: matchSettings.raceTo,
       modeId: matchSettings.modeId
     });
     const room = createUniqueRoom({
-      displayName: requiredDisplayName(body.displayName),
+      displayName: displayNameForRequest(body, account),
       playerId: body.playerId,
+      accountId: account?.accountId,
       matchSettings
     });
     console.log("[raceTo] saved room matchSettings", {
@@ -97,7 +105,11 @@ async function handleApi(request, response) {
     sendJson(response, 201, {
       seat: "player1",
       seatToken,
-      room: sanitizeRoomForViewer(room, seatToken)
+      room: sanitizeRoomForViewer(room, {
+        seatToken,
+        playerId: body.playerId,
+        accountId: account?.accountId
+      })
     });
     return;
   }
@@ -106,6 +118,42 @@ async function handleApi(request, response) {
     sendJson(response, 202, {
       status: "placeholder",
       message: "Quick Match coming next."
+    });
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/accounts/upgrade") {
+    const body = await readJson(request);
+    const account = createOrUpgradeAccount(accounts, {
+      accountId: body.accountId,
+      username: body.username,
+      displayName: body.displayName
+    });
+    accounts.set(account.accountId, account);
+    persistState();
+
+    sendJson(response, 201, {
+      account: sanitizeAccount(account)
+    });
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/profile") {
+    const account = getAccount(accounts, url.searchParams.get("accountId"));
+    if (!account) throw httpError(404, "Account not found");
+
+    sendJson(response, 200, {
+      account: sanitizeAccount(account)
+    });
+    return;
+  }
+
+  if (request.method === "GET" && segments[0] === "api" && segments[1] === "accounts" && segments[2]) {
+    const account = getAccount(accounts, segments[2]);
+    if (!account) throw httpError(404, "Account not found");
+
+    sendJson(response, 200, {
+      account: sanitizeAccount(account)
     });
     return;
   }
@@ -258,42 +306,65 @@ async function handleApi(request, response) {
     if (request.method === "GET" && segments.length === 3) {
       const seatToken = url.searchParams.get("seatToken");
       const playerId = url.searchParams.get("playerId");
-      const viewerIdentity = getViewerIdentity(room, { seatToken, playerId });
+      const account = accountForRequest(url.searchParams.get("accountId"));
+      const viewerIdentity = getViewerIdentity(room, {
+        seatToken,
+        playerId,
+        accountId: account?.accountId
+      });
       sendJson(response, 200, {
         viewerSeat: viewerIdentity.seat,
         alreadySeated: viewerIdentity.seat !== "spectator",
         seat: viewerIdentity.seat === "spectator" ? null : viewerIdentity.seat,
-        seatToken: viewerIdentity.restoredBy === "playerId" ? viewerIdentity.seatToken : undefined,
+        seatToken: ["playerId", "accountId"].includes(viewerIdentity.restoredBy) ? viewerIdentity.seatToken : undefined,
         restoredBy: viewerIdentity.restoredBy,
-        room: sanitizeRoomForViewer(room, { seatToken, playerId })
+        room: sanitizeRoomForViewer(room, {
+          seatToken,
+          playerId,
+          accountId: account?.accountId
+        })
       });
       return;
     }
 
     if (request.method === "POST" && segments[3] === "join") {
       const body = await readJson(request);
-      const viewerSeat = getViewerSeat(room, body.seatToken, body.playerId);
+      const account = accountForRequest(body.accountId);
+      const viewerSeat = getViewerSeat(room, {
+        seatToken: body.seatToken,
+        playerId: body.playerId,
+        accountId: account?.accountId
+      });
       const result = joinRoom(room, {
         seatToken: body.seatToken,
         playerId: body.playerId,
+        accountId: account?.accountId,
         displayName: viewerSeat === "spectator"
-          ? requiredDisplayName(body.displayName)
-          : body.displayName
+          ? displayNameForRequest(body, account)
+          : body.displayName ?? account?.displayName
       });
       const nextRoom = advanceAndSaveRoom(result.room);
       sendJson(response, 200, {
         seat: result.seat,
         seatToken: result.seatToken,
-        room: sanitizeRoomForViewer(nextRoom, result.seatToken)
+        room: sanitizeRoomForViewer(nextRoom, {
+          seatToken: result.seatToken,
+          playerId: body.playerId,
+          accountId: account?.accountId
+        })
       });
       return;
     }
 
     if (request.method === "POST" && segments[3] === "actions") {
       const body = await readJson(request);
-      const nextRoom = advanceAndSaveRoom(applyRoomAction(room, body));
+      const account = accountForRequest(body.accountId);
+      const nextRoom = advanceAndSaveRoom(applyRoomAction(room, {
+        ...body,
+        accountId: account?.accountId
+      }));
       sendJson(response, 200, {
-        room: sanitizeRoomForViewer(nextRoom, body.seatToken, body.playerId)
+        room: sanitizeRoomForViewer(nextRoom, body.seatToken, body.playerId, account?.accountId)
       });
       return;
     }
@@ -311,7 +382,7 @@ function advanceAndSaveRoom(room) {
 }
 
 function persistState() {
-  savePersistedState(persistenceFile, { rooms, tournaments });
+  savePersistedState(persistenceFile, { rooms, tournaments, accounts });
 }
 
 async function serveStatic(request, response) {
@@ -350,14 +421,15 @@ function publicRoutePath(pathname) {
     "/home.html": "/apps/euchre-table-prototype/home.html",
     "/room.html": "/apps/euchre-table-prototype/room.html",
     "/game.html": "/apps/euchre-table-prototype/game.html",
+    "/profile.html": "/apps/euchre-table-prototype/profile.html",
     "/rules.html": "/apps/euchre-table-prototype/rules.html",
     "/tournament.html": "/apps/euchre-table-prototype/tournament.html"
   }[pathname] ?? pathname;
 }
 
-function createUniqueRoom({ displayName, playerId, matchSettings } = {}) {
+function createUniqueRoom({ displayName, playerId, accountId, matchSettings } = {}) {
   for (let attempts = 0; attempts < 20; attempts += 1) {
-    const room = createRoom({ displayName, playerId, matchSettings });
+    const room = createRoom({ displayName, playerId, accountId, matchSettings });
     if (!rooms.has(room.roomCode)) return room;
   }
 
@@ -468,6 +540,15 @@ function httpError(statusCode, message) {
   const error = new Error(message);
   error.statusCode = statusCode;
   return error;
+}
+
+function accountForRequest(accountId) {
+  return getAccount(accounts, accountId);
+}
+
+function displayNameForRequest(body, account) {
+  const displayName = String(body.displayName ?? "").trim();
+  return displayName ? requiredDisplayName(displayName) : requiredDisplayName(account?.displayName);
 }
 
 function requiredDisplayName(displayName) {
