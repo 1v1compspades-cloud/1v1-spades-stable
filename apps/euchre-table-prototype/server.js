@@ -26,6 +26,10 @@ import {
   sanitizeLeaderboardForPublic
 } from "./src/leaderboard-state.js";
 import {
+  cancelQuickMatchQueue,
+  enterQuickMatchQueue
+} from "./src/quick-match-state.js";
+import {
   adminRecordMatchWinner,
   createTournament,
   exportTournamentBackup,
@@ -51,6 +55,7 @@ const rooms = persistedState.rooms;
 const tournaments = persistedState.tournaments;
 const accounts = persistedState.accounts;
 const leaderboardStats = persistedState.leaderboardStats;
+const quickMatchQueue = persistedState.quickMatchQueue;
 
 const server = createServer(async (request, response) => {
   try {
@@ -120,9 +125,40 @@ async function handleApi(request, response) {
   }
 
   if (request.method === "POST" && url.pathname === "/api/quick-match") {
-    sendJson(response, 202, {
-      status: "placeholder",
-      message: "Quick Match coming next."
+    const body = await readJson(request);
+    const account = accountForRequest(body.accountId);
+    const result = enterQuickMatchQueue(quickMatchQueue, {
+      playerId: body.playerId,
+      accountId: account?.accountId,
+      displayName: displayNameForRequest(body, account),
+      matchSettings: createMatchSettingsFromBody(body),
+      createMatchRoom: createQuickMatchRoom
+    });
+    persistState();
+
+    sendJson(response, result.matched ? 200 : 202, {
+      queue: result.entry,
+      matched: result.matched,
+      matchedRoomCode: result.entry.matchedRoomCode,
+      room: result.entry.matchedRoomCode
+        ? sanitizeMatchedQuickRoom(result.entry, body.playerId, account?.accountId)
+        : null
+    });
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/quick-match/cancel") {
+    const body = await readJson(request);
+    const account = accountForRequest(body.accountId);
+    const entry = cancelQuickMatchQueue(quickMatchQueue, {
+      queueId: body.queueId,
+      playerId: body.playerId,
+      accountId: account?.accountId
+    });
+    persistState();
+
+    sendJson(response, 200, {
+      queue: entry
     });
     return;
   }
@@ -396,7 +432,7 @@ function advanceAndSaveRoom(room) {
 }
 
 function persistState() {
-  savePersistedState(persistenceFile, { rooms, tournaments, accounts, leaderboardStats });
+  savePersistedState(persistenceFile, { rooms, tournaments, accounts, leaderboardStats, quickMatchQueue });
 }
 
 async function serveStatic(request, response) {
@@ -479,6 +515,22 @@ function createUniqueTournament({ bracketSize, matchSettings }) {
   throw httpError(500, "Could not generate a unique tournament code");
 }
 
+function createQuickMatchRoom({ player1, player2, matchSettings }) {
+  const room = createUniqueRoom({
+    displayName: player1.displayName,
+    playerId: player1.playerId,
+    accountId: player1.accountId,
+    matchSettings
+  });
+  const joined = joinRoom(room, {
+    displayName: player2.displayName,
+    playerId: player2.playerId,
+    accountId: player2.accountId
+  }).room;
+  rooms.set(joined.roomCode, joined);
+  return joined;
+}
+
 function createTournamentMatchRoom({ tournamentCode, round, matchNumber, player1, player2, matchSettings }) {
   const baseRoomCode = `${tournamentCode.slice(0, 4)}${round}${matchNumber}`;
   let roomCode = baseRoomCode;
@@ -504,6 +556,16 @@ function createTournamentMatchRoom({ tournamentCode, round, matchNumber, player1
   });
   rooms.set(roomCode, room);
   return room;
+}
+
+function sanitizeMatchedQuickRoom(entry, playerId, accountId) {
+  const room = rooms.get(entry.matchedRoomCode);
+  if (!room) return null;
+
+  return sanitizeRoomForViewer(room, {
+    playerId,
+    accountId
+  });
 }
 
 function syncTournamentFromRoom(room) {

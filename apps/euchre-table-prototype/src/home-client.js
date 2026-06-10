@@ -1,6 +1,7 @@
 import { setupInfoPanel } from "./info-panel.js";
 
 const quickMatchButton = document.querySelector("#quickMatchButton");
+const cancelQuickMatchButton = document.querySelector("#cancelQuickMatchButton");
 const quickMatchStatus = document.querySelector("#quickMatchStatus");
 const homeJoinRoomCode = document.querySelector("#homeJoinRoomCode");
 const homeJoinRoomButton = document.querySelector("#homeJoinRoomButton");
@@ -16,6 +17,10 @@ const homepageAdminControls = document.querySelector("#homepageAdminControls");
 const homepageAdminAccessKey = "euchreHomepageAdminUnlocked";
 const homepageSettingsKey = "euchreHomepageSettings";
 const homepageAdminCodeValue = "Zxcvfdsaqwer1287!";
+const guestPlayerIdKey = "euchre.guestPlayerId";
+const accountProfileKey = "euchre.accountProfile";
+const quickMatchQueueKey = "euchre.quickMatchQueue";
+let quickMatchPollHandle = null;
 
 setupInfoPanel();
 
@@ -30,20 +35,14 @@ if (sessionStorage.getItem(homepageAdminAccessKey) === "true") {
 }
 
 syncCreateRoomHref();
+restoreQuickMatchQueue();
 
 quickMatchButton.addEventListener("click", async () => {
-  quickMatchButton.disabled = true;
-  saveSettings();
+  await enterQuickMatchQueue();
+});
 
-  try {
-    const response = await fetch("/api/quick-match", { method: "POST" });
-    const payload = await response.json();
-    quickMatchStatus.textContent = payload.message ?? "Quick Match coming next.";
-  } catch {
-    quickMatchStatus.textContent = "Quick Match coming next.";
-  } finally {
-    quickMatchButton.disabled = false;
-  }
+cancelQuickMatchButton.addEventListener("click", async () => {
+  await cancelQuickMatchQueue();
 });
 
 createRoomLink.addEventListener("click", (event) => {
@@ -95,6 +94,135 @@ unlockAdminButton.addEventListener("click", () => {
 function showAdminControls(message) {
   homepageAdminControls.hidden = false;
   homepageAdminStatus.textContent = message;
+}
+
+async function enterQuickMatchQueue() {
+  const playerName = requiredPlayerName();
+  if (!playerName) return;
+
+  quickMatchButton.disabled = true;
+  saveSettings();
+
+  try {
+    const result = await postJson("/api/quick-match", {
+      displayName: playerName,
+      ...currentIdentityPayload(),
+      matchSettings: currentMatchSettings()
+    });
+    handleQuickMatchResult(result);
+  } catch (error) {
+    quickMatchStatus.textContent = error.message;
+    stopQuickMatchPolling();
+  } finally {
+    quickMatchButton.disabled = false;
+  }
+}
+
+async function cancelQuickMatchQueue() {
+  const savedQueue = loadQuickMatchQueue();
+  if (!savedQueue?.queueId) return;
+
+  cancelQuickMatchButton.disabled = true;
+  try {
+    const result = await postJson("/api/quick-match/cancel", {
+      queueId: savedQueue.queueId,
+      ...currentIdentityPayload()
+    });
+    storeQuickMatchQueue(result.queue);
+    stopQuickMatchPolling();
+    renderQuickMatchQueue(result.queue);
+  } catch (error) {
+    quickMatchStatus.textContent = error.message;
+  } finally {
+    cancelQuickMatchButton.disabled = false;
+  }
+}
+
+function handleQuickMatchResult(result) {
+  storeQuickMatchQueue(result.queue);
+  renderQuickMatchQueue(result.queue);
+
+  if (result.matched && result.matchedRoomCode) {
+    stopQuickMatchPolling();
+    quickMatchStatus.textContent = "Match found. Opening room...";
+    window.location.href = `./room.html?room=${encodeURIComponent(result.matchedRoomCode)}`;
+    return;
+  }
+
+  startQuickMatchPolling();
+}
+
+function restoreQuickMatchQueue() {
+  const savedQueue = loadQuickMatchQueue();
+  if (!savedQueue || !["waiting", "matched"].includes(savedQueue.status)) return;
+
+  renderQuickMatchQueue(savedQueue);
+  enterQuickMatchQueue().catch((error) => {
+    quickMatchStatus.textContent = error.message;
+  });
+}
+
+function startQuickMatchPolling() {
+  if (quickMatchPollHandle) return;
+  quickMatchPollHandle = setInterval(() => {
+    enterQuickMatchQueue().catch((error) => {
+      quickMatchStatus.textContent = error.message;
+    });
+  }, 2500);
+}
+
+function stopQuickMatchPolling() {
+  if (!quickMatchPollHandle) return;
+  clearInterval(quickMatchPollHandle);
+  quickMatchPollHandle = null;
+}
+
+function renderQuickMatchQueue(queue) {
+  const waiting = queue?.status === "waiting";
+  const matched = queue?.status === "matched";
+  quickMatchButton.hidden = waiting || matched;
+  cancelQuickMatchButton.hidden = !waiting;
+  quickMatchStatus.textContent = quickMatchStatusFor(queue);
+}
+
+function quickMatchStatusFor(queue) {
+  if (!queue) return "";
+  if (queue.status === "waiting") return "Searching for a compatible Quick Match...";
+  if (queue.status === "matched") return "Match found. Opening room...";
+  if (queue.status === "cancelled") return "Quick Match search cancelled.";
+  if (queue.status === "expired") return "Quick Match search expired. Try again.";
+  return "";
+}
+
+function storeQuickMatchQueue(queue) {
+  if (!queue) {
+    localStorage.removeItem(quickMatchQueueKey);
+    return;
+  }
+  localStorage.setItem(quickMatchQueueKey, JSON.stringify(queue));
+}
+
+function loadQuickMatchQueue() {
+  try {
+    return JSON.parse(localStorage.getItem(quickMatchQueueKey));
+  } catch {
+    return null;
+  }
+}
+
+async function postJson(path, body) {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  const payload = await response.json();
+
+  if (!response.ok) {
+    throw new Error(payload.error ?? "Request failed");
+  }
+
+  return payload;
 }
 
 function saveSettings() {
@@ -151,6 +279,34 @@ function requiredPlayerName() {
     return null;
   }
   return playerName;
+}
+
+function currentIdentityPayload() {
+  const accountId = getAccountId();
+  return {
+    playerId: getGuestPlayerId(),
+    ...(accountId ? { accountId } : {})
+  };
+}
+
+function getGuestPlayerId() {
+  const existingPlayerId = localStorage.getItem(guestPlayerIdKey);
+  if (existingPlayerId) return existingPlayerId;
+
+  const playerId = typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `guest-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  localStorage.setItem(guestPlayerIdKey, playerId);
+  return playerId;
+}
+
+function getAccountId() {
+  try {
+    const account = JSON.parse(localStorage.getItem(accountProfileKey));
+    return account?.accountId ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function loadSettings() {

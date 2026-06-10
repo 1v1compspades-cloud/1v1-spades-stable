@@ -23,7 +23,8 @@ test("home screen has the main routes and actions", async () => {
   assert.match(publicActions, /Join Match/);
   assert.match(publicActions, /id="homeJoinRoomCode"/);
   assert.match(publicActions, /id="homeJoinRoomButton"/);
-  assert.match(publicActions, /Quick Match/);
+  assert.match(publicActions, /Find Quick Match/);
+  assert.match(publicActions, /Cancel Queue/);
   assert.match(publicActions, /Profile/);
   assert.match(publicActions, /Leaderboard/);
   assert.match(publicActions, /Rules/);
@@ -377,11 +378,17 @@ test("dealer choice buttons are coin-flip only and hide after selection", async 
   assert.match(client, /nonDealerButton\.textContent = "Be Non-Dealer"/);
 });
 
-test("Quick Match is wired as a placeholder", async () => {
+test("Quick Match is wired to queue, cancel, and matched room redirect", async () => {
   const client = await readText("src/home-client.js");
 
   assert.match(client, /\/api\/quick-match/);
-  assert.match(client, /Quick Match coming next/);
+  assert.match(client, /\/api\/quick-match\/cancel/);
+  assert.match(client, /quickMatchQueueKey = "euchre\.quickMatchQueue"/);
+  assert.match(client, /Searching for a compatible Quick Match/);
+  assert.match(client, /cancelQuickMatchButton/);
+  assert.match(client, /startQuickMatchPolling/);
+  assert.match(client, /window\.location\.href = `\.\/room\.html\?room=\$\{encodeURIComponent\(result\.matchedRoomCode\)\}`/);
+  assert.doesNotMatch(client, /Quick Match coming next/);
 });
 
 test("home join room button opens room by code", async () => {
@@ -716,6 +723,142 @@ test("account profiles upgrade guests and protect room seats", async () => {
       assert.equal(reloadedProfile.statusCode, 200);
       assert.equal(reloadedProfile.body.account.displayName, "Mehdi Zerrad");
       assert.equal(reloadedProfile.body.account.username, "mehdi_zerrad");
+    } finally {
+      await stopServer(server);
+    }
+  });
+});
+
+test("quick match API persists waiting entries and creates matched rooms", async () => {
+  await withTempStateFile(async (stateFile) => {
+    const port = 5209;
+    let server = await startTestServer(port, stateFile);
+    let accountId;
+    let firstQueueId;
+
+    try {
+      const account = await requestJson(port, "/api/accounts/upgrade", {
+        method: "POST",
+        body: {
+          username: "queue_alice",
+          displayName: "Queue Alice"
+        }
+      });
+      accountId = account.body.account.accountId;
+
+      const first = await requestJson(port, "/api/quick-match", {
+        method: "POST",
+        body: {
+          displayName: "Queue Alice",
+          playerId: "alice-device",
+          accountId,
+          matchSettings: {
+            modeId: "communityCompetitive",
+            raceTo: 5,
+            stickTheDealer: true
+          }
+        }
+      });
+      assert.equal(first.statusCode, 202);
+      assert.equal(first.body.queue.status, "waiting");
+      assert.equal(first.body.matched, false);
+      firstQueueId = first.body.queue.queueId;
+    } finally {
+      await stopServer(server);
+    }
+
+    server = await startTestServer(port, stateFile);
+    try {
+      const refreshed = await requestJson(port, "/api/quick-match", {
+        method: "POST",
+        body: {
+          displayName: "Queue Alice Again",
+          playerId: "alice-device",
+          accountId,
+          matchSettings: {
+            modeId: "communityCompetitive",
+            raceTo: 5,
+            stickTheDealer: true
+          }
+        }
+      });
+      assert.equal(refreshed.statusCode, 202);
+      assert.equal(refreshed.body.queue.queueId, firstQueueId);
+      assert.equal(refreshed.body.queue.status, "waiting");
+
+      const raceToTen = await requestJson(port, "/api/quick-match", {
+        method: "POST",
+        body: {
+          displayName: "Race Ten",
+          playerId: "race-ten-device",
+          matchSettings: {
+            modeId: "communityCompetitive",
+            raceTo: 10,
+            stickTheDealer: true
+          }
+        }
+      });
+      assert.equal(raceToTen.statusCode, 202);
+      assert.equal(raceToTen.body.queue.status, "waiting");
+      assert.equal(raceToTen.body.matched, false);
+
+      const matched = await requestJson(port, "/api/quick-match", {
+        method: "POST",
+        body: {
+          displayName: "Queue Bob",
+          playerId: "bob-device",
+          matchSettings: {
+            modeId: "communityCompetitive",
+            raceTo: 5,
+            stickTheDealer: true
+          }
+        }
+      });
+      assert.equal(matched.statusCode, 200);
+      assert.equal(matched.body.matched, true);
+      assert.equal(matched.body.queue.status, "matched");
+      assert.ok(matched.body.matchedRoomCode);
+      assert.equal(matched.body.room.viewerSeat, "player2");
+      assert.equal(matched.body.room.playerNames.player1, "Queue Alice");
+      assert.equal(matched.body.room.playerNames.player2, "Queue Bob");
+      assert.equal(matched.body.room.matchSettings.raceTo, 5);
+
+      const hostRestore = await requestJson(port, `/api/rooms/${matched.body.matchedRoomCode}?accountId=${encodeURIComponent(accountId)}`);
+      assert.equal(hostRestore.statusCode, 200);
+      assert.equal(hostRestore.body.viewerSeat, "player1");
+      assert.equal(hostRestore.body.restoredBy, "accountId");
+
+      const guestRestore = await requestJson(port, `/api/rooms/${matched.body.matchedRoomCode}?playerId=bob-device`);
+      assert.equal(guestRestore.statusCode, 200);
+      assert.equal(guestRestore.body.viewerSeat, "player2");
+      assert.equal(guestRestore.body.restoredBy, "playerId");
+
+      const hostReenter = await requestJson(port, "/api/quick-match", {
+        method: "POST",
+        body: {
+          displayName: "Queue Alice",
+          playerId: "alice-device",
+          accountId,
+          matchSettings: {
+            modeId: "communityCompetitive",
+            raceTo: 5,
+            stickTheDealer: true
+          }
+        }
+      });
+      assert.equal(hostReenter.statusCode, 200);
+      assert.equal(hostReenter.body.queue.queueId, firstQueueId);
+      assert.equal(hostReenter.body.matchedRoomCode, matched.body.matchedRoomCode);
+
+      const cancelled = await requestJson(port, "/api/quick-match/cancel", {
+        method: "POST",
+        body: {
+          queueId: raceToTen.body.queue.queueId,
+          playerId: "race-ten-device"
+        }
+      });
+      assert.equal(cancelled.statusCode, 200);
+      assert.equal(cancelled.body.queue.status, "cancelled");
     } finally {
       await stopServer(server);
     }

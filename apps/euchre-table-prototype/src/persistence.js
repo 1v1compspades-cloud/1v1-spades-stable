@@ -18,7 +18,8 @@ export function loadPersistedState(filePath) {
       rooms: mapFromRecord(parsed.rooms),
       tournaments: mapFromRecord(parsed.tournaments),
       accounts: mapFromRecord(parsed.accounts),
-      leaderboardStats: mapFromRecord(parsed.leaderboardStats)
+      leaderboardStats: mapFromRecord(parsed.leaderboardStats),
+      quickMatchQueue: mapFromRecord(parsed.quickMatchQueue)
     };
   } catch (error) {
     console.warn(`Could not load persisted Euchre state: ${error.message}`);
@@ -26,7 +27,7 @@ export function loadPersistedState(filePath) {
   }
 }
 
-export function savePersistedState(filePath, { rooms, tournaments, accounts, leaderboardStats }) {
+export function savePersistedState(filePath, { rooms, tournaments, accounts, leaderboardStats, quickMatchQueue }) {
   if (!filePath) return;
 
   mkdirSync(dirname(filePath), { recursive: true });
@@ -37,7 +38,8 @@ export function savePersistedState(filePath, { rooms, tournaments, accounts, lea
     rooms: Object.fromEntries(rooms),
     tournaments: Object.fromEntries(tournaments),
     accounts: Object.fromEntries(accounts ?? new Map()),
-    leaderboardStats: Object.fromEntries(leaderboardStats ?? new Map())
+    leaderboardStats: Object.fromEntries(leaderboardStats ?? new Map()),
+    quickMatchQueue: Object.fromEntries(quickMatchQueue ?? new Map())
   };
 
   writeFileSync(tempPath, JSON.stringify(payload, null, 2));
@@ -49,7 +51,8 @@ function emptyState() {
     rooms: new Map(),
     tournaments: new Map(),
     accounts: new Map(),
-    leaderboardStats: new Map()
+    leaderboardStats: new Map(),
+    quickMatchQueue: new Map()
   };
 }
 
