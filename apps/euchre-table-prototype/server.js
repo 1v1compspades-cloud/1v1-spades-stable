@@ -3,8 +3,11 @@ import { createServer } from "node:http";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  accountIdentityNames,
   createOrUpgradeAccount,
+  findAccountByUsername,
   getAccount,
+  normalizeIdentityName,
   sanitizeAccount
 } from "./src/account-state.js";
 import {
@@ -76,9 +79,11 @@ const server = createServer(async (request, response) => {
 
     await serveStatic(request, response);
   } catch (error) {
-    sendJson(response, error.statusCode ?? 500, {
+    const errorBody = {
       error: error.message || "Unexpected server error"
-    });
+    };
+    if (error.code) errorBody.code = error.code;
+    sendJson(response, error.statusCode ?? 500, errorBody);
   }
 });
 
@@ -94,12 +99,14 @@ async function handleApi(request, response) {
     const body = await readJson(request);
     const matchSettings = createMatchSettingsFromBody(body);
     const account = accountForRequest(body.accountId);
+    const displayName = displayNameForRequest(body, account);
+    ensureGuestNameDoesNotBelongToAccount(displayName, account);
     console.log("[raceTo] create room API received", {
       raceTo: matchSettings.raceTo,
       modeId: matchSettings.modeId
     });
     const room = createUniqueRoom({
-      displayName: displayNameForRequest(body, account),
+      displayName,
       playerId: body.playerId,
       accountId: account?.accountId,
       matchSettings
@@ -127,10 +134,13 @@ async function handleApi(request, response) {
   if (request.method === "POST" && url.pathname === "/api/quick-match") {
     const body = await readJson(request);
     const account = accountForRequest(body.accountId);
+    const displayName = displayNameForRequest(body, account);
+    ensureGuestNameDoesNotBelongToAccount(displayName, account);
     const result = enterQuickMatchQueue(quickMatchQueue, {
       playerId: body.playerId,
       accountId: account?.accountId,
-      displayName: displayNameForRequest(body, account),
+      displayName,
+      identityNames: identityNamesForRequest(displayName, account),
       matchSettings: createMatchSettingsFromBody(body),
       createMatchRoom: createQuickMatchRoom
     });
@@ -383,13 +393,18 @@ async function handleApi(request, response) {
         playerId: body.playerId,
         accountId: account?.accountId
       });
+      const displayName = viewerSeat === "spectator"
+        ? displayNameForRequest(body, account)
+        : body.displayName ?? account?.displayName;
+      if (viewerSeat === "spectator") {
+        ensureGuestNameDoesNotBelongToAccount(displayName, account);
+      }
       const result = joinRoom(room, {
         seatToken: body.seatToken,
         playerId: body.playerId,
         accountId: account?.accountId,
-        displayName: viewerSeat === "spectator"
-          ? displayNameForRequest(body, account)
-          : body.displayName ?? account?.displayName
+        displayName,
+        blockedIdentityNames: blockedIdentityNamesForRoom(room)
       });
       const nextRoom = advanceAndSaveRoom(result.room);
       sendJson(response, 200, {
@@ -525,7 +540,8 @@ function createQuickMatchRoom({ player1, player2, matchSettings }) {
   const joined = joinRoom(room, {
     displayName: player2.displayName,
     playerId: player2.playerId,
-    accountId: player2.accountId
+    accountId: player2.accountId,
+    blockedIdentityNames: player1.identityNames ?? [player1.displayName]
   }).room;
   rooms.set(joined.roomCode, joined);
   return joined;
@@ -613,9 +629,10 @@ function sendJson(response, statusCode, value) {
   response.end(JSON.stringify(value));
 }
 
-function httpError(statusCode, message) {
+function httpError(statusCode, message, code) {
   const error = new Error(message);
   error.statusCode = statusCode;
+  if (code) error.code = code;
   return error;
 }
 
@@ -624,8 +641,33 @@ function accountForRequest(accountId) {
 }
 
 function displayNameForRequest(body, account) {
+  if (account) return requiredDisplayName(account.displayName);
   const displayName = String(body.displayName ?? "").trim();
-  return displayName ? requiredDisplayName(displayName) : requiredDisplayName(account?.displayName);
+  return requiredDisplayName(displayName);
+}
+
+function identityNamesForRequest(displayName, account) {
+  return [
+    normalizeIdentityName(displayName),
+    ...accountIdentityNames(account)
+  ].filter(Boolean);
+}
+
+function blockedIdentityNamesForRoom(room) {
+  return ["player1", "player2"].flatMap((seat) => {
+    const player = room.players?.[seat];
+    if (!player) return [];
+    return [
+      normalizeIdentityName(player.displayName),
+      ...accountIdentityNames(accountForRequest(player.accountId))
+    ].filter(Boolean);
+  });
+}
+
+function ensureGuestNameDoesNotBelongToAccount(displayName, account) {
+  if (account) return;
+  if (!findAccountByUsername(accounts, displayName)) return;
+  throw httpError(409, "That username is already registered. Log in to use it.", "registered_username");
 }
 
 function requiredDisplayName(displayName) {

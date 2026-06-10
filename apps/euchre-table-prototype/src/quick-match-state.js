@@ -4,6 +4,7 @@ export function enterQuickMatchQueue(quickMatchQueue, {
   playerId,
   accountId,
   displayName,
+  identityNames,
   matchSettings,
   createMatchRoom,
   now = Date.now()
@@ -11,6 +12,7 @@ export function enterQuickMatchQueue(quickMatchQueue, {
   const normalizedPlayerId = normalizeId(playerId);
   const normalizedAccountId = normalizeId(accountId);
   const name = normalizeDisplayName(displayName);
+  const normalizedIdentityNames = normalizeIdentityNames(identityNames, name);
   const settings = normalizeMatchSettings(matchSettings);
 
   if (!normalizedPlayerId) {
@@ -31,9 +33,15 @@ export function enterQuickMatchQueue(quickMatchQueue, {
     };
   }
 
+  const duplicateIdentityEntry = findActiveEntryForIdentityNames(quickMatchQueue, normalizedIdentityNames);
+  if (duplicateIdentityEntry) {
+    throw queueError(409, "This account or name is already in the Quick Match queue.", "duplicate_name_or_account");
+  }
+
   const compatibleEntry = findCompatibleEntry(quickMatchQueue, {
     playerId: normalizedPlayerId,
     accountId: normalizedAccountId,
+    identityNames: normalizedIdentityNames,
     matchSettings: settings
   });
 
@@ -42,6 +50,7 @@ export function enterQuickMatchQueue(quickMatchQueue, {
     playerId: normalizedPlayerId,
     accountId: normalizedAccountId,
     displayName: name,
+    identityNames: normalizedIdentityNames,
     matchSettings: settings,
     createdAt: new Date(now).toISOString(),
     status: "waiting",
@@ -136,6 +145,13 @@ function findActiveEntryForPlayer(quickMatchQueue, identity) {
   }) ?? null;
 }
 
+function findActiveEntryForIdentityNames(quickMatchQueue, identityNames) {
+  return [...quickMatchQueue.values()].find((entry) => {
+    if (!["waiting", "matched"].includes(entry.status)) return false;
+    return identityNamesOverlap(entry.identityNames, identityNames);
+  }) ?? null;
+}
+
 function findCompatibleEntry(quickMatchQueue, challenger) {
   return [...quickMatchQueue.values()]
     .filter((entry) => entry.status === "waiting")
@@ -147,6 +163,7 @@ function compatibleEntries(entry, challenger) {
   if (entry.playerId === normalizeId(challenger.playerId)) return false;
   const challengerAccountId = normalizeId(challenger.accountId);
   if (entry.accountId && challengerAccountId && entry.accountId === challengerAccountId) return false;
+  if (identityNamesOverlap(entry.identityNames, challenger.identityNames)) return false;
   return sameMatchSettings(entry.matchSettings, challenger.matchSettings);
 }
 
@@ -179,6 +196,26 @@ function normalizeDisplayName(displayName) {
   return name.slice(0, 32);
 }
 
+function normalizeIdentityNames(identityNames, displayName) {
+  const names = [
+    displayName,
+    ...(Array.isArray(identityNames) ? identityNames : [])
+  ].map(normalizeIdentityName).filter(Boolean);
+  return [...new Set(names)];
+}
+
+function normalizeIdentityName(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function identityNamesOverlap(left = [], right = []) {
+  const normalizedRight = new Set(right.map(normalizeIdentityName).filter(Boolean));
+  return left.some((name) => normalizedRight.has(normalizeIdentityName(name)));
+}
+
 function normalizeId(value) {
   const id = String(value ?? "").trim();
   return id ? id.slice(0, 120) : null;
@@ -188,8 +225,9 @@ function generateQueueId() {
   return `qm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function queueError(statusCode, message) {
+function queueError(statusCode, message, code) {
   const error = new Error(message);
   error.statusCode = statusCode;
+  if (code) error.code = code;
   return error;
 }

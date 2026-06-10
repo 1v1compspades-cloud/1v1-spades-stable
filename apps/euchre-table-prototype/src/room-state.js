@@ -77,7 +77,7 @@ export function createRoom({
   });
 }
 
-export function joinRoom(room, { seatToken, displayName = "Opponent", playerId, accountId } = {}) {
+export function joinRoom(room, { seatToken, displayName = "Opponent", playerId, accountId, blockedIdentityNames = [] } = {}) {
   const existingSeat = seatForToken(room, seatToken);
   const normalizedAccountId = normalizeAccountId(accountId);
 
@@ -96,7 +96,7 @@ export function joinRoom(room, { seatToken, displayName = "Opponent", playerId, 
   }
 
   if (accountIdMatchesSeatedPlayer(room, normalizedAccountId)) {
-    throw roomError(409, "This account is already seated in this room");
+    throw roomError(409, "This account is already seated in this room", "duplicate_seat");
   }
 
   const name = normalizeDisplayName(displayName);
@@ -109,8 +109,8 @@ export function joinRoom(room, { seatToken, displayName = "Opponent", playerId, 
     throw roomError(409, "Room already has two seated players");
   }
 
-  if (displayNameMatchesSeatedPlayer(room, name)) {
-    throw roomError(409, "That player is already seated in this room");
+  if (displayNameMatchesSeatedPlayer(room, name) || identityNameMatchesList(blockedIdentityNames, name)) {
+    throw roomError(409, "This account or name is already seated in this room.", "duplicate_name_or_account");
   }
 
   const nextSeatToken = seatToken || generateSeatToken();
@@ -1032,16 +1032,22 @@ function accountIdMatchesSeatedPlayer(room, accountId) {
 }
 
 function displayNameMatchesSeatedPlayer(room, displayName) {
-  const normalizedName = normalizeDisplayName(displayName).toLowerCase();
+  const normalizedName = normalizeIdentityName(displayName);
   if (!normalizedName) return false;
 
   return ["player1", "player2"].some((seat) => {
     const seatedDisplayName = room.players[seat]?.displayName;
     if (!seatedDisplayName) return false;
 
-    const seatedName = normalizeDisplayName(seatedDisplayName).toLowerCase();
+    const seatedName = normalizeIdentityName(seatedDisplayName);
     return seatedName === normalizedName;
   });
+}
+
+function identityNameMatchesList(identityNames, displayName) {
+  const normalizedName = normalizeIdentityName(displayName);
+  if (!normalizedName) return false;
+  return identityNames.some((identityName) => normalizeIdentityName(identityName) === normalizedName);
 }
 
 function ensurePlayerIdentity(room, seat, playerId, accountId) {
@@ -1113,6 +1119,13 @@ function normalizeDisplayName(displayName) {
   return name.slice(0, 32);
 }
 
+function normalizeIdentityName(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
 function normalizePlayerId(playerId) {
   const id = String(playerId ?? "").trim();
   return id ? id.slice(0, 120) : null;
@@ -1175,9 +1188,10 @@ function shuffleDeck(deck) {
   return copy;
 }
 
-function roomError(statusCode, message) {
+function roomError(statusCode, message, code) {
   const error = new Error(message);
   error.statusCode = statusCode;
+  if (code) error.code = code;
   return error;
 }
 

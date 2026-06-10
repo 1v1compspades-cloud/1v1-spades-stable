@@ -333,6 +333,8 @@ test("room client restores stored seat sessions by room code", async () => {
   assert.match(client, /if \(result\.seatToken && result\.room\.viewerSeat !== "spectator"\)/);
   assert.match(client, /setSession\(result\.room\.roomCode, result\.seatToken\)/);
   assert.match(client, /showJoinFallback = viewerSeat === "spectator" && roomView\.alreadySeated !== true && !roomView\.players\.player2/);
+  assert.match(client, /function joinNameAlreadySeated\(displayName\)/);
+  assert.match(client, /This account or name is already seated in this room\./);
   assert.match(client, /Choose Join as Opponent to take the open seat, or watch as spectator\./);
   assert.doesNotMatch(client, /function autoJoinRoom[\s\S]*body: \{ displayName \}/);
   assert.match(client, /render\(\);\n  if \(status\) setStatus\(status\);/);
@@ -656,15 +658,27 @@ test("account profiles upgrade guests and protect room seats", async () => {
         method: "POST",
         body: {
           playerId: "guest-alice",
-          username: "mehdi_zerrad",
+          username: "1v1",
           displayName: "Mehdi Zerrad"
         }
       });
       assert.equal(upgraded.statusCode, 201);
-      assert.equal(upgraded.body.account.username, "mehdi_zerrad");
+      assert.equal(upgraded.body.account.username, "1v1");
       assert.equal(upgraded.body.account.displayName, "Mehdi Zerrad");
       assert.ok(upgraded.body.account.createdAt);
       accountId = upgraded.body.account.accountId;
+
+      const duplicateUsernameRestore = await requestJson(port, "/api/accounts/upgrade", {
+        method: "POST",
+        body: {
+          username: "  1V1  ",
+          displayName: "Different Device Name"
+        }
+      });
+      assert.equal(duplicateUsernameRestore.statusCode, 201);
+      assert.equal(duplicateUsernameRestore.body.account.accountId, accountId);
+      assert.equal(duplicateUsernameRestore.body.account.username, "1v1");
+      assert.equal(duplicateUsernameRestore.body.account.displayName, "Mehdi Zerrad");
 
       const profile = await requestJson(port, `/api/profile?accountId=${encodeURIComponent(accountId)}`);
       assert.equal(profile.statusCode, 200);
@@ -673,7 +687,7 @@ test("account profiles upgrade guests and protect room seats", async () => {
       const accountRoom = await requestJson(port, "/api/rooms", {
         method: "POST",
         body: {
-          displayName: "",
+          displayName: "Local Override",
           playerId: "account-device",
           accountId
         }
@@ -683,6 +697,17 @@ test("account profiles upgrade guests and protect room seats", async () => {
       assert.equal(accountRoom.body.room.playerNames.player1, "Mehdi Zerrad");
       roomCode = accountRoom.body.room.roomCode;
       hostToken = accountRoom.body.seatToken;
+
+      const registeredUsernameCreate = await requestJson(port, "/api/rooms", {
+        method: "POST",
+        body: {
+          displayName: "1v1",
+          playerId: "guest-using-registered-username"
+        }
+      });
+      assert.equal(registeredUsernameCreate.statusCode, 409);
+      assert.equal(registeredUsernameCreate.body.code, "registered_username");
+      assert.equal(registeredUsernameCreate.body.error, "That username is already registered. Log in to use it.");
 
       const accountReconnect = await requestJson(port, `/api/rooms/${roomCode}?accountId=${encodeURIComponent(accountId)}`);
       assert.equal(accountReconnect.statusCode, 200);
@@ -702,6 +727,29 @@ test("account profiles upgrade guests and protect room seats", async () => {
       });
       assert.equal(duplicateAccountJoin.statusCode, 409);
       assert.match(duplicateAccountJoin.body.error, /account is already seated/);
+      assert.equal(duplicateAccountJoin.body.code, "duplicate_seat");
+
+      const duplicateUsernameJoin = await requestJson(port, `/api/rooms/${roomCode}/join`, {
+        method: "POST",
+        body: {
+          displayName: "  1V1  ",
+          playerId: "second-device-username"
+        }
+      });
+      assert.equal(duplicateUsernameJoin.statusCode, 409);
+      assert.equal(duplicateUsernameJoin.body.code, "registered_username");
+      assert.equal(duplicateUsernameJoin.body.error, "That username is already registered. Log in to use it.");
+
+      const duplicateDisplayNameJoin = await requestJson(port, `/api/rooms/${roomCode}/join`, {
+        method: "POST",
+        body: {
+          displayName: " mehdi   zerrad ",
+          playerId: "second-device-display-name"
+        }
+      });
+      assert.equal(duplicateDisplayNameJoin.statusCode, 409);
+      assert.equal(duplicateDisplayNameJoin.body.code, "duplicate_name_or_account");
+      assert.equal(duplicateDisplayNameJoin.body.error, "This account or name is already seated in this room.");
 
       const guestJoin = await requestJson(port, `/api/rooms/${roomCode}/join`, {
         method: "POST",
@@ -713,6 +761,18 @@ test("account profiles upgrade guests and protect room seats", async () => {
       assert.equal(guestJoin.statusCode, 200);
       assert.equal(guestJoin.body.seat, "player2");
       assert.equal(guestJoin.body.room.playerNames.player2, "Guest Bob");
+
+      const updatedProfile = await requestJson(port, "/api/accounts/upgrade", {
+        method: "POST",
+        body: {
+          accountId,
+          username: "1v1",
+          displayName: "Mehdi Updated"
+        }
+      });
+      assert.equal(updatedProfile.statusCode, 201);
+      assert.equal(updatedProfile.body.account.accountId, accountId);
+      assert.equal(updatedProfile.body.account.displayName, "Mehdi Updated");
     } finally {
       await stopServer(server);
     }
@@ -721,8 +781,8 @@ test("account profiles upgrade guests and protect room seats", async () => {
     try {
       const reloadedProfile = await requestJson(port, `/api/accounts/${encodeURIComponent(accountId)}`);
       assert.equal(reloadedProfile.statusCode, 200);
-      assert.equal(reloadedProfile.body.account.displayName, "Mehdi Zerrad");
-      assert.equal(reloadedProfile.body.account.username, "mehdi_zerrad");
+      assert.equal(reloadedProfile.body.account.displayName, "Mehdi Updated");
+      assert.equal(reloadedProfile.body.account.username, "1v1");
     } finally {
       await stopServer(server);
     }
@@ -785,6 +845,22 @@ test("quick match API persists waiting entries and creates matched rooms", async
       assert.equal(refreshed.statusCode, 202);
       assert.equal(refreshed.body.queue.queueId, firstQueueId);
       assert.equal(refreshed.body.queue.status, "waiting");
+
+      const duplicateGuestQueue = await requestJson(port, "/api/quick-match", {
+        method: "POST",
+        body: {
+          displayName: " QUEUE_ALICE ",
+          playerId: "queue-imposter-device",
+          matchSettings: {
+            modeId: "communityCompetitive",
+            raceTo: 5,
+            stickTheDealer: true
+          }
+        }
+      });
+      assert.equal(duplicateGuestQueue.statusCode, 409);
+      assert.equal(duplicateGuestQueue.body.code, "registered_username");
+      assert.equal(duplicateGuestQueue.body.error, "That username is already registered. Log in to use it.");
 
       const raceToTen = await requestJson(port, "/api/quick-match", {
         method: "POST",

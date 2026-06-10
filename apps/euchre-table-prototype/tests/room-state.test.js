@@ -786,7 +786,11 @@ test("account identity attaches to seats and cannot occupy both seats", () => {
       accountId: "account-host",
       displayName: "Other Host"
     }),
-    /account is already seated/
+    (error) => {
+      assert.match(error.message, /account is already seated/);
+      assert.equal(error.code, "duplicate_seat");
+      return true;
+    }
   );
 
   const joined = joinRoom(room, {
@@ -813,10 +817,32 @@ test("manual URL reload with saved playerId restores existing seat", () => {
 });
 
 test("same display name cannot occupy both seats without a valid existing token", () => {
-  const room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", displayName: "Mehdi" });
+  const room = createRoom({ roomCode: "ABCDE", seatToken: "host-token", displayName: "Mehdi   Zerrad" });
 
-  assert.throws(() => joinRoom(room, { displayName: " mehdi " }), /already seated/);
-  assert.throws(() => joinRoom(room, { seatToken: "new-token", displayName: "Mehdi" }), /already seated/);
+  assert.throws(() => joinRoom(room, { displayName: " mehdi zerrad " }), /already seated/);
+  assert.throws(() => joinRoom(room, { seatToken: "new-token", displayName: "MEHDI ZERRAD" }), /already seated/);
+});
+
+test("blocked account usernames cannot join as guest display names", () => {
+  const room = createRoom({
+    roomCode: "ABCDE",
+    seatToken: "host-token",
+    accountId: "account-host",
+    displayName: "Mehdi Zerrad"
+  });
+
+  assert.throws(
+    () => joinRoom(room, {
+      playerId: "guest-device",
+      displayName: "  1V1  ",
+      blockedIdentityNames: ["1v1", "Mehdi Zerrad"]
+    }),
+    (error) => {
+      assert.equal(error.code, "duplicate_name_or_account");
+      assert.equal(error.message, "This account or name is already seated in this room.");
+      return true;
+    }
+  );
 });
 
 test("reconnect restores active match state and prevents seat stealing", () => {

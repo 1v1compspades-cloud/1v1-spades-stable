@@ -46,6 +46,34 @@ test("same accountId cannot match itself", () => {
   assert.equal(queue.size, 1);
 });
 
+test("same normalized display name cannot match itself", () => {
+  const queue = new Map();
+  enterQueue(queue, { playerId: "p1", displayName: "One   V One" });
+
+  assert.throws(
+    () => enterQueue(queue, { playerId: "p2", displayName: " one v one " }),
+    (error) => {
+      assert.equal(error.code, "duplicate_name_or_account");
+      return true;
+    }
+  );
+});
+
+test("same normalized account username cannot match itself", () => {
+  const queue = new Map();
+  enterQueue(queue, {
+    playerId: "p1",
+    accountId: "acct1",
+    displayName: "Mehdi",
+    identityNames: ["1v1", "Mehdi"]
+  });
+
+  assert.throws(
+    () => enterQueue(queue, { playerId: "p2", displayName: "  1V1  " }),
+    /already in the Quick Match queue/
+  );
+});
+
 test("raceTo 5 only matches raceTo 5 and raceTo 10 only matches raceTo 10", () => {
   const queue = new Map();
   enterQueue(queue, { playerId: "p1", displayName: "Five", raceTo: 5 });
@@ -101,12 +129,13 @@ test("refresh re-enter queue returns existing matched entry", () => {
   assert.equal(refreshed.entry.matchedRoomCode, "MATCH1");
 });
 
-function enterQueue(queue, { playerId, accountId, displayName, raceTo = 5, now = Date.parse("2026-06-10T12:00:00.000Z") }) {
+function enterQueue(queue, { playerId, accountId, displayName, identityNames, raceTo = 5, now = Date.parse("2026-06-10T12:00:00.000Z") }) {
   let roomCounter = queue.__roomCounter ?? 0;
   return enterQuickMatchQueue(queue, {
     playerId,
     accountId,
     displayName,
+    identityNames,
     matchSettings: {
       modeId: "communityCompetitive",
       raceTo,

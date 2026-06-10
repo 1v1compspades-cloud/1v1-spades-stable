@@ -130,6 +130,8 @@ elements.openInviteLinkButton?.addEventListener("click", () => {
   window.open(roomLinkFor(roomView.roomCode), "_blank", "noopener");
 });
 
+elements.joinNameInput?.addEventListener("input", () => render());
+
 elements.passButton?.addEventListener("click", async () => {
   await sendAction({ type: "passTrump" });
 });
@@ -151,6 +153,10 @@ elements.joinAsPlayer2Button?.addEventListener("click", async () => {
   const displayName = fallbackJoinName();
   if (!displayName) {
     setStatus("Enter your name to continue.");
+    return;
+  }
+  if (joinNameAlreadySeated(displayName)) {
+    setStatus("This account or name is already seated in this room.");
     return;
   }
 
@@ -506,6 +512,27 @@ function fallbackJoinName() {
   return name || null;
 }
 
+function candidateJoinName() {
+  return elements.joinNameInput?.value?.trim() || currentPlayerName();
+}
+
+function joinNameAlreadySeated(displayName) {
+  const normalizedName = normalizeIdentityName(displayName);
+  if (!normalizedName || !roomView?.playerNames) return false;
+
+  return ["player1", "player2"].some((seat) => {
+    const playerName = roomView.playerNames[seat];
+    return normalizeIdentityName(playerName) === normalizedName;
+  });
+}
+
+function normalizeIdentityName(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
 function savePlayerName(playerName) {
   let settings = {};
   try {
@@ -579,8 +606,10 @@ function render() {
   setDisabled(elements.copySpectatorLinkButton, false);
   setDisabled(elements.openInviteLinkButton, false);
   const showJoinFallback = viewerSeat === "spectator" && roomView.alreadySeated !== true && !roomView.players.player2;
+  const duplicateJoinName = showJoinFallback && joinNameAlreadySeated(candidateJoinName());
   setHidden(elements.joinAsPlayer2Button, !showJoinFallback);
   setHidden(elements.joinNameInput, !showJoinFallback);
+  setDisabled(elements.joinAsPlayer2Button, !showJoinFallback || duplicateJoinName);
   setHidden(elements.coinFlipWinner?.closest("div"), gameInterfaceActive);
   setHidden(elements.startingPositionTile, gameInterfaceActive || !roomView.startingPositionChoice);
   setText(elements.player1Score, state.score.player1);

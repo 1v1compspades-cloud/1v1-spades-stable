@@ -71,6 +71,36 @@ test("reconnect and accountId flow does not duplicate stats", () => {
   assert.equal(stats.get("guest:loser-player").matchesPlayed, 1);
 });
 
+test("leaderboard keeps one row for the same accountId across devices and names", () => {
+  const stats = new Map();
+  recordCompletedRoomStats(stats, completedRoom({
+    winner: {
+      playerId: "phone-device",
+      accountId: "account-one",
+      displayName: "1v1"
+    }
+  }));
+  recordCompletedRoomStats(stats, completedRoom({
+    roomCode: "STATS2",
+    winner: {
+      playerId: "macbook-device",
+      accountId: "account-one",
+      displayName: "One V One"
+    },
+    loser: {
+      playerId: "second-loser",
+      displayName: "Second Loser"
+    }
+  }));
+
+  assert.equal(stats.has("account:account-one"), true);
+  assert.equal(stats.has("guest:phone-device"), false);
+  assert.equal(stats.has("guest:macbook-device"), false);
+  assert.equal(stats.get("account:account-one").wins, 2);
+  assert.equal(stats.get("account:account-one").matchesPlayed, 2);
+  assert.equal([...stats.keys()].filter((key) => key.startsWith("account:account-one")).length, 1);
+});
+
 test("leaderboard sorts by wins then win percentage", () => {
   const stats = new Map([
     ["guest:a", stat({ displayName: "Three Wins", wins: 3, losses: 2 })],
@@ -111,9 +141,9 @@ test("public leaderboard does not expose private tokens or admin fields", () => 
   assert.doesNotMatch(publicJson, /private-admin-key/);
 });
 
-function completedRoom({ winner = {}, loser = {} } = {}) {
+function completedRoom({ roomCode = "STATS", winner = {}, loser = {} } = {}) {
   return {
-    roomCode: "STATS",
+    roomCode,
     players: {
       player1: {
         seat: "player1",
