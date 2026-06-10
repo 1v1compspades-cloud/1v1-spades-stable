@@ -90,7 +90,7 @@ test("explicit Race To 5 is saved on the room and ends match at 5", () => {
       score: { player1: 0, player2: 3 }
     }
   };
-  room = applyRoomAction(room, { seatToken: "host-token", type: "chooseTrump", suit: "hearts" });
+  room = orderUpHeartsAndDiscard(room);
   room = playFixedHand(room);
 
   assert.equal(room.gameState.phase, "match_complete");
@@ -117,7 +117,7 @@ test("explicit Race To 10 does not end match at 5", () => {
       score: { player1: 0, player2: 3 }
     }
   };
-  room = applyRoomAction(room, { seatToken: "host-token", type: "chooseTrump", suit: "hearts" });
+  room = orderUpHeartsAndDiscard(room);
   room = playFixedHand(room);
 
   assert.equal(room.gameState.phase, "next_round_countdown");
@@ -385,19 +385,113 @@ test("non-dealer acts first and dealer acts second during trump selection", () =
   assert.equal(room.gameState.currentTurn, "player2");
 });
 
-test("dealer picks up upcard and discards when upcard suit is ordered", () => {
+test("ordering up upcard adds it to dealer hand and waits for dealer discard", () => {
   let room = createStartedRoom();
-  const dealerHandBefore = room.gameState.hands.player2;
   const upcard = room.gameState.upcard;
 
   room = applyRoomAction(room, { seatToken: "host-token", type: "chooseTrump", suit: upcard.suit });
 
-  assert.equal(room.gameState.hands.player2.length, 5);
+  assert.equal(room.gameState.hands.player2.length, 6);
   assert.equal(room.gameState.hands.player2.some((card) => card.rank === upcard.rank && card.suit === upcard.suit), true);
   assert.equal(room.gameState.kitty.some((card) => card.rank === upcard.rank && card.suit === upcard.suit), false);
+  assert.equal(room.gameState.actionPhase, "dealer_discard");
+  assert.equal(room.gameState.currentTurn, "player2");
+  assert.equal(room.gameState.trumpSuit, upcard.suit);
   assert.equal(room.gameState.dealerPickup.dealer, "player2");
   assert.deepEqual(room.gameState.dealerPickup.upcard, upcard);
-  assert.deepEqual(room.gameState.dealerPickup.discarded, dealerHandBefore[0]);
+  assert.equal(room.gameState.dealerPickup.pending, true);
+  assert.equal(room.gameState.dealerPickup.discarded, null);
+});
+
+test("dealer must discard before trick play can start", () => {
+  let room = createStartedRoom();
+  const upcard = room.gameState.upcard;
+
+  room = applyRoomAction(room, { seatToken: "host-token", type: "chooseTrump", suit: upcard.suit });
+
+  assert.throws(
+    () => applyRoomAction(room, { seatToken: "guest-token", type: "playCard", card: { rank: "A", suit: "hearts" } }),
+    /Expected phase playing/
+  );
+});
+
+test("dealer discard returns hand to 5 and discarded card is not playable", () => {
+  let room = createStartedRoom();
+  const upcard = room.gameState.upcard;
+  const discarded = { rank: "9", suit: "clubs" };
+
+  room = applyRoomAction(room, { seatToken: "host-token", type: "chooseTrump", suit: upcard.suit });
+  room = applyRoomAction(room, { seatToken: "guest-token", type: "discard", card: discarded });
+
+  assert.equal(room.gameState.hands.player2.length, 5);
+  assert.equal(room.gameState.actionPhase, "playing");
+  assert.equal(room.gameState.currentTurn, "player1");
+  assert.equal(room.gameState.hands.player2.some((card) => card.rank === discarded.rank && card.suit === discarded.suit), false);
+  assert.equal(room.gameState.kitty.some((card) => card.rank === discarded.rank && card.suit === discarded.suit), true);
+  assert.deepEqual(room.gameState.dealerPickup.discarded, discarded);
+
+  const opponentViewAfterDiscard = sanitizeRoomForViewer(room, "host-token");
+  const spectatorViewAfterDiscard = sanitizeRoomForViewer(room, "spectator-token");
+  assert.equal(opponentViewAfterDiscard.gameState.dealerPickup.discarded, "discarded");
+  assert.equal(spectatorViewAfterDiscard.gameState.dealerPickup.discarded, "discarded");
+
+  room = applyRoomAction(room, { seatToken: "host-token", type: "playCard", card: { rank: "J", suit: "diamonds" } });
+  const dealerView = sanitizeRoomForViewer(room, "guest-token");
+  assert.deepEqual(dealerView.gameState.dealerPickup.discarded, discarded);
+  assert.equal(dealerView.gameState.viewerHand.some((card) => card.rank === discarded.rank && card.suit === discarded.suit), false);
+  assert.equal(dealerView.gameState.playableCards.some((card) => card.rank === discarded.rank && card.suit === discarded.suit), false);
+});
+
+test("turning down upcard does not add it to dealer hand", () => {
+  let room = createStartedRoom();
+  const upcard = room.gameState.upcard;
+
+  room = applyRoomAction(room, { seatToken: "host-token", type: "passTrump" });
+  room = applyRoomAction(room, { seatToken: "guest-token", type: "passTrump" });
+
+  assert.equal(room.gameState.trumpState.round, 2);
+  assert.equal(room.gameState.hands.player2.length, 5);
+  assert.equal(room.gameState.hands.player2.some((card) => card.rank === upcard.rank && card.suit === upcard.suit), false);
+  assert.equal(room.gameState.kitty.some((card) => card.rank === upcard.rank && card.suit === upcard.suit), true);
+});
+
+test("round 2 trump choice does not add upcard", () => {
+  let room = createStartedRoom();
+  const upcard = room.gameState.upcard;
+
+  room = applyRoomAction(room, { seatToken: "host-token", type: "passTrump" });
+  room = applyRoomAction(room, { seatToken: "guest-token", type: "passTrump" });
+  room = applyRoomAction(room, { seatToken: "host-token", type: "chooseTrump", suit: "spades" });
+
+  assert.equal(room.gameState.actionPhase, "playing");
+  assert.equal(room.gameState.trumpSuit, "spades");
+  assert.equal(room.gameState.hands.player2.length, 5);
+  assert.equal(room.gameState.hands.player2.some((card) => card.rank === upcard.rank && card.suit === upcard.suit), false);
+  assert.equal(room.gameState.kitty.some((card) => card.rank === upcard.rank && card.suit === upcard.suit), true);
+});
+
+test("non-dealer cannot discard for dealer", () => {
+  let room = createStartedRoom();
+  const upcard = room.gameState.upcard;
+
+  room = applyRoomAction(room, { seatToken: "host-token", type: "chooseTrump", suit: upcard.suit });
+
+  assert.throws(
+    () => applyRoomAction(room, { seatToken: "host-token", type: "discard", card: { rank: "A", suit: "clubs" } }),
+    /Only the dealer can discard/
+  );
+});
+
+test("dealer cannot discard a card they do not hold", () => {
+  let room = createStartedRoom();
+  const upcard = room.gameState.upcard;
+
+  room = applyRoomAction(room, { seatToken: "host-token", type: "chooseTrump", suit: upcard.suit });
+
+  assert.throws(
+    () => applyRoomAction(room, { seatToken: "guest-token", type: "discard", card: { rank: "A", suit: "spades" } }),
+    /do not hold/
+  );
 });
 
 test("dealer rotates every hand across multiple hands", () => {
@@ -412,7 +506,11 @@ test("dealer rotates every hand across multiple hands", () => {
   assert.equal(room.gameState.handNumber, 2);
   assert.equal(room.gameState.dealer, "player1");
 
-  room = applyRoomAction(room, { seatToken: "guest-token", type: "chooseTrump", suit: "hearts" });
+  room = orderUpHeartsAndDiscard(room, {
+    chooserToken: "guest-token",
+    dealerToken: "host-token",
+    discard: { rank: "A", suit: "clubs" }
+  });
   room = playFixedHandWithPlayer2Lead(room);
   room = advanceRoomClock(room, { now: Date.parse(room.nextRoundStartsAt) + 1, deck: fixedDeck });
 
@@ -571,7 +669,7 @@ test("next hand does not auto-start when match target is reached", () => {
       }
     }
   };
-  room = applyRoomAction(room, { seatToken: "host-token", type: "chooseTrump", suit: "hearts" });
+  room = orderUpHeartsAndDiscard(room);
   room = playFixedHand(room);
 
   assert.equal(room.gameState.phase, "match_complete");
@@ -693,7 +791,7 @@ test("same display name cannot occupy both seats without a valid existing token"
 
 test("reconnect restores active match state and prevents seat stealing", () => {
   let room = createStartedRoom();
-  room = applyRoomAction(room, { seatToken: "host-token", type: "chooseTrump", suit: "hearts" });
+  room = orderUpHeartsAndDiscard(room);
   room = applyRoomAction(room, { seatToken: "host-token", type: "playCard", card: { rank: "J", suit: "diamonds" } });
 
   const restoredHost = joinRoom(room, { seatToken: "host-token", displayName: "Not Host" });
@@ -786,8 +884,20 @@ function createStartedRoom(options = {}) {
 }
 
 function completeHandRoom(room = createStartedRoom()) {
-  room = applyRoomAction(room, { seatToken: "host-token", type: "chooseTrump", suit: "hearts" });
+  room = orderUpHeartsAndDiscard(room);
   return playFixedHand(room);
+}
+
+function orderUpHeartsAndDiscard(
+  room,
+  {
+    chooserToken = "host-token",
+    dealerToken = "guest-token",
+    discard = { rank: "9", suit: "clubs" }
+  } = {}
+) {
+  room = applyRoomAction(room, { seatToken: chooserToken, type: "chooseTrump", suit: "hearts" });
+  return applyRoomAction(room, { seatToken: dealerToken, type: "discard", card: discard });
 }
 
 function playFixedHand(room) {

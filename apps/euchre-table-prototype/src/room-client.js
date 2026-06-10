@@ -678,6 +678,8 @@ function renderStatus() {
     } else {
       setStatus(`${getPlayerDisplayName(state.currentTurn)} to choose or pass trump.`);
     }
+  } else if (state.actionPhase === "dealer_discard") {
+    setStatus(`${getPlayerDisplayName(state.dealer)} picked up the upcard and must discard one card.`);
   } else if (state.actionPhase === "playing") {
     setStatus(`${getPlayerDisplayName(state.currentTurn)} to play. Trump: ${suitName(activeTrumpSuit(state))}.`);
   } else if (state.phase === "next_round_countdown" || state.phase === "hand_score") {
@@ -713,13 +715,16 @@ function renderViewerHand(state, viewerSeat) {
   if (viewerSeat === "spectator") return;
 
   for (const card of state.viewerHand) {
-    const legal = state.playableCards.some((candidate) => cardsEqual(candidate, card));
+    const discardable = state.actionPhase === "dealer_discard"
+      && viewerSeat === state.dealer
+      && state.discardableCards.some((candidate) => cardsEqual(candidate, card));
+    const legal = discardable || state.playableCards.some((candidate) => cardsEqual(candidate, card));
     const button = document.createElement("button");
     button.type = "button";
     button.className = ["card", isRed(card.suit) ? "red" : "", legal ? "legal" : ""].filter(Boolean).join(" ");
     button.innerHTML = cardMarkup(card);
     button.disabled = !legal;
-    button.addEventListener("click", () => sendAction({ type: "playCard", card }).catch((error) => setStatus(error.message)));
+    button.addEventListener("click", () => sendAction({ type: discardable ? "discard" : "playCard", card }).catch((error) => setStatus(error.message)));
     elements.viewerHand.append(button);
   }
 }

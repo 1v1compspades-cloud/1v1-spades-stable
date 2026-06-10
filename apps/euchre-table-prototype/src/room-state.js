@@ -245,16 +245,17 @@ export function applyRoomAction(room, { seatToken, playerId, type, suit, positio
 
     const trumpState = chooseTrump(gameState.trumpState, seat, suit);
     const nextState = applyDealerPickupIfNeeded(gameState, trumpState);
+    const needsDealerDiscard = Boolean(nextState.dealerPickup?.pending);
     return syncRoomFields({
       ...room,
       gameState: {
         ...nextState,
         phase: "playing",
-        actionPhase: "playing",
+        actionPhase: needsDealerDiscard ? "dealer_discard" : "playing",
         trumpState,
         trumpSuit: trumpState.trumpSuit,
         maker: trumpState.maker,
-        currentTurn: gameState.leader
+        currentTurn: needsDealerDiscard ? trumpState.dealer : gameState.leader
       },
       updatedAt: new Date().toISOString()
     });
@@ -295,6 +296,16 @@ export function applyRoomAction(room, { seatToken, playerId, type, suit, positio
       },
       updatedAt: new Date().toISOString()
     });
+  }
+
+  if (type === "discard") {
+    ensurePhase(gameState, "dealer_discard");
+
+    if (seat !== gameState.dealer) {
+      throw roomError(403, "Only the dealer can discard after picking up the upcard");
+    }
+
+    return discardForDealer(room, seat, card);
   }
 
   if (type === "playCard") {
@@ -375,6 +386,16 @@ export function sanitizeRoomForViewer(room, seatToken, playerId) {
       trumpState: sanitizeTrumpState(state.trumpState),
       upcard: state.upcard,
       kittyCount: state.kitty.length,
+      dealerPickup: state.dealerPickup
+        ? {
+            dealer: state.dealerPickup.dealer,
+            upcard: state.dealerPickup.upcard,
+            pending: Boolean(state.dealerPickup.pending),
+            discarded: state.dealerPickup.discarded
+              ? viewerSeat === state.dealer ? state.dealerPickup.discarded : "discarded"
+              : null
+          }
+        : null,
       viewerHand,
       handCounts: {
         player1: state.hands.player1.length,
@@ -382,6 +403,9 @@ export function sanitizeRoomForViewer(room, seatToken, playerId) {
       },
       playableCards: viewerSeat === state.currentTurn && state.actionPhase === "playing" && state.trumpSuit
         ? getPlayableCards(viewerHand, state.currentTrick[0]?.card ?? null, state.trumpSuit)
+        : [],
+      discardableCards: viewerSeat === state.dealer && state.actionPhase === "dealer_discard"
+        ? [...viewerHand]
         : [],
       currentTrick: state.currentTrick,
       completedTricks: state.completedTricks,
@@ -544,6 +568,7 @@ function startHand(previousState, { deck = shuffleDeck(createDeck()), matchSetti
     trumpState,
     trumpSuit: null,
     maker: null,
+    dealerPickup: null,
     leader: otherPlayer(dealer),
     currentTurn: currentTrumpActor(trumpState),
     currentTrick: [],
@@ -573,6 +598,7 @@ function createWaitingGameState({ mode, modeId }) {
     trumpState: null,
     trumpSuit: null,
     maker: null,
+    dealerPickup: null,
     leader: null,
     currentTurn: null,
     currentTrick: [],
@@ -676,6 +702,43 @@ function playCardForRoom(room, player, card) {
   });
 }
 
+function discardForDealer(room, dealer, card) {
+  const state = room.gameState;
+  const hand = state.hands[dealer];
+  const discarded = card;
+
+  assertDealerPickupPending(state, dealer);
+
+  if (!hand.some((candidate) => cardsEqual(candidate, discarded))) {
+    throw new Error("Dealer cannot discard a card they do not hold");
+  }
+
+  const dealerHand = removeCard(hand, discarded);
+  if (dealerHand.length !== 5) {
+    throw new Error("Dealer must discard exactly one card");
+  }
+
+  return syncRoomFields({
+    ...room,
+    gameState: {
+      ...state,
+      hands: {
+        ...state.hands,
+        [dealer]: dealerHand
+      },
+      kitty: [...state.kitty, discarded],
+      dealerPickup: {
+        ...state.dealerPickup,
+        pending: false,
+        discarded
+      },
+      actionPhase: "playing",
+      currentTurn: state.leader
+    },
+    updatedAt: new Date().toISOString()
+  });
+}
+
 function applyDealerPickupIfNeeded(state, trumpState) {
   if (trumpState.round !== 1 || trumpState.trumpSuit !== trumpState.upcardSuit) {
     return state;
@@ -684,20 +747,19 @@ function applyDealerPickupIfNeeded(state, trumpState) {
   const dealer = trumpState.dealer;
   const dealerHand = state.hands[dealer];
   const pickupHand = [...dealerHand, state.upcard];
-  const discardIndex = 0;
-  const discarded = pickupHand[discardIndex];
 
   return {
     ...state,
     hands: {
       ...state.hands,
-      [dealer]: pickupHand.filter((_, index) => index !== discardIndex)
+      [dealer]: pickupHand
     },
     kitty: state.kitty.filter((card) => !cardsEqual(card, state.upcard)),
     dealerPickup: {
       dealer,
       upcard: state.upcard,
-      discarded
+      pending: true,
+      discarded: null
     }
   };
 }
@@ -862,6 +924,12 @@ function ensureStartingDealerChosen(room) {
 function ensureBothPlayersSeated(room) {
   if (!room.players.player1 || !room.players.player2) {
     throw new Error("Waiting for opponent");
+  }
+}
+
+function assertDealerPickupPending(state, dealer) {
+  if (!state.dealerPickup?.pending || state.dealerPickup.dealer !== dealer) {
+    throw new Error("Dealer must pick up the upcard before discarding");
   }
 }
 
