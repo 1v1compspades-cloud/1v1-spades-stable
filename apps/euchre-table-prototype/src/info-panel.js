@@ -53,6 +53,19 @@ const infoPages = [
     ]
   },
   {
+    id: "leaderboard",
+    label: "Leaderboard",
+    title: "Leaderboard",
+    body: [
+      "Completed matches update basic win/loss standings for guest players and saved profiles.",
+      "Leaderboard rows show public match stats only."
+    ],
+    link: {
+      href: "./leaderboard.html",
+      text: "View Leaderboard"
+    }
+  },
+  {
     id: "discord",
     label: "Discord / Community",
     title: "Discord / Community",
@@ -185,6 +198,14 @@ function renderActivePage(overlay, activePageId) {
     link.target = "_blank";
     link.rel = "noreferrer";
     link.textContent = "Join the Discord";
+    content.append(link);
+  }
+
+  if (activePage.link) {
+    const link = document.createElement("a");
+    link.className = "button-link primary-action";
+    link.href = activePage.link.href;
+    link.textContent = activePage.link.text;
     content.append(link);
   }
 }

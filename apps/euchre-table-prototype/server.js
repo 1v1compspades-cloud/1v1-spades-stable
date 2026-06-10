@@ -22,6 +22,10 @@ import {
   savePersistedState
 } from "./src/persistence.js";
 import {
+  recordCompletedRoomStats,
+  sanitizeLeaderboardForPublic
+} from "./src/leaderboard-state.js";
+import {
   adminRecordMatchWinner,
   createTournament,
   exportTournamentBackup,
@@ -46,6 +50,7 @@ const persistedState = loadPersistedState(persistenceFile);
 const rooms = persistedState.rooms;
 const tournaments = persistedState.tournaments;
 const accounts = persistedState.accounts;
+const leaderboardStats = persistedState.leaderboardStats;
 
 const server = createServer(async (request, response) => {
   try {
@@ -118,6 +123,13 @@ async function handleApi(request, response) {
     sendJson(response, 202, {
       status: "placeholder",
       message: "Quick Match coming next."
+    });
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/leaderboard") {
+    sendJson(response, 200, {
+      leaderboard: sanitizeLeaderboardForPublic(leaderboardStats)
     });
     return;
   }
@@ -374,7 +386,9 @@ async function handleApi(request, response) {
 }
 
 function advanceAndSaveRoom(room) {
-  const nextRoom = advanceRoomClock(room);
+  let nextRoom = advanceRoomClock(room);
+  const leaderboardResult = recordCompletedRoomStats(leaderboardStats, nextRoom);
+  nextRoom = leaderboardResult.room;
   rooms.set(nextRoom.roomCode, nextRoom);
   syncTournamentFromRoom(nextRoom);
   persistState();
@@ -382,7 +396,7 @@ function advanceAndSaveRoom(room) {
 }
 
 function persistState() {
-  savePersistedState(persistenceFile, { rooms, tournaments, accounts });
+  savePersistedState(persistenceFile, { rooms, tournaments, accounts, leaderboardStats });
 }
 
 async function serveStatic(request, response) {
@@ -422,6 +436,7 @@ function publicRoutePath(pathname) {
     "/room.html": "/apps/euchre-table-prototype/room.html",
     "/game.html": "/apps/euchre-table-prototype/game.html",
     "/profile.html": "/apps/euchre-table-prototype/profile.html",
+    "/leaderboard.html": "/apps/euchre-table-prototype/leaderboard.html",
     "/rules.html": "/apps/euchre-table-prototype/rules.html",
     "/tournament.html": "/apps/euchre-table-prototype/tournament.html"
   }[pathname] ?? pathname;

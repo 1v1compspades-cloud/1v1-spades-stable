@@ -1537,6 +1537,47 @@ body::before {
   color: var(--accent-2);
 }
 
+.leaderboard-panel,
+.profile-nav {
+  margin-top: 22px;
+}
+
+.leaderboard-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.leaderboard-table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+  color: var(--ink);
+}
+
+.leaderboard-table th,
+.leaderboard-table td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 13px 10px;
+  text-align: left;
+}
+
+.leaderboard-table th {
+  color: var(--accent);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.leaderboard-table td {
+  color: var(--ink);
+}
+
+.profile-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 @media (max-width: 720px) {
   .master-shell {
     width: min(100vw - 18px, 860px);
@@ -1618,5 +1659,9 @@ body::before {
 
   .discord-action {
     width: 100%;
+  }
+
+  .leaderboard-table {
+    min-width: 620px;
   }
 }

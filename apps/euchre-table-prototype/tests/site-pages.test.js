@@ -25,6 +25,7 @@ test("home screen has the main routes and actions", async () => {
   assert.match(publicActions, /id="homeJoinRoomButton"/);
   assert.match(publicActions, /Quick Match/);
   assert.match(publicActions, /Profile/);
+  assert.match(publicActions, /Leaderboard/);
   assert.match(publicActions, /Rules/);
   assert.doesNotMatch(publicActions, /Create Tournament/);
   assert.match(html, /Your Name/);
@@ -53,6 +54,8 @@ test("shared info panel has Euchre help pages and Discord action", async () => {
   assert.match(infoClient, /Euchre Rules/);
   assert.match(infoClient, /Scoring/);
   assert.match(infoClient, /Lobby \/ Invite Help/);
+  assert.match(infoClient, /Leaderboard/);
+  assert.match(infoClient, /View Leaderboard/);
   assert.match(infoClient, /Discord \/ Community/);
   assert.match(infoClient, /Join the Discord/);
   assert.match(infoClient, /event\.key === "Escape"/);
@@ -120,6 +123,25 @@ test("profile screen supports lightweight account upgrade", async () => {
   assert.match(client, /\/api\/accounts\/upgrade/);
   assert.match(client, /\/api\/profile\?accountId=/);
   assert.match(client, /playerId: getGuestPlayerId\(\)/);
+});
+
+test("leaderboard screen renders public standings table", async () => {
+  const html = await readText("leaderboard.html");
+  const client = await readText("src/leaderboard-client.js");
+  const css = await readText("src/styles.css");
+
+  assert.match(html, /Leaderboard - 1v1 Euchre/);
+  assert.match(html, /id="leaderboardRows"/);
+  assert.match(html, /Rank/);
+  assert.match(html, /Display name/);
+  assert.match(html, /Wins/);
+  assert.match(html, /Losses/);
+  assert.match(html, /Matches played/);
+  assert.match(html, /Win %/);
+  assert.match(html, /Tournament wins/);
+  assert.match(client, /\/api\/leaderboard/);
+  assert.match(client, /textContent/);
+  assert.match(css, /\.leaderboard-table/);
 });
 
 test("one-player room lobby exposes invite controls without start sequence or create/join controls", async () => {
@@ -512,6 +534,10 @@ test("server health check and root route work", async () => {
       assert.equal(profile.statusCode, 200);
       assert.match(profile.body, /id="profileForm"/);
 
+      const leaderboard = await requestText(port, "/leaderboard.html");
+      assert.equal(leaderboard.statusCode, 200);
+      assert.match(leaderboard.body, /id="leaderboardRows"/);
+
       const publicCss = await requestText(port, "/src/styles.css");
       assert.equal(publicCss.statusCode, 200);
       assert.match(publicCss.body, /\[hidden\]/);
@@ -690,6 +716,68 @@ test("account profiles upgrade guests and protect room seats", async () => {
       assert.equal(reloadedProfile.statusCode, 200);
       assert.equal(reloadedProfile.body.account.displayName, "Mehdi Zerrad");
       assert.equal(reloadedProfile.body.account.username, "mehdi_zerrad");
+    } finally {
+      await stopServer(server);
+    }
+  });
+});
+
+test("leaderboard API reads persisted stats and hides private identifiers", async () => {
+  await withTempStateFile(async (stateFile) => {
+    await writeFile(stateFile, JSON.stringify({
+      version: 1,
+      savedAt: "2026-06-10T00:00:00.000Z",
+      rooms: {},
+      tournaments: {},
+      accounts: {},
+      leaderboardStats: {
+        "account:account-alice": {
+          playerId: "alice-device",
+          accountId: "account-alice",
+          displayName: "Alice",
+          wins: 3,
+          losses: 0,
+          matchesPlayed: 3,
+          pointsFor: 15,
+          pointsAgainst: 4,
+          tournamentWins: 1,
+          updatedAt: "2026-06-10T00:00:00.000Z",
+          seatToken: "private-seat-token",
+          adminKey: "private-admin-key"
+        },
+        "guest:bob-device": {
+          playerId: "bob-device",
+          accountId: null,
+          displayName: "Bob",
+          wins: 3,
+          losses: 2,
+          matchesPlayed: 5,
+          pointsFor: 23,
+          pointsAgainst: 18,
+          tournamentWins: 0,
+          updatedAt: "2026-06-10T00:00:00.000Z"
+        }
+      }
+    }, null, 2));
+
+    const port = 5208;
+    const server = await startTestServer(port, stateFile);
+
+    try {
+      const response = await requestJson(port, "/api/leaderboard");
+      assert.equal(response.statusCode, 200);
+      assert.deepEqual(response.body.leaderboard.map((row) => row.displayName), ["Alice", "Bob"]);
+      assert.equal(response.body.leaderboard[0].rank, 1);
+      assert.equal(response.body.leaderboard[0].wins, 3);
+      assert.equal(response.body.leaderboard[0].winPercentage, 100);
+      assert.equal(response.body.leaderboard[0].tournamentWins, 1);
+
+      const publicJson = JSON.stringify(response.body);
+      assert.doesNotMatch(publicJson, /account-alice/);
+      assert.doesNotMatch(publicJson, /alice-device/);
+      assert.doesNotMatch(publicJson, /bob-device/);
+      assert.doesNotMatch(publicJson, /private-seat-token/);
+      assert.doesNotMatch(publicJson, /private-admin-key/);
     } finally {
       await stopServer(server);
     }
