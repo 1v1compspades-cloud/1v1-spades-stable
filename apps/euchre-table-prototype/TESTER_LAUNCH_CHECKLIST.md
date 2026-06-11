@@ -41,8 +41,7 @@
 
 ## Safety
 
-- Confirm the site says it is free-play only.
-- Confirm the launch disclaimer says: No cash games. No deposits. No wallets. No paid entries.
+- Confirm the launch disclaimer says: 1v1 Euchre is free-play only. There are no cash games, wagers, buy-ins, deposits, payouts, or paid prize pools.
 - Confirm hidden hands are not visible to spectators.
 - Confirm the private host key is never shown on player or spectator pages.
 - Confirm host controls stay hidden until a valid private host key is entered.

@@ -375,34 +375,109 @@ button:disabled {
 }
 
 .card,
-.upcard {
+.upcard-card {
+  position: relative;
   min-height: 118px;
-  border: 2px solid var(--line);
+  border: 2px solid rgba(18, 17, 14, 0.78);
   border-radius: 8px;
-  background: white;
+  background:
+    linear-gradient(145deg, rgba(239, 183, 42, 0.16), transparent 32%),
+    linear-gradient(180deg, #fffdf5, #f7ecd4);
   display: grid;
   place-items: center;
   text-align: center;
   color: var(--ink);
   font-weight: 900;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 255, 255, 0.74),
+    inset 0 0 0 6px rgba(239, 183, 42, 0.2),
+    0 6px 14px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
 }
 
 .card {
   width: 100%;
 }
 
-.card .rank {
-  display: block;
-  font-size: 1.5rem;
+.card.black {
+  color: var(--ink);
 }
 
-.card .suit {
+.card-face-inner {
+  position: relative;
+  width: 100%;
+  min-height: inherit;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  align-items: center;
+  padding: 8px;
+}
+
+.card-face-inner::before {
+  content: "1v1";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%) rotate(-16deg);
+  color: rgba(189, 142, 25, 0.15);
+  font-size: 1.15rem;
+  letter-spacing: 0;
+  pointer-events: none;
+}
+
+.card-corner {
+  display: grid;
+  justify-items: center;
+  justify-self: start;
+  line-height: 0.95;
+  z-index: 1;
+}
+
+.card-corner-bottom {
+  justify-self: end;
+  transform: rotate(180deg);
+}
+
+.card .rank,
+.upcard-card .rank {
   display: block;
-  font-size: 1.8rem;
+  font-size: 1.08rem;
+}
+
+.card .suit,
+.upcard-card .suit {
+  display: block;
+  font-size: 1.35rem;
+}
+
+.card-center {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 2px;
+}
+
+.rank-large {
+  display: block;
+  font-size: clamp(1.85rem, 8vw, 3.15rem);
+  line-height: 0.92;
+}
+
+.suit-large {
+  font-size: clamp(2.05rem, 9vw, 3.6rem) !important;
+  line-height: 0.92;
 }
 
 .card.red {
+  color: #b32925;
+}
+
+.card:disabled {
+  color: var(--ink);
+}
+
+.card.red:disabled {
   color: #b32925;
 }
 
@@ -414,20 +489,120 @@ button:disabled {
   outline: 3px solid rgba(35, 103, 165, 0.25);
 }
 
-.card-back {
-  color: white;
+.jack-portrait {
+  width: min(76px, 82%);
+  aspect-ratio: 0.72;
+  border: 2px solid currentColor;
+  border-radius: 42% 42% 16px 16px;
+  display: grid;
+  place-items: center;
+  position: relative;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.18) 25%, transparent 25%) 0 0 / 16px 16px,
-    linear-gradient(135deg, transparent 75%, rgba(255, 255, 255, 0.18) 75%) 0 0 / 16px 16px,
-    var(--accent-2);
+    radial-gradient(circle at 50% 28%, rgba(255, 255, 255, 0.92) 0 16%, transparent 17%),
+    linear-gradient(145deg, rgba(239, 183, 42, 0.46), rgba(255, 255, 255, 0.35));
+  box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.42);
+}
+
+.jack-head {
+  position: absolute;
+  top: 15%;
+  width: 34%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  background: #fff8e8;
+}
+
+.jack-body {
+  position: absolute;
+  bottom: 18%;
+  width: 58%;
+  height: 34%;
+  border-radius: 48% 48% 12px 12px;
+  border: 2px solid currentColor;
+  background: currentColor;
+  opacity: 0.92;
+}
+
+.jack-suit {
+  position: absolute;
+  bottom: 6%;
+  font-size: 1.45rem;
+  line-height: 1;
+  color: #fff8e8;
+}
+
+.card-back {
+  position: relative;
+  color: transparent;
+  background:
+    linear-gradient(135deg, rgba(239, 183, 42, 0.18) 25%, transparent 25%) 0 0 / 16px 16px,
+    linear-gradient(135deg, transparent 75%, rgba(239, 183, 42, 0.18) 75%) 0 0 / 16px 16px,
+    linear-gradient(160deg, #12100c, #2b2415);
+  border-color: rgba(239, 183, 42, 0.68);
+}
+
+.card-back::after {
+  content: "1v1";
+  color: var(--master-gold);
+  font-size: 1rem;
+  letter-spacing: 0;
 }
 
 .upcard {
+  width: min(118px, 100%);
+  min-height: 152px;
   margin-bottom: 16px;
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  position: relative;
 }
 
 .upcard.empty {
+  width: 100%;
+  min-height: 118px;
+  border: 2px dashed var(--line);
+  border-radius: 8px;
+  background: rgba(255, 250, 240, 0.62);
   color: var(--muted);
+}
+
+.kitty-card-back {
+  position: absolute;
+  width: 92%;
+  min-height: 138px;
+  border: 2px solid rgba(239, 183, 42, 0.58);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(239, 183, 42, 0.18) 25%, transparent 25%) 0 0 / 16px 16px,
+    linear-gradient(135deg, transparent 75%, rgba(239, 183, 42, 0.18) 75%) 0 0 / 16px 16px,
+    linear-gradient(160deg, #12100c, #2b2415);
+  box-shadow: 0 8px 14px rgba(0, 0, 0, 0.2);
+}
+
+.kitty-card-back::after {
+  content: "1v1";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  color: var(--master-gold);
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.kitty-card-back-bottom {
+  transform: translate(8px, 8px) rotate(2deg);
+}
+
+.kitty-card-back-top {
+  transform: translate(4px, 4px) rotate(-1deg);
+}
+
+.upcard-card {
+  width: 92%;
+  min-height: 138px;
+  z-index: 2;
 }
 
 .trump-panel {
@@ -1663,5 +1838,249 @@ body::before {
 
   .leaderboard-table {
     min-width: 620px;
+  }
+}
+
+@media (max-width: 720px) {
+  body.room-active {
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  .game-screen.room-active {
+    width: min(100vw - 12px, 860px);
+    min-height: 100dvh;
+    padding: 8px 0 calc(10px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .game-screen.room-active .room-topbar {
+    gap: 6px;
+    margin-bottom: 2px;
+  }
+
+  .game-screen.room-active .room-topbar .info-button,
+  .game-screen.room-active .room-topbar .button-link {
+    min-height: 34px;
+    height: 34px;
+    width: auto;
+    padding: 0 10px;
+    font-size: 0.82rem;
+  }
+
+  .game-screen.room-active .room-topbar .online-pill {
+    min-height: 22px;
+    padding: 0 7px;
+    font-size: 0.64rem;
+  }
+
+  .game-screen.room-active .compact-status {
+    margin: 0;
+  }
+
+  .game-screen.room-active .compact-status p {
+    font-size: 0.84rem;
+    line-height: 1.2;
+  }
+
+  .game-screen.room-active .trump-action-bar {
+    position: sticky;
+    top: 4px;
+    z-index: 6;
+    gap: 8px;
+    margin: 0;
+    padding: 10px;
+  }
+
+  .game-screen.room-active .trump-action-copy {
+    gap: 2px;
+  }
+
+  .game-screen.room-active .trump-action-copy h2 {
+    font-size: 0.95rem;
+  }
+
+  .game-screen.room-active .trump-action-copy p:not(.eyebrow) {
+    font-size: 0.82rem;
+    line-height: 1.2;
+  }
+
+  .game-screen.room-active .trump-action-controls,
+  .game-screen.room-active .trump-action-bar .trump-buttons {
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+    gap: 8px;
+  }
+
+  .game-screen.room-active .trump-action-bar button {
+    min-height: 46px;
+    height: auto;
+    font-size: 0.95rem;
+  }
+
+  .game-screen.room-active .scoreband {
+    margin-top: 0;
+  }
+
+  .game-screen.room-active .scoreband div {
+    padding: 5px 4px;
+  }
+
+  .game-screen.room-active .scoreband span {
+    font-size: 0.66rem;
+  }
+
+  .game-screen.room-active .scoreband strong {
+    font-size: 1.08rem;
+  }
+
+  .game-screen.room-active .room-table {
+    flex: 1 1 auto;
+    min-height: 0;
+    margin-top: 0;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "opponent"
+      "center"
+      "player";
+    gap: 6px;
+    align-content: stretch;
+  }
+
+  .game-screen.room-active .room-table > .player-panel:first-child {
+    grid-area: player;
+    position: sticky;
+    bottom: calc(4px + env(safe-area-inset-bottom));
+    z-index: 5;
+    padding: 8px;
+  }
+
+  .game-screen.room-active .room-table > .center-panel {
+    grid-area: center;
+    display: grid;
+    grid-template-columns: minmax(78px, 0.42fr) minmax(0, 1fr);
+    grid-template-areas:
+      "center-heading center-heading"
+      "upcard trick";
+    gap: 6px 8px;
+    padding: 8px;
+  }
+
+  .game-screen.room-active .room-table > .player-panel:last-child {
+    grid-area: opponent;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+    align-items: center;
+    padding: 6px 8px;
+  }
+
+  .game-screen.room-active .panel-heading {
+    margin-bottom: 6px;
+  }
+
+  .game-screen.room-active .panel-heading h2,
+  .game-screen.room-active .trick-area h3 {
+    font-size: 0.82rem;
+  }
+
+  .game-screen.room-active .panel-heading span {
+    font-size: 0.68rem;
+  }
+
+  .game-screen.room-active .center-panel .panel-heading {
+    grid-area: center-heading;
+    margin-bottom: 0;
+  }
+
+  .game-screen.room-active .upcard {
+    grid-area: upcard;
+    width: 86px;
+    min-height: 108px;
+    margin-bottom: 0;
+  }
+
+  .game-screen.room-active .kitty-card-back {
+    min-height: 96px;
+  }
+
+  .game-screen.room-active .upcard-card {
+    min-height: 96px;
+  }
+
+  .game-screen.room-active .trick-area {
+    grid-area: trick;
+    margin-top: 0;
+  }
+
+  .game-screen.room-active .history {
+    display: none;
+  }
+
+  .game-screen.room-active .current-trick {
+    gap: 6px;
+    min-height: 78px;
+  }
+
+  .game-screen.room-active .card,
+  .game-screen.room-active .play-slot {
+    min-height: 78px;
+    border-width: 1px;
+  }
+
+  .game-screen.room-active .card .rank {
+    font-size: 0.78rem;
+  }
+
+  .game-screen.room-active .card .suit {
+    font-size: 0.94rem;
+  }
+
+  .game-screen.room-active .rank-large {
+    font-size: 1.65rem;
+  }
+
+  .game-screen.room-active .suit-large {
+    font-size: 2rem !important;
+  }
+
+  .game-screen.room-active .jack-portrait {
+    width: min(54px, 84%);
+  }
+
+  .game-screen.room-active .jack-suit {
+    font-size: 1rem;
+  }
+
+  .game-screen.room-active .hand {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .game-screen.room-active .player-panel:first-child .card {
+    min-height: 76px;
+    padding: 0;
+  }
+
+  .game-screen.room-active .card-backs {
+    display: flex;
+    justify-content: flex-end;
+    gap: 4px;
+  }
+
+  .game-screen.room-active .card-backs .card {
+    width: 22px;
+    min-height: 32px;
+    padding: 0;
+    border-radius: 4px;
+    overflow: hidden;
+    color: transparent;
+  }
+
+  .game-screen.room-active #nextHandButton,
+  .game-screen.room-active #spectatorNotice {
+    grid-column: 1 / -1;
   }
 }

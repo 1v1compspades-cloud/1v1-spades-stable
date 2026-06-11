@@ -34,8 +34,7 @@
 
 ## Safety And Mobile
 
-- Confirm the site says it is free-play only.
-- Confirm only the approved launch disclaimer appears: No cash games. No deposits. No wallets. No paid entries.
+- Confirm only the approved launch disclaimer appears: 1v1 Euchre is free-play only. There are no cash games, wagers, buy-ins, deposits, payouts, or paid prize pools.
 - Confirm mobile layout works.
 - Confirm there is no horizontal overflow.
 - Confirm browser console has no errors during the smoke test.

@@ -7,7 +7,8 @@ const infoPages = [
     title: "About 1v1 Euchre Freeplay",
     body: [
       "1v1 Euchre Freeplay is a two-player Euchre match app built for quick games, friend invites, and future tournament play.",
-      "Create a private room, invite an opponent, ready up, and play a clean head-to-head match."
+      "Create a private room, invite an opponent, ready up, and play a clean head-to-head match.",
+      "1v1 Euchre is free-play only. There are no cash games, wagers, buy-ins, deposits, payouts, or paid prize pools."
     ]
   },
   {

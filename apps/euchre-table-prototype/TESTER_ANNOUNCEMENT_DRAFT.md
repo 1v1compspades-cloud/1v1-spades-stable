@@ -6,7 +6,7 @@ https://1v1euchre.com
 
 I am looking for a few testers to try Play-a-Friend rooms and small 4-player tournament brackets. Please try creating a room, joining from another browser/device, playing a hand, and testing a short tournament flow.
 
-This is free-play only. No cash games. No deposits. No wallets. No paid entries.
+1v1 Euchre is free-play only. There are no cash games, wagers, buy-ins, deposits, payouts, or paid prize pools.
 
 If you find a bug, please send:
 

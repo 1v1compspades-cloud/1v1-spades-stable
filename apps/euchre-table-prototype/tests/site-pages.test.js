@@ -1,13 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import http from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const appRoot = new URL("../", import.meta.url);
 const adminKey = "Zxcvfdsaqwer1287!";
+const freePlayDisclaimer = "1v1 Euchre is free-play only. There are no cash games, wagers, buy-ins, deposits, payouts, or paid prize pools.";
 
 test("home screen has the main routes and actions", async () => {
   const html = await readText("home.html");
@@ -69,6 +70,7 @@ test("shared info panel has Euchre help pages and Discord action", async () => {
   assert.match(infoClient, /View Tournament History/);
   assert.match(infoClient, /Discord \/ Community/);
   assert.match(infoClient, /Join the Discord/);
+  assert.match(infoClient, new RegExp(escapeRegExp(freePlayDisclaimer)));
   assert.match(infoClient, /event\.key === "Escape"/);
   assert.match(infoClient, /event\.target === overlay/);
   assert.match(homeClient, /setupInfoPanel\(\)/);
@@ -114,6 +116,7 @@ test("rules screen includes the core Euchre rule copy", async () => {
   assert.match(html, /First to 10/);
   assert.match(html, /Stick the Dealer is ON/);
   assert.match(html, /Fair Play/);
+  assert.match(html, new RegExp(escapeRegExp(freePlayDisclaimer)));
   assert.match(html, /Support/);
   assert.match(html, /hidden hands stay private/);
   assert.match(css, /\.shell:not\(\.master-shell\) \.rules-panel/);
@@ -246,6 +249,7 @@ test("game screen owns gameplay interface and is guarded until start", async () 
   const html = await readText("game.html");
   const client = await readText("src/room-client.js");
 
+  assert.match(html, /class="master-shell game-shell game-screen"/);
   assert.match(html, /id="scoreband" class="scoreband" aria-label="Match score" hidden/);
   assert.match(html, /id="roomTable" class="table-grid room-table" hidden/);
   assert.doesNotMatch(html, /id="pregameTargetScore">10<\/strong>/);
@@ -262,10 +266,55 @@ test("game screen owns gameplay interface and is guarded until start", async () 
   assert.doesNotMatch(html, /Player 2/);
   assert.match(client, /const gamePagePhases = \["playing", "hand_score", "next_round_countdown", "match_complete"\]/);
   assert.match(client, /function isGamePagePhase\(phase\)/);
+  assert.match(client, /gameShell: document\.querySelector\("\.game-shell"\)/);
+  assert.match(client, /updateGameLayoutState\(gameInterfaceActive, state\)/);
+  assert.match(client, /document\.body\.classList\.toggle\("room-active", active\)/);
   assert.match(client, /isRoomPage && isGamePagePhase\(phase\)/);
   assert.match(client, /\.\/game\.html\?room=\$\{roomCode\}/);
   assert.match(client, /isGamePage && !isGamePagePhase\(phase\)/);
   assert.match(client, /\.\/room\.html\?room=\$\{roomCode\}/);
+});
+
+test("kitty upcard uses branded card stack with Jack-only portrait", async () => {
+  const client = await readText("src/room-client.js");
+  const css = await readText("src/styles.css");
+
+  assert.match(client, /elements\.upcard\.className = card \? "upcard kitty-stack" : "upcard empty"/);
+  assert.match(client, /kitty-card-back kitty-card-back-bottom/);
+  assert.match(client, /kitty-card-back kitty-card-back-top/);
+  assert.match(client, /cardClassNames\(card, \["upcard-card"\]\)/);
+  assert.match(client, /card\.rank === "J"/);
+  assert.match(client, /jack-portrait/);
+  assert.match(client, /rank-large/);
+  assert.match(client, /suit-large/);
+  assert.match(client, /isRed\(card\.suit\) \? "red" : "black"/);
+  assert.match(css, /\.upcard-card/);
+  assert.match(css, /\.kitty-card-back/);
+  assert.match(css, /\.card-back::after[\s\S]*content: "1v1"/);
+  assert.match(css, /\.card\.black[\s\S]*color: var\(--ink\)/);
+  assert.match(css, /\.card\.red[\s\S]*color: #b32925/);
+  assert.match(css, /\.jack-portrait/);
+  assert.match(css, /\.suit-large[\s\S]*font-size: clamp/);
+  assert.match(css, /\.game-screen\.room-active \.upcard-card[\s\S]*min-height: 96px/);
+});
+
+test("mobile active game layout keeps play areas compact and reachable", async () => {
+  const css = await readText("src/styles.css");
+
+  assert.match(css, /body\.room-active[\s\S]*min-height: 100dvh/);
+  assert.match(css, /\.game-screen\.room-active[\s\S]*min-height: 100dvh/);
+  assert.match(css, /\.game-screen\.room-active[\s\S]*padding: 8px 0 calc\(10px \+ env\(safe-area-inset-bottom\)\)/);
+  assert.match(css, /grid-template-areas:[\s\S]*"opponent"[\s\S]*"center"[\s\S]*"player"/);
+  assert.match(css, /\.game-screen\.room-active \.room-table > \.player-panel:first-child[\s\S]*position: sticky/);
+  assert.match(css, /bottom: calc\(4px \+ env\(safe-area-inset-bottom\)\)/);
+  assert.match(css, /\.game-screen\.room-active \.room-table > \.center-panel[\s\S]*"upcard trick"/);
+  assert.match(css, /\.game-screen\.room-active \.history[\s\S]*display: none/);
+  assert.match(css, /\.game-screen\.room-active \.trump-action-bar[\s\S]*position: sticky/);
+  assert.match(css, /\.game-screen\.room-active \.trump-action-bar button[\s\S]*min-height: 46px/);
+  assert.match(css, /\.game-screen\.room-active \.hand[\s\S]*repeat\(5, minmax\(0, 1fr\)\)/);
+  assert.match(css, /\.game-screen\.room-active \.card-backs \.card[\s\S]*width: 22px/);
+  assert.match(css, /\.card:disabled[\s\S]*color: var\(--ink\)/);
+  assert.match(css, /\.card\.red:disabled[\s\S]*color: #b32925/);
 });
 
 test("mobile trump actions render in a main action bar", async () => {
@@ -494,7 +543,7 @@ test("tester launch checklist covers room, tournament, spectator, and mobile che
   assert.match(checklist, /Confirm champion display appears/);
   assert.match(checklist, /hidden hands stay private/);
   assert.match(checklist, /no horizontal page overflow/);
-  assert.match(checklist, /No cash games\. No deposits\. No wallets\. No paid entries\./);
+  assert.match(checklist, new RegExp(escapeRegExp(freePlayDisclaimer)));
 });
 
 test("production launch checklist covers live domain safety checks", async () => {
@@ -510,7 +559,7 @@ test("production launch checklist covers live domain safety checks", async () =>
   assert.match(checklist, /Join 4 players/);
   assert.match(checklist, /champion screen appears/);
   assert.match(checklist, /spectators cannot see hidden hands/);
-  assert.match(checklist, /No cash games\. No deposits\. No wallets\. No paid entries\./);
+  assert.match(checklist, new RegExp(escapeRegExp(freePlayDisclaimer)));
   assert.match(checklist, /mobile layout works/);
 });
 
@@ -520,8 +569,7 @@ test("tester announcement draft is Discord-safe and asks for bug screenshots", a
 
   assert.match(announcement, /1V1 Euchre Free Play/);
   assert.match(announcement, /https:\/\/1v1euchre\.com/);
-  assert.match(announcement, /free-play only/);
-  assert.match(announcement, /No cash games\. No deposits\. No wallets\. No paid entries\./);
+  assert.match(announcement, new RegExp(escapeRegExp(freePlayDisclaimer)));
   assert.match(announcement, /screenshot or screen recording/);
 });
 
@@ -1633,48 +1681,18 @@ test("corrupt persistence file does not crash server", async () => {
   });
 });
 
-test("app-facing files avoid restricted commerce wording except approved disclaimers", async () => {
-  const files = [
-    "home.html",
-    "rules.html",
-    "room.html",
-    "tournament.html",
-    "tournament-history.html",
-    "DEPLOYMENT_NOTES.md",
-    "TESTER_LAUNCH_CHECKLIST.md",
-    "PRODUCTION_LAUNCH_CHECKLIST.md",
-    "TESTER_ANNOUNCEMENT_DRAFT.md",
-    "src/home-client.js",
-    "src/room-client.js",
-    "src/tournament-client.js",
-    "src/tournament-history-client.js"
-  ];
-  const restricted = [
-    ["cash game"].join(""),
-    ["real ", "money"].join(""),
-    ["dep", "osit"].join(""),
-    ["withdraw", "al"].join(""),
-    ["wal", "let"].join(""),
-    ["pr", "ize"].join(""),
-    ["gam", "bling"].join(""),
-    ["b", "et"].join(""),
-    ["wa", "ger"].join("")
-  ];
-  const allowedDisclaimers = [
-    "No cash games.",
-    "No deposits.",
-    "No wallets.",
-    "No paid entries."
-  ];
+test("public app files avoid restricted commerce wording except the approved free-play disclaimer", async () => {
+  const files = await listPublicTextFiles();
+  const restricted = /\b(cash games?|cash|bets?|betting|wagers?|wagering|gamble|gambling|buy-ins?|entry fees?|payouts?|prize pools?|prizes?|deposits?|withdraw|withdrawal|casino|real money|paid tournaments?|paid entries?)\b/i;
+
+  assert.ok(files.includes("home.html"));
+  assert.ok(files.includes("rules.html"));
+  assert.ok(files.includes("src/info-panel.js"));
 
   for (const file of files) {
-    let text = await readText(file);
-    for (const allowed of allowedDisclaimers) {
-      text = text.replaceAll(allowed, "");
-    }
-    for (const term of restricted) {
-      assert.equal(text.toLowerCase().includes(term), false, `${file} contains restricted wording`);
-    }
+    const rawText = await readText(file);
+    const text = rawText.replaceAll(freePlayDisclaimer, "");
+    assert.equal(restricted.test(text), false, `${file} contains restricted public wording`);
   }
 });
 
@@ -1703,6 +1721,35 @@ test("user-facing pages do not contain local-only links", async () => {
 
 async function readText(path) {
   return readFile(new URL(path, appRoot), "utf8");
+}
+
+async function listPublicTextFiles(relativeDir = ".") {
+  const ignoredDirectories = new Set([".data", "node_modules", "tests"]);
+  const allowedExtensions = /\.(css|html|js|json|md)$/;
+  const dirUrl = new URL(relativeDir === "." ? "./" : `${relativeDir}/`, appRoot);
+  const entries = await readdir(dirUrl, { withFileTypes: true });
+  const files = [];
+
+  for (const entry of entries) {
+    if (entry.name.startsWith(".") && entry.name !== ".well-known") continue;
+    const relativePath = relativeDir === "." ? entry.name : `${relativeDir}/${entry.name}`;
+
+    if (entry.isDirectory()) {
+      if (ignoredDirectories.has(entry.name)) continue;
+      files.push(...await listPublicTextFiles(relativePath));
+      continue;
+    }
+
+    if (entry.isFile() && allowedExtensions.test(entry.name)) {
+      files.push(relativePath);
+    }
+  }
+
+  return files;
+}
+
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function withTempStateFile(callback) {

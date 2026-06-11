@@ -13,6 +13,7 @@ const guestPlayerIdKey = "euchre.guestPlayerId";
 const accountProfileKey = "euchre.accountProfile";
 const homepageSettingsKey = "euchreHomepageSettings";
 const elements = {
+  gameShell: document.querySelector(".game-shell"),
   activeRoomControls: document.querySelector("#activeRoomControls"),
   copyCodeButton: document.querySelector("#copyCodeButton"),
   copySpectatorLinkButton: document.querySelector("#copySpectatorLinkButton"),
@@ -548,6 +549,7 @@ function startPolling() {
 
 function render() {
   if (!roomView) {
+    updateGameLayoutState(false);
     setHidden(elements.invitePanel, true);
     setHidden(elements.coinFlipPanel, true);
     elements.coinFlipPanel?.replaceChildren();
@@ -568,6 +570,7 @@ function render() {
   const opponentSeat = viewerSeat === "player1" ? "player2" : "player1";
   const playerCount = Number(roomView.players.player1) + Number(roomView.players.player2);
   const gameInterfaceActive = isGamePage && isGamePagePhase(state.phase);
+  updateGameLayoutState(gameInterfaceActive, state);
   const trumpSuit = activeTrumpSuit(state);
   const raceTo = roomView.matchSettings?.raceTo ?? state.targetScore ?? 10;
   const raceToDebugKey = `${roomView.roomCode}:${roomView.matchSettings?.raceTo}:${state.targetScore}`;
@@ -645,6 +648,17 @@ function render() {
     renderOpponentHand(state, viewerSeat, opponentSeat);
     renderCurrentTrick(state);
     renderTrickHistory(state);
+  }
+}
+
+function updateGameLayoutState(active, state = {}) {
+  if (!isGamePage) return;
+
+  document.body.classList.toggle("room-active", active);
+  elements.gameShell?.classList.toggle("room-active", active);
+  if (elements.gameShell) {
+    elements.gameShell.dataset.phase = active ? state.phase ?? "" : "";
+    elements.gameShell.dataset.actionPhase = active ? state.actionPhase ?? "" : "";
   }
 }
 
@@ -764,7 +778,7 @@ function renderViewerHand(state, viewerSeat) {
     const legal = discardable || state.playableCards.some((candidate) => cardsEqual(candidate, card));
     const button = document.createElement("button");
     button.type = "button";
-    button.className = ["card", isRed(card.suit) ? "red" : "", legal ? "legal" : ""].filter(Boolean).join(" ");
+    button.className = cardClassNames(card, [legal ? "legal" : ""]);
     button.innerHTML = cardMarkup(card);
     button.disabled = !legal;
     button.addEventListener("click", () => sendAction({ type: discardable ? "discard" : "playCard", card }).catch((error) => setStatus(error.message)));
@@ -788,8 +802,15 @@ function renderOpponentHand(state, viewerSeat, opponentSeat) {
 
 function renderUpcard(card) {
   if (!elements.upcard) return;
-  elements.upcard.className = `upcard ${card && isRed(card.suit) ? "red" : ""}`;
-  elements.upcard.innerHTML = card ? cardMarkup(card) : "No cards dealt";
+  elements.upcard.className = card ? "upcard kitty-stack" : "upcard empty";
+  elements.upcard.setAttribute("aria-label", card ? `${card.rank} of ${suitName(card.suit)} upcard on kitty` : "No cards dealt");
+  elements.upcard.innerHTML = card
+    ? `
+      <span class="kitty-card-back kitty-card-back-bottom" aria-hidden="true"></span>
+      <span class="kitty-card-back kitty-card-back-top" aria-hidden="true"></span>
+      <span class="${cardClassNames(card, ["upcard-card"])}">${cardMarkup(card)}</span>
+    `
+    : "No cards dealt";
 }
 
 function renderCurrentTrick(state) {
@@ -798,7 +819,7 @@ function renderCurrentTrick(state) {
 
   for (const play of state.currentTrick) {
     const div = document.createElement("div");
-    div.className = `card ${isRed(play.card.suit) ? "red" : ""}`;
+    div.className = cardClassNames(play.card);
     div.innerHTML = `<span>${getPlayerDisplayName(play.player)}</span>${cardMarkup(play.card)}`;
     elements.currentTrick.append(div);
   }
@@ -846,7 +867,35 @@ function setDisabled(element, disabled) {
 }
 
 function cardMarkup(card) {
-  return `<span><span class="rank">${card.rank}</span><span class="suit">${suitSymbol(card.suit)}</span></span>`;
+  const symbol = suitSymbol(card.suit);
+  const isJack = card.rank === "J";
+  const centerMarkup = isJack
+    ? `
+      <span class="jack-portrait" aria-hidden="true">
+        <span class="jack-head"></span>
+        <span class="jack-body"></span>
+        <span class="jack-suit">${symbol}</span>
+      </span>
+    `
+    : `<span class="rank-large">${card.rank}</span><span class="suit suit-large">${symbol}</span>`;
+
+  return `
+    <span class="card-face-inner">
+      <span class="card-corner card-corner-top"><span class="rank">${card.rank}</span><span class="suit">${symbol}</span></span>
+      <span class="card-center">${centerMarkup}</span>
+      <span class="card-corner card-corner-bottom"><span class="rank">${card.rank}</span><span class="suit">${symbol}</span></span>
+    </span>
+  `;
+}
+
+function cardClassNames(card, extraClasses = []) {
+  return [
+    "card",
+    isRed(card.suit) ? "red" : "black",
+    `suit-${card.suit}`,
+    card.rank === "J" ? "face-jack" : "rank-card",
+    ...extraClasses
+  ].filter(Boolean).join(" ");
 }
 
 function setStatus(message) {
