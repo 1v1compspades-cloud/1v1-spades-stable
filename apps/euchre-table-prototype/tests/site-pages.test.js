@@ -910,6 +910,24 @@ test("quick match API persists waiting entries and creates matched rooms", async
       assert.equal(first.body.queue.status, "waiting");
       assert.equal(first.body.matched, false);
       firstQueueId = first.body.queue.queueId;
+
+      const debugQueue = await requestJson(port, "/api/debug/quick-match");
+      assert.equal(debugQueue.statusCode, 200);
+      assert.equal(debugQueue.body.queue.length, 1);
+      assert.equal(debugQueue.body.queue[0].queueId, firstQueueId);
+      assert.equal(debugQueue.body.queue[0].status, "waiting");
+      assert.equal(debugQueue.body.queue[0].raceTo, 5);
+      assert.equal(debugQueue.body.queue[0].hasAccountId, true);
+      assert.equal(debugQueue.body.queue[0].normalizedDisplayName, "queue alice");
+      assert.equal(debugQueue.body.queue[0].matchedRoomCode, null);
+      assert.equal("playerId" in debugQueue.body.queue[0], false);
+      assert.equal("accountId" in debugQueue.body.queue[0], false);
+      const debugJson = JSON.stringify(debugQueue.body);
+      assert.equal(debugJson.includes("\"playerId\""), false);
+      assert.equal(debugJson.includes("\"accountId\""), false);
+      assert.equal(debugJson.includes("seatToken"), false);
+      assert.equal(debugJson.includes("adminKey"), false);
+      assert.equal(debugJson.includes("hiddenHands"), false);
     } finally {
       await stopServer(server);
     }
@@ -1011,7 +1029,9 @@ test("quick match API persists waiting entries and creates matched rooms", async
       });
       assert.equal(hostReenter.statusCode, 200);
       assert.equal(hostReenter.body.queue.queueId, firstQueueId);
+      assert.equal(hostReenter.body.matched, true);
       assert.equal(hostReenter.body.matchedRoomCode, matched.body.matchedRoomCode);
+      assert.equal(hostReenter.body.room.viewerSeat, "player1");
 
       const cancelled = await requestJson(port, "/api/quick-match/cancel", {
         method: "POST",
@@ -1022,6 +1042,147 @@ test("quick match API persists waiting entries and creates matched rooms", async
       });
       assert.equal(cancelled.statusCode, 200);
       assert.equal(cancelled.body.queue.status, "cancelled");
+
+      const privateRoom = await requestJson(port, "/api/rooms", {
+        method: "POST",
+        body: {
+          displayName: "Private Host",
+          playerId: "private-host-device",
+          matchSettings: {
+            modeId: "communityCompetitive",
+            raceTo: 5,
+            stickTheDealer: true
+          }
+        }
+      });
+      assert.equal(privateRoom.statusCode, 201);
+
+      const privateJoin = await requestJson(port, `/api/rooms/${privateRoom.body.room.roomCode}/join`, {
+        method: "POST",
+        body: {
+          displayName: "Private Guest",
+          playerId: "private-guest-device"
+        }
+      });
+      assert.equal(privateJoin.statusCode, 200);
+      assert.equal(privateJoin.body.room.playerNames.player1, "Private Host");
+      assert.equal(privateJoin.body.room.playerNames.player2, "Private Guest");
+    } finally {
+      await stopServer(server);
+    }
+  });
+});
+
+test("quick match API matches different accounts and account versus guest", async () => {
+  await withTempStateFile(async (stateFile) => {
+    const port = 5218;
+    const server = await startTestServer(port, stateFile);
+
+    try {
+      const alice = await requestJson(port, "/api/accounts/upgrade", {
+        method: "POST",
+        body: {
+          username: "qm_alice",
+          displayName: "QM Alice"
+        }
+      });
+      const bob = await requestJson(port, "/api/accounts/upgrade", {
+        method: "POST",
+        body: {
+          username: "qm_bob",
+          displayName: "QM Bob"
+        }
+      });
+
+      const aliceQueue = await requestJson(port, "/api/quick-match", {
+        method: "POST",
+        body: {
+          displayName: "QM Alice",
+          playerId: "qm-alice-device",
+          accountId: alice.body.account.accountId,
+          matchSettings: {
+            modeId: "communityCompetitive",
+            raceTo: 10,
+            stickTheDealer: true
+          }
+        }
+      });
+      assert.equal(aliceQueue.statusCode, 202);
+
+      const bobMatch = await requestJson(port, "/api/quick-match", {
+        method: "POST",
+        body: {
+          displayName: "QM Bob",
+          playerId: "qm-bob-device",
+          accountId: bob.body.account.accountId,
+          matchSettings: {
+            modeId: "communityCompetitive",
+            raceTo: 10,
+            stickTheDealer: true
+          }
+        }
+      });
+      assert.equal(bobMatch.statusCode, 200);
+      assert.equal(bobMatch.body.matched, true);
+      assert.ok(bobMatch.body.matchedRoomCode);
+      assert.equal(bobMatch.body.room.viewerSeat, "player2");
+
+      const alicePoll = await requestJson(port, "/api/quick-match", {
+        method: "POST",
+        body: {
+          displayName: "QM Alice",
+          playerId: "qm-alice-device",
+          accountId: alice.body.account.accountId,
+          matchSettings: {
+            modeId: "communityCompetitive",
+            raceTo: 10,
+            stickTheDealer: true
+          }
+        }
+      });
+      assert.equal(alicePoll.statusCode, 200);
+      assert.equal(alicePoll.body.matched, true);
+      assert.equal(alicePoll.body.matchedRoomCode, bobMatch.body.matchedRoomCode);
+      assert.equal(alicePoll.body.room.viewerSeat, "player1");
+
+      const registered = await requestJson(port, "/api/accounts/upgrade", {
+        method: "POST",
+        body: {
+          username: "registered_live",
+          displayName: "Registered Live"
+        }
+      });
+      const registeredWaiting = await requestJson(port, "/api/quick-match", {
+        method: "POST",
+        body: {
+          displayName: "Registered Live",
+          playerId: "registered-device",
+          accountId: registered.body.account.accountId,
+          matchSettings: {
+            modeId: "communityCompetitive",
+            raceTo: 5,
+            stickTheDealer: true
+          }
+        }
+      });
+      assert.equal(registeredWaiting.statusCode, 202);
+
+      const differentGuest = await requestJson(port, "/api/quick-match", {
+        method: "POST",
+        body: {
+          displayName: "Legit Guest",
+          playerId: "legit-guest-device",
+          matchSettings: {
+            modeId: "communityCompetitive",
+            raceTo: 5,
+            stickTheDealer: true
+          }
+        }
+      });
+      assert.equal(differentGuest.statusCode, 200);
+      assert.equal(differentGuest.body.matched, true);
+      assert.equal(differentGuest.body.room.playerNames.player1, "Registered Live");
+      assert.equal(differentGuest.body.room.playerNames.player2, "Legit Guest");
     } finally {
       await stopServer(server);
     }

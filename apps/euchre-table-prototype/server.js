@@ -35,6 +35,8 @@ import {
 } from "./src/tournament-history-state.js";
 import {
   cancelQuickMatchQueue,
+  debugQuickMatchQueue,
+  expireQuickMatchQueue,
   enterQuickMatchQueue
 } from "./src/quick-match-state.js";
 import {
@@ -175,6 +177,16 @@ async function handleApi(request, response) {
 
     sendJson(response, 200, {
       queue: entry
+    });
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/debug/quick-match") {
+    const expired = expireQuickMatchQueue(quickMatchQueue);
+    if (expired) persistState();
+
+    sendJson(response, 200, {
+      queue: debugQuickMatchQueue(quickMatchQueue)
     });
     return;
   }

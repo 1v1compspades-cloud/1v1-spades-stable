@@ -19,7 +19,7 @@ export function enterQuickMatchQueue(quickMatchQueue, {
     throw queueError(400, "Player identity is required for Quick Match");
   }
 
-  expireWaitingEntries(quickMatchQueue, now);
+  expireQuickMatchQueue(quickMatchQueue, now);
 
   const existingEntry = findActiveEntryForPlayer(quickMatchQueue, {
     playerId: normalizedPlayerId,
@@ -89,7 +89,7 @@ export function enterQuickMatchQueue(quickMatchQueue, {
 }
 
 export function cancelQuickMatchQueue(quickMatchQueue, { playerId, accountId, queueId, now = Date.now() } = {}) {
-  expireWaitingEntries(quickMatchQueue, now);
+  expireQuickMatchQueue(quickMatchQueue, now);
 
   const entry = queueId
     ? quickMatchQueue.get(queueId)
@@ -128,14 +128,40 @@ export function sanitizeQueueEntry(entry) {
   };
 }
 
-function expireWaitingEntries(quickMatchQueue, now) {
+export function expireQuickMatchQueue(quickMatchQueue, now = Date.now()) {
+  let changed = false;
+
   for (const entry of quickMatchQueue.values()) {
-    if (entry.status !== "waiting") continue;
-    if (now - Date.parse(entry.createdAt) >= QUICK_MATCH_EXPIRY_MS) {
+    if (!["waiting", "matched"].includes(entry.status)) continue;
+
+    const expiresFrom = entry.status === "matched"
+      ? entry.matchedAt ?? entry.createdAt
+      : entry.createdAt;
+    if (now - Date.parse(expiresFrom) >= QUICK_MATCH_EXPIRY_MS) {
       entry.status = "expired";
       entry.expiredAt = new Date(now).toISOString();
+      changed = true;
     }
   }
+
+  return changed;
+}
+
+export function debugQuickMatchQueue(quickMatchQueue, now = Date.now()) {
+  expireQuickMatchQueue(quickMatchQueue, now);
+
+  return [...quickMatchQueue.values()]
+    .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
+    .map((entry) => ({
+      queueId: entry.queueId,
+      status: entry.status,
+      raceTo: entry.matchSettings?.raceTo ?? null,
+      hasAccountId: Boolean(entry.accountId),
+      normalizedDisplayName: normalizeIdentityName(entry.displayName),
+      createdAt: entry.createdAt,
+      ageSeconds: Math.max(0, Math.floor((now - Date.parse(entry.createdAt)) / 1000)),
+      matchedRoomCode: entry.status === "matched" ? entry.matchedRoomCode ?? null : null
+    }));
 }
 
 function findActiveEntryForPlayer(quickMatchQueue, identity) {

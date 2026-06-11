@@ -26,6 +26,42 @@ test("second compatible player matches and creates room", () => {
   assert.equal([...queue.values()].every((entry) => entry.status === "matched"), true);
 });
 
+test("two different accounts with different usernames match", () => {
+  const queue = new Map();
+  enterQueue(queue, {
+    playerId: "alice-device",
+    accountId: "acct-alice",
+    displayName: "Alice",
+    identityNames: ["alice_user", "Alice"]
+  });
+  const result = enterQueue(queue, {
+    playerId: "bob-device",
+    accountId: "acct-bob",
+    displayName: "Bob",
+    identityNames: ["bob_user", "Bob"]
+  });
+
+  assert.equal(result.matched, true);
+  assert.equal(result.entry.matchedRoomCode, "MATCH1");
+});
+
+test("account and guest with different names match", () => {
+  const queue = new Map();
+  enterQueue(queue, {
+    playerId: "alice-device",
+    accountId: "acct-alice",
+    displayName: "Alice",
+    identityNames: ["alice_user", "Alice"]
+  });
+  const result = enterQueue(queue, {
+    playerId: "guest-device",
+    displayName: "Guest Bob"
+  });
+
+  assert.equal(result.matched, true);
+  assert.equal(result.entry.matchedRoomCode, "MATCH1");
+});
+
 test("same playerId cannot match itself and returns existing waiting entry", () => {
   const queue = new Map();
   const first = enterQueue(queue, { playerId: "same-player", displayName: "Alice" });
@@ -116,6 +152,30 @@ test("expired entries are ignored", () => {
   assert.equal(result.matched, false);
   assert.equal([...queue.values()].find((entry) => entry.playerId === "old").status, "expired");
   assert.equal([...queue.values()].find((entry) => entry.playerId === "new").status, "waiting");
+});
+
+test("stale matched entries do not block fresh matches", () => {
+  const queue = new Map();
+  const now = Date.parse("2026-06-10T12:00:00.000Z");
+  enterQueue(queue, { playerId: "old-alice", displayName: "Alice", now });
+  enterQueue(queue, { playerId: "old-bob", displayName: "Bob", now });
+
+  const freshAlice = enterQueue(queue, {
+    playerId: "fresh-alice",
+    displayName: "Alice",
+    now: now + 5 * 60 * 1000 + 1
+  });
+  const freshBob = enterQueue(queue, {
+    playerId: "fresh-bob",
+    displayName: "Bob",
+    now: now + 5 * 60 * 1000 + 2
+  });
+
+  assert.equal(freshAlice.matched, false);
+  assert.equal(freshAlice.entry.status, "waiting");
+  assert.equal(freshBob.matched, true);
+  assert.equal(freshBob.entry.matchedRoomCode, "MATCH2");
+  assert.equal([...queue.values()].filter((entry) => entry.status === "expired").length, 2);
 });
 
 test("refresh re-enter queue returns existing matched entry", () => {
