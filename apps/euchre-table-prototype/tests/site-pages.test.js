@@ -11,6 +11,7 @@ const adminKey = "Zxcvfdsaqwer1287!";
 
 test("home screen has the main routes and actions", async () => {
   const html = await readText("home.html");
+  const client = await readText("src/home-client.js");
   const publicActions = html.match(/<section class="home-action-panel"[\s\S]*?<\/section>/)?.[0] ?? "";
 
   assert.match(html, /<title>1v1 Euchre<\/title>/);
@@ -25,6 +26,8 @@ test("home screen has the main routes and actions", async () => {
   assert.match(publicActions, /id="homeJoinRoomButton"/);
   assert.match(publicActions, /Find Quick Match/);
   assert.match(publicActions, /Cancel Queue/);
+  assert.match(publicActions, /id="leaveCurrentRoomButton"/);
+  assert.match(publicActions, /Leave current room/);
   assert.match(publicActions, /Profile/);
   assert.match(publicActions, /Leaderboard/);
   assert.match(publicActions, /Rules/);
@@ -41,6 +44,10 @@ test("home screen has the main routes and actions", async () => {
   assert.match(html, /Create Tournament/);
   assert.match(html, /Tournament settings/);
   assert.match(html, /Host tournament tools/);
+  assert.match(client, /clearSavedActiveRoom\(localStorage, savedRoom\.roomCode\)/);
+  assert.match(client, /loadSavedActiveRoom\(\)/);
+  assert.match(client, /roomHasStarted\(room\)/);
+  assert.match(client, /window\.history\.replaceState\(null, "", "\.\/home\.html"\)/);
 });
 
 test("shared info panel has Euchre help pages and Discord action", async () => {
@@ -119,11 +126,15 @@ test("profile screen supports lightweight account upgrade", async () => {
   assert.match(html, /id="profileForm"/);
   assert.match(html, /id="profileDisplayName"/);
   assert.match(html, /id="profileUsername"/);
+  assert.match(html, /id="leaveCurrentRoomButton"/);
+  assert.match(html, /Leave current room/);
   assert.match(html, /Save Profile/);
   assert.match(client, /accountProfileKey = "euchre\.accountProfile"/);
   assert.match(client, /\/api\/accounts\/upgrade/);
   assert.match(client, /\/api\/profile\?accountId=/);
   assert.match(client, /playerId: getGuestPlayerId\(\)/);
+  assert.match(client, /clearSavedActiveRoom\(localStorage, savedRoom\.roomCode\)/);
+  assert.match(client, /window\.location\.href = "\.\/home\.html"/);
 });
 
 test("leaderboard screen renders public standings table", async () => {
@@ -309,15 +320,16 @@ test("invite links use the public room route without the app subdirectory", asyn
 
 test("room client restores stored seat sessions by room code", async () => {
   const client = await readText("src/room-client.js");
+  const helper = await readText("src/local-room-session.js");
 
-  assert.match(client, /roomSeatTokenPrefix = "euchre\.room\."/);
+  assert.match(helper, /roomSeatTokenPrefix = "euchre\.room\."/);
   assert.match(client, /guestPlayerIdKey = "euchre\.guestPlayerId"/);
-  assert.match(client, /function roomSeatTokenKey\(roomCode\)/);
+  assert.match(helper, /function roomSeatTokenKey\(roomCode\)/);
   assert.match(client, /function getGuestPlayerId\(\)/);
   assert.match(client, /localStorage\.setItem\(roomSeatTokenKey\(normalizedRoomCode\), seatToken\)/);
   assert.match(client, /localStorage\.setItem\(guestPlayerIdKey, playerId\)/);
   assert.match(client, /localStorage\.getItem\(roomSeatTokenKey\(normalizedRoomCode\)\)/);
-  assert.match(client, /roomSessionsKey = "euchreRoomSeatsByRoom"/);
+  assert.match(helper, /roomSessionsKey = "euchreRoomSeatsByRoom"/);
   assert.match(client, /accountProfileKey = "euchre\.accountProfile"/);
   assert.match(client, /urlRoomCode = urlParams\.get\("room"\)\?\.toUpperCase\(\) \?\? null/);
   assert.match(client, /session = loadSession\(urlRoomCode\)/);
@@ -332,6 +344,7 @@ test("room client restores stored seat sessions by room code", async () => {
   assert.match(client, /new URLSearchParams\(currentIdentityPayload\(\)\)/);
   assert.match(client, /if \(result\.seatToken && result\.room\.viewerSeat !== "spectator"\)/);
   assert.match(client, /setSession\(result\.room\.roomCode, result\.seatToken\)/);
+  assert.match(client, /clearSavedActiveRoom\(localStorage, roomCode\)/);
   assert.match(client, /showJoinFallback = viewerSeat === "spectator" && roomView\.alreadySeated !== true && !roomView\.players\.player2/);
   assert.match(client, /function joinNameAlreadySeated\(displayName\)/);
   assert.match(client, /This account or name is already seated in this room\./);

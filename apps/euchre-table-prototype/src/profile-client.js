@@ -1,4 +1,5 @@
 import { setupInfoPanel } from "./info-panel.js";
+import { clearSavedActiveRoom, loadSavedActiveRoom } from "./local-room-session.js";
 
 const accountProfileKey = "euchre.accountProfile";
 const guestPlayerIdKey = "euchre.guestPlayerId";
@@ -8,6 +9,7 @@ const elements = {
   form: document.querySelector("#profileForm"),
   displayName: document.querySelector("#profileDisplayName"),
   username: document.querySelector("#profileUsername"),
+  leaveCurrentRoom: document.querySelector("#leaveCurrentRoomButton"),
   displayValue: document.querySelector("#profileDisplayValue"),
   usernameValue: document.querySelector("#profileUsernameValue"),
   status: document.querySelector("#profileStatus")
@@ -54,6 +56,10 @@ elements.form.addEventListener("submit", async (event) => {
   }
 });
 
+elements.leaveCurrentRoom?.addEventListener("click", async () => {
+  await leaveCurrentRoom();
+});
+
 async function saveProfile({ displayName, username }) {
   const existingAccount = loadAccount();
   const result = await api("/api/accounts/upgrade", {
@@ -66,6 +72,43 @@ async function saveProfile({ displayName, username }) {
     }
   });
   return result.account;
+}
+
+async function leaveCurrentRoom() {
+  const savedRoom = loadSavedActiveRoom();
+  if (!savedRoom?.roomCode) {
+    setStatus("No current room saved on this device.");
+    return;
+  }
+
+  try {
+    const room = await fetchSavedRoom(savedRoom);
+    if (roomHasStarted(room) && !window.confirm("This game already started. Leave this device's saved room? This only clears this browser and does not delete or forfeit the room.")) {
+      setStatus("Still restoring current room.");
+      return;
+    }
+  } catch {
+    // If the room cannot be checked, clearing local restore data is still safe.
+  }
+
+  clearSavedActiveRoom(localStorage, savedRoom.roomCode);
+  window.location.href = "./home.html";
+}
+
+async function fetchSavedRoom(savedRoom) {
+  const query = new URLSearchParams({
+    seatToken: savedRoom.seatToken ?? "",
+    playerId: savedRoom.playerId ?? getGuestPlayerId()
+  });
+  const accountId = savedRoom.accountId ?? loadAccount()?.accountId;
+  if (accountId) query.set("accountId", accountId);
+
+  const result = await api(`/api/rooms/${encodeURIComponent(savedRoom.roomCode)}?${query.toString()}`);
+  return result.room;
+}
+
+function roomHasStarted(room) {
+  return ["playing", "hand_score", "next_round_countdown", "match_complete"].includes(room?.gameState?.phase);
 }
 
 async function refreshProfile(accountId) {

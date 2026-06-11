@@ -1,7 +1,9 @@
 import { setupInfoPanel } from "./info-panel.js";
+import { clearSavedActiveRoom, loadSavedActiveRoom } from "./local-room-session.js";
 
 const quickMatchButton = document.querySelector("#quickMatchButton");
 const cancelQuickMatchButton = document.querySelector("#cancelQuickMatchButton");
+const leaveCurrentRoomButton = document.querySelector("#leaveCurrentRoomButton");
 const quickMatchStatus = document.querySelector("#quickMatchStatus");
 const homeJoinRoomCode = document.querySelector("#homeJoinRoomCode");
 const homeJoinRoomButton = document.querySelector("#homeJoinRoomButton");
@@ -43,6 +45,10 @@ quickMatchButton.addEventListener("click", async () => {
 
 cancelQuickMatchButton.addEventListener("click", async () => {
   await cancelQuickMatchQueue();
+});
+
+leaveCurrentRoomButton?.addEventListener("click", async () => {
+  await leaveCurrentRoom();
 });
 
 createRoomLink.addEventListener("click", (event) => {
@@ -136,6 +142,49 @@ async function cancelQuickMatchQueue() {
   } finally {
     cancelQuickMatchButton.disabled = false;
   }
+}
+
+async function leaveCurrentRoom() {
+  const savedRoom = loadSavedActiveRoom();
+  if (!savedRoom?.roomCode) {
+    quickMatchStatus.textContent = "No current room saved on this device.";
+    return;
+  }
+
+  try {
+    const room = await fetchSavedRoom(savedRoom);
+    if (roomHasStarted(room) && !window.confirm("This game already started. Leave this device's saved room? This only clears this browser and does not delete or forfeit the room.")) {
+      quickMatchStatus.textContent = "Still restoring current room.";
+      return;
+    }
+  } catch {
+    // If the room no longer exists or cannot be checked, it is still safe to clear local restore data.
+  }
+
+  const cleared = clearSavedActiveRoom(localStorage, savedRoom.roomCode);
+  quickMatchStatus.textContent = cleared?.roomCode
+    ? `Left saved room ${cleared.roomCode} on this device.`
+    : "Left saved room on this device.";
+  window.history.replaceState(null, "", "./home.html");
+}
+
+async function fetchSavedRoom(savedRoom) {
+  const identity = currentIdentityPayload();
+  const query = new URLSearchParams({
+    seatToken: savedRoom.seatToken ?? "",
+    playerId: savedRoom.playerId ?? identity.playerId
+  });
+  const accountId = savedRoom.accountId ?? identity.accountId;
+  if (accountId) query.set("accountId", accountId);
+
+  const response = await fetch(`/api/rooms/${encodeURIComponent(savedRoom.roomCode)}?${query.toString()}`);
+  if (!response.ok) throw new Error("Room unavailable");
+  const result = await response.json();
+  return result.room;
+}
+
+function roomHasStarted(room) {
+  return ["playing", "hand_score", "next_round_countdown", "match_complete"].includes(room?.gameState?.phase);
 }
 
 function handleQuickMatchResult(result) {

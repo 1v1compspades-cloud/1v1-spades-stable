@@ -1,10 +1,14 @@
 import { cardsEqual } from "../../../packages/euchre-core/src/index.js";
 import { setupInfoPanel } from "./info-panel.js";
+import {
+  activeRoomSessionKey as storageKey,
+  clearSavedActiveRoom,
+  roomSeatTokenKey,
+  roomSeatTokenPrefix,
+  roomSessionsKey
+} from "./local-room-session.js";
 import { cardLabel, suitSymbol } from "./table-state.js";
 
-const storageKey = "euchreRoomSeat";
-const roomSessionsKey = "euchreRoomSeatsByRoom";
-const roomSeatTokenPrefix = "euchre.room.";
 const guestPlayerIdKey = "euchre.guestPlayerId";
 const accountProfileKey = "euchre.accountProfile";
 const homepageSettingsKey = "euchreHomepageSettings";
@@ -405,18 +409,7 @@ function clearCurrentSession() {
 }
 
 function clearStoredSession(roomCode) {
-  clearCurrentSession();
-  if (!roomCode) return;
-
-  const normalizedRoomCode = roomCode.toUpperCase();
-  localStorage.removeItem(roomSeatTokenKey(normalizedRoomCode));
-  const sessions = loadSessionMap();
-  delete sessions[normalizedRoomCode];
-  localStorage.setItem(roomSessionsKey, JSON.stringify(sessions));
-}
-
-function roomSeatTokenKey(roomCode) {
-  return `${roomSeatTokenPrefix}${roomCode}.seatToken`;
+  clearSavedActiveRoom(localStorage, roomCode);
 }
 
 function getGuestPlayerId() {
