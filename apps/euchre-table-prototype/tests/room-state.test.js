@@ -612,6 +612,56 @@ test("player can throw off only when void in the led suit", () => {
   assert.equal(room.gameState.completedTricks.length, 2);
 });
 
+test("completed trick preserves public lastTrick winning card summary", () => {
+  let room = createStartedRoom();
+  room = orderUpHeartsAndDiscard(room);
+  room = applyRoomAction(room, { seatToken: "host-token", type: "playCard", card: { rank: "J", suit: "diamonds" } });
+  room = applyRoomAction(room, { seatToken: "guest-token", type: "playCard", card: { rank: "A", suit: "hearts" } });
+
+  assert.equal(room.gameState.currentTrick.length, 0);
+  assert.equal(room.gameState.completedTricks.length, 1);
+  assert.equal(room.gameState.lastTrick.trickNumber, 1);
+  assert.equal(room.gameState.lastTrick.winningSeat, "player1");
+  assert.deepEqual(room.gameState.lastTrick.winningCard, { rank: "J", suit: "diamonds" });
+  assert.equal(room.gameState.lastTrick.plays.length, 2);
+  assert.deepEqual(room.gameState.lastTrick.plays.map((play) => play.seat), ["player1", "player2"]);
+  assert.equal(typeof room.gameState.lastTrick.completedAt, "string");
+  assert.equal(room.gameState.lastTrick.sequence, 1);
+});
+
+test("lastTrick is public-safe for spectators and clears when next trick starts", () => {
+  let room = createStartedRoom();
+  room = orderUpHeartsAndDiscard(room);
+  room = applyRoomAction(room, { seatToken: "host-token", type: "playCard", card: { rank: "J", suit: "diamonds" } });
+  room = applyRoomAction(room, { seatToken: "guest-token", type: "playCard", card: { rank: "A", suit: "hearts" } });
+
+  const spectatorView = sanitizeRoomForViewer(room, "spectator-token");
+  assert.equal(spectatorView.viewerSeat, "spectator");
+  assert.deepEqual(spectatorView.gameState.viewerHand, []);
+  assert.equal(spectatorView.gameState.lastTrick.winningSeat, "player1");
+  assert.deepEqual(spectatorView.gameState.lastTrick.winningCard, { rank: "J", suit: "diamonds" });
+  assert.equal(JSON.stringify(spectatorView.gameState.lastTrick).includes("seatToken"), false);
+  assert.equal(JSON.stringify(spectatorView.gameState.lastTrick).includes("discarded"), false);
+  assert.equal(JSON.stringify(spectatorView.gameState.lastTrick).includes('"rank":"9","suit":"clubs"'), false);
+  assert.equal(noRestrictedFields(spectatorView.gameState.lastTrick, ["hands", "kitty", "seatToken", "playerId", "accountId"]), true);
+
+  room = applyRoomAction(room, { seatToken: "host-token", type: "playCard", card: { rank: "9", suit: "spades" } });
+  assert.equal(room.gameState.currentTrick.length, 1);
+  assert.equal(room.gameState.lastTrick, null);
+});
+
+test("new hand clears lastTrick summary", () => {
+  let room = completeHandRoom();
+  assert.equal(room.gameState.currentTrick.length, 0);
+  assert.equal(room.gameState.lastTrick.trickNumber, 5);
+  assert.deepEqual(room.gameState.lastTrick.winningCard, { rank: "9", suit: "hearts" });
+
+  room = advanceRoomClock(room, { now: Date.parse(room.nextRoundStartsAt) + 1, deck: fixedDeck });
+  assert.equal(room.gameState.handNumber, 2);
+  assert.equal(room.gameState.lastTrick, null);
+  assert.equal(room.gameState.currentTrick.length, 0);
+});
+
 test("both players can pass upcard and choose second-round trump", () => {
   let room = createStartedRoom();
   const upcardSuit = room.gameState.upcard.suit;

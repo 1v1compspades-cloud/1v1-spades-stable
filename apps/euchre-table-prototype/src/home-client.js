@@ -23,6 +23,8 @@ const guestPlayerIdKey = "euchre.guestPlayerId";
 const accountProfileKey = "euchre.accountProfile";
 const quickMatchQueueKey = "euchre.quickMatchQueue";
 let quickMatchPollHandle = null;
+let fallbackGuestPlayerId = null;
+let fallbackQuickMatchQueue = null;
 
 setupInfoPanel();
 
@@ -236,7 +238,7 @@ function renderQuickMatchQueue(queue) {
 
 function quickMatchStatusFor(queue) {
   if (!queue) return "";
-  if (queue.status === "waiting") return "Searching for a compatible Quick Match...";
+  if (queue.status === "waiting") return `Searching for a ${quickMatchRaceLabel(queue)} Quick Match. Both players must choose the same Match target.`;
   if (queue.status === "matched") return "Match found. Opening room...";
   if (queue.status === "cancelled") return "Quick Match search cancelled.";
   if (queue.status === "expired") return "Quick Match search expired. Try again.";
@@ -244,18 +246,21 @@ function quickMatchStatusFor(queue) {
 }
 
 function storeQuickMatchQueue(queue) {
+  fallbackQuickMatchQueue = queue ?? null;
+
   if (!queue) {
-    localStorage.removeItem(quickMatchQueueKey);
+    removeLocalStorage(quickMatchQueueKey);
     return;
   }
-  localStorage.setItem(quickMatchQueueKey, JSON.stringify(queue));
+  writeLocalStorage(quickMatchQueueKey, JSON.stringify(queue));
 }
 
 function loadQuickMatchQueue() {
   try {
-    return JSON.parse(localStorage.getItem(quickMatchQueueKey));
+    const storedQueue = readLocalStorage(quickMatchQueueKey);
+    return storedQueue ? JSON.parse(storedQueue) : fallbackQuickMatchQueue;
   } catch {
-    return null;
+    return fallbackQuickMatchQueue;
   }
 }
 
@@ -276,7 +281,7 @@ async function postJson(path, body) {
 
 function saveSettings() {
   const settings = currentMatchSettings();
-  localStorage.setItem(homepageSettingsKey, JSON.stringify({
+  writeLocalStorage(homepageSettingsKey, JSON.stringify({
     playerName: playerNameInput.value.trim(),
     modeId: settings.modeId,
     targetScore: String(settings.raceTo),
@@ -339,19 +344,21 @@ function currentIdentityPayload() {
 }
 
 function getGuestPlayerId() {
-  const existingPlayerId = localStorage.getItem(guestPlayerIdKey);
+  const existingPlayerId = readLocalStorage(guestPlayerIdKey) ?? fallbackGuestPlayerId;
   if (existingPlayerId) return existingPlayerId;
 
   const playerId = typeof crypto !== "undefined" && crypto.randomUUID
     ? crypto.randomUUID()
     : `guest-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  localStorage.setItem(guestPlayerIdKey, playerId);
+  fallbackGuestPlayerId = playerId;
+  writeLocalStorage(guestPlayerIdKey, playerId);
   return playerId;
 }
 
 function getAccountId() {
   try {
-    const account = JSON.parse(localStorage.getItem(accountProfileKey));
+    const storedProfile = readLocalStorage(accountProfileKey);
+    const account = storedProfile ? JSON.parse(storedProfile) : null;
     return account?.accountId ?? null;
   } catch {
     return null;
@@ -360,8 +367,40 @@ function getAccountId() {
 
 function loadSettings() {
   try {
-    return JSON.parse(localStorage.getItem(homepageSettingsKey)) ?? {};
+    const storedSettings = readLocalStorage(homepageSettingsKey);
+    return storedSettings ? JSON.parse(storedSettings) : {};
   } catch {
     return {};
+  }
+}
+
+function quickMatchRaceLabel(queue) {
+  const raceTo = Number(queue?.matchSettings?.raceTo);
+  return [5, 10].includes(raceTo) ? `Race To ${raceTo}` : "compatible";
+}
+
+function readLocalStorage(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalStorage(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function removeLocalStorage(key) {
+  try {
+    localStorage.removeItem(key);
+    return true;
+  } catch {
+    return false;
   }
 }

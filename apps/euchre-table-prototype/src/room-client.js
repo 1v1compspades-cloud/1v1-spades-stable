@@ -63,6 +63,9 @@ const elements = {
   trumpButtons: document.querySelector("#trumpButtons"),
   passButton: document.querySelector("#passButton"),
   currentTrick: document.querySelector("#currentTrick"),
+  lastTrickArea: document.querySelector("#lastTrickArea"),
+  lastTrick: document.querySelector("#lastTrick"),
+  lastTrickMeta: document.querySelector("#lastTrickMeta"),
   trickHistory: document.querySelector("#trickHistory")
 };
 
@@ -614,8 +617,8 @@ function render() {
   setText(elements.player2ScoreLabel, getPlayerDisplayName("player2"));
   setText(elements.targetScore, raceTo);
   setText(elements.pregameTargetScore, raceTo);
-  setText(elements.player1Slot, roomView.players.player1 ? readySeatLabel("player1", roomView.playerReady, roomView.playerNames) : "Waiting");
-  setText(elements.player2Slot, roomView.players.player2 ? readySeatLabel("player2", roomView.playerReady, roomView.playerNames) : "Waiting");
+  renderLobbySeat(elements.player1Slot, roomView.players.player1 ? "player1" : null);
+  renderLobbySeat(elements.player2Slot, roomView.players.player2 ? "player2" : null);
   setText(elements.viewerHandTitle, viewerSeat === "spectator" ? "Spectator View" : handTitle(viewerSeat));
   setText(elements.opponentHandTitle, viewerSeat === "spectator" ? "Hidden Hands" : handTitle(opponentSeat));
   setText(elements.kittyCount, `${state.kittyCount} cards`);
@@ -642,11 +645,12 @@ function render() {
 
   renderStatus();
   if (isGamePage) {
-    renderUpcard(state.upcard);
+    renderUpcard(state.upcard, trumpSuit);
     renderTrumpControls(state, viewerSeat);
     renderViewerHand(state, viewerSeat);
     renderOpponentHand(state, viewerSeat, opponentSeat);
     renderCurrentTrick(state);
+    renderLastTrick(state);
     renderTrickHistory(state);
   }
 }
@@ -800,15 +804,30 @@ function renderOpponentHand(state, viewerSeat, opponentSeat) {
   }
 }
 
-function renderUpcard(card) {
+function renderUpcard(card, trumpSuit = null) {
   if (!elements.upcard) return;
-  elements.upcard.className = card ? "upcard kitty-stack" : "upcard empty";
-  elements.upcard.setAttribute("aria-label", card ? `${card.rank} of ${suitName(card.suit)} upcard on kitty` : "No cards dealt");
-  elements.upcard.innerHTML = card
+  const hasKittyStack = Boolean(card || trumpSuit);
+  const trumpBadge = trumpSuit
+    ? `
+      <span class="kitty-trump-badge ${isRed(trumpSuit) ? "red" : "black"}" aria-label="Trump is ${suitName(trumpSuit)}">
+        <span>Trump</span>
+        <strong>${suitSymbol(trumpSuit)}</strong>
+      </span>
+    `
+    : "";
+  elements.upcard.className = hasKittyStack ? `upcard kitty-stack${trumpSuit ? " has-trump" : ""}` : "upcard empty";
+  elements.upcard.setAttribute(
+    "aria-label",
+    hasKittyStack
+      ? `${card ? `${card.rank} of ${suitName(card.suit)} upcard on kitty` : "Kitty"}${trumpSuit ? `. Trump is ${suitName(trumpSuit)}.` : ""}`
+      : "No cards dealt"
+  );
+  elements.upcard.innerHTML = hasKittyStack
     ? `
       <span class="kitty-card-back kitty-card-back-bottom" aria-hidden="true"></span>
       <span class="kitty-card-back kitty-card-back-top" aria-hidden="true"></span>
-      <span class="${cardClassNames(card, ["upcard-card"])}">${cardMarkup(card)}</span>
+      ${card ? `<span class="${cardClassNames(card, ["upcard-card"])}">${cardMarkup(card)}</span>` : ""}
+      ${trumpBadge}
     `
     : "No cards dealt";
 }
@@ -819,8 +838,8 @@ function renderCurrentTrick(state) {
 
   for (const play of state.currentTrick) {
     const div = document.createElement("div");
-    div.className = cardClassNames(play.card);
-    div.innerHTML = `<span>${getPlayerDisplayName(play.player)}</span>${cardMarkup(play.card)}`;
+    div.className = cardClassNames(play.card, ["current-trick-card"]);
+    div.innerHTML = `<span class="trick-card-player">${getPlayerDisplayName(trickPlayerSeat(play))}</span>${cardMarkup(play.card)}`;
     elements.currentTrick.append(div);
   }
 
@@ -829,6 +848,39 @@ function renderCurrentTrick(state) {
     slot.className = "play-slot";
     slot.textContent = "Waiting";
     elements.currentTrick.append(slot);
+  }
+}
+
+function renderLastTrick(state) {
+  if (!elements.lastTrickArea || !elements.lastTrick) return;
+
+  const lastTrick = state.lastTrick;
+  const shouldShow = Boolean(lastTrick?.winningCard && lastTrick?.plays?.length) && state.currentTrick.length === 0;
+  setHidden(elements.lastTrickArea, !shouldShow);
+  elements.lastTrick.replaceChildren();
+
+  if (!shouldShow) {
+    setText(elements.lastTrickMeta, "Winning Card");
+    return;
+  }
+
+  const winningSeat = lastTrick.winningSeat;
+  setText(
+    elements.lastTrickMeta,
+    `Trick ${lastTrick.trickNumber ?? ""} - ${getPlayerDisplayName(winningSeat)} won`
+  );
+
+  for (const play of lastTrick.plays) {
+    const seat = trickPlayerSeat(play);
+    const isWinner = seat === winningSeat && cardsEqual(play.card, lastTrick.winningCard);
+    const div = document.createElement("div");
+    div.className = cardClassNames(play.card, ["last-trick-card", isWinner ? "winning-card" : ""]);
+    div.innerHTML = `
+      <span class="trick-card-player">${getPlayerDisplayName(seat)}</span>
+      ${cardMarkup(play.card)}
+      ${isWinner ? '<span class="winning-card-badge">Winning Card</span>' : ""}
+    `;
+    elements.lastTrick.append(div);
   }
 }
 
@@ -846,6 +898,10 @@ function renderTrickHistory(state) {
 
 function setText(element, value) {
   if (element) element.textContent = value;
+}
+
+function trickPlayerSeat(play) {
+  return play?.seat ?? play?.player;
 }
 
 function setHidden(element, hidden) {
@@ -868,16 +924,7 @@ function setDisabled(element, disabled) {
 
 function cardMarkup(card) {
   const symbol = suitSymbol(card.suit);
-  const isJack = card.rank === "J";
-  const centerMarkup = isJack
-    ? `
-      <span class="jack-portrait" aria-hidden="true">
-        <span class="jack-head"></span>
-        <span class="jack-body"></span>
-        <span class="jack-suit">${symbol}</span>
-      </span>
-    `
-    : `<span class="rank-large">${card.rank}</span><span class="suit suit-large">${symbol}</span>`;
+  const centerMarkup = `<span class="rank-large">${card.rank}</span><span class="suit suit-large">${symbol}</span>`;
 
   return `
     <span class="card-face-inner">
@@ -999,11 +1046,27 @@ function trumpActionLabel(state, suit) {
 }
 
 function readyLabel(ready = {}) {
-  return `${getPlayerDisplayName("player1")} ${ready.player1 ? "Ready" : "Not Ready"} / ${getPlayerDisplayName("player2")} ${ready.player2 ? "Ready" : "Not Ready"}`;
+  return `${getPlayerDisplayName("player1")}: ${ready.player1 ? "Ready" : "Not Ready"} / ${getPlayerDisplayName("player2")}: ${ready.player2 ? "Ready" : "Not Ready"}`;
 }
 
-function readySeatLabel(seat, ready = {}, names = {}) {
-  return `${names[seat] ?? getPlayerDisplayName(seat)} ${ready[seat] ? "Ready" : "Not Ready"}`;
+function renderLobbySeat(element, seat) {
+  if (!element) return;
+  element.replaceChildren();
+
+  if (!seat) {
+    element.textContent = "Waiting";
+    return;
+  }
+
+  const name = document.createElement("span");
+  name.className = "slot-player-name";
+  name.textContent = roomView.playerNames?.[seat] ?? getPlayerDisplayName(seat);
+
+  const ready = document.createElement("span");
+  ready.className = `slot-ready-state ${roomView.playerReady?.[seat] ? "ready" : "not-ready"}`;
+  ready.textContent = roomView.playerReady?.[seat] ? "Ready" : "Not Ready";
+
+  element.append(name, ready);
 }
 
 function startingPositionLabel(choice) {

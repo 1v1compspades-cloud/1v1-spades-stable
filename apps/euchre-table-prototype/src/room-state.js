@@ -425,6 +425,7 @@ export function sanitizeRoomForViewer(room, seatToken, playerId, accountId) {
         ? [...viewerHand]
         : [],
       currentTrick: state.currentTrick,
+      lastTrick: sanitizeLastTrick(state.lastTrick),
       completedTricks: state.completedTricks,
       tricksWon: state.tricksWon,
       handScore: state.handScore,
@@ -589,6 +590,7 @@ function startHand(previousState, { deck = shuffleDeck(createDeck()), matchSetti
     leader: otherPlayer(dealer),
     currentTurn: currentTrumpActor(trumpState),
     currentTrick: [],
+    lastTrick: null,
     completedTricks: [],
     tricksWon: { player1: 0, player2: 0 },
     handScore: null,
@@ -619,6 +621,7 @@ function createWaitingGameState({ mode, modeId }) {
     leader: null,
     currentTurn: null,
     currentTrick: [],
+    lastTrick: null,
     completedTricks: [],
     tricksWon: { player1: 0, player2: 0 },
     handScore: null,
@@ -648,6 +651,7 @@ function playCardForRoom(room, player, card) {
         ...state,
         hands,
         currentTrick,
+        lastTrick: null,
         currentTurn: otherPlayer(player)
       },
       updatedAt: new Date().toISOString()
@@ -659,11 +663,21 @@ function playCardForRoom(room, player, card) {
     ...state.tricksWon,
     [winnerPlay.player]: state.tricksWon[winnerPlay.player] + 1
   };
+  const lastTrick = createLastTrickSummary({
+    trickNumber: state.completedTricks.length + 1,
+    plays: currentTrick,
+    winnerPlay
+  });
   const completedTricks = [
     ...state.completedTricks,
     {
+      trickNumber: lastTrick.trickNumber,
       plays: currentTrick,
-      winner: winnerPlay.player
+      winner: winnerPlay.player,
+      winningSeat: winnerPlay.player,
+      winningCard: winnerPlay.card,
+      completedAt: lastTrick.completedAt,
+      sequence: lastTrick.sequence
     }
   ];
 
@@ -690,6 +704,7 @@ function playCardForRoom(room, player, card) {
         score,
         winner,
         currentTrick: [],
+        lastTrick,
         completedTricks,
         tricksWon,
         handScore,
@@ -710,6 +725,7 @@ function playCardForRoom(room, player, card) {
       ...state,
       hands,
       currentTrick: [],
+      lastTrick,
       completedTricks,
       tricksWon,
       leader: winnerPlay.player,
@@ -778,6 +794,41 @@ function applyDealerPickupIfNeeded(state, trumpState) {
       pending: true,
       discarded: null
     }
+  };
+}
+
+function createLastTrickSummary({ trickNumber, plays, winnerPlay }) {
+  const completedAt = new Date().toISOString();
+  return {
+    trickNumber,
+    plays: plays.map((play) => ({
+      seat: play.player,
+      player: play.player,
+      card: play.card
+    })),
+    winningSeat: winnerPlay.player,
+    winningCard: winnerPlay.card,
+    completedAt,
+    sequence: trickNumber
+  };
+}
+
+function sanitizeLastTrick(lastTrick) {
+  if (!lastTrick) return null;
+
+  return {
+    trickNumber: lastTrick.trickNumber,
+    plays: Array.isArray(lastTrick.plays)
+      ? lastTrick.plays.map((play) => ({
+          seat: play.seat ?? play.player,
+          player: play.player ?? play.seat,
+          card: play.card
+        }))
+      : [],
+    winningSeat: lastTrick.winningSeat ?? lastTrick.winner,
+    winningCard: lastTrick.winningCard,
+    completedAt: lastTrick.completedAt ?? null,
+    sequence: lastTrick.sequence ?? lastTrick.trickNumber ?? null
   };
 }
 
@@ -861,6 +912,7 @@ function normalizeGameStateForMatchSettings(gameState, matchSettings) {
     ...gameState,
     modeId: matchSettings.modeId,
     mode,
+    lastTrick: sanitizeLastTrick(gameState.lastTrick),
     trumpState: gameState.trumpState
       ? {
           ...gameState.trumpState,

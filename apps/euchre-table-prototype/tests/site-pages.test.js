@@ -183,6 +183,7 @@ test("tournament history screen renders public tournament summaries", async () =
 
 test("one-player room lobby exposes invite controls without start sequence or create/join controls", async () => {
   const html = await readText("room.html");
+  const client = await readText("src/room-client.js");
   const css = await readText("src/styles.css");
 
   assert.doesNotMatch(html, /Create Room/);
@@ -208,6 +209,14 @@ test("one-player room lobby exposes invite controls without start sequence or cr
   assert.match(html, /Hidden Hands/);
   assert.match(html, />Host<\/span>/);
   assert.match(html, />Opponent<\/span>/);
+  assert.match(client, /renderLobbySeat\(elements\.player1Slot/);
+  assert.match(client, /renderLobbySeat\(elements\.player2Slot/);
+  assert.match(client, /slot-player-name/);
+  assert.match(client, /slot-ready-state/);
+  assert.match(client, /Ready" : "Not Ready"/);
+  assert.match(css, /\.slot-player-name/);
+  assert.match(css, /\.slot-ready-state/);
+  assert.match(css, /\.slot-ready-state\.ready/);
   assert.doesNotMatch(html, /Player 1/);
   assert.doesNotMatch(html, /Player 2/);
   assert.doesNotMatch(html, /id="roomTable"/);
@@ -275,40 +284,76 @@ test("game screen owns gameplay interface and is guarded until start", async () 
   assert.match(client, /\.\/room\.html\?room=\$\{roomCode\}/);
 });
 
-test("kitty upcard uses branded card stack with Jack-only portrait", async () => {
+test("kitty upcard uses branded card stack with consistent Jack highlight", async () => {
   const client = await readText("src/room-client.js");
   const css = await readText("src/styles.css");
 
-  assert.match(client, /elements\.upcard\.className = card \? "upcard kitty-stack" : "upcard empty"/);
+  assert.match(client, /elements\.upcard\.className = hasKittyStack \? `upcard kitty-stack\$\{trumpSuit \? " has-trump" : ""\}` : "upcard empty"/);
+  assert.match(client, /renderUpcard\(state\.upcard, trumpSuit\)/);
+  assert.match(client, /function renderUpcard\(card, trumpSuit = null\)/);
+  assert.match(client, /kitty-trump-badge/);
+  assert.match(client, /Trump is \$\{suitName\(trumpSuit\)\}/);
+  assert.match(client, /suitSymbol\(trumpSuit\)/);
   assert.match(client, /kitty-card-back kitty-card-back-bottom/);
   assert.match(client, /kitty-card-back kitty-card-back-top/);
   assert.match(client, /cardClassNames\(card, \["upcard-card"\]\)/);
-  assert.match(client, /card\.rank === "J"/);
-  assert.match(client, /jack-portrait/);
+  assert.match(client, /card\.rank === "J" \? "face-jack" : "rank-card"/);
   assert.match(client, /rank-large/);
   assert.match(client, /suit-large/);
+  assert.match(client, /const centerMarkup = `<span class="rank-large">\$\{card\.rank\}<\/span><span class="suit suit-large">\$\{symbol\}<\/span>`/);
+  assert.doesNotMatch(client, /jack-art|jack-portrait|jack-mini-rank|jack-band|jack-suit-bottom/);
+  assert.match(client, /card-corner card-corner-top[\s\S]*rank[\s\S]*suit/);
+  assert.match(client, /card-corner card-corner-bottom[\s\S]*rank[\s\S]*suit/);
   assert.match(client, /isRed\(card\.suit\) \? "red" : "black"/);
   assert.match(css, /\.upcard-card/);
   assert.match(css, /\.kitty-card-back/);
+  assert.match(css, /\.kitty-trump-badge/);
+  assert.match(css, /\.kitty-trump-badge\.red[\s\S]*color: #b32925/);
+  assert.match(css, /\.kitty-trump-badge[\s\S]*pointer-events: none/);
   assert.match(css, /\.card-back::after[\s\S]*content: "1v1"/);
   assert.match(css, /\.card\.black[\s\S]*color: var\(--ink\)/);
   assert.match(css, /\.card\.red[\s\S]*color: #b32925/);
-  assert.match(css, /\.jack-portrait/);
+  assert.match(css, /\.face-jack[\s\S]*border-color: var\(--gold\)/);
+  assert.match(css, /\.face-jack[\s\S]*rgba\(239, 183, 42, 0\.24\)/);
+  assert.match(css, /\.face-jack \.card-face-inner::before[\s\S]*rgba\(239, 183, 42, 0\.22\)/);
+  assert.doesNotMatch(css, /jack-portrait|jack-mini-rank|jack-band|jack-suit-bottom/);
+  assert.match(css, /\.card-corner[\s\S]*z-index: 2/);
   assert.match(css, /\.suit-large[\s\S]*font-size: clamp/);
   assert.match(css, /\.game-screen\.room-active \.upcard-card[\s\S]*min-height: 96px/);
+  assert.match(css, /\.game-screen\.room-active \.kitty-trump-badge[\s\S]*min-height: 22px/);
 });
 
 test("mobile active game layout keeps play areas compact and reachable", async () => {
+  const html = await readText("game.html");
+  const client = await readText("src/room-client.js");
   const css = await readText("src/styles.css");
 
+  assert.match(html, /id="lastTrickArea"[\s\S]*Last Trick/);
+  assert.match(html, /id="lastTrickMeta"[\s\S]*Winning Card/);
+  assert.match(client, /lastTrickArea: document\.querySelector\("#lastTrickArea"\)/);
+  assert.match(client, /function renderLastTrick\(state\)/);
+  assert.match(client, /state\.lastTrick/);
+  assert.match(client, /winningCard/);
+  assert.match(client, /winningSeat/);
+  assert.match(client, /winning-card-badge/);
+  assert.doesNotMatch(client, /lastCompletedTrick|showingLastTrick|visiblePlays/);
   assert.match(css, /body\.room-active[\s\S]*min-height: 100dvh/);
   assert.match(css, /\.game-screen\.room-active[\s\S]*min-height: 100dvh/);
   assert.match(css, /\.game-screen\.room-active[\s\S]*padding: 8px 0 calc\(10px \+ env\(safe-area-inset-bottom\)\)/);
   assert.match(css, /grid-template-areas:[\s\S]*"opponent"[\s\S]*"center"[\s\S]*"player"/);
   assert.match(css, /\.game-screen\.room-active \.room-table > \.player-panel:first-child[\s\S]*position: sticky/);
   assert.match(css, /bottom: calc\(4px \+ env\(safe-area-inset-bottom\)\)/);
-  assert.match(css, /\.game-screen\.room-active \.room-table > \.center-panel[\s\S]*"upcard trick"/);
+  assert.match(css, /\.game-screen\.room-active \.room-table > \.center-panel[\s\S]*"upcard trick"[\s\S]*"last-trick last-trick"/);
+  assert.match(css, /\.game-screen\.room-active \.room-table > \.center-panel[\s\S]*min-height: 284px/);
   assert.match(css, /\.game-screen\.room-active \.history[\s\S]*display: none/);
+  assert.match(css, /\.last-trick-area/);
+  assert.match(css, /\.last-trick-heading/);
+  assert.match(css, /\.last-trick-card/);
+  assert.match(css, /\.last-trick-card\.winning-card/);
+  assert.match(css, /\.winning-card-badge/);
+  assert.match(css, /\.trick-card-player/);
+  assert.match(css, /\.game-screen\.room-active \.current-trick,[\s\S]*\.game-screen\.room-active \.last-trick[\s\S]*min-height: 102px/);
+  assert.match(css, /\.game-screen\.room-active \.current-trick \.card,[\s\S]*\.game-screen\.room-active \.current-trick \.play-slot,[\s\S]*\.game-screen\.room-active \.last-trick \.card[\s\S]*min-height: 102px/);
   assert.match(css, /\.game-screen\.room-active \.trump-action-bar[\s\S]*position: sticky/);
   assert.match(css, /\.game-screen\.room-active \.trump-action-bar button[\s\S]*min-height: 46px/);
   assert.match(css, /\.game-screen\.room-active \.hand[\s\S]*repeat\(5, minmax\(0, 1fr\)\)/);
@@ -353,6 +398,21 @@ test("mobile chrome does not cover trump actions", async () => {
   assert.match(css, /\.room-topbar \.online-pill[\s\S]*position: static/);
   assert.match(css, /pointer-events: none/);
   assert.match(css, /grid-template-columns: 1fr/);
+});
+
+test("mobile lobby keeps room controls compact and ready action reachable", async () => {
+  const css = await readText("src/styles.css");
+
+  assert.match(css, /@media \(max-width: 720px\)/);
+  assert.match(css, /\.room-shell \.lobby-panel[\s\S]*gap: 16px/);
+  assert.match(css, /\.room-code-display[\s\S]*font-size: clamp\(2\.35rem, 16vw, 3\.35rem\)/);
+  assert.match(css, /\.room-shell \.share-actions button[\s\S]*min-height: 50px/);
+  assert.match(css, /\.room-shell \.invite-panel[\s\S]*order: 3/);
+  assert.match(css, /\.room-shell #readyButton[\s\S]*order: 2/);
+  assert.match(css, /\.room-shell \.players-section[\s\S]*order: 4/);
+  assert.match(css, /\.room-shell \.match-settings-panel[\s\S]*order: 5/);
+  assert.match(css, /\.room-topbar \.online-pill::after[\s\S]*content: "Online"/);
+  assert.match(css, /\.room-shell \.player-slot strong[\s\S]*font-size: clamp\(1\.5rem, 9vw, 2rem\)/);
 });
 
 test("active room screen hides lobby create and join controls", async () => {
@@ -470,7 +530,13 @@ test("Quick Match is wired to queue, cancel, and matched room redirect", async (
   assert.match(client, /\/api\/quick-match/);
   assert.match(client, /\/api\/quick-match\/cancel/);
   assert.match(client, /quickMatchQueueKey = "euchre\.quickMatchQueue"/);
-  assert.match(client, /Searching for a compatible Quick Match/);
+  assert.match(client, /fallbackGuestPlayerId = null/);
+  assert.match(client, /fallbackQuickMatchQueue = null/);
+  assert.match(client, /Searching for a \$\{quickMatchRaceLabel\(queue\)\} Quick Match\. Both players must choose the same Match target\./);
+  assert.match(client, /function readLocalStorage/);
+  assert.match(client, /function writeLocalStorage/);
+  assert.match(client, /function removeLocalStorage/);
+  assert.match(client, /readLocalStorage\(guestPlayerIdKey\) \?\? fallbackGuestPlayerId/);
   assert.match(client, /cancelQuickMatchButton/);
   assert.match(client, /startQuickMatchPolling/);
   assert.match(client, /window\.location\.href = `\.\/room\.html\?room=\$\{encodeURIComponent\(result\.matchedRoomCode\)\}`/);

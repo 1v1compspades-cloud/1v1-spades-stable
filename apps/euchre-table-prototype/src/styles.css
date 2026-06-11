@@ -429,7 +429,7 @@ button:disabled {
   justify-items: center;
   justify-self: start;
   line-height: 0.95;
-  z-index: 1;
+  z-index: 2;
 }
 
 .card-corner-bottom {
@@ -489,47 +489,17 @@ button:disabled {
   outline: 3px solid rgba(35, 103, 165, 0.25);
 }
 
-.jack-portrait {
-  width: min(76px, 82%);
-  aspect-ratio: 0.72;
-  border: 2px solid currentColor;
-  border-radius: 42% 42% 16px 16px;
-  display: grid;
-  place-items: center;
-  position: relative;
-  background:
-    radial-gradient(circle at 50% 28%, rgba(255, 255, 255, 0.92) 0 16%, transparent 17%),
-    linear-gradient(145deg, rgba(239, 183, 42, 0.46), rgba(255, 255, 255, 0.35));
-  box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.42);
+.face-jack {
+  border-color: var(--gold);
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 255, 255, 0.78),
+    inset 0 0 0 7px rgba(239, 183, 42, 0.24),
+    0 0 0 2px rgba(239, 183, 42, 0.32),
+    0 8px 18px rgba(0, 0, 0, 0.16);
 }
 
-.jack-head {
-  position: absolute;
-  top: 15%;
-  width: 34%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  border: 2px solid currentColor;
-  background: #fff8e8;
-}
-
-.jack-body {
-  position: absolute;
-  bottom: 18%;
-  width: 58%;
-  height: 34%;
-  border-radius: 48% 48% 12px 12px;
-  border: 2px solid currentColor;
-  background: currentColor;
-  opacity: 0.92;
-}
-
-.jack-suit {
-  position: absolute;
-  bottom: 6%;
-  font-size: 1.45rem;
-  line-height: 1;
-  color: #fff8e8;
+.face-jack .card-face-inner::before {
+  color: rgba(239, 183, 42, 0.22);
 }
 
 .card-back {
@@ -605,6 +575,42 @@ button:disabled {
   z-index: 2;
 }
 
+.kitty-trump-badge {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  z-index: 4;
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  gap: 5px;
+  align-items: center;
+  min-height: 30px;
+  padding: 3px 9px;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  background: #fff8e8;
+  color: var(--ink);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.24);
+  line-height: 1;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.kitty-trump-badge.red {
+  color: #b32925;
+}
+
+.kitty-trump-badge span {
+  font-size: 0.54rem;
+  font-weight: 1000;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.kitty-trump-badge strong {
+  font-size: 1.18rem;
+}
+
 .trump-panel {
   padding: 12px;
   border: 1px solid var(--line);
@@ -626,15 +632,91 @@ button:disabled {
 }
 
 .trick-area,
+.last-trick-area,
 .history {
   margin-top: 16px;
 }
 
-.current-trick {
+.current-trick,
+.last-trick {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   min-height: 118px;
+}
+
+.last-trick-area {
+  padding: 10px;
+  border: 1px solid rgba(239, 183, 42, 0.36);
+  border-radius: 8px;
+  background: rgba(239, 183, 42, 0.07);
+}
+
+.last-trick-heading {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.last-trick-heading h3 {
+  margin: 0;
+}
+
+.last-trick-heading span {
+  color: var(--gold);
+  font-size: 0.72rem;
+  font-weight: 1000;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.current-trick-card,
+.last-trick-card {
+  align-content: stretch;
+}
+
+.trick-card-player {
+  display: block;
+  width: 100%;
+  padding: 6px 8px 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.last-trick-card {
+  opacity: 0.94;
+  outline: 2px solid rgba(239, 183, 42, 0.22);
+}
+
+.last-trick-card.winning-card {
+  opacity: 1;
+  outline: 3px solid rgba(239, 183, 42, 0.84);
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 255, 255, 0.78),
+    inset 0 0 0 7px rgba(239, 183, 42, 0.28),
+    0 0 0 2px rgba(239, 183, 42, 0.4),
+    0 10px 22px rgba(0, 0, 0, 0.2);
+}
+
+.winning-card-badge {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  z-index: 3;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: #111;
+  font-size: 0.52rem;
+  font-weight: 1000;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  text-transform: uppercase;
 }
 
 .play-slot {
@@ -1560,6 +1642,30 @@ body::before {
   overflow-wrap: anywhere;
 }
 
+.slot-player-name,
+.slot-ready-state {
+  display: block;
+}
+
+.slot-ready-state {
+  margin-top: 10px;
+  color: var(--master-muted);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 1000;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.slot-ready-state.ready {
+  color: #5ff1bd;
+}
+
+.slot-ready-state.not-ready {
+  color: var(--master-muted);
+}
+
 .empty-slot-card {
   border-style: dashed;
   border-color: rgba(255, 255, 255, 0.18);
@@ -1755,7 +1861,7 @@ body::before {
 
 @media (max-width: 720px) {
   .master-shell {
-    width: min(100vw - 18px, 860px);
+    width: min(100vw - 16px, 860px);
     padding-top: 18px;
   }
 
@@ -1766,6 +1872,15 @@ body::before {
   .home-master-panel,
   .lobby-panel {
     padding: 22px 18px;
+  }
+
+  .room-shell {
+    padding-top: 10px;
+  }
+
+  .room-shell .lobby-panel {
+    gap: 16px;
+    padding: 16px 14px 18px;
   }
 
   .mode-grid,
@@ -1782,6 +1897,9 @@ body::before {
   }
 
   .room-code-display {
+    padding: 16px 10px;
+    border-width: 2px;
+    font-size: clamp(2.35rem, 16vw, 3.35rem);
     letter-spacing: 0.12em;
   }
 
@@ -1792,8 +1910,104 @@ body::before {
   .room-topbar .online-pill {
     min-height: 24px;
     padding: 0 8px;
-    font-size: 0.7rem;
+    font-size: 0;
     letter-spacing: 0.06em;
+  }
+
+  .room-topbar .online-pill::after {
+    content: "Online";
+    font-size: 0.68rem;
+  }
+
+  .room-shell .compact-status {
+    margin-bottom: 8px;
+    padding-inline: 6px;
+  }
+
+  .room-shell .compact-status p {
+    margin-bottom: 0;
+    font-size: 0.96rem;
+    line-height: 1.25;
+  }
+
+  .room-shell .room-code-label {
+    margin-bottom: -8px;
+    font-size: 0.72rem;
+  }
+
+  .room-shell .share-actions {
+    gap: 8px;
+  }
+
+  .room-shell .share-actions button {
+    min-height: 50px;
+    font-size: 0.92rem;
+  }
+
+  .room-shell .players-section {
+    gap: 10px;
+    padding-top: 16px;
+    order: 4;
+  }
+
+  .room-shell .player-slot {
+    min-height: 118px;
+    padding: 16px;
+  }
+
+  .room-shell .player-slot strong {
+    margin-top: 26px;
+    font-size: clamp(1.5rem, 9vw, 2rem);
+    line-height: 1.08;
+  }
+
+  .room-shell .slot-ready-state {
+    margin-top: 8px;
+    font-size: 0.68rem;
+  }
+
+  .room-shell .match-settings-panel {
+    gap: 12px;
+    padding: 16px;
+    order: 5;
+  }
+
+  .room-shell .match-settings-panel h2 {
+    font-size: 0.88rem;
+  }
+
+  .room-shell .match-settings-grid {
+    gap: 14px;
+  }
+
+  .room-shell .invite-panel {
+    gap: 12px;
+    padding-top: 8px;
+    border-top: 0;
+    order: 3;
+  }
+
+  .room-shell .invite-panel p {
+    order: 1;
+    font-size: 0.98rem;
+    line-height: 1.3;
+  }
+
+  .room-shell #readyButton {
+    order: 2;
+    min-height: 54px;
+    font-size: 1rem;
+  }
+
+  .room-shell .invite-link-row {
+    order: 3;
+    padding-top: 10px;
+    border-top: 1px solid var(--master-line-soft);
+  }
+
+  .room-shell .invite-link-row strong {
+    font-size: 0.72rem;
+    line-height: 1.25;
   }
 
   .trump-action-bar {
@@ -1963,8 +2177,10 @@ body::before {
     grid-template-columns: minmax(78px, 0.42fr) minmax(0, 1fr);
     grid-template-areas:
       "center-heading center-heading"
-      "upcard trick";
+      "upcard trick"
+      "last-trick last-trick";
     gap: 6px 8px;
+    min-height: 284px;
     padding: 8px;
   }
 
@@ -1982,7 +2198,8 @@ body::before {
   }
 
   .game-screen.room-active .panel-heading h2,
-  .game-screen.room-active .trick-area h3 {
+  .game-screen.room-active .trick-area h3,
+  .game-screen.room-active .last-trick-area h3 {
     font-size: 0.82rem;
   }
 
@@ -2010,24 +2227,82 @@ body::before {
     min-height: 96px;
   }
 
+  .game-screen.room-active .kitty-trump-badge {
+    bottom: 5px;
+    min-height: 22px;
+    padding: 2px 6px;
+    border-width: 1px;
+  }
+
+  .game-screen.room-active .kitty-trump-badge span {
+    font-size: 0.45rem;
+  }
+
+  .game-screen.room-active .kitty-trump-badge strong {
+    font-size: 0.92rem;
+  }
+
   .game-screen.room-active .trick-area {
     grid-area: trick;
     margin-top: 0;
+  }
+
+  .game-screen.room-active .last-trick-area {
+    grid-area: last-trick;
+    margin-top: 0;
+    padding: 7px;
+  }
+
+  .game-screen.room-active .last-trick-heading {
+    margin-bottom: 5px;
+  }
+
+  .game-screen.room-active .last-trick-heading span {
+    font-size: 0.56rem;
   }
 
   .game-screen.room-active .history {
     display: none;
   }
 
-  .game-screen.room-active .current-trick {
+  .game-screen.room-active .current-trick,
+  .game-screen.room-active .last-trick {
     gap: 6px;
-    min-height: 78px;
+    min-height: 102px;
   }
 
   .game-screen.room-active .card,
   .game-screen.room-active .play-slot {
     min-height: 78px;
     border-width: 1px;
+  }
+
+  .game-screen.room-active .current-trick .card,
+  .game-screen.room-active .current-trick .play-slot,
+  .game-screen.room-active .last-trick .card {
+    min-height: 102px;
+  }
+
+  .game-screen.room-active .trick-card-player {
+    padding: 4px 5px 0;
+    font-size: 0.58rem;
+  }
+
+  .game-screen.room-active .current-trick .card-face-inner {
+    min-height: 74px;
+    padding: 5px;
+  }
+
+  .game-screen.room-active .last-trick .card-face-inner {
+    min-height: 74px;
+    padding: 5px;
+  }
+
+  .game-screen.room-active .winning-card-badge {
+    right: 4px;
+    bottom: 4px;
+    padding: 2px 4px;
+    font-size: 0.42rem;
   }
 
   .game-screen.room-active .card .rank {
@@ -2044,14 +2319,6 @@ body::before {
 
   .game-screen.room-active .suit-large {
     font-size: 2rem !important;
-  }
-
-  .game-screen.room-active .jack-portrait {
-    width: min(54px, 84%);
-  }
-
-  .game-screen.room-active .jack-suit {
-    font-size: 1rem;
   }
 
   .game-screen.room-active .hand {
