@@ -29,6 +29,11 @@ import {
   sanitizeLeaderboardForPublic
 } from "./src/leaderboard-state.js";
 import {
+  getTournamentHistoryRecord,
+  recentTournamentHistory,
+  recordCompletedTournamentHistory
+} from "./src/tournament-history-state.js";
+import {
   cancelQuickMatchQueue,
   enterQuickMatchQueue
 } from "./src/quick-match-state.js";
@@ -59,6 +64,7 @@ const tournaments = persistedState.tournaments;
 const accounts = persistedState.accounts;
 const leaderboardStats = persistedState.leaderboardStats;
 const quickMatchQueue = persistedState.quickMatchQueue;
+const tournamentHistory = persistedState.tournamentHistory;
 
 const server = createServer(async (request, response) => {
   try {
@@ -177,6 +183,21 @@ async function handleApi(request, response) {
     sendJson(response, 200, {
       leaderboard: sanitizeLeaderboardForPublic(leaderboardStats)
     });
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/tournament-history") {
+    sendJson(response, 200, {
+      history: recentTournamentHistory(tournamentHistory)
+    });
+    return;
+  }
+
+  if (request.method === "GET" && segments[0] === "api" && segments[1] === "tournament-history" && segments[2]) {
+    const record = getTournamentHistoryRecord(tournamentHistory, segments[2]);
+    if (!record) throw httpError(404, "Tournament history not found");
+
+    sendJson(response, 200, { history: record });
     return;
   }
 
@@ -325,7 +346,8 @@ async function handleApi(request, response) {
       const body = await readJson(request);
       sendJson(response, 200, {
         backup: exportTournamentBackup(tournament, {
-          adminKey: body.adminKey
+          adminKey: body.adminKey,
+          history: tournamentHistory.get(tournamentCode)
         })
       });
       return;
@@ -342,6 +364,7 @@ async function handleApi(request, response) {
         createMatchRoom: createTournamentMatchRoom
       });
       tournaments.set(tournamentCode, nextTournament);
+      recordTournamentHistoryIfComplete(nextTournament);
       persistState();
 
       sendJson(response, 200, {
@@ -447,7 +470,14 @@ function advanceAndSaveRoom(room) {
 }
 
 function persistState() {
-  savePersistedState(persistenceFile, { rooms, tournaments, accounts, leaderboardStats, quickMatchQueue });
+  savePersistedState(persistenceFile, {
+    rooms,
+    tournaments,
+    accounts,
+    leaderboardStats,
+    quickMatchQueue,
+    tournamentHistory
+  });
 }
 
 async function serveStatic(request, response) {
@@ -488,6 +518,7 @@ function publicRoutePath(pathname) {
     "/game.html": "/apps/euchre-table-prototype/game.html",
     "/profile.html": "/apps/euchre-table-prototype/profile.html",
     "/leaderboard.html": "/apps/euchre-table-prototype/leaderboard.html",
+    "/tournament-history.html": "/apps/euchre-table-prototype/tournament-history.html",
     "/rules.html": "/apps/euchre-table-prototype/rules.html",
     "/tournament.html": "/apps/euchre-table-prototype/tournament.html"
   }[pathname] ?? pathname;
@@ -598,6 +629,8 @@ function syncTournamentFromRoom(room) {
 
   if (!winnerId) return;
 
+  let latestTournament = tournament;
+
   try {
     const nextTournament = recordMatchWinner(tournament, {
       round: room.tournamentMatch.round,
@@ -606,9 +639,17 @@ function syncTournamentFromRoom(room) {
       createMatchRoom: createTournamentMatchRoom
     });
     tournaments.set(tournament.tournamentCode, nextTournament);
+    latestTournament = nextTournament;
   } catch (error) {
     if (error.statusCode !== 409) throw error;
+    latestTournament = tournaments.get(room.tournamentMatch.tournamentCode) ?? latestTournament;
   }
+
+  recordTournamentHistoryIfComplete(latestTournament, { finalRoom: room });
+}
+
+function recordTournamentHistoryIfComplete(tournament, { finalRoom } = {}) {
+  return recordCompletedTournamentHistory(tournamentHistory, tournament, { finalRoom });
 }
 
 async function readJson(request) {

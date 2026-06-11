@@ -30,6 +30,7 @@ test("home screen has the main routes and actions", async () => {
   assert.match(publicActions, /Leave current room/);
   assert.match(publicActions, /Profile/);
   assert.match(publicActions, /Leaderboard/);
+  assert.match(publicActions, /Tournament History/);
   assert.match(publicActions, /Rules/);
   assert.doesNotMatch(publicActions, /Create Tournament/);
   assert.match(html, /Your Name/);
@@ -64,6 +65,8 @@ test("shared info panel has Euchre help pages and Discord action", async () => {
   assert.match(infoClient, /Lobby \/ Invite Help/);
   assert.match(infoClient, /Leaderboard/);
   assert.match(infoClient, /View Leaderboard/);
+  assert.match(infoClient, /Tournament History/);
+  assert.match(infoClient, /View Tournament History/);
   assert.match(infoClient, /Discord \/ Community/);
   assert.match(infoClient, /Join the Discord/);
   assert.match(infoClient, /event\.key === "Escape"/);
@@ -129,6 +132,7 @@ test("profile screen supports lightweight account upgrade", async () => {
   assert.match(html, /id="leaveCurrentRoomButton"/);
   assert.match(html, /Leave current room/);
   assert.match(html, /Save Profile/);
+  assert.match(html, /Tournament History/);
   assert.match(client, /accountProfileKey = "euchre\.accountProfile"/);
   assert.match(client, /\/api\/accounts\/upgrade/);
   assert.match(client, /\/api\/profile\?accountId=/);
@@ -154,6 +158,24 @@ test("leaderboard screen renders public standings table", async () => {
   assert.match(client, /\/api\/leaderboard/);
   assert.match(client, /textContent/);
   assert.match(css, /\.leaderboard-table/);
+});
+
+test("tournament history screen renders public tournament summaries", async () => {
+  const html = await readText("tournament-history.html");
+  const client = await readText("src/tournament-history-client.js");
+
+  assert.match(html, /Tournament History - 1v1 Euchre/);
+  assert.match(html, /Past Tournaments/);
+  assert.match(html, /id="tournamentHistoryRows"/);
+  assert.match(html, /Tournament code/);
+  assert.match(html, /Bracket size/);
+  assert.match(html, /Champion/);
+  assert.match(html, /Runner-up/);
+  assert.match(html, /Completed/);
+  assert.match(html, /Matches/);
+  assert.match(html, /Rounds/);
+  assert.match(client, /\/api\/tournament-history/);
+  assert.match(client, /textContent/);
 });
 
 test("one-player room lobby exposes invite controls without start sequence or create/join controls", async () => {
@@ -559,6 +581,10 @@ test("server health check and root route work", async () => {
       const leaderboard = await requestText(port, "/leaderboard.html");
       assert.equal(leaderboard.statusCode, 200);
       assert.match(leaderboard.body, /id="leaderboardRows"/);
+
+      const history = await requestText(port, "/tournament-history.html");
+      assert.equal(history.statusCode, 200);
+      assert.match(history.body, /id="tournamentHistoryRows"/);
 
       const publicCss = await requestText(port, "/src/styles.css");
       assert.equal(publicCss.statusCode, 200);
@@ -1016,6 +1042,65 @@ test("leaderboard API reads persisted stats and hides private identifiers", asyn
   });
 });
 
+test("tournament history API sorts public persisted records newest first", async () => {
+  await withTempStateFile(async (stateFile) => {
+    await writeFile(stateFile, JSON.stringify({
+      version: 1,
+      savedAt: "2026-06-10T00:00:00.000Z",
+      rooms: {},
+      tournaments: {},
+      accounts: {},
+      leaderboardStats: {},
+      quickMatchQueue: {},
+      tournamentHistory: {
+        OLDONE: {
+          tournamentCode: "OLDONE",
+          bracketSize: 4,
+          championDisplayName: "Old Champion",
+          runnerUpDisplayName: "Old Runner",
+          completedAt: "2026-06-10T10:00:00.000Z",
+          createdAt: "2026-06-10T09:00:00.000Z",
+          matchCount: 3,
+          rounds: 2,
+          status: "complete",
+          adminKey: "private-admin-key",
+          seatToken: "private-seat-token"
+        },
+        NEWONE: {
+          tournamentCode: "NEWONE",
+          bracketSize: 8,
+          championDisplayName: "New Champion",
+          runnerUpDisplayName: "New Runner",
+          completedAt: "2026-06-10T11:00:00.000Z",
+          createdAt: "2026-06-10T09:30:00.000Z",
+          matchCount: 7,
+          rounds: 3,
+          status: "complete"
+        }
+      }
+    }, null, 2));
+
+    const port = 5210;
+    const server = await startTestServer(port, stateFile);
+
+    try {
+      const response = await requestJson(port, "/api/tournament-history");
+      assert.equal(response.statusCode, 200);
+      assert.deepEqual(response.body.history.map((record) => record.tournamentCode), ["NEWONE", "OLDONE"]);
+
+      const detail = await requestJson(port, "/api/tournament-history/OLDONE");
+      assert.equal(detail.statusCode, 200);
+      assert.equal(detail.body.history.championDisplayName, "Old Champion");
+
+      const publicJson = JSON.stringify(response.body);
+      assert.doesNotMatch(publicJson, /private-admin-key/);
+      assert.doesNotMatch(publicJson, /private-seat-token/);
+    } finally {
+      await stopServer(server);
+    }
+  });
+});
+
 test("room creation stores and exposes selected Race To values", async () => {
   await withTempStateFile(async (stateFile) => {
     const port = 5205;
@@ -1326,6 +1411,99 @@ test("persistence reload keeps tournament bracket and winner advancement", async
   });
 });
 
+test("completed tournament creates idempotent history that survives reload", async () => {
+  await withTempStateFile(async (stateFile) => {
+    const port = 5211;
+    let server = await startTestServer(port, stateFile);
+    let tournamentCode;
+    let championId;
+
+    try {
+      const created = await requestJson(port, "/api/tournaments", {
+        method: "POST",
+        body: { bracketSize: 4 }
+      });
+      tournamentCode = created.body.tournament.tournamentCode;
+
+      const emptyHistory = await requestJson(port, "/api/tournament-history");
+      assert.equal(emptyHistory.statusCode, 200);
+      assert.deepEqual(emptyHistory.body.history, []);
+
+      for (const displayName of ["A", "B", "C", "D"]) {
+        const joined = await requestJson(port, `/api/tournaments/${tournamentCode}/join`, {
+          method: "POST",
+          body: { displayName }
+        });
+        assert.equal(joined.statusCode, 200);
+      }
+
+      const started = await requestJson(port, `/api/tournaments/${tournamentCode}/admin/start`, {
+        method: "POST",
+        body: { adminKey }
+      });
+      const firstWinnerId = started.body.tournament.bracket.rounds[0].matches[0].player1.id;
+      const secondWinnerId = started.body.tournament.bracket.rounds[0].matches[1].player1.id;
+
+      await requestJson(port, `/api/tournaments/${tournamentCode}/admin/matches/r1m1/winner`, {
+        method: "POST",
+        body: { adminKey, round: 1, winnerId: firstWinnerId, source: "admin_mark_winner" }
+      });
+      const secondReported = await requestJson(port, `/api/tournaments/${tournamentCode}/admin/matches/r1m2/winner`, {
+        method: "POST",
+        body: { adminKey, round: 1, winnerId: secondWinnerId, source: "admin_mark_winner" }
+      });
+      const finalMatch = secondReported.body.tournament.bracket.rounds[1].matches[0];
+      championId = finalMatch.player1.id;
+
+      const finalReported = await requestJson(port, `/api/tournaments/${tournamentCode}/admin/matches/r2m1/winner`, {
+        method: "POST",
+        body: { adminKey, round: 2, winnerId: championId, source: "admin_mark_winner" }
+      });
+      assert.equal(finalReported.body.tournament.status, "complete");
+
+      const duplicateFinal = await requestJson(port, `/api/tournaments/${tournamentCode}/admin/matches/r2m1/winner`, {
+        method: "POST",
+        body: { adminKey, round: 2, winnerId: championId, source: "admin_mark_winner" }
+      });
+      assert.equal(duplicateFinal.statusCode, 409);
+
+      const history = await requestJson(port, "/api/tournament-history");
+      assert.equal(history.statusCode, 200);
+      assert.equal(history.body.history.length, 1);
+      assert.equal(history.body.history[0].tournamentCode, tournamentCode);
+      assert.equal(history.body.history[0].championDisplayName, "A");
+      assert.equal(history.body.history[0].runnerUpDisplayName, "C");
+      assert.equal(history.body.history[0].matchCount, 3);
+      assert.equal(history.body.history[0].rounds, 2);
+      assert.equal(history.body.history[0].status, "complete");
+
+      const exportResponse = await requestJson(port, `/api/tournaments/${tournamentCode}/admin/export`, {
+        method: "POST",
+        body: { adminKey }
+      });
+      assert.equal(exportResponse.statusCode, 200);
+      assert.equal(exportResponse.body.backup.history.tournamentCode, tournamentCode);
+
+      const publicJson = JSON.stringify(history.body);
+      assert.doesNotMatch(publicJson, /Zxcvfdsaqwer1287!/);
+      assert.doesNotMatch(publicJson, /seatToken/);
+      assert.doesNotMatch(publicJson, /hiddenHands/);
+    } finally {
+      await stopServer(server);
+    }
+
+    server = await startTestServer(port, stateFile);
+    try {
+      const reloadedHistory = await requestJson(port, "/api/tournament-history");
+      assert.equal(reloadedHistory.statusCode, 200);
+      assert.equal(reloadedHistory.body.history.length, 1);
+      assert.equal(reloadedHistory.body.history[0].tournamentCode, tournamentCode);
+    } finally {
+      await stopServer(server);
+    }
+  });
+});
+
 test("persistence reload keeps a 64-player tournament bracket", async () => {
   await withTempStateFile(async (stateFile) => {
     const port = 5202;
@@ -1461,13 +1639,15 @@ test("app-facing files avoid restricted commerce wording except approved disclai
     "rules.html",
     "room.html",
     "tournament.html",
+    "tournament-history.html",
     "DEPLOYMENT_NOTES.md",
     "TESTER_LAUNCH_CHECKLIST.md",
     "PRODUCTION_LAUNCH_CHECKLIST.md",
     "TESTER_ANNOUNCEMENT_DRAFT.md",
     "src/home-client.js",
     "src/room-client.js",
-    "src/tournament-client.js"
+    "src/tournament-client.js",
+    "src/tournament-history-client.js"
   ];
   const restricted = [
     ["cash game"].join(""),
@@ -1503,7 +1683,8 @@ test("user-facing pages do not contain local-only links", async () => {
     "home.html",
     "rules.html",
     "room.html",
-    "tournament.html"
+    "tournament.html",
+    "tournament-history.html"
   ];
   const localOnly = [
     "localhost",

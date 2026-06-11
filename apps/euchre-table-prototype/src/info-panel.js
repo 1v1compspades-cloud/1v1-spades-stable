@@ -66,6 +66,19 @@ const infoPages = [
     }
   },
   {
+    id: "tournament-history",
+    label: "Tournament History",
+    title: "Tournament History",
+    body: [
+      "Completed tournament summaries show public-safe bracket results after a champion is declared.",
+      "History records include the champion, bracket size, rounds, and completed date without private room data."
+    ],
+    link: {
+      href: "./tournament-history.html",
+      text: "View Tournament History"
+    }
+  },
+  {
     id: "discord",
     label: "Discord / Community",
     title: "Discord / Community",

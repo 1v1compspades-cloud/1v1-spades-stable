@@ -109,13 +109,19 @@ export function validateTournamentBracket(tournament, { adminKey }) {
   };
 }
 
-export function exportTournamentBackup(tournament, { adminKey }) {
+export function exportTournamentBackup(tournament, { adminKey, history = null }) {
   verifyTournamentAdmin(tournament, adminKey);
 
-  return {
+  const backup = {
     exportedAt: new Date().toISOString(),
     tournament: sanitizeTournamentForAdmin(tournament, adminKey)
   };
+
+  if (history) {
+    backup.history = sanitizeTournamentHistorySummary(history);
+  }
+
+  return backup;
 }
 
 export function generateBracket(tournament, { createMatchRoom = defaultCreateMatchRoom } = {}) {
@@ -340,6 +346,34 @@ function collectMatchLinks(tournament) {
       roomCode: match.roomCode,
       roomLink: match.roomLink
     }));
+}
+
+function sanitizeTournamentHistorySummary(history) {
+  const summary = {
+    tournamentCode: String(history.tournamentCode ?? "").toUpperCase(),
+    bracketSize: Number(history.bracketSize ?? 0),
+    championDisplayName: String(history.championDisplayName ?? "Champion"),
+    runnerUpDisplayName: history.runnerUpDisplayName ? String(history.runnerUpDisplayName) : null,
+    completedAt: history.completedAt ?? null,
+    createdAt: history.createdAt ?? null,
+    matchCount: Number(history.matchCount ?? 0),
+    rounds: Number(history.rounds ?? 0),
+    finalScore: history.finalScore
+      ? {
+          player1: Number(history.finalScore.player1 ?? 0),
+          player2: Number(history.finalScore.player2 ?? 0)
+        }
+      : null,
+    status: "complete"
+  };
+
+  if (history.championAccountId) {
+    summary.championAccountId = String(history.championAccountId);
+  } else if (history.championPlayerId) {
+    summary.championPlayerId = String(history.championPlayerId);
+  }
+
+  return summary;
 }
 
 function buildEmptyRounds(bracketSize) {
