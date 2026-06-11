@@ -4,6 +4,7 @@ import { clearSavedActiveRoom, loadSavedActiveRoom } from "./local-room-session.
 const accountProfileKey = "euchre.accountProfile";
 const guestPlayerIdKey = "euchre.guestPlayerId";
 const homepageSettingsKey = "euchreHomepageSettings";
+const quickMatchQueueKey = "euchre.quickMatchQueue";
 
 const elements = {
   form: document.querySelector("#profileForm"),
@@ -83,7 +84,7 @@ async function leaveCurrentRoom() {
 
   try {
     const room = await fetchSavedRoom(savedRoom);
-    if (roomHasStarted(room) && !window.confirm("This game already started. Leave this device's saved room? This only clears this browser and does not delete or forfeit the room.")) {
+    if (roomHasStarted(room) && !window.confirm("Leave this match? You may need the invite link to rejoin.")) {
       setStatus("Still restoring current room.");
       return;
     }
@@ -92,6 +93,8 @@ async function leaveCurrentRoom() {
   }
 
   clearSavedActiveRoom(localStorage, savedRoom.roomCode);
+  localStorage.removeItem(quickMatchQueueKey);
+  setStatus("You left current room.");
   window.location.href = "./home.html";
 }
 

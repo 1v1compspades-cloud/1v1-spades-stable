@@ -662,6 +662,25 @@ test("new hand clears lastTrick summary", () => {
   assert.equal(room.gameState.currentTrick.length, 0);
 });
 
+test("Quick Match rematch requires both players", () => {
+  let room = createCompletedQuickMatchRoom();
+
+  room = applyRoomAction(room, { seatToken: "host-token", type: "requestRematch" });
+  assert.equal(room.gameState.phase, "match_complete");
+  assert.equal(room.quickMatch.rematchVotes.player1, true);
+  assert.equal(room.quickMatch.rematchVotes.player2, false);
+
+  room = applyRoomAction(room, { seatToken: "guest-token", type: "requestRematch" });
+  assert.equal(room.gameState.phase, "pregame_settings");
+  assert.equal(room.gameState.actionPhase, "pregame_settings");
+  assert.deepEqual(room.gameState.score, { player1: 0, player2: 0 });
+  assert.equal(room.gameState.winner, null);
+  assert.equal(room.quickMatch.rematchVotes.player1, false);
+  assert.equal(room.quickMatch.rematchVotes.player2, false);
+  assert.equal(room.leaderboardRecordedAt, null);
+  assert.deepEqual(room.playerReady, { player1: false, player2: false });
+});
+
 test("both players can pass upcard and choose second-round trump", () => {
   let room = createStartedRoom();
   const upcardSuit = room.gameState.upcard.suit;
@@ -992,6 +1011,33 @@ function createStartedRoom(options = {}) {
 function completeHandRoom(room = createStartedRoom()) {
   room = orderUpHeartsAndDiscard(room);
   return playFixedHand(room);
+}
+
+function createCompletedQuickMatchRoom() {
+  const joined = joinRoom(createRoom({ roomCode: "REMAT", seatToken: "host-token" }), {
+    seatToken: "guest-token"
+  }).room;
+
+  return {
+    ...joined,
+    leaderboardRecordedAt: "2026-06-10T12:00:00.000Z",
+    quickMatch: {
+      source: "quick_match",
+      autoRequeue: false,
+      rematchVotes: {
+        player1: false,
+        player2: false
+      },
+      rematchReady: false
+    },
+    gameState: {
+      ...joined.gameState,
+      phase: "match_complete",
+      actionPhase: "match_complete",
+      winner: "player1",
+      score: { player1: 5, player2: 3 }
+    }
+  };
 }
 
 function orderUpHeartsAndDiscard(

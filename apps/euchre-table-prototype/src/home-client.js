@@ -155,7 +155,7 @@ async function leaveCurrentRoom() {
 
   try {
     const room = await fetchSavedRoom(savedRoom);
-    if (roomHasStarted(room) && !window.confirm("This game already started. Leave this device's saved room? This only clears this browser and does not delete or forfeit the room.")) {
+    if (roomHasStarted(room) && !window.confirm("Leave this match? You may need the invite link to rejoin.")) {
       quickMatchStatus.textContent = "Still restoring current room.";
       return;
     }
@@ -164,9 +164,10 @@ async function leaveCurrentRoom() {
   }
 
   const cleared = clearSavedActiveRoom(localStorage, savedRoom.roomCode);
+  storeQuickMatchQueue(null);
   quickMatchStatus.textContent = cleared?.roomCode
-    ? `Left saved room ${cleared.roomCode} on this device.`
-    : "Left saved room on this device.";
+    ? `You left current room ${cleared.roomCode} on this device.`
+    : "You left current room on this device.";
   window.history.replaceState(null, "", "./home.html");
 }
 
@@ -190,22 +191,29 @@ function roomHasStarted(room) {
 }
 
 function handleQuickMatchResult(result) {
-  storeQuickMatchQueue(result.queue);
-  renderQuickMatchQueue(result.queue);
-
   if (result.matched && result.matchedRoomCode) {
+    storeQuickMatchQueue(null);
+    renderQuickMatchQueue(null);
     stopQuickMatchPolling();
     quickMatchStatus.textContent = "Match found. Opening room...";
     window.location.href = `./room.html?room=${encodeURIComponent(result.matchedRoomCode)}`;
     return;
   }
 
+  storeQuickMatchQueue(result.queue);
+  renderQuickMatchQueue(result.queue);
   startQuickMatchPolling();
 }
 
 function restoreQuickMatchQueue() {
   const savedQueue = loadQuickMatchQueue();
-  if (!savedQueue || !["waiting", "matched"].includes(savedQueue.status)) return;
+  if (!savedQueue) return;
+
+  if (savedQueue.status !== "waiting") {
+    storeQuickMatchQueue(null);
+    renderQuickMatchQueue(null);
+    return;
+  }
 
   renderQuickMatchQueue(savedQueue);
   enterQuickMatchQueue().catch((error) => {

@@ -1775,6 +1775,20 @@ body::before {
   color: var(--master-text);
 }
 
+.match-complete-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 12px 0 0;
+}
+
+.match-complete-actions button {
+  min-height: 58px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 1000;
+}
+
 .shell:not(.master-shell) {
   color: var(--ink);
 }
@@ -2026,6 +2040,15 @@ body::before {
   .trump-action-bar button {
     min-height: 56px;
     font-size: 1.05rem;
+  }
+
+  .match-complete-actions {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .match-complete-actions button {
+    min-height: 52px;
   }
 
   .info-overlay {

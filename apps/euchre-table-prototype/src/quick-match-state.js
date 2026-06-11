@@ -111,6 +111,21 @@ export function cancelQuickMatchQueue(quickMatchQueue, { playerId, accountId, qu
   return sanitizeQueueEntry(entry);
 }
 
+export function completeQuickMatchRoom(quickMatchQueue, roomCode, now = Date.now()) {
+  if (!roomCode) return false;
+  let changed = false;
+  const completedAt = new Date(now).toISOString();
+
+  for (const entry of quickMatchQueue.values()) {
+    if (entry.status !== "matched" || entry.matchedRoomCode !== roomCode) continue;
+    entry.status = "complete";
+    entry.completedAt = completedAt;
+    changed = true;
+  }
+
+  return changed;
+}
+
 export function sanitizeQueueEntry(entry) {
   if (!entry) return null;
 

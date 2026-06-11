@@ -35,6 +35,7 @@ import {
 } from "./src/tournament-history-state.js";
 import {
   cancelQuickMatchQueue,
+  completeQuickMatchRoom,
   debugQuickMatchQueue,
   expireQuickMatchQueue,
   enterQuickMatchQueue
@@ -475,6 +476,9 @@ function advanceAndSaveRoom(room) {
   let nextRoom = advanceRoomClock(room);
   const leaderboardResult = recordCompletedRoomStats(leaderboardStats, nextRoom);
   nextRoom = leaderboardResult.room;
+  if (nextRoom.quickMatch && nextRoom.gameState?.phase === "match_complete") {
+    completeQuickMatchRoom(quickMatchQueue, nextRoom.roomCode);
+  }
   rooms.set(nextRoom.roomCode, nextRoom);
   syncTournamentFromRoom(nextRoom);
   persistState();
@@ -586,6 +590,15 @@ function createQuickMatchRoom({ player1, player2, matchSettings }) {
     accountId: player2.accountId,
     blockedIdentityNames: player1.identityNames ?? [player1.displayName]
   }).room;
+  joined.quickMatch = {
+    source: "quick_match",
+    autoRequeue: false,
+    rematchVotes: {
+      player1: false,
+      player2: false
+    },
+    rematchReady: false
+  };
   rooms.set(joined.roomCode, joined);
   return joined;
 }

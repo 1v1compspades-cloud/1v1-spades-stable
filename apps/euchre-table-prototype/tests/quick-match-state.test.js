@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   cancelQuickMatchQueue,
+  completeQuickMatchRoom,
   enterQuickMatchQueue
 } from "../src/quick-match-state.js";
 
@@ -187,6 +188,21 @@ test("refresh re-enter queue returns existing matched entry", () => {
   assert.equal(matched.matched, true);
   assert.equal(refreshed.matched, true);
   assert.equal(refreshed.entry.matchedRoomCode, "MATCH1");
+});
+
+test("completed Quick Match does not auto-requeue players into old room", () => {
+  const queue = new Map();
+  enterQueue(queue, { playerId: "p1", displayName: "Alice" });
+  const matched = enterQueue(queue, { playerId: "p2", displayName: "Bob" });
+
+  assert.equal(matched.entry.matchedRoomCode, "MATCH1");
+  assert.equal(completeQuickMatchRoom(queue, "MATCH1"), true);
+
+  const fresh = enterQueue(queue, { playerId: "p1", displayName: "Alice" });
+  assert.equal(fresh.matched, false);
+  assert.equal(fresh.entry.status, "waiting");
+  assert.equal(fresh.entry.matchedRoomCode, null);
+  assert.equal([...queue.values()].filter((entry) => entry.status === "complete").length, 2);
 });
 
 function enterQueue(queue, { playerId, accountId, displayName, identityNames, raceTo = 5, now = Date.parse("2026-06-10T12:00:00.000Z") }) {

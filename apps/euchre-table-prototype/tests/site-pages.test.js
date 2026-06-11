@@ -378,8 +378,11 @@ test("mobile trump actions render in a main action bar", async () => {
   assert.equal(statusIndex < trumpPanelIndex, true);
   assert.equal(trumpPanelIndex < roomTableIndex, true);
   assert.doesNotMatch(headerMarkup, /trumpPanel|trumpButtons|passButton/);
-  assert.match(client, /Order Up \$\{label\}/);
-  assert.match(client, /Keep \$\{label\}/);
+  assert.match(client, /Ordering the upcard sends it to the dealer\. Dealer picks it up, then discards one card\./);
+  assert.match(client, /Pick one card to discard\./);
+  assert.match(client, /Waiting for dealer to discard\./);
+  assert.match(client, /"Pick Up Upcard"/);
+  assert.match(client, /"Order Up Dealer"/);
   assert.match(client, /Choose \$\{label\}/);
   assert.match(client, /setHidden\(elements\.passButton, !canAct\)/);
   assert.match(client, /if \(!canAct\) return/);
@@ -526,6 +529,8 @@ test("dealer choice buttons are coin-flip only and hide after selection", async 
 
 test("Quick Match is wired to queue, cancel, and matched room redirect", async () => {
   const client = await readText("src/home-client.js");
+  const roomClient = await readText("src/room-client.js");
+  const gameHtml = await readText("game.html");
 
   assert.match(client, /\/api\/quick-match/);
   assert.match(client, /\/api\/quick-match\/cancel/);
@@ -539,7 +544,16 @@ test("Quick Match is wired to queue, cancel, and matched room redirect", async (
   assert.match(client, /readLocalStorage\(guestPlayerIdKey\) \?\? fallbackGuestPlayerId/);
   assert.match(client, /cancelQuickMatchButton/);
   assert.match(client, /startQuickMatchPolling/);
+  assert.match(client, /if \(savedQueue\.status !== "waiting"\)/);
+  assert.match(client, /storeQuickMatchQueue\(null\)/);
   assert.match(client, /window\.location\.href = `\.\/room\.html\?room=\$\{encodeURIComponent\(result\.matchedRoomCode\)\}`/);
+  assert.match(gameHtml, /id="matchCompleteActions"/);
+  assert.match(gameHtml, /id="rematchButton"[\s\S]*Rematch/);
+  assert.match(gameHtml, /id="backToLobbyButton"[\s\S]*Back to Lobby/);
+  assert.match(roomClient, /type: "requestRematch"/);
+  assert.match(roomClient, /function clearQuickMatchIntent/);
+  assert.match(roomClient, /localStorage\.removeItem\(quickMatchQueueKey\)/);
+  assert.match(roomClient, /Leave this match\? You may need the invite link to rejoin\./);
   assert.doesNotMatch(client, /Quick Match coming next/);
 });
 

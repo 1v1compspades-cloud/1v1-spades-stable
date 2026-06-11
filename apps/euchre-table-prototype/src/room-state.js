@@ -28,6 +28,7 @@ export function createRoom({
   accountId,
   coinFlipWinner = null,
   tournamentMatch = null,
+  quickMatch = null,
   matchSettings,
   targetScore,
   raceTo,
@@ -71,6 +72,7 @@ export function createRoom({
     nextHandStartsAt: null,
     nextRoundStartsAt: null,
     tournamentMatch,
+    quickMatch,
     gameState,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
@@ -347,6 +349,18 @@ export function applyRoomAction(room, { seatToken, playerId, accountId, type, su
     });
   }
 
+  if (type === "requestRematch") {
+    if (gameState.phase !== "match_complete") {
+      throw new Error("Rematch is available after the match is complete");
+    }
+
+    if (!room.quickMatch) {
+      throw new Error("Rematch is available for Quick Match rooms");
+    }
+
+    return requestQuickMatchRematch(room, seat);
+  }
+
   throw new Error(`Unsupported room action: ${type}`);
 }
 
@@ -381,6 +395,9 @@ export function sanitizeRoomForViewer(room, seatToken, playerId, accountId) {
     countdownEndsAt: safeRoom.countdownEndsAt,
     nextHandStartsAt: safeRoom.nextHandStartsAt,
     nextRoundStartsAt: safeRoom.nextRoundStartsAt,
+    quickMatch: safeRoom.quickMatch
+      ? sanitizeQuickMatchRoomState(safeRoom.quickMatch)
+      : null,
     matchSettings: {
       ...safeRoom.matchSettings
     },
@@ -772,6 +789,65 @@ function discardForDealer(room, dealer, card) {
   });
 }
 
+function requestQuickMatchRematch(room, seat) {
+  const rematchVotes = {
+    player1: false,
+    player2: false,
+    ...room.quickMatch?.rematchVotes,
+    [seat]: true
+  };
+  const rematchReady = Boolean(rematchVotes.player1 && rematchVotes.player2);
+  const quickMatch = {
+    ...room.quickMatch,
+    rematchVotes,
+    rematchReady,
+    autoRequeue: false
+  };
+
+  if (!rematchReady) {
+    return syncRoomFields({
+      ...room,
+      quickMatch,
+      updatedAt: new Date().toISOString()
+    });
+  }
+
+  const mode = modeForMatchSettings(room.matchSettings);
+  const rematchState = createWaitingGameState({ mode, modeId: room.matchSettings.modeId });
+  rematchState.phase = "pregame_settings";
+  rematchState.actionPhase = "pregame_settings";
+
+  const rematchRoom = {
+    ...room,
+    playerReady: {
+      player1: false,
+      player2: false
+    },
+    coinFlipWinner: null,
+    coinFlipWinnerSeed: null,
+    startingPositionChoice: null,
+    firstDealer: null,
+    countdownStartedAt: null,
+    countdownEndsAt: null,
+    nextHandStartsAt: null,
+    nextRoundStartsAt: null,
+    leaderboardRecordedAt: null,
+    quickMatch: {
+      ...quickMatch,
+      rematchVotes: {
+        player1: false,
+        player2: false
+      },
+      rematchReady: false,
+      rematchedAt: new Date().toISOString()
+    },
+    gameState: rematchState,
+    updatedAt: new Date().toISOString()
+  };
+
+  return syncRoomFields(rematchRoom);
+}
+
 function applyDealerPickupIfNeeded(state, trumpState) {
   if (trumpState.round !== 1 || trumpState.trumpSuit !== trumpState.upcardSuit) {
     return state;
@@ -860,6 +936,18 @@ function syncRoomFields(room) {
     trumpState: guardedRoom.gameState.trumpState,
     score: guardedRoom.gameState.score,
     handHistory: guardedRoom.gameState.handHistory
+  };
+}
+
+function sanitizeQuickMatchRoomState(quickMatch) {
+  return {
+    source: quickMatch.source ?? "quick_match",
+    autoRequeue: Boolean(quickMatch.autoRequeue),
+    rematchVotes: {
+      player1: Boolean(quickMatch.rematchVotes?.player1),
+      player2: Boolean(quickMatch.rematchVotes?.player2)
+    },
+    rematchReady: Boolean(quickMatch.rematchReady)
   };
 }
 

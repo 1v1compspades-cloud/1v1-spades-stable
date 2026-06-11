@@ -1,4 +1,5 @@
 import { cardsEqual } from "../../../packages/euchre-core/src/index.js";
+import { sortDisplayHand } from "./card-display.js";
 import { setupInfoPanel } from "./info-panel.js";
 import {
   activeRoomSessionKey as storageKey,
@@ -12,13 +13,19 @@ import { cardLabel, suitSymbol } from "./table-state.js";
 const guestPlayerIdKey = "euchre.guestPlayerId";
 const accountProfileKey = "euchre.accountProfile";
 const homepageSettingsKey = "euchreHomepageSettings";
+const quickMatchQueueKey = "euchre.quickMatchQueue";
 const elements = {
   gameShell: document.querySelector(".game-shell"),
+  homeLinks: document.querySelectorAll('a[href="./home.html"]'),
+  backToLobbyLink: document.querySelector("#backToLobbyLink"),
   activeRoomControls: document.querySelector("#activeRoomControls"),
   copyCodeButton: document.querySelector("#copyCodeButton"),
   copySpectatorLinkButton: document.querySelector("#copySpectatorLinkButton"),
   openInviteLinkButton: document.querySelector("#openInviteLinkButton"),
   nextHandButton: document.querySelector("#nextHandButton"),
+  matchCompleteActions: document.querySelector("#matchCompleteActions"),
+  rematchButton: document.querySelector("#rematchButton"),
+  backToLobbyButton: document.querySelector("#backToLobbyButton"),
   roomStatus: document.querySelector("#roomStatus"),
   roomCode: document.querySelector("#roomCode"),
   viewerSeat: document.querySelector("#viewerSeat"),
@@ -148,6 +155,28 @@ elements.nextHandButton?.addEventListener("click", async () => {
   await sendAction({ type: "startNextHand" });
 });
 
+elements.rematchButton?.addEventListener("click", async () => {
+  await sendAction({ type: "requestRematch" });
+});
+
+elements.backToLobbyButton?.addEventListener("click", () => {
+  leaveCurrentRoomOnThisDevice("You left current room.");
+});
+
+elements.homeLinks?.forEach((link) => {
+  link.addEventListener("click", (event) => {
+    if (!confirmActiveMatchLeave()) {
+      event.preventDefault();
+    }
+  });
+});
+
+elements.backToLobbyLink?.addEventListener("click", (event) => {
+  if (!confirmActiveMatchLeave()) {
+    event.preventDefault();
+  }
+});
+
 async function handleReadyClick() {
   const viewerSeat = roomView?.viewerSeat;
   const viewerReady = viewerSeat && viewerSeat !== "spectator"
@@ -254,6 +283,10 @@ async function refreshRoom(status) {
     }
     setRoom(result.room, status);
   } catch (error) {
+    if (isNetworkError(error)) {
+      setStatus("Reconnecting...");
+      return;
+    }
     clearStoredSession(session?.roomCode);
     session = null;
     setStatus(`${error.message}. Create a room or enter a room code to continue.`);
@@ -416,6 +449,30 @@ function clearStoredSession(roomCode) {
   clearSavedActiveRoom(localStorage, roomCode);
 }
 
+function clearQuickMatchIntent() {
+  localStorage.removeItem(quickMatchQueueKey);
+}
+
+function leaveCurrentRoomOnThisDevice(message = "You left current room.") {
+  clearQuickMatchIntent();
+  clearStoredSession(roomView?.roomCode ?? session?.roomCode);
+  session = null;
+  setStatus(message);
+  window.location.href = "./home.html";
+}
+
+function confirmActiveMatchLeave() {
+  if (!roomView || roomView.gameState?.phase === "match_complete" || !isGamePagePhase(roomView.gameState?.phase)) {
+    return true;
+  }
+
+  return window.confirm("Leave this match? You may need the invite link to rejoin.");
+}
+
+function isNetworkError(error) {
+  return error instanceof TypeError || /failed to fetch|network/i.test(error.message ?? "");
+}
+
 function getGuestPlayerId() {
   const existingPlayerId = localStorage.getItem(guestPlayerIdKey);
   if (existingPlayerId) return existingPlayerId;
@@ -558,6 +615,9 @@ function render() {
     elements.coinFlipPanel?.replaceChildren();
     setHidden(elements.trumpPanel, true);
     setDisabled(elements.nextHandButton, true);
+    setHidden(elements.matchCompleteActions, true);
+    setDisabled(elements.rematchButton, true);
+    setDisabled(elements.backToLobbyButton, true);
     setHidden(elements.scoreband, true);
     setDisabled(elements.copyCodeButton, true);
     setDisabled(elements.copySpectatorLinkButton, true);
@@ -639,6 +699,7 @@ function render() {
   }
   setHidden(elements.nextHandButton, true);
   setDisabled(elements.nextHandButton, true);
+  renderMatchCompleteActions(state, viewerSeat);
   setHidden(elements.scoreband, !gameInterfaceActive);
   setHidden(elements.roomTable, !gameInterfaceActive);
   setHidden(elements.pregamePanel, gameInterfaceActive);
@@ -722,7 +783,13 @@ function renderStatus() {
   const playerCount = Number(roomView.players.player1) + Number(roomView.players.player2);
 
   if (state.winner) {
-    setStatus(`${getPlayerDisplayName(state.winner)} wins the match.`);
+    const viewerSeat = roomView.viewerSeat;
+    const viewerVoted = viewerSeat !== "spectator" && Boolean(roomView.quickMatch?.rematchVotes?.[viewerSeat]);
+    if (viewerVoted) {
+      setStatus("Rematch requested. Waiting for opponent.");
+    } else {
+      setStatus(`${getPlayerDisplayName(state.winner)} wins the match.`);
+    }
   } else if (state.phase === "waiting_for_players") {
     setStatus("Waiting for opponent.");
   } else if (state.phase === "pregame_settings") {
@@ -740,12 +807,37 @@ function renderStatus() {
       setStatus(`${getPlayerDisplayName(state.currentTurn)} to choose or pass trump.`);
     }
   } else if (state.actionPhase === "dealer_discard") {
-    setStatus(`${getPlayerDisplayName(state.dealer)} picked up the upcard and must discard one card.`);
+    if (roomView.viewerSeat === state.dealer) {
+      setStatus("Pick one card to discard.");
+    } else {
+      setStatus("Waiting for dealer to discard.");
+    }
   } else if (state.actionPhase === "playing") {
     setStatus(`${getPlayerDisplayName(state.currentTurn)} to play. Trump: ${suitName(activeTrumpSuit(state))}.`);
   } else if (state.phase === "next_round_countdown" || state.phase === "hand_score") {
     const points = state.handScore.points;
     setStatus(`Hand complete. ${scoreDeltaLabel(points)}. Next round starts in ${secondsUntil(state.nextRoundStartsAt)}.`);
+  }
+}
+
+function renderMatchCompleteActions(state, viewerSeat) {
+  if (!elements.matchCompleteActions) return;
+
+  const matchComplete = state.phase === "match_complete";
+  const seatedViewer = viewerSeat !== "spectator";
+  const canRematch = matchComplete && seatedViewer && Boolean(roomView.quickMatch);
+  setHidden(elements.matchCompleteActions, !matchComplete);
+  setHidden(elements.rematchButton, !canRematch);
+  setHidden(elements.backToLobbyButton, !matchComplete);
+
+  if (elements.rematchButton) {
+    const viewerVoted = seatedViewer && Boolean(roomView.quickMatch?.rematchVotes?.[viewerSeat]);
+    elements.rematchButton.disabled = !canRematch || viewerVoted;
+    elements.rematchButton.textContent = viewerVoted ? "Waiting for Rematch" : "Rematch";
+  }
+
+  if (elements.backToLobbyButton) {
+    elements.backToLobbyButton.disabled = !matchComplete;
   }
 }
 
@@ -775,7 +867,7 @@ function renderViewerHand(state, viewerSeat) {
 
   if (viewerSeat === "spectator") return;
 
-  for (const card of state.viewerHand) {
+  for (const card of sortDisplayHand(state.viewerHand, activeTrumpSuit(state))) {
     const discardable = state.actionPhase === "dealer_discard"
       && viewerSeat === state.dealer
       && state.discardableCards.some((candidate) => cardsEqual(candidate, card));
@@ -1018,6 +1110,20 @@ function waitingMessage(view, state, playerCount) {
 }
 
 function trumpActionHelp(state, canAct) {
+  const pickupCopy = "Ordering the upcard sends it to the dealer. Dealer picks it up, then discards one card.";
+
+  if (state.actionPhase === "dealer_discard") {
+    return roomView?.viewerSeat === state.dealer
+      ? "Pick one card to discard."
+      : "Waiting for dealer to discard.";
+  }
+
+  if (state.trumpState?.round === 1) {
+    return canAct
+      ? pickupCopy
+      : `${getPlayerDisplayName(state.currentTurn)} is choosing trump. ${pickupCopy}`;
+  }
+
   if (canAct) {
     if (state.trumpState?.forcedDealerChoice) {
       return "Stick the Dealer is active. Choose trump to continue.";
@@ -1038,8 +1144,8 @@ function trumpActionLabel(state, suit) {
 
   if (state.trumpState?.round === 1) {
     return state.currentTurn === state.trumpState.dealer
-      ? `Keep ${label}`
-      : `Order Up ${label}`;
+      ? "Pick Up Upcard"
+      : "Order Up Dealer";
   }
 
   return `Choose ${label}`;
