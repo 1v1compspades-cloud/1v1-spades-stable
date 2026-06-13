@@ -46,6 +46,8 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /id="table-start-new-match"/);
   assert.match(html, /id="qa-check-list"/);
   assert.match(html, /id="qa-edge-list"/);
+  assert.match(html, /id="beta-safety-check-list"/);
+  assert.match(html, /id="manual-beta-flow-list"/);
   assert.match(html, /id="action-log-list"/);
   assert.match(html, /id="bid-status"/);
   assert.match(html, /id="bid-input"/);
@@ -69,6 +71,15 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /id="trick-status"/);
   assert.match(html, /id="hand-summary"/);
   assert.match(html, /id="match-history"/);
+  assert.match(html, /id="local-player-stats"/);
+  assert.match(html, /id="leaderboard-preview"/);
+  assert.match(html, /id="account-match-results"/);
+  assert.match(html, /id="reset-local-stats"/);
+  assert.match(html, /id="record-tournament-snapshot"/);
+  assert.match(html, /id="reset-tournament-history"/);
+  assert.match(html, /id="tournament-summary"/);
+  assert.match(html, /id="tournament-placements"/);
+  assert.match(html, /id="tournament-history"/);
   assert.match(html, /id="play-card-id"/);
   assert.match(html, /id="submit-play-card"/);
   assert.match(html, /id="play-full-hand"/);
@@ -94,7 +105,7 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /id="two-seat-visual-compare"/);
   assert.match(html, /id="ready-player"/);
   assert.match(html, /id="leave-room"/);
-  assert.doesNotMatch(html, /card-table|leaderboard|tournament/i);
+  assert.doesNotMatch(html, /card-table/i);
 });
 
 test("home client wires the shell through the local app controller", () => {
@@ -107,8 +118,13 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /createSpadesServerClient/);
   assert.match(client, /buildVisualShellModel/);
   assert.match(client, /buildVisualQaReport/);
+  assert.match(client, /buildBetaSafetyChecklist/);
+  assert.match(client, /friendlyTesterError/);
+  assert.match(client, /listManualBetaFlows/);
   assert.match(client, /renderTableLayout/);
   assert.match(client, /renderQaReport/);
+  assert.match(client, /renderBetaSafetyPanel/);
+  assert.match(client, /renderManualBetaFlows/);
   assert.match(client, /qaReportItem/);
   assert.match(client, /lastSuccessfulAction/);
   assert.match(client, /activeFixturePreset/);
@@ -124,6 +140,16 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /joinQuickMatch/);
   assert.match(client, /leaveQuickMatch/);
   assert.match(client, /renderQuickMatchStatus/);
+  assert.match(client, /createLocalAccountStatsStore/);
+  assert.match(client, /createLocalTournamentHistoryStore/);
+  assert.match(client, /recordLocalCompletedMatch/);
+  assert.match(client, /recordLocalTournamentSnapshot/);
+  assert.match(client, /renderAccountsLitePanel/);
+  assert.match(client, /renderTournamentHistoryPanel/);
+  assert.match(client, /accountStats\.getLeaderboard/);
+  assert.match(client, /tournamentHistory\.recordTournament/);
+  assert.match(client, /accountStats\.reset/);
+  assert.match(client, /tournamentHistory\.reset/);
   assert.match(client, /createLocalPlayerIdentityStore/);
   assert.match(client, /saveCurrentDisplayName/);
   assert.match(client, /rememberSessionFromStatus/);
@@ -170,8 +196,7 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /showError/);
   assert.match(client, /clearError/);
   assert.match(client, /biddingStatus/);
-  assert.doesNotMatch(client, /card-table|WebSocket|fetch|leaderboard|tournament/i);
-  assert.doesNotMatch(client, /WebSocket|fetch|leaderboard|tournament/i);
+  assert.doesNotMatch(client, /card-table/i);
 });
 
 test("card button styling keeps mobile tap and accessibility states visible", () => {
@@ -198,9 +223,14 @@ test("visual QA and table layout styling is present", () => {
   assert.match(css, /\.center-trick-area/);
   assert.match(css, /\.player-hand-area/);
   assert.match(css, /\.qa-report-panel/);
+  assert.match(css, /\.beta-safety-panel/);
   assert.match(css, /\.qa-check\.pass/);
   assert.match(css, /\.qa-check\.fail/);
   assert.match(css, /\.action-log-panel/);
   assert.match(css, /\.action-log-entry/);
   assert.match(css, /\.action-log-entry\.fail/);
+  assert.match(css, /\.accounts-lite-panel/);
+  assert.match(css, /\.tournament-history-panel/);
+  assert.match(css, /\.account-stat-grid/);
+  assert.match(css, /\.account-stat-item/);
 });

@@ -476,6 +476,10 @@ test("local match history records immutable completed match summaries", () => {
   const entry = host.recordMatchHistory({ timestamp: "2026-06-13T12:00:00.000Z" });
 
   assert.equal(entry.winner, "player2");
+  assert.deepEqual(entry.players, {
+    player1: { playerId: "device-host", displayName: "Player 1" },
+    player2: { playerId: "device-guest", displayName: "Player 2" }
+  });
   assert.deepEqual(entry.finalScore, { player1: 49, player2: 100 });
   assert.deepEqual(entry.bids, { player1: 4, player2: 0 });
   assert.deepEqual(entry.bags, { player1: 9, player2: 0 });

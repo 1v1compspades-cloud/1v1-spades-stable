@@ -53,7 +53,8 @@ h2 {
 .card-button-grid,
 .table-layout-shell,
 .qa-check-list,
-.action-log-list {
+.action-log-list,
+.account-stat-grid {
   display: grid;
   gap: 12px;
 }
@@ -167,7 +168,10 @@ select:focus-visible {
 }
 
 .qa-report-panel,
-.action-log-panel {
+.action-log-panel,
+.accounts-lite-panel,
+.tournament-history-panel,
+.beta-safety-panel {
   display: grid;
   gap: 12px;
   margin: 0 0 18px;
@@ -217,6 +221,19 @@ select:focus-visible {
 .action-log-entry.fail {
   border-color: rgba(255, 180, 168, 0.38);
   background: rgba(142, 52, 38, 0.24);
+}
+
+.account-stat-item {
+  min-height: 44px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  color: #f8f4eb;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(248, 244, 235, 0.16);
+  font-size: 13px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
 }
 
 h3 {

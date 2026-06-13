@@ -1,7 +1,14 @@
 import { createSpadesAppController } from "./app-controller.js";
 import { createLocalActionLog } from "./action-log.js";
+import { createLocalAccountStatsStore } from "./local-account-stats.js";
 import { createSpadesLiveSyncClient } from "./live-sync-client.js";
 import { createLocalPlayerIdentityStore } from "./local-identity.js";
+import { createLocalTournamentHistoryStore } from "./local-tournament-history.js";
+import {
+  buildBetaSafetyChecklist,
+  friendlyTesterError,
+  listManualBetaFlows
+} from "./beta-readiness.js";
 import {
   createTwoSeatManualHarness,
   listManualFixturePresets
@@ -59,6 +66,8 @@ const tableLastTrickAreaOutput = document.querySelector("#table-last-trick-area"
 const tablePlayerHandAreaOutput = document.querySelector("#table-player-hand-area");
 const qaCheckListOutput = document.querySelector("#qa-check-list");
 const qaEdgeListOutput = document.querySelector("#qa-edge-list");
+const betaSafetyCheckListOutput = document.querySelector("#beta-safety-check-list");
+const manualBetaFlowListOutput = document.querySelector("#manual-beta-flow-list");
 const actionLogListOutput = document.querySelector("#action-log-list");
 const manualVisualRoomOutput = document.querySelector("#manual-visual-room");
 const manualVisualPhaseOutput = document.querySelector("#manual-visual-phase");
@@ -82,6 +91,12 @@ const playableStatusOutput = document.querySelector("#playable-status");
 const trickStatusOutput = document.querySelector("#trick-status");
 const handSummaryOutput = document.querySelector("#hand-summary");
 const matchHistoryOutput = document.querySelector("#match-history");
+const localPlayerStatsOutput = document.querySelector("#local-player-stats");
+const leaderboardPreviewOutput = document.querySelector("#leaderboard-preview");
+const accountMatchResultsOutput = document.querySelector("#account-match-results");
+const tournamentSummaryOutput = document.querySelector("#tournament-summary");
+const tournamentPlacementsOutput = document.querySelector("#tournament-placements");
+const tournamentHistoryOutput = document.querySelector("#tournament-history");
 const errorOutput = document.querySelector("#shell-error");
 const bidInput = document.querySelector("#bid-input");
 const playCardIdInput = document.querySelector("#play-card-id");
@@ -95,7 +110,10 @@ let lastSuccessfulAction = "none";
 let activeFixturePreset = "none";
 let transportMode = "direct";
 const actionLog = createLocalActionLog();
+const accountStats = createLocalAccountStatsStore();
+const tournamentHistory = createLocalTournamentHistoryStore();
 displayNameInput.value = localIdentity.displayName;
+renderManualBetaFlows();
 
 for (const presetName of listManualFixturePresets().filter((name) => !name.startsWith("reconnect-"))) {
   const option = document.createElement("option");
@@ -217,7 +235,7 @@ document.querySelector("#start-next-hand").addEventListener("click", () => {
 
 document.querySelector("#record-match-history").addEventListener("click", () => {
   runShellAction(() => {
-    controller.recordMatchHistory();
+    recordLocalCompletedMatch();
     return controller.getActiveRoomStatus();
   }, "record match history");
 });
@@ -232,7 +250,7 @@ document.querySelector("#table-leave-room").addEventListener("click", () => {
 
 document.querySelector("#table-record-history").addEventListener("click", () => {
   runShellAction(() => {
-    controller.recordMatchHistory();
+    recordLocalCompletedMatch();
     return controller.getActiveRoomStatus();
   }, "record match history");
 });
@@ -243,6 +261,29 @@ document.querySelector("#table-start-next-hand").addEventListener("click", () =>
 
 document.querySelector("#table-start-new-match").addEventListener("click", () => {
   runShellAction(() => activeShellActions().startNewMatch(), "reset/new match");
+});
+
+document.querySelector("#reset-local-stats").addEventListener("click", () => {
+  accountStats.reset();
+  lastSuccessfulAction = "reset local stats";
+  actionLog.record("reset local stats", currentShellStatus());
+  renderAccountsLitePanel();
+  renderStatus(currentShellStatus());
+});
+
+document.querySelector("#record-tournament-snapshot").addEventListener("click", () => {
+  runShellAction(() => {
+    recordLocalTournamentSnapshot();
+    return currentShellStatus();
+  }, "record tournament snapshot");
+});
+
+document.querySelector("#reset-tournament-history").addEventListener("click", () => {
+  tournamentHistory.reset();
+  lastSuccessfulAction = "reset tournament history";
+  actionLog.record("reset tournament history", currentShellStatus());
+  renderTournamentHistoryPanel();
+  renderStatus(currentShellStatus());
 });
 
 document.querySelector("#manual-setup").addEventListener("click", () => {
@@ -345,14 +386,16 @@ async function runShellAction(action, successLabel = "completed action") {
     renderStatus(status);
   } catch (error) {
     const message = error?.message ?? "Action failed";
+    const friendlyMessage = friendlyTesterError(message);
     const status = currentShellStatus();
-    actionLog.record(successLabel, status, { outcome: "failure", message });
+    actionLog.record(successLabel, status, { outcome: "failure", message: friendlyMessage });
     showError(message);
     renderActionLog();
     renderQaReport(status, message, {
       checks: qaCheckListOutput,
       edges: qaEdgeListOutput
     });
+    renderBetaSafetyPanel(status);
   }
 }
 
@@ -524,6 +567,7 @@ function renderStatus(status) {
   turnStatusOutput.textContent = `Turn: ${status?.currentTurn ?? "none"}`;
   actionStatusOutput.textContent = status ? formatActionStatus(status) : "Action: none";
   renderVisualShell(status);
+  renderBetaSafetyPanel(status);
   statusOutput.textContent = status ? renderRoomShellText(status) : "No active room.";
   bidStatusOutput.textContent = status?.biddingStatus
     ? `Bid next: ${status.biddingStatus.nextBidder ?? "none"}`
@@ -541,6 +585,8 @@ function renderStatus(status) {
     ? `Hand summary: ${formatHandSummary(status.handSummary)}`
     : "Hand summary: none";
   matchHistoryOutput.textContent = formatMatchHistory(controller.getMatchHistory());
+  renderAccountsLitePanel();
+  renderTournamentHistoryPanel();
   renderActionLog();
 }
 
@@ -782,7 +828,7 @@ function renderTwoSeatVisualCompare() {
 }
 
 function showError(message) {
-  errorOutput.textContent = message;
+  errorOutput.textContent = friendlyTesterError(message);
 }
 
 function clearError() {
@@ -829,6 +875,125 @@ function formatMatchHistory(history) {
   return `Match history: ${history.map((entry) => (
     `${entry.timestamp} ${entry.winner} ${entry.finalScore.player1}-${entry.finalScore.player2}`
   )).join(" | ")}`;
+}
+
+function recordLocalCompletedMatch(options = {}) {
+  const entry = controller.recordMatchHistory(options);
+  accountStats.recordMatch(entry);
+  renderAccountsLitePanel();
+  renderTournamentHistoryPanel();
+  return entry;
+}
+
+function recordLocalTournamentSnapshot() {
+  const matches = accountStats.listResults();
+  if (!matches.length) {
+    throw new Error("Record at least one completed match before creating a tournament snapshot");
+  }
+  const nextNumber = tournamentHistory.listTournaments().length + 1;
+  const tournament = tournamentHistory.recordTournament({
+    id: `local-tournament-${nextNumber}`,
+    name: `Local Tournament ${nextNumber}`,
+    matches
+  });
+  renderTournamentHistoryPanel();
+  return tournament;
+}
+
+function renderAccountsLitePanel() {
+  const playerStats = accountStats.getPlayerStats(localIdentity.playerId);
+  localPlayerStatsOutput.replaceChildren(
+    accountStatItem("Local player", `${localIdentity.displayName} (${localIdentity.playerId})`),
+    accountStatItem("Games", `${playerStats.gamesPlayed} played | ${playerStats.wins}W ${playerStats.losses}L`),
+    accountStatItem("Nil", `${playerStats.nilMade} made | ${playerStats.nilFailed} failed`),
+    accountStatItem("Bags", String(playerStats.bags))
+  );
+
+  const leaderboard = accountStats.getLeaderboard({ limit: 5 });
+  leaderboardPreviewOutput.replaceChildren(...(leaderboard.length
+    ? leaderboard.map((row, index) => accountStatItem(
+      `#${index + 1} ${row.displayName}`,
+      `${row.wins}W ${row.losses}L | games ${row.gamesPlayed} | nil ${row.nilMade}/${row.nilFailed} | bags ${row.bags}`
+    ))
+    : [accountStatItem("Leaderboard", "No local completed matches yet")]));
+
+  const results = accountStats.listResults({ playerId: localIdentity.playerId });
+  accountMatchResultsOutput.textContent = results.length
+    ? `Local match results: ${results.map((entry) => (
+      `${entry.timestamp} ${entry.roomCode} winner ${entry.winner} score ${entry.finalScore.player1}-${entry.finalScore.player2}`
+    )).join(" | ")}`
+    : "Local match results: none";
+}
+
+function accountStatItem(label, value) {
+  const item = document.createElement("p");
+  item.className = "account-stat-item";
+  item.textContent = `${label}: ${value}`;
+  return item;
+}
+
+function renderBetaSafetyPanel(status = currentShellStatus()) {
+  const checklist = buildBetaSafetyChecklist({
+    status,
+    transportMode,
+    serverStatus: betaServerStatus(),
+    webSocketStatus: betaWebSocketStatus(),
+    playerId: localIdentity.playerId,
+    lastAction: lastSuccessfulAction,
+    lastError: errorOutput.textContent
+  });
+  betaSafetyCheckListOutput.replaceChildren(...checklist.map((check) => qaReportItem(
+    check.pass,
+    check.name,
+    check.detail
+  )));
+}
+
+function renderManualBetaFlows() {
+  manualBetaFlowListOutput.replaceChildren(...listManualBetaFlows().map((flow) => accountStatItem(
+    flow.label,
+    flow.steps.join(" > ")
+  )));
+}
+
+function betaServerStatus() {
+  if (isRealServerMode()) {
+    return realServerClient.error
+      ? `real server ${realServerClient.connectionStatus}: ${friendlyTesterError(realServerClient.error)}`
+      : `real server ${realServerClient.connectionStatus}`;
+  }
+  if (isLiveSyncMode()) return "mock live-sync local";
+  return "direct local controller";
+}
+
+function betaWebSocketStatus() {
+  if (isRealServerMode()) return realServerClient.connectionStatus;
+  if (isLiveSyncMode()) return liveSyncClient.status ? "mock socket active" : "mock socket idle";
+  return "not used in direct local mode";
+}
+
+function renderTournamentHistoryPanel() {
+  const summary = tournamentHistory.getSummary();
+  tournamentSummaryOutput.replaceChildren(
+    accountStatItem("Tournaments", String(summary.tournamentCount)),
+    accountStatItem("Grouped matches", String(summary.matchCount)),
+    accountStatItem("Latest", summary.latest ? `${summary.latest.name} (${summary.latest.matchIds.length} matches)` : "none")
+  );
+
+  const latestPlacements = summary.latest?.placements ?? [];
+  tournamentPlacementsOutput.replaceChildren(...(latestPlacements.length
+    ? latestPlacements.map((row) => accountStatItem(
+      `#${row.place} ${row.displayName}`,
+      `${row.wins}W ${row.losses}L | diff ${row.scoreDiff} | bags ${row.bags} | nil ${row.nilMade}/${row.nilFailed}`
+    ))
+    : [accountStatItem("Placements", "No local tournament snapshots yet")]));
+
+  const tournaments = tournamentHistory.listTournaments({ playerId: localIdentity.playerId });
+  tournamentHistoryOutput.textContent = tournaments.length
+    ? `Tournament history: ${tournaments.map((entry) => (
+      `${entry.timestamp} ${entry.name} matches ${entry.matchIds.length} players ${entry.players.length}`
+    )).join(" | ")}`
+    : "Tournament history: none";
 }
 
 function formatVisualQaResult(result) {

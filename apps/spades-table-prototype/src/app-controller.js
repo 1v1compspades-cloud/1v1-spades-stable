@@ -407,6 +407,16 @@ function summarizeSpadesMatch(room, { timestamp }) {
     roomCode: room.roomCode,
     timestamp,
     winner: status.winner,
+    players: {
+      player1: {
+        playerId: room.players.player1?.playerId ?? null,
+        displayName: room.players.player1?.displayName ?? "Player 1"
+      },
+      player2: {
+        playerId: room.players.player2?.playerId ?? null,
+        displayName: room.players.player2?.displayName ?? "Player 2"
+      }
+    },
     finalScore: status.score,
     bids: status.bids,
     bags: status.bags,

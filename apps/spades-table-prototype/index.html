@@ -87,6 +87,11 @@
           <div id="qa-check-list" class="qa-check-list"></div>
           <div id="qa-edge-list" class="qa-check-list"></div>
         </section>
+        <section class="beta-safety-panel" aria-labelledby="beta-safety-title">
+          <h3 id="beta-safety-title">Beta Safety Checklist</h3>
+          <div id="beta-safety-check-list" class="qa-check-list"></div>
+          <div id="manual-beta-flow-list" class="account-stat-grid" aria-label="Manual beta test flows"></div>
+        </section>
         <section class="action-log-panel" aria-labelledby="action-log-title">
           <h3 id="action-log-title">Recent Local Actions</h3>
           <div id="action-log-list" class="action-log-list"></div>
@@ -98,6 +103,21 @@
         <p id="trick-status" class="status-line">Current trick: none</p>
         <pre id="hand-summary">Hand summary: none</pre>
         <pre id="match-history">Match history: none</pre>
+        <section class="accounts-lite-panel" aria-labelledby="accounts-lite-title">
+          <h3 id="accounts-lite-title">Accounts-Lite Preview</h3>
+          <div id="local-player-stats" class="account-stat-grid" aria-label="Local player stats"></div>
+          <div id="leaderboard-preview" class="account-stat-grid" aria-label="Local leaderboard preview"></div>
+          <pre id="account-match-results">Local match results: none</pre>
+          <button id="reset-local-stats" type="button">Reset Local Stats</button>
+        </section>
+        <section class="tournament-history-panel" aria-labelledby="tournament-history-title">
+          <h3 id="tournament-history-title">Tournament History Prep</h3>
+          <button id="record-tournament-snapshot" type="button">Record Local Tournament Snapshot</button>
+          <button id="reset-tournament-history" type="button">Reset Tournament History</button>
+          <div id="tournament-summary" class="account-stat-grid" aria-label="Local tournament summary"></div>
+          <div id="tournament-placements" class="account-stat-grid" aria-label="Local tournament placements"></div>
+          <pre id="tournament-history">Tournament history: none</pre>
+        </section>
         <p id="shell-error" class="error-line" role="status"></p>
         <div class="bid-controls" aria-label="Bidding controls">
           <label>
