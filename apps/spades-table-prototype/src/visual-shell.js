@@ -63,7 +63,11 @@ export function buildVisualQaReport(status, {
   lastSuccessfulAction = "none",
   fixturePreset = "none",
   matchHistoryCount = 0,
-  transportMode = "direct"
+  transportMode = "direct",
+  localPlayerId = "unknown",
+  displayName = "Player",
+  seatBinding = "none",
+  reconnectStatus = "unknown"
 } = {}) {
   const model = buildVisualShellModel(status);
   const hasStatus = Boolean(status);
@@ -73,6 +77,10 @@ export function buildVisualQaReport(status, {
     qaCheck("hidden-hand status", hiddenHandProtected(status), hiddenDetail),
     qaCheck("phase", hasStatus && model.phase !== "none", model.phase),
     qaCheck("transport mode", Boolean(transportMode), transportMode),
+    qaCheck("local player id", Boolean(localPlayerId), localPlayerId),
+    qaCheck("display name", Boolean(displayName), displayName),
+    qaCheck("seat binding", Boolean(seatBinding), seatBinding),
+    qaCheck("reconnect status", Boolean(reconnectStatus), reconnectStatus),
     qaCheck("last successful action", lastSuccessfulAction !== "none", lastSuccessfulAction),
     qaCheck("fixture preset", fixturePreset !== "none", fixturePreset),
     qaCheck("match/history status", hasStatus, formatMatchHistoryStatus(status, matchHistoryCount))

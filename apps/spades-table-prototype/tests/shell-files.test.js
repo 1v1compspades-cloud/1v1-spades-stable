@@ -124,6 +124,13 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /joinQuickMatch/);
   assert.match(client, /leaveQuickMatch/);
   assert.match(client, /renderQuickMatchStatus/);
+  assert.match(client, /createLocalPlayerIdentityStore/);
+  assert.match(client, /saveCurrentDisplayName/);
+  assert.match(client, /rememberSessionFromStatus/);
+  assert.match(client, /reconnectStatusFor/);
+  assert.match(client, /localPlayerId/);
+  assert.match(client, /displayName/);
+  assert.match(client, /seatBinding/);
   assert.match(client, /directActions/);
   assert.match(client, /actionLog\.record/);
   assert.match(client, /renderActionLog/);

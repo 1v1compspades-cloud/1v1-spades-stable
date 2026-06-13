@@ -50,6 +50,55 @@ test("joins player2, restores already-seated viewers, and assigns spectators whe
   assert.equal(spectator.seat, "spectator");
 });
 
+test("blocks seat stealing when a token and player id belong to different seats", () => {
+  let room = createRoom({ seatToken: PLAYER1_TOKEN, playerId: "device-1" });
+  room = joinRoom(room, {
+    seatToken: PLAYER2_TOKEN,
+    playerId: "device-2",
+    displayName: "South"
+  }).room;
+
+  const stolenTokenView = sanitizeRoomForViewer(room, {
+    seatToken: PLAYER1_TOKEN,
+    playerId: "device-2"
+  });
+
+  assert.equal(stolenTokenView.viewerSeat, "spectator");
+  assert.equal(stolenTokenView.alreadySeated, false);
+  assert.deepEqual(stolenTokenView.hand, []);
+  assert.throws(() => applyRoomAction(room, {
+    type: "ready",
+    seatToken: PLAYER1_TOKEN,
+    playerId: "device-2"
+  }), /Join this room|already seated/);
+});
+
+test("waiting player2 leave opens the seat while in-progress leave preserves reconnect", () => {
+  let waiting = createRoom({ seatToken: PLAYER1_TOKEN, playerId: "device-1" });
+  waiting = joinRoom(waiting, {
+    seatToken: PLAYER2_TOKEN,
+    playerId: "device-2",
+    displayName: "South"
+  }).room;
+  waiting = leaveRoom(waiting, { seatToken: PLAYER2_TOKEN, playerId: "device-2" });
+
+  const replacement = joinRoom(waiting, {
+    seatToken: "replacement-token",
+    playerId: "device-3",
+    displayName: "East"
+  });
+
+  assert.equal(replacement.seat, "player2");
+  assert.equal(replacement.room.players.player2.playerId, "device-3");
+
+  let playing = biddingCompleteRoom();
+  playing = leaveRoom(playing, { seatToken: PLAYER2_TOKEN, playerId: "device-2" });
+  const reconnected = joinRoom(playing, { playerId: "device-2" });
+
+  assert.equal(reconnected.seat, "player2");
+  assert.equal(reconnected.alreadySeated, true);
+});
+
 test("ready state starts a server-owned hand with coin flip, dealer, first player, and deal", () => {
   let room = readyStartedRoom({ coinFlipWinner: "player1" });
 

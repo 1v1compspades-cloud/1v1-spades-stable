@@ -34,6 +34,20 @@ test("quick match does not queue the same player twice and supports duplicate ac
   assert.equal(queue.waitingPlayers().length, 1);
 });
 
+test("quick match blocks self-match even with a new seat token", () => {
+  const queue = createQuickMatchQueue({ boundary: createSpadesServerBoundary() });
+  const first = queue.joinQueue(request("joinQueue", "host", "seat-host", "Host", "self-1"));
+  const selfAttempt = queue.joinQueue(request("joinQueue", "host", "seat-host-2", "Host Clone", "self-2"));
+  const guest = queue.joinQueue(request("joinQueue", "guest", "seat-guest", "Guest", "guest-1"));
+
+  assert.equal(first.queue.state, "waiting");
+  assert.equal(selfAttempt.queue.state, "waiting");
+  assert.equal(selfAttempt.queue.waitingCount, 1);
+  assert.equal(queue.waitingPlayers().length, 0);
+  assert.equal(guest.queue.state, "matched");
+  assert.equal(guest.view.viewerSeat, "player2");
+});
+
 test("quick match leave queue is safe and idempotent", () => {
   const queue = createQuickMatchQueue({ boundary: createSpadesServerBoundary() });
   queue.joinQueue(request("joinQueue", "host", "seat-host", "Host", "join-1"));

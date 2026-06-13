@@ -5,6 +5,12 @@ export function createSeatViewerHelpers({ seats = TWO_PLAYER_SEATS } = {}) {
 
   function getViewerSeat(room, { seatToken, playerId } = {}) {
     const normalizedPlayerId = normalizePlayerId(playerId);
+    if (seatToken && normalizedPlayerId) {
+      const tokenOwner = seatList.find((seat) => room.players?.[seat]?.seatToken === seatToken);
+      if (tokenOwner && room.players[tokenOwner].playerId !== normalizedPlayerId) {
+        return "spectator";
+      }
+    }
     for (const seat of seatList) {
       const player = room.players?.[seat];
       if (!player) continue;

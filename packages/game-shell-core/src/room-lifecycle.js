@@ -98,6 +98,21 @@ export function createTwoPlayerRoomLifecycle({
       return syncRoom(room);
     }
 
+    if (room.phase === "waiting" && seat !== seat1) {
+      return syncRoom({
+        ...room,
+        players: {
+          ...room.players,
+          [seat]: null
+        },
+        playerReady: {
+          ...room.playerReady,
+          [seat]: false
+        },
+        updatedAt: now()
+      });
+    }
+
     return syncRoom({
       ...room,
       players: {

@@ -1,6 +1,7 @@
 import { createSpadesAppController } from "./app-controller.js";
 import { createLocalActionLog } from "./action-log.js";
 import { createSpadesLiveSyncClient } from "./live-sync-client.js";
+import { createLocalPlayerIdentityStore } from "./local-identity.js";
 import {
   createTwoSeatManualHarness,
   listManualFixturePresets
@@ -17,20 +18,21 @@ import {
   runVisualQaScript
 } from "./visual-qa-scripts.js";
 
+const identityStore = createLocalPlayerIdentityStore();
+let localIdentity = identityStore.load();
 const controller = createSpadesAppController({
-  createPlayerId: loadOrCreatePlayerId
+  createPlayerId: () => identityStore.load().playerId
 });
 const liveSyncServer = createMockSpadesSocketTransport();
-const liveSyncPlayerId = loadOrCreatePlayerId();
 const liveSyncClient = createSpadesLiveSyncClient({
   socketServer: liveSyncServer,
   clientId: "shell-live-sync-client",
-  playerId: liveSyncPlayerId,
-  seatToken: loadOrCreateSeatToken(liveSyncPlayerId)
+  playerId: localIdentity.playerId,
+  seatToken: localIdentity.seatToken
 });
 const realServerClient = createSpadesServerClient({
-  playerId: liveSyncPlayerId,
-  seatToken: loadOrCreateSeatToken(liveSyncPlayerId)
+  playerId: localIdentity.playerId,
+  seatToken: localIdentity.seatToken
 });
 
 const displayNameInput = document.querySelector("#display-name");
@@ -93,6 +95,7 @@ let lastSuccessfulAction = "none";
 let activeFixturePreset = "none";
 let transportMode = "direct";
 const actionLog = createLocalActionLog();
+displayNameInput.value = localIdentity.displayName;
 
 for (const presetName of listManualFixturePresets().filter((name) => !name.startsWith("reconnect-"))) {
   const option = document.createElement("option");
@@ -109,16 +112,24 @@ for (const scriptName of listVisualQaScripts()) {
 }
 
 document.querySelector("#create-room").addEventListener("click", () => {
-  runShellAction(() => activeShellActions().createRoom({
-    displayName: displayNameInput.value || "Player"
-  }), "create room");
+  runShellAction(() => {
+    saveCurrentDisplayName();
+    return activeShellActions().createRoom({
+      displayName: localIdentity.displayName,
+      seatToken: localIdentity.seatToken
+    });
+  }, "create room");
 });
 
 document.querySelector("#join-room").addEventListener("click", () => {
-  runShellAction(() => activeShellActions().joinRoom({
-    roomCode: joinCodeInput.value,
-    displayName: displayNameInput.value || "Player"
-  }), "join room");
+  runShellAction(() => {
+    saveCurrentDisplayName();
+    return activeShellActions().joinRoom({
+      roomCode: joinCodeInput.value,
+      displayName: localIdentity.displayName,
+      seatToken: localIdentity.seatToken
+    });
+  }, "join room");
 });
 
 document.querySelector("#restore-room").addEventListener("click", () => {
@@ -134,9 +145,13 @@ document.querySelector("#join-quick-match").addEventListener("click", () => {
     if (!isRealServerMode()) {
       throw new Error("Quick Match requires real local server mode");
     }
+    saveCurrentDisplayName();
     const response = await realServerClient.joinQuickMatch({
-      displayName: displayNameInput.value || "Player"
+      displayName: localIdentity.displayName
     });
+    if (response.session) {
+      localIdentity = identityStore.saveSession(response.session);
+    }
     renderQuickMatchStatus();
     return serverStatusFromResponseOrQueue(response);
   }, "join quick match");
@@ -161,6 +176,7 @@ document.querySelector("#clear-room").addEventListener("click", () => {
   } else {
     controller.clearActiveRoom();
   }
+  localIdentity = identityStore.clearSession();
   lastSuccessfulAction = "clear active room";
   actionLog.record("clear active room", null);
   renderStatus(null);
@@ -323,6 +339,7 @@ async function runShellAction(action, successLabel = "completed action") {
   try {
     clearError();
     const status = await action();
+    rememberSessionFromStatus(status);
     lastSuccessfulAction = successLabel;
     actionLog.record(successLabel, status);
     renderStatus(status);
@@ -549,7 +566,11 @@ function renderVisualShell(status) {
   }, {
     lastSuccessfulAction,
     fixturePreset: activeFixturePreset,
-    transportMode
+    transportMode,
+    localPlayerId: localIdentity.playerId,
+    displayName: localIdentity.displayName,
+    seatBinding: status?.viewerSeat ?? "none",
+    reconnectStatus: reconnectStatusFor(status)
   });
 }
 
@@ -614,7 +635,11 @@ function renderQaReport(status, errorMessage, targets, context = {}) {
     lastSuccessfulAction: context.lastSuccessfulAction ?? lastSuccessfulAction,
     fixturePreset: context.fixturePreset ?? activeFixturePreset,
     matchHistoryCount: context.matchHistoryCount ?? controller.getMatchHistory().length,
-    transportMode: context.transportMode ?? transportMode
+    transportMode: context.transportMode ?? transportMode,
+    localPlayerId: context.localPlayerId ?? localIdentity.playerId,
+    displayName: context.displayName ?? localIdentity.displayName,
+    seatBinding: context.seatBinding ?? status?.viewerSeat ?? "none",
+    reconnectStatus: context.reconnectStatus ?? reconnectStatusFor(status)
   });
   targets.checks.replaceChildren(
     ...report.contextMessages.map((check) => qaReportItem(check.pass, check.name, check.detail)),
@@ -816,22 +841,43 @@ function formatVisualQaResult(result) {
   return `Visual QA ${result.name}: ${finalPhase}, tricks ${trickCount}, checks ${checks}${restoreText}`;
 }
 
-function loadOrCreatePlayerId() {
-  const key = "spadesPrototypePlayerId";
-  const existing = localStorage.getItem(key);
-  if (existing) return existing;
-
-  const nextId = `player-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-  localStorage.setItem(key, nextId);
-  return nextId;
+function saveCurrentDisplayName() {
+  localIdentity = identityStore.saveDisplayName(displayNameInput.value || "Player");
+  displayNameInput.value = localIdentity.displayName;
+  return localIdentity;
 }
 
-function loadOrCreateSeatToken(playerId) {
-  const key = "spadesPrototypeLiveSeatToken";
-  const existing = localStorage.getItem(key);
-  if (existing) return existing;
+function rememberSessionFromStatus(status) {
+  if (!status) {
+    localIdentity = identityStore.clearSession();
+    return localIdentity;
+  }
 
-  const nextToken = `seat-${String(playerId ?? "shell").slice(0, 12)}-${Date.now().toString(36)}`;
-  localStorage.setItem(key, nextToken);
-  return nextToken;
+  const activeSession = activeSessionForMode();
+  if (activeSession) {
+    localIdentity = identityStore.saveSession(activeSession);
+  } else if (status.viewerSeat === "spectator") {
+    localIdentity = identityStore.clearSession();
+  }
+  return localIdentity;
+}
+
+function activeSessionForMode() {
+  if (isRealServerMode()) return realServerClient.session;
+  if (isLiveSyncMode()) return liveSyncClient.session;
+  if (!["player1", "player2"].includes(currentShellStatus()?.viewerSeat)) return null;
+  return {
+    roomCode: currentShellStatus().roomCode,
+    seatToken: localIdentity.seatToken,
+    playerId: localIdentity.playerId,
+    seat: currentShellStatus().viewerSeat
+  };
+}
+
+function reconnectStatusFor(status) {
+  if (!status) return localIdentity.lastSession ? "saved session missing active room" : "no saved room";
+  const session = localIdentity.lastSession;
+  if (!session) return `${status.viewerSeat} view active without saved room`;
+  if (session.roomCode !== status.roomCode) return `saved ${session.roomCode}; viewing ${status.roomCode}`;
+  return `${status.viewerSeat} restored for ${session.roomCode}`;
 }

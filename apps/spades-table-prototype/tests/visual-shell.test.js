@@ -161,13 +161,22 @@ test("visual QA report shows pass fail checks from sanitized views", () => {
   harness.readyBoth();
   harness.bidBoth({ hostBid: 4, guestBid: 3 });
 
-  const hostReport = buildVisualQaReport(harness.statusForView("host"));
+  const hostReport = buildVisualQaReport(harness.statusForView("host"), {
+    localPlayerId: "player-local",
+    displayName: "North",
+    seatBinding: "player1",
+    reconnectStatus: "player1 restored for QA001"
+  });
   const spectatorReport = buildVisualQaReport(harness.statusForView("spectator"));
   const emptyReport = buildVisualQaReport(null);
 
   assert.equal(hostReport.overallPass, true);
-  assert.equal(hostReport.contextMessages.length, 7);
+  assert.equal(hostReport.contextMessages.length, 11);
   assert.equal(hostReport.contextMessages.find((check) => check.name === "transport mode").detail, "direct");
+  assert.equal(hostReport.contextMessages.find((check) => check.name === "local player id").detail, "player-local");
+  assert.equal(hostReport.contextMessages.find((check) => check.name === "display name").detail, "North");
+  assert.equal(hostReport.contextMessages.find((check) => check.name === "seat binding").detail, "player1");
+  assert.equal(hostReport.contextMessages.find((check) => check.name === "reconnect status").detail, "player1 restored for QA001");
   assert.equal(hostReport.contextMessages.at(-1).name, "match/history status");
   assert.equal(hostReport.checks.length, 8);
   assert.equal(hostReport.checks.every((check) => check.pass), true);
