@@ -111,6 +111,34 @@ test("server client reconnect restores sanitized room snapshot", async () => {
   }
 });
 
+test("server client Quick Match pairs players and receives queue status", async () => {
+  const fixture = await startServerClientFixture();
+
+  try {
+    const host = fixture.client("host", "seat-host");
+    const guest = fixture.client("guest", "seat-guest");
+    const spectator = fixture.client("viewer", "seat-viewer");
+    const spectatorUpdates = [];
+    spectator.onStatus((update) => spectatorUpdates.push(update));
+
+    const waiting = await host.joinQuickMatch({ displayName: "Host", actionId: "qm-host" });
+    const matched = await guest.joinQuickMatch({ displayName: "Guest", actionId: "qm-guest" });
+    await spectator.joinRoom({ roomCode: matched.match.roomCode, displayName: "Viewer" });
+
+    assert.equal(waiting.queue.state, "waiting");
+    assert.equal(matched.queue.state, "matched");
+    assert.equal(host.status.viewerSeat, "player1");
+    assert.equal(guest.status.viewerSeat, "player2");
+    assert.equal(spectator.status.viewerSeat, "spectator");
+    assert.deepEqual(spectator.status.hand, []);
+    assert.equal(host.queueStatus.state, "matched");
+    assert.equal(guest.session.seat, "player2");
+    assert.equal(spectatorUpdates.at(-1).view.viewerSeat, "spectator");
+  } finally {
+    await fixture.close();
+  }
+});
+
 async function readyClients(fixture, roomCode, { readyOnly = false } = {}) {
   const host = fixture.client("host", "seat-host");
   const guest = fixture.client("guest", "seat-guest");
@@ -136,6 +164,18 @@ async function startServerClientFixture() {
       if (roomCode) {
         websocketServer?.broadcastRoom(roomCode, {
           sourceClientId: "http-test",
+          requestId: payload.requestId,
+          responseType: payload.type,
+          actionId: payload.actionId,
+          duplicate: payload.duplicate
+        });
+      }
+    },
+    onQueueResponse: (payload) => {
+      websocketServer?.broadcastQueue(payload);
+      if (payload.match?.roomCode) {
+        websocketServer?.broadcastRoom(payload.match.roomCode, {
+          sourceClientId: "quick-match-test",
           requestId: payload.requestId,
           responseType: payload.type,
           actionId: payload.actionId,

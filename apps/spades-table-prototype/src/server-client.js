@@ -15,6 +15,7 @@ export function createSpadesServerClient({
   let currentView = null;
   let lastResponse = null;
   let lastError = null;
+  let queueStatus = null;
   let pending = [];
 
   const client = {
@@ -40,6 +41,10 @@ export function createSpadesServerClient({
 
     get lastResponse() {
       return lastResponse;
+    },
+
+    get queueStatus() {
+      return queueStatus;
     },
 
     onStatus(listener) {
@@ -107,6 +112,26 @@ export function createSpadesServerClient({
 
     startNewMatch(options = {}) {
       return playerAction("new-match", endpointRoomCode(options), options);
+    },
+
+    async joinQuickMatch(options = {}) {
+      await subscribeQueue();
+      const response = await postJson("/api/quick-match/join", {
+        displayName: options.displayName,
+        actionId: options.actionId,
+        identity: requestIdentity(options)
+      });
+      await adoptQueueResponse(response);
+      return response;
+    },
+
+    async leaveQuickMatch(options = {}) {
+      const response = await postJson("/api/quick-match/leave", {
+        actionId: options.actionId,
+        identity: requestIdentity(options)
+      });
+      await adoptQueueResponse(response);
+      return response;
     },
 
     async reconnect() {
@@ -200,6 +225,15 @@ export function createSpadesServerClient({
     ));
   }
 
+  async function subscribeQueue() {
+    await connectSocket();
+    socket.send(JSON.stringify({
+      type: "subscribeQueue",
+      identity: requestIdentity()
+    }));
+    return waitForMessage((message) => message.type === "queueStatus");
+  }
+
   async function connectSocket() {
     if (connected && socket) return socket;
     if (!WebSocketImpl) {
@@ -237,6 +271,19 @@ export function createSpadesServerClient({
       emit({
         type: message.type,
         view: currentView,
+        event: message
+      });
+    }
+    if (message.type === "queueStatus") {
+      queueStatus = message.queue;
+      if (message.view) {
+        currentView = message.view;
+        activeRoomCode = message.view.roomCode;
+      }
+      emit({
+        type: "queueStatus",
+        view: currentView,
+        queue: queueStatus,
         event: message
       });
     }
@@ -289,6 +336,18 @@ export function createSpadesServerClient({
     const next = current + 1;
     actionSequences.set(type, next);
     return `${roomCode}:${currentView.viewerSeat}:${type}:${next}`;
+  }
+
+  async function adoptQueueResponse(response) {
+    queueStatus = response.queue;
+    if (response.session) {
+      activeSession = { ...response.session };
+    }
+    if (response.view) {
+      currentView = response.view;
+      activeRoomCode = response.view.roomCode;
+      await subscribe(activeRoomCode);
+    }
   }
 
   function emit(update) {

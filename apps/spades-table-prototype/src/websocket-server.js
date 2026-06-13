@@ -77,6 +77,25 @@ export function attachSpadesWebSocketServer({
       return;
     }
 
+    if (message.type === "subscribeQueue") {
+      client.identity = normalizeIdentity({
+        ...client.identity,
+        ...(message.identity ?? {})
+      });
+      client.subscribedRooms.add("__queue__");
+      const roomSubscribers = subscriptions.get("__queue__") ?? new Set();
+      roomSubscribers.add(client.clientId);
+      subscriptions.set("__queue__", roomSubscribers);
+      send(client.socket, {
+        type: "queueStatus",
+        queue: {
+          state: "subscribed",
+          waitingCount: 0
+        }
+      });
+      return;
+    }
+
     if (message.type === "action") {
       const request = {
         ...(message.request ?? {}),
@@ -159,15 +178,49 @@ export function attachSpadesWebSocketServer({
     });
   }
 
+  function broadcastQueue(payload = {}) {
+    return [...(subscriptions.get("__queue__") ?? [])].flatMap((clientId) => {
+      const client = clients.get(clientId);
+      if (!client || client.socket.readyState !== OPEN_SOCKET) return [];
+      const event = {
+        type: "queueStatus",
+        queue: payload.queue,
+        match: matchForClient(payload.match, client.identity),
+        view: viewForClient(payload.match, client.identity),
+        spectatorView: payload.spectatorView ?? null
+      };
+      send(client.socket, event);
+      return [event];
+    });
+  }
+
   return {
     wss,
     clients,
     subscriptions,
     broadcastRoom,
+    broadcastQueue,
     close() {
       return new Promise((resolve) => wss.close(resolve));
     }
   };
+}
+
+function matchForClient(match, identity) {
+  if (!match) return null;
+  const player1 = match.player1?.identity?.playerId === identity.playerId;
+  const player2 = match.player2?.identity?.playerId === identity.playerId;
+  return {
+    roomCode: match.roomCode,
+    seat: player1 ? "player1" : (player2 ? "player2" : "spectator")
+  };
+}
+
+function viewForClient(match, identity) {
+  if (!match) return null;
+  if (match.player1?.identity?.playerId === identity.playerId) return match.player1.response.view;
+  if (match.player2?.identity?.playerId === identity.playerId) return match.player2.response.view;
+  return match.spectatorView;
 }
 
 function roomUpdateEvent(room, identity, {

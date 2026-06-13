@@ -16,6 +16,19 @@ const { app, boundary } = createSpadesHttpServer({
         duplicate: payload.duplicate
       });
     }
+  },
+  onQueueResponse: (payload) => {
+    websocketServer?.broadcastQueue(payload);
+    const roomCode = payload.match?.roomCode;
+    if (roomCode) {
+      websocketServer?.broadcastRoom(roomCode, {
+        sourceClientId: "quick-match",
+        requestId: payload.requestId,
+        responseType: payload.type,
+        actionId: payload.actionId,
+        duplicate: payload.duplicate
+      });
+    }
   }
 });
 const httpServer = createServer(app);

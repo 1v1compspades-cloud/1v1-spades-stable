@@ -1,9 +1,12 @@
 import express from "express";
+import { createQuickMatchQueue } from "./quick-match.js";
 import { createSpadesServerBoundary } from "./server-boundary.js";
 
 export function createSpadesHttpServer({
   boundary = createSpadesServerBoundary(),
-  onBoundaryResponse = null
+  onBoundaryResponse = null,
+  quickMatchQueue = createQuickMatchQueue({ boundary }),
+  onQueueResponse = null
 } = {}) {
   const app = express();
   app.use(express.json({ limit: "128kb" }));
@@ -51,6 +54,20 @@ export function createSpadesHttpServer({
     sendBoundaryResponse(response, boundary.handle(roomRequest(request, "newMatch")), onBoundaryResponse);
   });
 
+  app.post("/api/quick-match/join", (request, response) => {
+    sendQueueResponse(response, safeQueueAction(() => quickMatchQueue.joinQueue({
+      ...request.body,
+      type: "joinQueue"
+    })), onQueueResponse);
+  });
+
+  app.post("/api/quick-match/leave", (request, response) => {
+    sendQueueResponse(response, safeQueueAction(() => quickMatchQueue.leaveQueue({
+      ...request.body,
+      type: "leaveQueue"
+    })), onQueueResponse);
+  });
+
   app.use((_request, response) => {
     response.status(404).json({
       ok: false,
@@ -63,6 +80,7 @@ export function createSpadesHttpServer({
   return {
     app,
     boundary,
+    quickMatchQueue,
     repository: boundary.repository
   };
 }
@@ -82,4 +100,36 @@ function sendBoundaryResponse(response, payload, onBoundaryResponse) {
   response
     .status(payload.ok ? 200 : payload.statusCode)
     .json(payload);
+}
+
+function sendQueueResponse(response, payload, onQueueResponse) {
+  if (payload.ok && onQueueResponse) {
+    onQueueResponse(payload);
+  }
+  response
+    .status(payload.ok ? 200 : payload.statusCode)
+    .json(payload);
+}
+
+function safeQueueAction(action) {
+  try {
+    return action();
+  } catch (error) {
+    return {
+      ok: false,
+      statusCode: error.statusCode ?? 500,
+      type: null,
+      queue: {
+        state: "error",
+        waitingCount: 0,
+        queued: false
+      },
+      match: null,
+      view: null,
+      spectatorView: null,
+      error: {
+        message: error.message ?? "Quick Match request failed"
+      }
+    };
+  }
 }

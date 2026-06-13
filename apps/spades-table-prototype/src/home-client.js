@@ -37,6 +37,7 @@ const displayNameInput = document.querySelector("#display-name");
 const joinCodeInput = document.querySelector("#join-code");
 const transportModeSelect = document.querySelector("#transport-mode");
 const transportModeStatusOutput = document.querySelector("#transport-mode-status");
+const quickMatchStatusOutput = document.querySelector("#quick-match-status");
 const phaseStatusOutput = document.querySelector("#phase-status");
 const seatStatusOutput = document.querySelector("#seat-status");
 const turnStatusOutput = document.querySelector("#turn-status");
@@ -126,6 +127,30 @@ document.querySelector("#restore-room").addEventListener("click", () => {
 
 document.querySelector("#reconnect-live-sync").addEventListener("click", () => {
   runShellAction(() => reconnectLiveSyncSnapshot(), "reconnect live sync snapshot");
+});
+
+document.querySelector("#join-quick-match").addEventListener("click", () => {
+  runShellAction(async () => {
+    if (!isRealServerMode()) {
+      throw new Error("Quick Match requires real local server mode");
+    }
+    const response = await realServerClient.joinQuickMatch({
+      displayName: displayNameInput.value || "Player"
+    });
+    renderQuickMatchStatus();
+    return serverStatusFromResponseOrQueue(response);
+  }, "join quick match");
+});
+
+document.querySelector("#leave-quick-match").addEventListener("click", () => {
+  runShellAction(async () => {
+    if (!isRealServerMode()) {
+      throw new Error("Quick Match requires real local server mode");
+    }
+    const response = await realServerClient.leaveQuickMatch();
+    renderQuickMatchStatus();
+    return response.view ?? currentShellStatus();
+  }, "leave quick match");
 });
 
 document.querySelector("#clear-room").addEventListener("click", () => {
@@ -287,6 +312,7 @@ liveSyncClient.onStatus((update) => {
 
 realServerClient.onStatus((update) => {
   if (isRealServerMode()) {
+    renderQuickMatchStatus();
     renderStatus(update.view);
   }
 });
@@ -428,6 +454,13 @@ function serverStatusFromResponse(response) {
   return response.view;
 }
 
+function serverStatusFromResponseOrQueue(response) {
+  if (!response.ok) {
+    throw new Error(response.error?.message ?? "Server action failed");
+  }
+  return response.view ?? currentShellStatus();
+}
+
 function reconnectLiveSyncSnapshot() {
   if (isRealServerMode()) return reconnectRealServerSnapshot();
   const result = liveSyncClient.reconnect();
@@ -457,6 +490,14 @@ function renderTransportModeStatus() {
     ? `real local server (${realServerClient.connectionStatus}${realServerClient.error ? `: ${realServerClient.error}` : ""})`
     : (isLiveSyncMode() ? "live sync QA" : "direct local");
   transportModeStatusOutput.textContent = `Transport: ${label}`;
+  renderQuickMatchStatus();
+}
+
+function renderQuickMatchStatus() {
+  const queue = realServerClient.queueStatus;
+  quickMatchStatusOutput.textContent = queue
+    ? `Quick Match: ${queue.state} (${queue.waitingCount ?? 0} waiting)`
+    : "Quick Match: idle";
 }
 
 function renderStatus(status) {

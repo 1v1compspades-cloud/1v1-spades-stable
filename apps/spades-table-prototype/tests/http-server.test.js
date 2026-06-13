@@ -174,6 +174,50 @@ test("HTTP leave next-hand and new-match endpoints return sanitized responses", 
   }
 });
 
+test("HTTP Quick Match pairs players and handles duplicate and leave queue", async () => {
+  const fixture = await startHttpFixture();
+
+  try {
+    const first = await fixture.post("/api/quick-match/join", {
+      displayName: "Host",
+      identity: hostIdentity(),
+      actionId: "queue-host"
+    });
+    const duplicate = await fixture.post("/api/quick-match/join", {
+      displayName: "Host",
+      identity: hostIdentity(),
+      actionId: "queue-host"
+    });
+    const left = await fixture.post("/api/quick-match/leave", {
+      identity: hostIdentity(),
+      actionId: "leave-host"
+    });
+    const rejoined = await fixture.post("/api/quick-match/join", {
+      displayName: "Host",
+      identity: hostIdentity(),
+      actionId: "queue-host-2"
+    });
+    const matched = await fixture.post("/api/quick-match/join", {
+      displayName: "Guest",
+      identity: guestIdentity(),
+      actionId: "queue-guest"
+    });
+
+    assert.equal(first.queue.state, "waiting");
+    assert.equal(duplicate.duplicate, true);
+    assert.equal(left.queue.state, "left");
+    assert.equal(rejoined.queue.state, "waiting");
+    assert.equal(matched.queue.state, "matched");
+    assert.equal(matched.view.viewerSeat, "player2");
+    assert.equal(matched.session.seat, "player2");
+    assert.deepEqual(matched.spectatorView.hand, []);
+    assert.equal(fixture.repository.get(matched.match.roomCode).players.player1.playerId, "host");
+    assert.equal(fixture.repository.get(matched.match.roomCode).players.player2.playerId, "guest");
+  } finally {
+    await fixture.close();
+  }
+});
+
 async function startHttpFixture() {
   const { app, repository } = createSpadesHttpServer();
   const server = await new Promise((resolve) => {
