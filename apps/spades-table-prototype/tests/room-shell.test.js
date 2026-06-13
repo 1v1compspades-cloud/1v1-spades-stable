@@ -57,6 +57,8 @@ test("renders sanitized room state without card or table UI details", () => {
   assert.match(text, /Phase: bidding/);
   assert.match(text, /Viewer: spectator/);
   assert.match(text, /Bid next: player1/);
+  assert.match(text, /Can act: false/);
+  assert.match(text, /Playable cards: 0/);
   assert.match(text, /Room full: true/);
   assert.match(text, /Spectator: true/);
   assert.match(text, /Hidden cards: 13-13/);

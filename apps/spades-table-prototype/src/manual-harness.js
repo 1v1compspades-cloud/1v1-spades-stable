@@ -49,6 +49,19 @@ export function createTwoSeatManualHarness({
         guest: guest.submitBid({ bid: guestBid, actionSequence: 1 })
       };
     },
+    playOneTrick() {
+      const hostStatus = host.getActiveRoomStatus();
+      const leader = hostStatus.currentTurn === "player1" ? host : guest;
+      const follower = hostStatus.currentTurn === "player1" ? guest : host;
+      const leadCard = leader.getActiveRoomStatus().hand[0];
+      const led = leader.submitPlayCard({ card: leadCard, actionSequence: 1 });
+      const followCard = follower.getActiveRoomStatus().hand.find((card) => (
+        follower.getPlayableCardStatus().cardIds.includes(`${card.rank}-${card.suit}`)
+      ));
+      const followed = follower.submitPlayCard({ card: followCard, actionSequence: 1 });
+
+      return { led, followed };
+    },
     statusText(controller = host) {
       return renderRoomShellText(controller.getActiveRoomStatus());
     }
@@ -69,4 +82,3 @@ function createMemoryStorage() {
     }
   };
 }
-

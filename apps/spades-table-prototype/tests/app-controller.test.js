@@ -248,6 +248,69 @@ test("third visitor becomes spectator and receives public room-full status only"
   assert.deepEqual(spectator.status.hiddenHandCounts, { player1: 13, player2: 13 });
 });
 
+test("play-card action updates current player status and playable card status", () => {
+  const { host, guest } = playingControllers();
+  const hostStatus = host.getActiveRoomStatus();
+
+  assert.equal(host.getCurrentPlayerStatus().currentPlayer, "player1");
+  assert.equal(host.getCurrentPlayerStatus().canAct, true);
+  assert.equal(guest.getCurrentPlayerStatus().canAct, false);
+  assert.equal(host.getPlayableCardStatus().count, 13);
+  assert.equal(guest.getPlayableCardStatus().count, 13);
+
+  const leadCard = hostStatus.hand.find((card) => card.suit === "clubs");
+  const led = host.submitPlayCard({ card: leadCard, actionSequence: 1 });
+
+  assert.equal(led.status.currentPlayerStatus.currentPlayer, "player2");
+  assert.equal(led.status.currentPlayerStatus.canAct, false);
+  assert.equal(guest.getCurrentPlayerStatus().canAct, true);
+});
+
+test("play-card action validates legal follow suit and does not corrupt state", () => {
+  const { host, guest } = playingControllers();
+  const leadCard = host.getActiveRoomStatus().hand.find((card) => card.suit === "clubs");
+  host.submitPlayCard({ card: leadCard, actionSequence: 1 });
+
+  const illegalOffSuit = guest.getActiveRoomStatus().hand.find((card) => card.suit === "diamonds");
+
+  assert.throws(() => guest.submitPlayCard({ card: illegalOffSuit, actionSequence: 1 }), /Illegal Spades play/);
+  assert.equal(guest.getActiveRoomStatus().currentTrick.length, 1);
+  assert.equal(guest.getActiveRoomStatus().hiddenHandCounts.player2, 13);
+});
+
+test("play-card action resolves trick and preserves public last trick summary", () => {
+  const { host, guest } = playingControllers();
+  const leadCard = host.getActiveRoomStatus().hand.find((card) => card.suit === "clubs");
+  host.submitPlayCard({ card: leadCard, actionSequence: 1 });
+  const followCard = guest.getActiveRoomStatus().hand.find((card) => card.suit === "clubs");
+  const followed = guest.submitPlayCard({ card: followCard, actionSequence: 1 });
+  const spectatorStatus = host.getRoomStatus("PLAY01");
+
+  assert.equal(followed.status.currentTrick.length, 0);
+  assert.equal(followed.status.lastTrick.plays.length, 2);
+  assert.equal(followed.status.lastTrick.winner, "player2");
+  assert.equal(followed.status.tricksTaken.player2, 1);
+  assert.deepEqual(spectatorStatus.hand, []);
+  assert.equal(spectatorStatus.lastTrick.winner, "player2");
+});
+
+test("duplicate play-card action is idempotent and stale turn is rejected", () => {
+  const { host, guest } = playingControllers();
+  const leadCard = host.getActiveRoomStatus().hand.find((card) => card.suit === "clubs");
+  const led = host.submitPlayCard({ card: leadCard, actionSequence: 9 });
+  const replayed = host.submitPlayCard({ card: leadCard, actionSequence: 9 });
+
+  assert.equal(replayed.room, led.room);
+  assert.equal(replayed.status.currentTrick.length, 1);
+  assert.equal(replayed.status.hiddenHandCounts.player1, 12);
+  assert.throws(() => host.submitPlayCard({ card: host.getActiveRoomStatus().hand[0] }), /Stale action expected player1 turn/);
+
+  const followCard = guest.getActiveRoomStatus().hand.find((card) => card.suit === "clubs");
+  const followed = guest.submitPlayCard({ card: followCard, actionSequence: 1 });
+
+  assert.equal(followed.status.lastTrick.winner, "player2");
+});
+
 function createMemoryStorage() {
   const values = new Map();
   return {
@@ -261,4 +324,58 @@ function createMemoryStorage() {
       values.delete(key);
     }
   };
+}
+
+function playingControllers() {
+  const host = createSpadesAppController({
+    storage: createMemoryStorage(),
+    createPlayerId: () => "device-host"
+  });
+  const guest = createSpadesAppController({
+    repository: host.repository,
+    storage: createMemoryStorage(),
+    createPlayerId: () => "device-guest"
+  });
+
+  host.createRoom({
+    roomCode: "PLAY01",
+    seatToken: "seat-host",
+    coinFlipWinner: "player2",
+    deck: player2HighDeck()
+  });
+  guest.joinRoom({ roomCode: "PLAY01", seatToken: "seat-guest" });
+  host.readyPlayer();
+  guest.readyPlayer();
+  host.submitBid({ bid: 4 });
+  guest.submitBid({ bid: 3 });
+
+  return { host, guest };
+}
+
+function player2HighDeck() {
+  return orderedDeck({
+    player1Cards: [
+      ...cards("clubs", ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]),
+      { rank: "2", suit: "hearts" }
+    ],
+    player2Cards: [
+      { rank: "A", suit: "clubs" },
+      ...cards("diamonds", ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"])
+    ]
+  });
+}
+
+function cards(suit, ranks) {
+  return ranks.map((rank) => ({ rank, suit }));
+}
+
+function orderedDeck({ player1Cards, player2Cards }) {
+  const used = new Set([...player1Cards, ...player2Cards].map((card) => `${card.rank}-${card.suit}`));
+  const stock = ["clubs", "diamonds", "hearts", "spades"].flatMap((suit) => (
+    ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
+      .map((rank) => ({ rank, suit }))
+      .filter((card) => !used.has(`${card.rank}-${card.suit}`))
+  ));
+
+  return [...player1Cards, ...player2Cards, ...stock];
 }

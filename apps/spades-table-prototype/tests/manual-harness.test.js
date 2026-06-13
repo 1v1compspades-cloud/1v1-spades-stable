@@ -25,3 +25,14 @@ test("manual harness drives ready and bidding without networking", () => {
   assert.match(harness.statusText(harness.guest), /Phase: playing/);
 });
 
+test("manual harness can play a scripted trick without card graphics", () => {
+  const harness = createTwoSeatManualHarness({ roomCode: "LOCAL3" });
+  harness.setup();
+  harness.readyBoth();
+  harness.bidBoth({ hostBid: 4, guestBid: 3 });
+
+  const trick = harness.playOneTrick();
+
+  assert.equal(trick.followed.status.lastTrick.plays.length, 2);
+  assert.match(harness.statusText(), /Playable cards:/);
+});

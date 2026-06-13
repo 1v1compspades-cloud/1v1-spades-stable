@@ -255,11 +255,13 @@ export function sanitizeRoomForViewer(room, viewer = {}) {
     tricksTaken: {
       ...room.game.tricksTaken
     },
+    currentPlayerStatus: currentPlayerStatus(room, viewerSeat),
     currentTrick: room.game.currentTrick.map(sanitizePlay),
     lastTrick: room.game.lastTrick,
     spadesBroken: room.game.spadesBroken,
     winner: room.game.winner,
     hiddenHandCounts: hiddenHandCounts(room.game.hands),
+    playableCardStatus: playableCardStatus(room, viewerSeat),
     hand: alreadySeated ? [...(room.game.hands?.[viewerSeat] ?? [])] : []
   };
 }
@@ -519,6 +521,39 @@ function hiddenHandCounts(hands) {
   return Object.fromEntries(PLAYERS.map((seat) => [seat, hands?.[seat]?.length ?? 0]));
 }
 
+function currentPlayerStatus(room, viewerSeat) {
+  return {
+    currentPlayer: room.currentTurn,
+    viewerSeat,
+    isViewerTurn: PLAYERS.includes(viewerSeat) && room.currentTurn === viewerSeat,
+    canAct: room.phase === "playing" && PLAYERS.includes(viewerSeat) && room.currentTurn === viewerSeat
+  };
+}
+
+function playableCardStatus(room, viewerSeat) {
+  if (room.phase !== "playing" || !PLAYERS.includes(viewerSeat)) {
+    return {
+      count: 0,
+      cardIds: []
+    };
+  }
+
+  const hand = room.game.hands?.[viewerSeat] ?? [];
+  const cardIds = hand
+    .filter((card) => isLegalPlay({
+      hand,
+      card,
+      currentTrick: room.game.currentTrick,
+      spadesBroken: room.game.spadesBroken
+    }))
+    .map(cardId);
+
+  return {
+    count: cardIds.length,
+    cardIds
+  };
+}
+
 function sanitizePlay(play) {
   return {
     player: play.player,
@@ -526,6 +561,10 @@ function sanitizePlay(play) {
       ...play.card
     }
   };
+}
+
+function cardId(card) {
+  return `${card.rank}-${card.suit}`;
 }
 
 function markConnected(room, seat) {

@@ -175,6 +175,40 @@ export function createSpadesAppController({
     return getActiveRoomStatus()?.biddingStatus ?? null;
   }
 
+  function submitPlayCard({ card, actionSequence = nextActionSequence("playCard") } = {}) {
+    const { room, session } = requireActiveRoom();
+    const actionId = createActionId({
+      roomCode: room.roomCode,
+      seat: session.seat,
+      type: "playCard",
+      sequence: actionSequence
+    });
+    const nextRoom = applyRoomAction(room, {
+      type: "playCard",
+      seatToken: session.seatToken,
+      playerId: session.playerId,
+      card,
+      actionId,
+      expectedPhase: "playing",
+      expectedTurn: session.seat
+    });
+    repository.save(nextRoom);
+
+    return {
+      room: nextRoom,
+      session,
+      status: sanitizeRoomForViewer(nextRoom, session)
+    };
+  }
+
+  function getCurrentPlayerStatus() {
+    return getActiveRoomStatus()?.currentPlayerStatus ?? null;
+  }
+
+  function getPlayableCardStatus() {
+    return getActiveRoomStatus()?.playableCardStatus ?? null;
+  }
+
   function leaveActiveRoom() {
     const session = loadSavedActiveRoom(storage);
     if (!session) {
@@ -227,6 +261,9 @@ export function createSpadesAppController({
     readyPlayer: readyActivePlayer,
     submitBid,
     getBiddingStatus,
+    submitPlayCard,
+    getCurrentPlayerStatus,
+    getPlayableCardStatus,
     leaveRoom: leaveActiveRoom,
     getActiveRoomStatus,
     getRoomStatus

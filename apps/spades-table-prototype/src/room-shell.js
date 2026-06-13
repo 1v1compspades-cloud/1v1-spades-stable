@@ -16,6 +16,8 @@ export function buildRoomShellModel(sanitizedRoom) {
     lastTrick: sanitizedRoom.lastTrick,
     hiddenHandCounts: sanitizedRoom.hiddenHandCounts,
     biddingStatus: sanitizedRoom.biddingStatus,
+    currentPlayerStatus: sanitizedRoom.currentPlayerStatus,
+    playableCardStatus: sanitizedRoom.playableCardStatus,
     roomFull: Boolean(sanitizedRoom.players.player1 && sanitizedRoom.players.player2),
     spectator: sanitizedRoom.viewerSeat === "spectator"
   };
@@ -37,6 +39,8 @@ export function renderRoomShellText(sanitizedRoom) {
     `Hand: ${model.handNumber}`,
     `Turn: ${model.currentTurn ?? "none"}`,
     `Bid next: ${model.biddingStatus?.nextBidder ?? "none"}`,
+    `Can act: ${Boolean(model.currentPlayerStatus?.canAct)}`,
+    `Playable cards: ${model.playableCardStatus?.count ?? 0}`,
     `Room full: ${model.roomFull}`,
     `Spectator: ${model.spectator}`,
     `Hidden cards: ${model.hiddenHandCounts.player1}-${model.hiddenHandCounts.player2}`,

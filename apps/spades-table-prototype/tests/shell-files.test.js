@@ -44,5 +44,6 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /showError/);
   assert.match(client, /clearError/);
   assert.match(client, /biddingStatus/);
+  assert.doesNotMatch(client, /submitPlayCard|play-card|card-table/i);
   assert.doesNotMatch(client, /WebSocket|fetch|leaderboard|tournament/i);
 });
