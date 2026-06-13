@@ -218,23 +218,25 @@ export function createSpadesServerClient({
 
   async function subscribe(roomCode) {
     await connectSocket();
+    const snapshot = waitForMessage((message) => (
+      ["roomUpdate", "roomSnapshot"].includes(message.type) && message.roomCode === roomCode
+    ));
     socket.send(JSON.stringify({
       type: "subscribe",
       roomCode,
       identity: requestIdentity()
     }));
-    return waitForMessage((message) => (
-      ["roomUpdate", "roomSnapshot"].includes(message.type) && message.roomCode === roomCode
-    ));
+    return snapshot;
   }
 
   async function subscribeQueue() {
     await connectSocket();
+    const status = waitForMessage((message) => message.type === "queueStatus");
     socket.send(JSON.stringify({
       type: "subscribeQueue",
       identity: requestIdentity()
     }));
-    return waitForMessage((message) => message.type === "queueStatus");
+    return status;
   }
 
   async function connectSocket() {
@@ -258,11 +260,12 @@ export function createSpadesServerClient({
 
     await waitForSocketOpen(socket);
     connected = true;
+    const identified = waitForMessage((message) => message.type === "identified");
     socket.send(JSON.stringify({
       type: "identify",
       identity: requestIdentity()
     }));
-    await waitForMessage((message) => message.type === "identified");
+    await identified;
     return socket;
   }
 
@@ -299,9 +302,20 @@ export function createSpadesServerClient({
     }
   }
 
-  function waitForMessage(predicate) {
-    return new Promise((resolve) => {
-      pending.push({ predicate, resolve });
+  function waitForMessage(predicate, timeoutMs = 5000) {
+    return new Promise((resolve, reject) => {
+      const waiter = {
+        predicate,
+        resolve(message) {
+          clearTimeout(timeout);
+          resolve(message);
+        }
+      };
+      const timeout = setTimeout(() => {
+        pending = pending.filter((candidate) => candidate !== waiter);
+        reject(new Error("Timed out waiting for Spades server client socket message"));
+      }, timeoutMs);
+      pending.push(waiter);
     });
   }
 

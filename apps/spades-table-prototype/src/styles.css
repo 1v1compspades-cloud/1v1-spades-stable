@@ -12,7 +12,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -59,6 +60,33 @@ h2 {
   gap: 12px;
 }
 
+.tester-entry-panel {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 18px;
+  padding: 14px;
+  border: 1px solid rgba(214, 178, 94, 0.42);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.tester-entry-panel h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+#tester-entry-summary,
+.tester-entry-note {
+  margin: 0;
+  color: #d7d1c3;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.tester-entry-note {
+  color: #f8f4eb;
+}
+
 label {
   display: grid;
   gap: 6px;
@@ -68,13 +96,19 @@ label {
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   padding: 12px;
   border: 1px solid rgba(248, 244, 235, 0.24);
   border-radius: 6px;
   color: #f8f4eb;
   background: rgba(0, 0, 0, 0.22);
+}
+
+textarea {
+  min-height: 96px;
+  resize: vertical;
 }
 
 button {
@@ -90,7 +124,8 @@ button {
 
 button:focus-visible,
 input:focus-visible,
-select:focus-visible {
+select:focus-visible,
+textarea:focus-visible {
   outline: 3px solid #f8f4eb;
   outline-offset: 3px;
 }
@@ -171,7 +206,8 @@ select:focus-visible {
 .action-log-panel,
 .accounts-lite-panel,
 .tournament-history-panel,
-.beta-safety-panel {
+.beta-safety-panel,
+.beta-feedback-panel {
   display: grid;
   gap: 12px;
   margin: 0 0 18px;
@@ -179,6 +215,11 @@ select:focus-visible {
   border: 1px solid rgba(248, 244, 235, 0.18);
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.16);
+}
+
+.feedback-form-grid {
+  display: grid;
+  gap: 12px;
 }
 
 .qa-check {

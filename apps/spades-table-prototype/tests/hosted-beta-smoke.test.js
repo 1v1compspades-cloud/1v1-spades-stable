@@ -73,6 +73,8 @@ test("hosted beta smoke flow covers health create join websocket quick match rec
       createRoomOk: true,
       joinRoomOk: true,
       webSocketConnected: true,
+      playOneTrickOk: true,
+      completeHandOk: true,
       reconnectOk: true,
       quickMatchOk: true,
       hiddenHandSafe: true

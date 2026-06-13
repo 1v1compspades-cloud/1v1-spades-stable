@@ -1,6 +1,6 @@
 # Spades Hosted Multiplayer Prototype Checklist
 
-This is for external beta smoke testing only. It is not a production account, payment, prize, or App Store build.
+This is for external beta smoke testing only. It is free play. It is not a production account, payment, prize, gambling, tournament payout, or App Store build.
 
 ## Local Run
 
@@ -19,6 +19,7 @@ Defaults:
 
 - `PORT`: server port supplied by the host. Falls back to `5175`.
 - `SPADES_SERVER_PORT`: optional local server-port fallback.
+- `SPADES_BIND_HOST`: optional bind host. Use `0.0.0.0` only when the host requires it.
 - `SPADES_PUBLIC_API_URL`: hosted API origin, for example `https://spades-beta.example.com`.
 - `SPADES_PUBLIC_WS_URL`: hosted WebSocket URL, for example `wss://spades-beta.example.com/ws`.
 
@@ -49,15 +50,25 @@ The server health response echoes the public API/WebSocket URLs only. It does no
 
 ## Hosted Smoke Test
 
+Scripted check:
+
+```sh
+cd apps/spades-table-prototype
+npm run smoke:hosted -- https://spades-beta.example.com
+```
+
+The script checks health, create room, join room, WebSocket connection, one trick, full hand completion, reconnect, Quick Match, and hidden-hand safety.
+
 1. Open `/health` and confirm `ok: true`.
 2. Create a room from tester A.
 3. Join by room code from tester B.
 4. Confirm both seats show only their own hands after ready/deal.
 5. Connect a spectator and confirm no hand is visible.
-6. Submit ready, bids, and at least one trick.
-7. Disconnect/reconnect one tester and confirm the same seat restores.
-8. Use Quick Match with two testers and confirm player1/player2 assignment.
-9. Confirm the beta safety panel shows hidden-hand safe.
+6. Submit ready, bids, and play one full trick.
+7. Complete a hand and confirm the summary appears.
+8. Disconnect/reconnect one tester and confirm the same seat restores.
+9. Use Quick Match with two testers and confirm player1/player2 assignment.
+10. Confirm the beta safety panel shows hidden-hand safe.
 
 ## Rollback Notes
 

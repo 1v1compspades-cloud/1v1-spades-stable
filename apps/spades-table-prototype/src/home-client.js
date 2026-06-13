@@ -7,8 +7,15 @@ import { createLocalTournamentHistoryStore } from "./local-tournament-history.js
 import {
   buildBetaSafetyChecklist,
   friendlyTesterError,
+  hiddenHandSafe,
   listManualBetaFlows
 } from "./beta-readiness.js";
+import {
+  buildDiagnosticsBundle,
+  createBetaIssueReport,
+  createLocalBetaFeedbackStore,
+  formatDiagnosticsSummary
+} from "./beta-feedback.js";
 import {
   createTwoSeatManualHarness,
   listManualFixturePresets
@@ -68,6 +75,13 @@ const qaCheckListOutput = document.querySelector("#qa-check-list");
 const qaEdgeListOutput = document.querySelector("#qa-edge-list");
 const betaSafetyCheckListOutput = document.querySelector("#beta-safety-check-list");
 const manualBetaFlowListOutput = document.querySelector("#manual-beta-flow-list");
+const betaIssueTitleInput = document.querySelector("#beta-issue-title");
+const betaIssueStepsInput = document.querySelector("#beta-issue-steps");
+const betaIssueExpectedInput = document.querySelector("#beta-issue-expected");
+const betaIssueActualInput = document.querySelector("#beta-issue-actual");
+const betaDiagnosticsOutput = document.querySelector("#beta-diagnostics-bundle");
+const betaFeedbackStatusOutput = document.querySelector("#beta-feedback-status");
+const betaReportHistoryOutput = document.querySelector("#beta-report-history");
 const actionLogListOutput = document.querySelector("#action-log-list");
 const manualVisualRoomOutput = document.querySelector("#manual-visual-room");
 const manualVisualPhaseOutput = document.querySelector("#manual-visual-phase");
@@ -112,6 +126,7 @@ let transportMode = "direct";
 const actionLog = createLocalActionLog();
 const accountStats = createLocalAccountStatsStore();
 const tournamentHistory = createLocalTournamentHistoryStore();
+const betaFeedback = createLocalBetaFeedbackStore();
 displayNameInput.value = localIdentity.displayName;
 renderManualBetaFlows();
 
@@ -286,6 +301,39 @@ document.querySelector("#reset-tournament-history").addEventListener("click", ()
   renderStatus(currentShellStatus());
 });
 
+document.querySelector("#refresh-diagnostics").addEventListener("click", () => {
+  renderBetaFeedbackPanel(currentShellStatus());
+  betaFeedbackStatusOutput.textContent = "Diagnostics refreshed.";
+});
+
+document.querySelector("#copy-diagnostics").addEventListener("click", () => {
+  copyDiagnosticsBundle();
+});
+
+document.querySelector("#save-beta-report").addEventListener("click", () => {
+  const report = createBetaIssueReport({
+    title: betaIssueTitleInput.value,
+    steps: betaIssueStepsInput.value,
+    expected: betaIssueExpectedInput.value,
+    actual: betaIssueActualInput.value,
+    diagnostics: currentDiagnosticsBundle()
+  });
+  betaFeedback.record(report);
+  betaFeedbackStatusOutput.textContent = `Saved local beta report: ${report.title}`;
+  renderBetaFeedbackHistory();
+});
+
+document.querySelector("#export-beta-reports").addEventListener("click", () => {
+  betaDiagnosticsOutput.value = betaFeedback.exportText();
+  betaFeedbackStatusOutput.textContent = "Saved beta reports exported into the diagnostics box.";
+});
+
+document.querySelector("#clear-beta-reports").addEventListener("click", () => {
+  betaFeedback.clear();
+  renderBetaFeedbackHistory();
+  betaFeedbackStatusOutput.textContent = "Saved beta reports cleared locally.";
+});
+
 document.querySelector("#manual-setup").addEventListener("click", () => {
   manualHarness.setup();
   lastSuccessfulAction = "manual setup";
@@ -396,6 +444,7 @@ async function runShellAction(action, successLabel = "completed action") {
       edges: qaEdgeListOutput
     });
     renderBetaSafetyPanel(status);
+    renderBetaFeedbackPanel(status);
   }
 }
 
@@ -588,6 +637,7 @@ function renderStatus(status) {
   renderAccountsLitePanel();
   renderTournamentHistoryPanel();
   renderActionLog();
+  renderBetaFeedbackPanel(status);
 }
 
 function renderVisualShell(status) {
@@ -947,6 +997,57 @@ function renderBetaSafetyPanel(status = currentShellStatus()) {
     check.name,
     check.detail
   )));
+}
+
+function renderBetaFeedbackPanel(status = currentShellStatus()) {
+  betaDiagnosticsOutput.value = formatDiagnosticsSummary(currentDiagnosticsBundle(status));
+  renderBetaFeedbackHistory();
+}
+
+function currentDiagnosticsBundle(status = currentShellStatus()) {
+  return buildDiagnosticsBundle({
+    status,
+    transportMode,
+    serverStatus: betaServerStatus(),
+    webSocketStatus: betaWebSocketStatus(),
+    playerId: localIdentity.playerId,
+    displayName: localIdentity.displayName,
+    lastAction: lastSuccessfulAction,
+    lastError: errorOutput.textContent,
+    hiddenHandSafe: hiddenHandSafe(status),
+    fixturePreset: activeFixturePreset,
+    actionLogEntries: actionLog.list()
+  });
+}
+
+function renderBetaFeedbackHistory() {
+  const reports = betaFeedback.list();
+  betaFeedbackStatusOutput.textContent = reports.length
+    ? `Feedback reports: ${reports.length} saved locally`
+    : "Feedback reports: none saved";
+  betaReportHistoryOutput.textContent = reports.length
+    ? `Saved beta reports: ${reports.map((report) => (
+      `${report.timestamp} ${report.title} | room ${report.diagnostics.roomCode} | phase ${report.diagnostics.phase} | seat ${report.diagnostics.seat}`
+    )).join("\n")}`
+    : "Saved beta reports: none";
+}
+
+async function copyDiagnosticsBundle() {
+  const text = betaDiagnosticsOutput.value || formatDiagnosticsSummary(currentDiagnosticsBundle());
+  betaDiagnosticsOutput.value = text;
+  try {
+    if (globalThis.navigator?.clipboard?.writeText) {
+      await globalThis.navigator.clipboard.writeText(text);
+      betaFeedbackStatusOutput.textContent = "Diagnostics copied.";
+      return;
+    }
+    betaDiagnosticsOutput.focus();
+    betaDiagnosticsOutput.select();
+    document.execCommand?.("copy");
+    betaFeedbackStatusOutput.textContent = "Diagnostics selected for copying.";
+  } catch (error) {
+    betaFeedbackStatusOutput.textContent = `Copy failed: ${friendlyTesterError(error?.message ?? "copy failed")}`;
+  }
 }
 
 function renderManualBetaFlows() {

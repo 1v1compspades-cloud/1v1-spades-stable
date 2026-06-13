@@ -6,11 +6,18 @@ import { dirname, resolve } from "node:path";
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const appDir = resolve(testDir, "..");
+const repoDir = resolve(appDir, "../..");
 
 test("basic shell exposes create join ready leave and status targets", () => {
   const html = readFileSync(resolve(appDir, "index.html"), "utf8");
 
   assert.match(html, /id="create-room"/);
+  assert.match(html, /id="tester-entry-panel"/);
+  assert.match(html, /id="tester-entry-steps"/);
+  assert.match(html, /id="tester-safety-copy"/);
+  assert.match(html, /Free-play tester build only/);
+  assert.match(html, /No gambling, prizes, payments, or tournament payouts/);
+  assert.match(html, /local previews only/);
   assert.match(html, /id="transport-mode"/);
   assert.match(html, /id="transport-mode-status"/);
   assert.match(html, /value="real-server"/);
@@ -48,6 +55,20 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /id="qa-edge-list"/);
   assert.match(html, /id="beta-safety-check-list"/);
   assert.match(html, /id="manual-beta-flow-list"/);
+  assert.match(html, /id="beta-feedback-title"/);
+  assert.match(html, /id="beta-issue-title"/);
+  assert.match(html, /id="beta-issue-steps"/);
+  assert.match(html, /id="beta-issue-expected"/);
+  assert.match(html, /id="beta-issue-actual"/);
+  assert.match(html, /id="beta-diagnostics-bundle"/);
+  assert.match(html, /id="refresh-diagnostics"/);
+  assert.match(html, /id="copy-diagnostics"/);
+  assert.match(html, /id="save-beta-report"/);
+  assert.match(html, /id="export-beta-reports"/);
+  assert.match(html, /id="clear-beta-reports"/);
+  assert.match(html, /id="beta-feedback-status"/);
+  assert.match(html, /id="beta-report-history"/);
+  assert.match(html, /Send this to dev/);
   assert.match(html, /id="action-log-list"/);
   assert.match(html, /id="bid-status"/);
   assert.match(html, /id="bid-input"/);
@@ -119,6 +140,14 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /buildVisualShellModel/);
   assert.match(client, /buildVisualQaReport/);
   assert.match(client, /buildBetaSafetyChecklist/);
+  assert.match(client, /buildDiagnosticsBundle/);
+  assert.match(client, /createBetaIssueReport/);
+  assert.match(client, /createLocalBetaFeedbackStore/);
+  assert.match(client, /formatDiagnosticsSummary/);
+  assert.match(client, /currentDiagnosticsBundle/);
+  assert.match(client, /renderBetaFeedbackPanel/);
+  assert.match(client, /copyDiagnosticsBundle/);
+  assert.match(client, /hiddenHandSafe/);
   assert.match(client, /friendlyTesterError/);
   assert.match(client, /listManualBetaFlows/);
   assert.match(client, /renderTableLayout/);
@@ -216,6 +245,8 @@ test("card button styling keeps mobile tap and accessibility states visible", ()
 test("visual QA and table layout styling is present", () => {
   const css = readFileSync(resolve(appDir, "src/styles.css"), "utf8");
 
+  assert.match(css, /\.tester-entry-panel/);
+  assert.match(css, /\.tester-entry-note/);
   assert.match(css, /\.table-layout-shell/);
   assert.match(css, /\.table-area/);
   assert.match(css, /\.table-controls/);
@@ -224,6 +255,8 @@ test("visual QA and table layout styling is present", () => {
   assert.match(css, /\.player-hand-area/);
   assert.match(css, /\.qa-report-panel/);
   assert.match(css, /\.beta-safety-panel/);
+  assert.match(css, /\.beta-feedback-panel/);
+  assert.match(css, /\.feedback-form-grid/);
   assert.match(css, /\.qa-check\.pass/);
   assert.match(css, /\.qa-check\.fail/);
   assert.match(css, /\.action-log-panel/);
@@ -239,19 +272,47 @@ test("hosted deploy checklist and server startup are present", () => {
   const packageJson = readFileSync(resolve(appDir, "package.json"), "utf8");
   const server = readFileSync(resolve(appDir, "server.js"), "utf8");
   const checklist = readFileSync(resolve(appDir, "DEPLOY_CHECKLIST.md"), "utf8");
+  const smokeScript = readFileSync(resolve(appDir, "scripts/hosted-beta-smoke.mjs"), "utf8");
+  const launchDoc = readFileSync(resolve(repoDir, "docs/SPADES_HOSTED_BETA_LAUNCH.md"), "utf8");
+  const feedbackDoc = readFileSync(resolve(repoDir, "docs/SPADES_BETA_FEEDBACK.md"), "utf8");
 
   assert.match(packageJson, /"start": "node server\.js"/);
+  assert.match(packageJson, /"smoke:hosted": "node scripts\/hosted-beta-smoke\.mjs"/);
   assert.match(server, /resolveServerEnvConfig/);
   assert.match(server, /createSpadesHostedServer/);
   assert.match(server, /logger\.info/);
   assert.match(server, /SIGTERM/);
   assert.match(server, /SIGINT/);
   assert.doesNotMatch(server, /hand|seatToken|secret/i);
+  assert.match(smokeScript, /runHostedBetaSmokeTest/);
+  assert.match(smokeScript, /SPADES_PUBLIC_API_URL/);
+  assert.match(smokeScript, /SPADES_PUBLIC_WS_URL/);
   assert.match(checklist, /SPADES_PUBLIC_API_URL/);
   assert.match(checklist, /SPADES_PUBLIC_WS_URL/);
+  assert.match(checklist, /SPADES_BIND_HOST/);
+  assert.match(checklist, /npm run smoke:hosted/);
+  assert.match(checklist, /one full trick/);
+  assert.match(checklist, /Complete a hand/);
+  assert.match(checklist, /free play/i);
+  assert.match(checklist, /no.*gambling/i);
   assert.match(checklist, /Render/);
   assert.match(checklist, /Railway/);
   assert.match(checklist, /Fly/);
   assert.match(checklist, /Hosted Smoke Test/);
   assert.match(checklist, /Rollback Notes/);
+  assert.match(launchDoc, /free play only/i);
+  assert.match(launchDoc, /Create a room and share the code/);
+  assert.match(launchDoc, /Join a room by code/);
+  assert.match(launchDoc, /Quick Match/);
+  assert.match(launchDoc, /Play one full trick/);
+  assert.match(launchDoc, /Complete one hand/);
+  assert.match(launchDoc, /no wagers, prizes, payments, gambling features, or tournament payouts/i);
+  assert.match(feedbackDoc, /copyable diagnostics bundle/i);
+  assert.match(feedbackDoc, /room code/i);
+  assert.match(feedbackDoc, /phase/i);
+  assert.match(feedbackDoc, /transport/i);
+  assert.match(feedbackDoc, /seat/i);
+  assert.match(feedbackDoc, /last action/i);
+  assert.match(feedbackDoc, /last error/i);
+  assert.match(feedbackDoc, /hidden-hand safety/i);
 });

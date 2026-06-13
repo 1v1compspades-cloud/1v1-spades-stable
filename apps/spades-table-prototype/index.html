@@ -11,6 +11,24 @@
       <section class="home-panel" aria-labelledby="home-title">
         <p class="eyebrow">Spades Master</p>
         <h1 id="home-title">1v1 Spades</h1>
+        <section id="tester-entry-panel" class="tester-entry-panel" aria-labelledby="tester-entry-title">
+          <h2 id="tester-entry-title">Hosted Beta Entry</h2>
+          <p id="tester-entry-summary">
+            Free-play tester build only. Choose a display name, create a room to share a code,
+            join a friend by room code, try Quick Match on the hosted server, or restore your
+            existing room after a refresh.
+          </p>
+          <div id="tester-entry-steps" class="account-stat-grid" aria-label="Tester entry steps">
+            <p class="account-stat-item">1. Enter a display name for this device.</p>
+            <p class="account-stat-item">2. Create a room or join with a room code.</p>
+            <p class="account-stat-item">3. Use Quick Match to pair two local tester identities.</p>
+            <p class="account-stat-item">4. Restore Active Room if the page refreshes.</p>
+          </div>
+          <p id="tester-safety-copy" class="tester-entry-note">
+            No gambling, prizes, payments, or tournament payouts. Leaderboard and tournament panels
+            are local previews only.
+          </p>
+        </section>
         <div class="controls">
           <label>
             Transport mode
@@ -91,6 +109,43 @@
           <h3 id="beta-safety-title">Beta Safety Checklist</h3>
           <div id="beta-safety-check-list" class="qa-check-list"></div>
           <div id="manual-beta-flow-list" class="account-stat-grid" aria-label="Manual beta test flows"></div>
+        </section>
+        <section class="beta-feedback-panel" aria-labelledby="beta-feedback-title">
+          <h3 id="beta-feedback-title">Beta Feedback Report</h3>
+          <p class="tester-entry-note">
+            Send this to dev when something feels wrong. It uses local-only storage and avoids hidden card details.
+          </p>
+          <div class="feedback-form-grid">
+            <label>
+              Issue summary
+              <textarea id="beta-issue-title" rows="2" placeholder="What broke or felt confusing?"></textarea>
+            </label>
+            <label>
+              Steps to reproduce
+              <textarea id="beta-issue-steps" rows="4" placeholder="What did you tap before it happened?"></textarea>
+            </label>
+            <label>
+              Expected
+              <textarea id="beta-issue-expected" rows="3" placeholder="What did you expect?"></textarea>
+            </label>
+            <label>
+              Actual
+              <textarea id="beta-issue-actual" rows="3" placeholder="What actually happened?"></textarea>
+            </label>
+          </div>
+          <label>
+            Copyable diagnostics bundle
+            <textarea id="beta-diagnostics-bundle" rows="14" readonly></textarea>
+          </label>
+          <div class="room-actions">
+            <button id="refresh-diagnostics" type="button">Refresh Diagnostics</button>
+            <button id="copy-diagnostics" type="button">Copy Diagnostics</button>
+            <button id="save-beta-report" type="button">Save Local Report</button>
+            <button id="export-beta-reports" type="button">Export Saved Reports</button>
+            <button id="clear-beta-reports" type="button">Clear Saved Reports</button>
+          </div>
+          <p id="beta-feedback-status" class="status-line">Feedback reports: none saved</p>
+          <pre id="beta-report-history">Saved beta reports: none</pre>
         </section>
         <section class="action-log-panel" aria-labelledby="action-log-title">
           <h3 id="action-log-title">Recent Local Actions</h3>
