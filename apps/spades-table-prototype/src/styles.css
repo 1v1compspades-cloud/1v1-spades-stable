@@ -52,7 +52,8 @@ h2 {
 .summary-grid,
 .card-button-grid,
 .table-layout-shell,
-.qa-check-list {
+.qa-check-list,
+.action-log-list {
   display: grid;
   gap: 12px;
 }
@@ -165,7 +166,8 @@ select:focus-visible {
   gap: 10px;
 }
 
-.qa-report-panel {
+.qa-report-panel,
+.action-log-panel {
   display: grid;
   gap: 12px;
   margin: 0 0 18px;
@@ -193,6 +195,28 @@ select:focus-visible {
   color: #ffe4dd;
   background: rgba(142, 52, 38, 0.34);
   border: 1px solid rgba(255, 180, 168, 0.38);
+}
+
+.action-log-entry {
+  min-height: 44px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  color: #f8f4eb;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(248, 244, 235, 0.16);
+  font-size: 13px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.action-log-entry.success {
+  border-color: rgba(180, 231, 170, 0.28);
+}
+
+.action-log-entry.fail {
+  border-color: rgba(255, 180, 168, 0.38);
+  background: rgba(142, 52, 38, 0.24);
 }
 
 h3 {

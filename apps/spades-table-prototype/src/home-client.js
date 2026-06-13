@@ -1,4 +1,5 @@
 import { createSpadesAppController } from "./app-controller.js";
+import { createLocalActionLog } from "./action-log.js";
 import {
   createTwoSeatManualHarness,
   listManualFixturePresets
@@ -38,6 +39,7 @@ const tableLastTrickAreaOutput = document.querySelector("#table-last-trick-area"
 const tablePlayerHandAreaOutput = document.querySelector("#table-player-hand-area");
 const qaCheckListOutput = document.querySelector("#qa-check-list");
 const qaEdgeListOutput = document.querySelector("#qa-edge-list");
+const actionLogListOutput = document.querySelector("#action-log-list");
 const manualVisualRoomOutput = document.querySelector("#manual-visual-room");
 const manualVisualPhaseOutput = document.querySelector("#manual-visual-phase");
 const manualVisualSeatOutput = document.querySelector("#manual-visual-seat");
@@ -71,6 +73,7 @@ const visualQaStatusOutput = document.querySelector("#visual-qa-status");
 let manualHarness = createTwoSeatManualHarness();
 let lastSuccessfulAction = "none";
 let activeFixturePreset = "none";
+const actionLog = createLocalActionLog();
 
 for (const presetName of listManualFixturePresets().filter((name) => !name.startsWith("reconnect-"))) {
   const option = document.createElement("option");
@@ -89,115 +92,123 @@ for (const scriptName of listVisualQaScripts()) {
 document.querySelector("#create-room").addEventListener("click", () => {
   runShellAction(() => controller.createRoom({
     displayName: displayNameInput.value || "Player"
-  }).status, "created room");
+  }).status, "create room");
 });
 
 document.querySelector("#join-room").addEventListener("click", () => {
   runShellAction(() => controller.joinRoom({
     roomCode: joinCodeInput.value,
     displayName: displayNameInput.value || "Player"
-  }).status, "joined room");
+  }).status, "join room");
 });
 
 document.querySelector("#restore-room").addEventListener("click", () => {
-  runShellAction(() => controller.restoreActiveRoom().status, "restored active room");
+  runShellAction(() => controller.restoreActiveRoom().status, "restore active room");
 });
 
 document.querySelector("#clear-room").addEventListener("click", () => {
   controller.clearActiveRoom();
+  lastSuccessfulAction = "clear active room";
+  actionLog.record("clear active room", null);
   renderStatus(null);
 });
 
 document.querySelector("#ready-player").addEventListener("click", () => {
-  runShellAction(() => controller.readyPlayer().status, "readied active player");
+  runShellAction(() => controller.readyPlayer().status, "ready");
 });
 
 document.querySelector("#leave-room").addEventListener("click", () => {
-  runShellAction(() => controller.leaveRoom().status, "left active room");
+  runShellAction(() => controller.leaveRoom().status, "leave room");
 });
 
 document.querySelector("#submit-bid").addEventListener("click", () => {
   runShellAction(() => controller.submitBid({
     bid: Number(bidInput.value)
-  }).status, "submitted bid");
+  }).status, "bid");
 });
 
 document.querySelector("#submit-nil").addEventListener("click", () => {
   bidInput.value = "0";
-  runShellAction(() => controller.submitBid({ bid: 0 }).status, "submitted nil bid");
+  runShellAction(() => controller.submitBid({ bid: 0 }).status, "bid");
 });
 
 document.querySelector("#submit-play-card").addEventListener("click", () => {
   runShellAction(() => controller.submitPlayCardById({
     cardId: playCardIdInput.value
-  }).status, "played card");
+  }).status, "play card");
 });
 
 document.querySelector("#play-full-hand").addEventListener("click", () => {
-  runShellAction(() => controller.playFullHand().status, "auto-played text hand");
+  runShellAction(() => controller.playFullHand().status, "play full hand");
 });
 
 document.querySelector("#start-next-hand").addEventListener("click", () => {
-  runShellAction(() => controller.startNextHand().status, "started next hand");
+  runShellAction(() => controller.startNextHand().status, "next hand");
 });
 
 document.querySelector("#record-match-history").addEventListener("click", () => {
   runShellAction(() => {
     controller.recordMatchHistory();
     return controller.getActiveRoomStatus();
-  }, "recorded match history");
+  }, "record match history");
 });
 
 document.querySelector("#start-new-match").addEventListener("click", () => {
-  runShellAction(() => controller.startNewMatch().status, "started new match");
+  runShellAction(() => controller.startNewMatch().status, "reset/new match");
 });
 
 document.querySelector("#table-leave-room").addEventListener("click", () => {
-  runShellAction(() => controller.leaveRoom().status, "left active room from table");
+  runShellAction(() => controller.leaveRoom().status, "leave room");
 });
 
 document.querySelector("#table-record-history").addEventListener("click", () => {
   runShellAction(() => {
     controller.recordMatchHistory();
     return controller.getActiveRoomStatus();
-  }, "recorded match history from table");
+  }, "record match history");
 });
 
 document.querySelector("#table-start-next-hand").addEventListener("click", () => {
-  runShellAction(() => controller.startNextHand().status, "started next hand from table");
+  runShellAction(() => controller.startNextHand().status, "next hand");
 });
 
 document.querySelector("#table-start-new-match").addEventListener("click", () => {
-  runShellAction(() => controller.startNewMatch().status, "started new match from table");
+  runShellAction(() => controller.startNewMatch().status, "reset/new match");
 });
 
 document.querySelector("#manual-setup").addEventListener("click", () => {
   manualHarness.setup();
+  lastSuccessfulAction = "manual setup";
   renderManualStatus();
 });
 
 document.querySelector("#manual-ready").addEventListener("click", () => {
   manualHarness.readyBoth();
+  lastSuccessfulAction = "manual ready";
   renderManualStatus();
 });
 
 document.querySelector("#manual-bid").addEventListener("click", () => {
   manualHarness.bidBoth();
+  lastSuccessfulAction = "manual bid";
   renderManualStatus("guest");
 });
 
 document.querySelector("#manual-trick").addEventListener("click", () => {
   manualHarness.playOneTrick();
+  lastSuccessfulAction = "manual trick";
   renderManualStatus();
 });
 
 document.querySelector("#manual-full-hand").addEventListener("click", () => {
   manualHarness.playFullHand();
+  lastSuccessfulAction = "manual full hand";
   renderManualStatus();
 });
 
 document.querySelector("#manual-next-hand").addEventListener("click", () => {
   manualHarness.startNextHand();
+  lastSuccessfulAction = "manual next hand";
   renderManualStatus();
 });
 
@@ -205,11 +216,14 @@ document.querySelector("#run-fixture").addEventListener("click", () => {
   manualHarness = createTwoSeatManualHarness();
   activeFixturePreset = fixturePresetSelect.value;
   manualHarness.runPreset(activeFixturePreset);
+  lastSuccessfulAction = `run fixture ${activeFixturePreset}`;
   renderManualStatus();
 });
 
 document.querySelector("#reset-fixture").addEventListener("click", () => {
   manualHarness = createTwoSeatManualHarness();
+  activeFixturePreset = "clean-room";
+  lastSuccessfulAction = "reset clean local room";
   manualHarness.setup();
   renderManualStatus();
 });
@@ -239,10 +253,15 @@ function runShellAction(action, successLabel = "completed action") {
     clearError();
     const status = action();
     lastSuccessfulAction = successLabel;
+    actionLog.record(successLabel, status);
     renderStatus(status);
   } catch (error) {
-    showError(error?.message ?? "Action failed");
-    renderQaReport(controller.getActiveRoomStatus(), error?.message ?? "Action failed", {
+    const message = error?.message ?? "Action failed";
+    const status = controller.getActiveRoomStatus();
+    actionLog.record(successLabel, status, { outcome: "failure", message });
+    showError(message);
+    renderActionLog();
+    renderQaReport(status, message, {
       checks: qaCheckListOutput,
       edges: qaEdgeListOutput
     });
@@ -272,12 +291,13 @@ function renderStatus(status) {
     ? `Hand summary: ${formatHandSummary(status.handSummary)}`
     : "Hand summary: none";
   matchHistoryOutput.textContent = formatMatchHistory(controller.getMatchHistory());
+  renderActionLog();
 }
 
 function renderVisualShell(status) {
   const playCard = (card) => {
     playCardIdInput.value = card.id;
-    runShellAction(() => controller.submitPlayCardById({ cardId: card.id }).status, `played ${card.id}`);
+    runShellAction(() => controller.submitPlayCardById({ cardId: card.id }).status, "play card");
   };
   renderVisualShellInto(status, {
     phase: visualPhaseOutput,
@@ -358,7 +378,8 @@ function renderQaReport(status, errorMessage, targets, context = {}) {
   const report = buildVisualQaReport(status, {
     errorMessage,
     lastSuccessfulAction: context.lastSuccessfulAction ?? lastSuccessfulAction,
-    fixturePreset: context.fixturePreset ?? activeFixturePreset
+    fixturePreset: context.fixturePreset ?? activeFixturePreset,
+    matchHistoryCount: context.matchHistoryCount ?? controller.getMatchHistory().length
   });
   targets.checks.replaceChildren(
     ...report.contextMessages.map((check) => qaReportItem(check.pass, check.name, check.detail)),
@@ -379,6 +400,39 @@ function qaReportItem(pass, name, detail) {
   item.className = pass ? "qa-check pass" : "qa-check fail";
   item.textContent = `${pass ? "PASS" : "FAIL"} ${name}: ${detail}`;
   return item;
+}
+
+function renderActionLog() {
+  const entries = actionLog.list();
+  if (!entries.length) {
+    const empty = document.createElement("p");
+    empty.className = "action-log-entry";
+    empty.textContent = "No local actions recorded yet.";
+    actionLogListOutput.replaceChildren(empty);
+    return;
+  }
+
+  actionLogListOutput.replaceChildren(...entries.map((entry) => {
+    const item = document.createElement("p");
+    item.className = `action-log-entry ${entry.outcome === "success" ? "success" : "fail"}`;
+    item.textContent = formatActionLogEntry(entry);
+    return item;
+  }));
+}
+
+function formatActionLogEntry(entry) {
+  const summary = entry.summary;
+  const statusText = [
+    `phase ${summary.phase}`,
+    `viewer ${summary.viewerSeat}`,
+    `turn ${summary.currentTurn}`,
+    `score ${summary.score}`,
+    `bags ${summary.bags}`,
+    `bids ${summary.bidStatus}`,
+    `last trick winner ${summary.lastTrickWinner}`
+  ].join(" | ");
+  const message = entry.message ? ` | ${entry.message}` : "";
+  return `${entry.outcome.toUpperCase()} ${entry.action}: ${statusText}${message}`;
 }
 
 function visualSummaryItem(label, primary, secondary) {

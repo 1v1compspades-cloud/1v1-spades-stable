@@ -39,6 +39,7 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /id="table-start-new-match"/);
   assert.match(html, /id="qa-check-list"/);
   assert.match(html, /id="qa-edge-list"/);
+  assert.match(html, /id="action-log-list"/);
   assert.match(html, /id="bid-status"/);
   assert.match(html, /id="bid-input"/);
   assert.match(html, /id="submit-bid"/);
@@ -93,6 +94,7 @@ test("home client wires the shell through the local app controller", () => {
   const client = readFileSync(resolve(appDir, "src/home-client.js"), "utf8");
 
   assert.match(client, /createSpadesAppController/);
+  assert.match(client, /createLocalActionLog/);
   assert.match(client, /buildVisualShellModel/);
   assert.match(client, /buildVisualQaReport/);
   assert.match(client, /renderTableLayout/);
@@ -100,6 +102,9 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /qaReportItem/);
   assert.match(client, /lastSuccessfulAction/);
   assert.match(client, /activeFixturePreset/);
+  assert.match(client, /actionLog\.record/);
+  assert.match(client, /renderActionLog/);
+  assert.match(client, /formatActionLogEntry/);
   assert.match(client, /table-start-new-match/);
   assert.match(client, /runVisualQaScript/);
   assert.match(client, /listVisualQaScripts/);
@@ -165,4 +170,7 @@ test("visual QA and table layout styling is present", () => {
   assert.match(css, /\.qa-report-panel/);
   assert.match(css, /\.qa-check\.pass/);
   assert.match(css, /\.qa-check\.fail/);
+  assert.match(css, /\.action-log-panel/);
+  assert.match(css, /\.action-log-entry/);
+  assert.match(css, /\.action-log-entry\.fail/);
 });

@@ -61,7 +61,8 @@ export function buildVisualShellModel(status) {
 export function buildVisualQaReport(status, {
   errorMessage = "",
   lastSuccessfulAction = "none",
-  fixturePreset = "none"
+  fixturePreset = "none",
+  matchHistoryCount = 0
 } = {}) {
   const model = buildVisualShellModel(status);
   const hasStatus = Boolean(status);
@@ -71,7 +72,8 @@ export function buildVisualQaReport(status, {
     qaCheck("hidden-hand status", hiddenHandProtected(status), hiddenDetail),
     qaCheck("phase", hasStatus && model.phase !== "none", model.phase),
     qaCheck("last successful action", lastSuccessfulAction !== "none", lastSuccessfulAction),
-    qaCheck("fixture preset", fixturePreset !== "none", fixturePreset)
+    qaCheck("fixture preset", fixturePreset !== "none", fixturePreset),
+    qaCheck("match/history status", hasStatus, formatMatchHistoryStatus(status, matchHistoryCount))
   ];
   const checks = [
     qaCheck("current viewer seat", hasStatus && ["player1", "player2", "spectator"].includes(model.viewerSeat), model.viewerSeat),
@@ -188,6 +190,11 @@ function formatSummaryCheck(model) {
     ...model.scoreRows.map((row) => `${row.seat} score ${row.score} tricks ${row.tricks}`),
     ...model.bidBagRows.map((row) => `${row.seat} bid ${row.bid ?? "none"} bags ${row.bags}`)
   ].join(" | ");
+}
+
+function formatMatchHistoryStatus(status, historyCount) {
+  if (!status) return `no active match | history ${historyCount}`;
+  return `${status.phase} | winner ${status.matchWinner ?? status.winner ?? "none"} | history ${historyCount}`;
 }
 
 function classifyActionError(message) {
