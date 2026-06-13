@@ -53,6 +53,7 @@ export function createRoom({
     phase: "waiting",
     handNumber: 0,
     game: createEmptyGameState(),
+    appliedActionIds: [],
     pendingDeck: deck,
     createdAt: now,
     updatedAt: now
@@ -130,6 +131,24 @@ export function leaveRoom(room, { seatToken, playerId } = {}) {
 }
 
 export function applyRoomAction(room, action = {}) {
+  const actionId = normalizeActionId(action.actionId);
+  if (actionId && room.appliedActionIds?.includes(actionId)) {
+    return room;
+  }
+
+  const nextRoom = applyRoomActionOnce(room, action);
+  return actionId ? recordAppliedAction(nextRoom, actionId) : nextRoom;
+}
+
+export function createActionId({ roomCode, seat, type, sequence } = {}) {
+  const parts = [roomCode, seat, type, sequence].map((part) => String(part ?? "").trim());
+  if (parts.some((part) => !part)) {
+    throw roomError(400, "Action id requires roomCode, seat, type, and sequence");
+  }
+  return parts.join(":");
+}
+
+function applyRoomActionOnce(room, action = {}) {
   const seat = getViewerSeat(room, action);
   ensureSeated(seat);
 
@@ -216,6 +235,7 @@ export function sanitizeRoomForViewer(room, viewer = {}) {
     firstPlayer: room.firstPlayer,
     currentTurn: room.currentTurn,
     handNumber: room.handNumber,
+    appliedActionCount: room.appliedActionIds?.length ?? 0,
     score: {
       ...room.game.score
     },
@@ -250,7 +270,7 @@ function maybeStartHand(room) {
     coinFlipWinner,
     dealer,
     firstPlayer,
-    currentTurn: "player1",
+    currentTurn: firstPlayer,
     phase: "bidding",
     handNumber,
     game: {
@@ -466,10 +486,18 @@ function markConnected(room, seat) {
   });
 }
 
+function recordAppliedAction(room, actionId) {
+  return syncRoom({
+    ...room,
+    appliedActionIds: [...(room.appliedActionIds ?? []), actionId]
+  });
+}
+
 function syncRoom(room) {
   return {
     ...room,
-    phase: room.game?.phase ?? room.phase
+    phase: room.game?.phase ?? room.phase,
+    appliedActionIds: room.appliedActionIds ?? []
   };
 }
 
@@ -496,6 +524,11 @@ function playerIdMatchesSeatedPlayer(room, playerId) {
 function normalizePlayerId(playerId) {
   const value = String(playerId ?? "").trim();
   return value ? value.slice(0, 80) : null;
+}
+
+function normalizeActionId(actionId) {
+  const value = String(actionId ?? "").trim();
+  return value ? value.slice(0, 160) : null;
 }
 
 function normalizeDisplayName(displayName) {

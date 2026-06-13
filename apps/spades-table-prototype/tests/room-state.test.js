@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   applyRoomAction,
+  createActionId,
   createRoom,
   joinRoom,
   leaveRoom,
@@ -50,13 +51,13 @@ test("joins player2, restores already-seated viewers, and assigns spectators whe
 });
 
 test("ready state starts a server-owned hand with coin flip, dealer, first player, and deal", () => {
-  let room = readyStartedRoom();
+  let room = readyStartedRoom({ coinFlipWinner: "player1" });
 
   assert.equal(room.phase, "bidding");
-  assert.equal(room.coinFlipWinner, "player2");
-  assert.equal(room.dealer, "player2");
-  assert.equal(room.firstPlayer, "player1");
-  assert.equal(room.currentTurn, "player1");
+  assert.equal(room.coinFlipWinner, "player1");
+  assert.equal(room.dealer, "player1");
+  assert.equal(room.firstPlayer, "player2");
+  assert.equal(room.currentTurn, "player2");
   assert.equal(room.game.hands.player1.length, 13);
   assert.equal(room.game.hands.player2.length, 13);
   assert.equal(room.game.stock.length, 26);
@@ -175,6 +176,101 @@ test("leave room marks the player disconnected without removing their seat", () 
   assert.equal(sanitizeRoomForViewer(room, { playerId: "device-1" }).viewerSeat, "player1");
 });
 
+test("deterministic action ids make reconnect replays idempotent", () => {
+  let room = readyStartedRoom();
+  const bidAction = {
+    type: "bid",
+    seatToken: PLAYER1_TOKEN,
+    bid: 4,
+    actionId: createActionId({
+      roomCode: "SPADES",
+      seat: "player1",
+      type: "bid",
+      sequence: 1
+    })
+  };
+
+  room = applyRoomAction(room, bidAction);
+  const replayedBidRoom = applyRoomAction(room, bidAction);
+
+  assert.equal(replayedBidRoom, room);
+  assert.deepEqual(room.game.bids, { player1: 4, player2: null });
+
+  room = applyRoomAction(room, {
+    type: "bid",
+    seatToken: PLAYER2_TOKEN,
+    bid: 3,
+    actionId: createActionId({
+      roomCode: "SPADES",
+      seat: "player2",
+      type: "bid",
+      sequence: 1
+    })
+  });
+
+  const card = room.game.hands.player1.find((candidate) => candidate.suit === "clubs");
+  const playAction = {
+    type: "playCard",
+    seatToken: PLAYER1_TOKEN,
+    card,
+    actionId: createActionId({
+      roomCode: "SPADES",
+      seat: "player1",
+      type: "playCard",
+      sequence: 2
+    })
+  };
+  room = applyRoomAction(room, playAction);
+  const replayedPlayRoom = applyRoomAction(room, playAction);
+
+  assert.equal(replayedPlayRoom, room);
+  assert.equal(room.game.currentTrick.length, 1);
+  assert.equal(room.game.hands.player1.length, 12);
+  assert.equal(sanitizeRoomForViewer(room, { seatToken: PLAYER1_TOKEN }).appliedActionCount, 3);
+});
+
+test("sanitized room views protect hidden hands in every phase", () => {
+  let waiting = createRoom({ roomCode: "SPADES", seatToken: PLAYER1_TOKEN, playerId: "device-1" });
+  waiting = joinRoom(waiting, {
+    seatToken: PLAYER2_TOKEN,
+    playerId: "device-2",
+    displayName: "South"
+  }).room;
+  const bidding = readyStartedRoom();
+  let playing = bidding;
+  playing = applyRoomAction(playing, { type: "bid", seatToken: PLAYER1_TOKEN, bid: 4 });
+  playing = applyRoomAction(playing, { type: "bid", seatToken: PLAYER2_TOKEN, bid: 3 });
+  const handComplete = playOutRoom(biddingCompleteRoom({
+    deck: player1WinsEveryTrickDeck(),
+    matchSettings: { targetScore: 500 }
+  }));
+  const matchComplete = playOutRoom(biddingCompleteRoom({
+    deck: player1WinsEveryTrickDeck(),
+    matchSettings: { targetScore: 40 }
+  }));
+
+  assertSanitizedPhase(waiting, "waiting");
+  assertSanitizedPhase(bidding, "bidding");
+  assertSanitizedPhase(playing, "playing");
+  assertSanitizedPhase(handComplete, "hand_complete");
+  assertSanitizedPhase(matchComplete, "match_complete");
+});
+
+test("reconnect views restore by player id after leave without leaking opponent hand", () => {
+  let room = biddingCompleteRoom();
+  room = leaveRoom(room, { seatToken: PLAYER1_TOKEN });
+
+  const reconnected = joinRoom(room, { playerId: "device-1" });
+  const view = sanitizeRoomForViewer(reconnected.room, { playerId: "device-1" });
+
+  assert.equal(reconnected.alreadySeated, true);
+  assert.equal(reconnected.seat, "player1");
+  assert.equal(view.viewerSeat, "player1");
+  assert.equal(view.players.player1.connected, true);
+  assert.deepEqual(view.hand, room.game.hands.player1);
+  assert.notDeepEqual(view.hand, room.game.hands.player2);
+});
+
 function readyStartedRoom({ deck = player2HighDeck(), matchSettings = {}, coinFlipWinner = "player2" } = {}) {
   let room = createRoom({
     roomCode: "SPADES",
@@ -202,6 +298,52 @@ function biddingCompleteRoom(options = {}) {
 
 function tokenForSeat(seat) {
   return seat === "player1" ? PLAYER1_TOKEN : PLAYER2_TOKEN;
+}
+
+function playOutRoom(room) {
+  while (room.phase === "playing") {
+    const leader = room.currentTurn;
+    const follower = leader === "player1" ? "player2" : "player1";
+    room = applyRoomAction(room, {
+      type: "playCard",
+      seatToken: tokenForSeat(leader),
+      card: room.game.hands[leader][0]
+    });
+    room = applyRoomAction(room, {
+      type: "playCard",
+      seatToken: tokenForSeat(follower),
+      card: room.game.hands[follower][0]
+    });
+  }
+
+  return room;
+}
+
+function assertSanitizedPhase(room, phase) {
+  const player1View = sanitizeRoomForViewer(room, { seatToken: PLAYER1_TOKEN });
+  const player2View = sanitizeRoomForViewer(room, { seatToken: PLAYER2_TOKEN });
+  const spectatorView = sanitizeRoomForViewer(room, {});
+
+  assert.equal(player1View.phase, phase);
+  assert.equal(player2View.phase, phase);
+  assert.equal(spectatorView.phase, phase);
+  assert.equal(player1View.viewerSeat, "player1");
+  assert.equal(player2View.viewerSeat, "player2");
+  assert.equal(spectatorView.viewerSeat, "spectator");
+  assert.equal(spectatorView.alreadySeated, false);
+  assert.deepEqual(spectatorView.hand, []);
+  assert.equal(player1View.players.player1.seatToken, undefined);
+  assert.equal(player2View.players.player2.seatToken, undefined);
+  assert.equal(spectatorView.players.player1.seatToken, undefined);
+
+  if (room.game.hands.player1.length) {
+    assert.deepEqual(player1View.hand, room.game.hands.player1);
+    assert.notDeepEqual(player1View.hand, room.game.hands.player2);
+  }
+  if (room.game.hands.player2.length) {
+    assert.deepEqual(player2View.hand, room.game.hands.player2);
+    assert.notDeepEqual(player2View.hand, room.game.hands.player1);
+  }
 }
 
 function player2HighDeck() {
