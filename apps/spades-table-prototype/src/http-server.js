@@ -2,7 +2,8 @@ import express from "express";
 import { createSpadesServerBoundary } from "./server-boundary.js";
 
 export function createSpadesHttpServer({
-  boundary = createSpadesServerBoundary()
+  boundary = createSpadesServerBoundary(),
+  onBoundaryResponse = null
 } = {}) {
   const app = express();
   app.use(express.json({ limit: "128kb" }));
@@ -19,35 +20,35 @@ export function createSpadesHttpServer({
     sendBoundaryResponse(response, boundary.handle({
       ...request.body,
       type: "createRoom"
-    }));
+    }), onBoundaryResponse);
   });
 
   app.post("/api/rooms/:roomCode/join", (request, response) => {
-    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "joinRoom")));
+    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "joinRoom")), onBoundaryResponse);
   });
 
   app.post("/api/rooms/:roomCode/ready", (request, response) => {
-    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "ready")));
+    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "ready")), onBoundaryResponse);
   });
 
   app.post("/api/rooms/:roomCode/bid", (request, response) => {
-    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "bid")));
+    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "bid")), onBoundaryResponse);
   });
 
   app.post("/api/rooms/:roomCode/play-card", (request, response) => {
-    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "playCard")));
+    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "playCard")), onBoundaryResponse);
   });
 
   app.post("/api/rooms/:roomCode/leave", (request, response) => {
-    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "leaveRoom")));
+    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "leaveRoom")), onBoundaryResponse);
   });
 
   app.post("/api/rooms/:roomCode/next-hand", (request, response) => {
-    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "nextHand")));
+    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "nextHand")), onBoundaryResponse);
   });
 
   app.post("/api/rooms/:roomCode/new-match", (request, response) => {
-    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "newMatch")));
+    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "newMatch")), onBoundaryResponse);
   });
 
   app.use((_request, response) => {
@@ -74,7 +75,10 @@ function roomRequest(request, type) {
   };
 }
 
-function sendBoundaryResponse(response, payload) {
+function sendBoundaryResponse(response, payload, onBoundaryResponse) {
+  if (payload.ok && onBoundaryResponse) {
+    onBoundaryResponse(payload);
+  }
   response
     .status(payload.ok ? 200 : payload.statusCode)
     .json(payload);

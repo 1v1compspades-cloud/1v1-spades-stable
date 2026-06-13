@@ -7,6 +7,7 @@ import {
 } from "./manual-harness.js";
 import { createMockSpadesSocketTransport } from "./mock-socket-transport.js";
 import { renderRoomShellText } from "./room-shell.js";
+import { createSpadesServerClient } from "./server-client.js";
 import {
   buildVisualQaReport,
   buildVisualShellModel
@@ -24,6 +25,10 @@ const liveSyncPlayerId = loadOrCreatePlayerId();
 const liveSyncClient = createSpadesLiveSyncClient({
   socketServer: liveSyncServer,
   clientId: "shell-live-sync-client",
+  playerId: liveSyncPlayerId,
+  seatToken: loadOrCreateSeatToken(liveSyncPlayerId)
+});
+const realServerClient = createSpadesServerClient({
   playerId: liveSyncPlayerId,
   seatToken: loadOrCreateSeatToken(liveSyncPlayerId)
 });
@@ -126,6 +131,8 @@ document.querySelector("#reconnect-live-sync").addEventListener("click", () => {
 document.querySelector("#clear-room").addEventListener("click", () => {
   if (isLiveSyncMode()) {
     liveSyncClient.disconnect();
+  } else if (isRealServerMode()) {
+    realServerClient.disconnect();
   } else {
     controller.clearActiveRoom();
   }
@@ -269,7 +276,7 @@ manualViewSelect.addEventListener("change", () => {
 
 transportModeSelect.addEventListener("change", () => {
   transportMode = transportModeSelect.value;
-  renderStatus(isLiveSyncMode() ? liveSyncClient.status : controller.getActiveRoomStatus());
+  renderStatus(currentShellStatus());
 });
 
 liveSyncClient.onStatus((update) => {
@@ -278,12 +285,18 @@ liveSyncClient.onStatus((update) => {
   }
 });
 
+realServerClient.onStatus((update) => {
+  if (isRealServerMode()) {
+    renderStatus(update.view);
+  }
+});
+
 renderStatus(controller.restoreActiveRoom().status);
 
-function runShellAction(action, successLabel = "completed action") {
+async function runShellAction(action, successLabel = "completed action") {
   try {
     clearError();
-    const status = action();
+    const status = await action();
     lastSuccessfulAction = successLabel;
     actionLog.record(successLabel, status);
     renderStatus(status);
@@ -301,6 +314,7 @@ function runShellAction(action, successLabel = "completed action") {
 }
 
 function activeShellActions() {
+  if (isRealServerMode()) return realServerActions();
   return isLiveSyncMode() ? liveSyncActions() : directActions();
 }
 
@@ -368,6 +382,38 @@ function liveSyncActions() {
   };
 }
 
+function realServerActions() {
+  return {
+    async createRoom(options) {
+      return serverStatusFromResponse(await realServerClient.createRoom(options));
+    },
+    async joinRoom(options) {
+      return serverStatusFromResponse(await realServerClient.joinRoom(options));
+    },
+    async restoreRoom() {
+      return reconnectRealServerSnapshot();
+    },
+    async readyPlayer() {
+      return serverStatusFromResponse(await realServerClient.readyPlayer());
+    },
+    async leaveRoom() {
+      return serverStatusFromResponse(await realServerClient.leaveRoom());
+    },
+    async submitBid(options) {
+      return serverStatusFromResponse(await realServerClient.submitBid(options));
+    },
+    async submitPlayCardById(options) {
+      return serverStatusFromResponse(await realServerClient.submitPlayCardById(options));
+    },
+    async startNextHand() {
+      return serverStatusFromResponse(await realServerClient.startNextHand());
+    },
+    async startNewMatch() {
+      return serverStatusFromResponse(await realServerClient.startNewMatch());
+    }
+  };
+}
+
 function liveSyncStatusFromResponse(response) {
   if (!response.ok) {
     throw new Error(response.error?.message ?? "Live sync action failed");
@@ -375,12 +421,26 @@ function liveSyncStatusFromResponse(response) {
   return response.view;
 }
 
+function serverStatusFromResponse(response) {
+  if (!response.ok) {
+    throw new Error(response.error?.message ?? "Server action failed");
+  }
+  return response.view;
+}
+
 function reconnectLiveSyncSnapshot() {
+  if (isRealServerMode()) return reconnectRealServerSnapshot();
   const result = liveSyncClient.reconnect();
   return result.status ?? liveSyncClient.status;
 }
 
+async function reconnectRealServerSnapshot() {
+  const result = await realServerClient.reconnect();
+  return result.status ?? realServerClient.status;
+}
+
 function currentShellStatus() {
+  if (isRealServerMode()) return realServerClient.status;
   return isLiveSyncMode() ? liveSyncClient.status : controller.getActiveRoomStatus();
 }
 
@@ -388,8 +448,15 @@ function isLiveSyncMode() {
   return transportMode === "live-sync";
 }
 
+function isRealServerMode() {
+  return transportMode === "real-server";
+}
+
 function renderTransportModeStatus() {
-  transportModeStatusOutput.textContent = `Transport: ${isLiveSyncMode() ? "live sync QA" : "direct local"}`;
+  const label = isRealServerMode()
+    ? `real local server (${realServerClient.connectionStatus}${realServerClient.error ? `: ${realServerClient.error}` : ""})`
+    : (isLiveSyncMode() ? "live sync QA" : "direct local");
+  transportModeStatusOutput.textContent = `Transport: ${label}`;
 }
 
 function renderStatus(status) {

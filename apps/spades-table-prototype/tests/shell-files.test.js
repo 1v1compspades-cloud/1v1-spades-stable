@@ -13,6 +13,7 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /id="create-room"/);
   assert.match(html, /id="transport-mode"/);
   assert.match(html, /id="transport-mode-status"/);
+  assert.match(html, /value="real-server"/);
   assert.match(html, /id="join-code"/);
   assert.match(html, /id="join-room"/);
   assert.match(html, /id="restore-room"/);
@@ -100,6 +101,7 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /createLocalActionLog/);
   assert.match(client, /createSpadesLiveSyncClient/);
   assert.match(client, /createMockSpadesSocketTransport/);
+  assert.match(client, /createSpadesServerClient/);
   assert.match(client, /buildVisualShellModel/);
   assert.match(client, /buildVisualQaReport/);
   assert.match(client, /renderTableLayout/);
@@ -112,7 +114,10 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /reconnectLiveSyncSnapshot/);
   assert.match(client, /activeShellActions/);
   assert.match(client, /isLiveSyncMode/);
+  assert.match(client, /isRealServerMode/);
   assert.match(client, /liveSyncActions/);
+  assert.match(client, /realServerActions/);
+  assert.match(client, /serverStatusFromResponse/);
   assert.match(client, /directActions/);
   assert.match(client, /actionLog\.record/);
   assert.match(client, /renderActionLog/);
