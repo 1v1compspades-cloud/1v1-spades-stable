@@ -8,6 +8,17 @@ This launch candidate is free play only. There are no cash prizes, no gambling, 
 - Public text says free play only.
 - Public text does not advertise prizes, cash, gambling, payments, or payouts.
 - Local previews are clearly described as local previews, not production rankings.
+- Release notes in `docs/SPADES_BETA_RELEASE_NOTES.md` match the deployed beta build.
+- Tester invite copy in `docs/BETA_TESTER_INVITE.md` uses free-play wording only.
+
+## Production Config Check
+
+- `SPADES_PUBLIC_API_URL` is set to the hosted API origin.
+- `SPADES_PUBLIC_WS_URL` is set to the hosted `/ws` endpoint.
+- Hosted API URL uses `https://`.
+- Hosted WebSocket URL uses `wss://`.
+- The health endpoint returns `ok: true`.
+- No credentials, admin keys, private seat tokens, or secrets are present in public environment variables.
 
 ## Mobile Layout Check
 
@@ -41,6 +52,15 @@ This launch candidate is free play only. There are no cash prizes, no gambling, 
 - Spectator sees no hidden hands.
 - Copyable diagnostics do not include hidden hands, private seat credentials, host-only data, or secrets.
 - No admin-only data is visible in the tester UI.
+- API responses do not include hidden opponent hands.
+- Health responses do not include hidden hands, tokens, or admin keys.
+
+## Rollback Check
+
+- Previous hosted release is available in the provider dashboard.
+- Previous `SPADES_PUBLIC_API_URL` and `SPADES_PUBLIC_WS_URL` values are known if they changed.
+- Restarting the service is acceptable because rooms are in memory for this beta.
+- Tester pause/update copy is ready if the launch candidate needs to be pulled back.
 
 ## Known Issues
 

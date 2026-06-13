@@ -2,6 +2,12 @@
 
 This is for external beta smoke testing only. It is free play. It is not a production account, payment, prize, gambling, tournament payout, or App Store build.
 
+Related launch docs:
+- `docs/PRODUCTION_CONFIG_CHECKLIST.md`
+- `docs/BETA_TESTER_INVITE.md`
+- `docs/SPADES_BETA_RELEASE_NOTES.md`
+- `docs/FINAL_SMOKE_TEST_CHECKLIST.md`
+
 ## Local Run
 
 ```sh
@@ -22,8 +28,32 @@ Defaults:
 - `SPADES_BIND_HOST`: optional bind host. Use `0.0.0.0` only when the host requires it.
 - `SPADES_PUBLIC_API_URL`: hosted API origin, for example `https://spades-beta.example.com`.
 - `SPADES_PUBLIC_WS_URL`: hosted WebSocket URL, for example `wss://spades-beta.example.com/ws`.
+- `PUBLIC_API_URL`: optional fallback public API origin if the host already exposes it.
+- `PUBLIC_WS_URL`: optional fallback public WebSocket endpoint if the host already exposes it.
 
 The server health response echoes the public API/WebSocket URLs only. It does not log hidden cards, room hands, player secrets, or request bodies.
+
+## Production Config Checklist
+
+1. Confirm the hosted app serves the Phase 39 beta build label.
+2. Confirm `SPADES_PUBLIC_API_URL` is an absolute `https://` URL for hosted beta.
+3. Confirm `SPADES_PUBLIC_WS_URL` is an absolute `wss://` URL ending in `/ws` for hosted beta.
+4. Confirm local fallback URLs use `http://127.0.0.1:<port>` and `ws://127.0.0.1:<port>/ws`.
+5. Confirm the HTTPS API URL is never paired with an insecure `ws://` WebSocket URL.
+6. Confirm no credentials, API keys, private seat tokens, or admin secrets are configured in public URL variables.
+7. Confirm `/health` returns `ok: true` after deploy.
+8. Confirm the hosted smoke script passes before inviting testers.
+
+## Backend URL / WebSocket URL Validation
+
+The smoke script validates public URLs before it runs:
+
+- API URL must use `http://` or `https://`.
+- WebSocket URL must use `ws://` or `wss://`.
+- Hosted `https://` API requires a `wss://` WebSocket URL.
+- Hosted WebSocket URL should end in `/ws`.
+
+If validation fails, fix `SPADES_PUBLIC_API_URL` and `SPADES_PUBLIC_WS_URL`, restart the service, and rerun the smoke test.
 
 ## Render
 
@@ -104,6 +134,17 @@ Use this sequence for each hosted beta invite:
 6. Confirm hidden hands, private seat credentials, host-only data, and admin-only data are not visible in the public UI.
 7. Confirm the mobile layout has no horizontal scrolling and the Report Bug button stays reachable.
 8. Run the final smoke-test checklist in `docs/FINAL_SMOKE_TEST_CHECKLIST.md`.
+9. Confirm release notes in `docs/SPADES_BETA_RELEASE_NOTES.md` match the deployed build.
+10. Confirm tester invite copy in `docs/BETA_TESTER_INVITE.md` uses free-play wording only.
+
+## API And UI Safety Confirmations
+
+- UI does not show hidden hands.
+- API responses do not include hidden opponent hands.
+- Diagnostics do not include hidden hands, private seat tokens, admin keys, secrets, or host-only data.
+- Event logs show sanitized action summaries only.
+- Health responses expose only operational status and public URLs.
+- Tester copy says free play only and does not mention real prizes, payments, gambling, or tournament payouts.
 
 ## Known Issues For Testers
 
@@ -115,7 +156,10 @@ Use this sequence for each hosted beta invite:
 
 ## Rollback Notes
 
+- Pause tester invites.
 - Roll back to the previous hosted release from the provider dashboard.
+- Restore the previous `SPADES_PUBLIC_API_URL` and `SPADES_PUBLIC_WS_URL` values if they changed.
 - Clear any in-memory rooms by restarting the service.
 - No database migration is needed because this prototype stores no production data.
+- Re-run `npm run smoke:hosted -- <hosted-url>` after rollback.
 - If WebSocket smoke tests fail, switch testers back to direct local or mock live-sync mode and collect the action/error text from the beta safety panel.
