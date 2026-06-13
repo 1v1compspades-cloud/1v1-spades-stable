@@ -29,6 +29,12 @@
 
       <section class="status-panel" aria-labelledby="status-title">
         <h2 id="status-title">Room Status</h2>
+        <div class="qa-status-grid" aria-label="Current text gameplay status">
+          <p id="phase-status" class="status-chip">Phase: none</p>
+          <p id="seat-status" class="status-chip">Seat: none</p>
+          <p id="turn-status" class="status-chip">Turn: none</p>
+          <p id="action-status" class="status-chip">Action: none</p>
+        </div>
         <pre id="room-status">No active room.</pre>
         <p id="bid-status" class="status-line">Bid next: none</p>
         <pre id="hand-status">Hand IDs: none</pre>
@@ -42,28 +48,44 @@
             Bid
             <input id="bid-input" type="number" min="0" max="13" inputmode="numeric" value="4">
           </label>
-          <button id="submit-bid" type="button">Submit Bid</button>
-          <button id="submit-nil" type="button">Nil</button>
+          <button id="submit-bid" type="button">Submit Bid for Active Seat</button>
+          <button id="submit-nil" type="button">Submit Nil Bid</button>
         </div>
         <div class="room-actions">
-          <button id="ready-player" type="button">Ready</button>
-          <button id="leave-room" type="button">Leave Room</button>
+          <button id="ready-player" type="button">Mark Active Seat Ready</button>
+          <button id="leave-room" type="button">Leave Active Room</button>
         </div>
         <div class="play-controls" aria-label="Text play-card controls">
           <label>
             Card ID
             <input id="play-card-id" autocomplete="off" placeholder="2-clubs">
           </label>
-          <button id="submit-play-card" type="button">Play Card ID</button>
-          <button id="play-full-hand" type="button">Play Full Hand Text</button>
-          <button id="start-next-hand" type="button">Start Next Hand</button>
-          <button id="record-match-history" type="button">Record Match Summary</button>
-          <button id="start-new-match" type="button">Start New Match</button>
+          <button id="submit-play-card" type="button">Play Card ID for Active Seat</button>
+          <button id="play-full-hand" type="button">Auto-Play Text Hand</button>
+          <button id="start-next-hand" type="button">Start Next Hand from Summary</button>
+          <button id="record-match-history" type="button">Record Completed Match</button>
+          <button id="start-new-match" type="button">Reset to New Match</button>
         </div>
       </section>
 
       <section class="manual-panel" aria-labelledby="manual-title">
         <h2 id="manual-title">Local Two-Seat Test</h2>
+        <div class="fixture-controls" aria-label="Fixture controls">
+          <label>
+            View as
+            <select id="manual-view">
+              <option value="host">Player 1</option>
+              <option value="guest">Player 2</option>
+              <option value="spectator">Spectator</option>
+            </select>
+          </label>
+          <label>
+            Preset
+            <select id="fixture-preset"></select>
+          </label>
+          <button id="run-fixture" type="button">Run Selected Preset</button>
+          <button id="reset-fixture" type="button">Reset Clean Local Room</button>
+        </div>
         <div class="room-actions">
           <button id="manual-setup" type="button">Setup Host/Guest</button>
           <button id="manual-ready" type="button">Ready Both</button>

@@ -16,12 +16,20 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /id="restore-room"/);
   assert.match(html, /id="clear-room"/);
   assert.match(html, /id="room-status"/);
+  assert.match(html, /id="phase-status"/);
+  assert.match(html, /id="seat-status"/);
+  assert.match(html, /id="turn-status"/);
+  assert.match(html, /id="action-status"/);
   assert.match(html, /id="bid-status"/);
   assert.match(html, /id="bid-input"/);
   assert.match(html, /id="submit-bid"/);
   assert.match(html, /id="submit-nil"/);
   assert.match(html, /id="shell-error"/);
   assert.match(html, /id="manual-setup"/);
+  assert.match(html, /id="manual-view"/);
+  assert.match(html, /id="fixture-preset"/);
+  assert.match(html, /id="run-fixture"/);
+  assert.match(html, /id="reset-fixture"/);
   assert.match(html, /id="manual-ready"/);
   assert.match(html, /id="manual-bid"/);
   assert.match(html, /id="manual-trick"/);
@@ -48,6 +56,7 @@ test("home client wires the shell through the local app controller", () => {
   const client = readFileSync(resolve(appDir, "src/home-client.js"), "utf8");
 
   assert.match(client, /createSpadesAppController/);
+  assert.match(client, /listManualFixturePresets/);
   assert.match(client, /controller\.createRoom/);
   assert.match(client, /controller\.joinRoom/);
   assert.match(client, /controller\.restoreActiveRoom/);
@@ -61,6 +70,9 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /controller\.getMatchHistory/);
   assert.match(client, /controller\.startNewMatch/);
   assert.match(client, /createTwoSeatManualHarness/);
+  assert.match(client, /manualViewSelect/);
+  assert.match(client, /fixturePresetSelect/);
+  assert.match(client, /runPreset/);
   assert.match(client, /showError/);
   assert.match(client, /clearError/);
   assert.match(client, /biddingStatus/);

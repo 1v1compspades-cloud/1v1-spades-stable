@@ -7,10 +7,11 @@ import {
 
 test("manual harness creates two local seats with shared repository", () => {
   const harness = createTwoSeatManualHarness({ roomCode: "LOCAL1" });
-  const { created, joined } = harness.setup();
+  const { created, joined, spectated } = harness.setup();
 
   assert.equal(created.status.viewerSeat, "player1");
   assert.equal(joined.status.viewerSeat, "player2");
+  assert.equal(spectated.status.viewerSeat, "spectator");
   assert.equal(harness.repository.get("LOCAL1").players.player2.displayName, "Guest");
 });
 
@@ -83,4 +84,23 @@ test("manual fixture preset can complete a local match and reconnect safely", ()
   assert.equal(reconnectAfterHand.restored.guest.status.viewerSeat, "player2");
   assert.equal(reconnectAfterMatch.restored.host.status.phase, "match_complete");
   assert.equal(reconnectAfterMatch.restored.guest.status.alreadySeated, true);
+});
+
+test("manual harness switches text views between player seats and spectator without leaks", () => {
+  const harness = createTwoSeatManualHarness({ roomCode: "LOCAL5" });
+  harness.setup();
+  harness.readyBoth();
+
+  const hostStatus = harness.statusForView("host");
+  const guestStatus = harness.statusForView("guest");
+  const spectatorStatus = harness.statusForView("spectator");
+
+  assert.equal(hostStatus.viewerSeat, "player1");
+  assert.equal(hostStatus.hand.length, 13);
+  assert.equal(guestStatus.viewerSeat, "player2");
+  assert.equal(guestStatus.hand.length, 13);
+  assert.equal(spectatorStatus.viewerSeat, "spectator");
+  assert.deepEqual(spectatorStatus.hand, []);
+  assert.deepEqual(spectatorStatus.hiddenHandCounts, { player1: 13, player2: 13 });
+  assert.match(harness.statusText("spectator"), /Spectator: true/);
 });

@@ -6,19 +6,24 @@ import {
   leaveRoom,
   sanitizeRoomForViewer
 } from "./room-state.js";
-import { createInMemoryRoomRepository } from "./room-repository.js";
 import {
+  createInMemoryMatchHistory,
+  createInMemoryRoomRepository,
+  createLocalRoomSessionStorage
+} from "../../../packages/game-shell-core/src/index.js";
+
+const spadesRoomSessionStorage = createLocalRoomSessionStorage({ namespace: "spades" });
+const {
   clearSavedActiveRoom,
   loadSavedActiveRoom,
   saveActiveRoomSession
-} from "./local-room-session.js";
-import { createInMemoryMatchHistory } from "./match-history.js";
+} = spadesRoomSessionStorage;
 
 export function createSpadesAppController({
   repository = createInMemoryRoomRepository(),
   storage = localStorage,
   createPlayerId = defaultPlayerId,
-  matchHistory = createInMemoryMatchHistory()
+  matchHistory = createSpadesMatchHistory()
 } = {}) {
   let playerId = null;
   const actionSequences = new Map();
@@ -385,6 +390,31 @@ export function cardIdFor(card) {
 
 function normalizeCardId(cardId) {
   return String(cardId ?? "").trim();
+}
+
+function createSpadesMatchHistory() {
+  return createInMemoryMatchHistory({
+    isComplete: (room) => room.phase === "match_complete",
+    summarize: summarizeSpadesMatch
+  });
+}
+
+function summarizeSpadesMatch(room, { timestamp }) {
+  const status = sanitizeRoomForViewer(room, {});
+  const summary = status.handSummary;
+  return {
+    id: `${room.roomCode}-${room.handNumber}-${timestamp}`,
+    roomCode: room.roomCode,
+    timestamp,
+    winner: status.winner,
+    finalScore: status.score,
+    bids: status.bids,
+    bags: status.bags,
+    nilResults: {
+      player1: summary?.players.player1.nilResult ?? null,
+      player2: summary?.players.player2.nilResult ?? null
+    }
+  };
 }
 
 function defaultPlayerId() {

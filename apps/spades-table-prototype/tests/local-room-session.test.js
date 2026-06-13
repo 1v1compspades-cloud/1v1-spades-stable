@@ -1,13 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  createLocalRoomSessionStorage,
+  createMemoryStorage
+} from "../../../packages/game-shell-core/src/index.js";
+
+const {
   activeRoomSessionKey,
   clearSavedActiveRoom,
   loadSavedActiveRoom,
   loadSavedRoomSession,
   roomSeatTokenKey,
   saveActiveRoomSession
-} from "../src/local-room-session.js";
+} = createLocalRoomSessionStorage({ namespace: "spades" });
 
 test("saves and restores the active room session", () => {
   const storage = createMemoryStorage();
@@ -83,18 +88,3 @@ test("clears active room and room-specific seat token", () => {
   assert.equal(loadSavedRoomSession("CLEAR1", storage), null);
   assert.equal(storage.getItem(roomSeatTokenKey("CLEAR1")), null);
 });
-
-function createMemoryStorage() {
-  const values = new Map();
-  return {
-    getItem(key) {
-      return values.has(key) ? values.get(key) : null;
-    },
-    setItem(key, value) {
-      values.set(key, String(value));
-    },
-    removeItem(key) {
-      values.delete(key);
-    }
-  };
-}

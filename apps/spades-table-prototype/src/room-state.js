@@ -12,8 +12,14 @@ import {
   placeBid,
   scoreHand
 } from "../../../packages/spades-core/src/index.js";
+import { createTwoPlayerRoomLifecycle as createShellLifecycle } from "../../../packages/game-shell-core/src/index.js";
 
 const ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const roomLifecycle = createShellLifecycle({
+  seats: PLAYERS,
+  generateSeatToken,
+  syncRoom
+});
 
 export function createRoom({
   roomCode = generateRoomCode(),
@@ -25,38 +31,29 @@ export function createRoom({
   deck = null,
   now = new Date().toISOString()
 } = {}) {
-  return syncRoom({
+  return roomLifecycle.createRoomShell({
     roomCode,
-    players: {
-      player1: {
-        seat: "player1",
-        seatToken,
-        playerId: normalizePlayerId(playerId),
-        displayName: normalizeDisplayName(displayName),
-        connected: true
+    seatToken,
+    playerId,
+    displayName,
+    extra: {
+      matchSettings: {
+        ...DEFAULT_MATCH_SETTINGS,
+        ...matchSettings
       },
-      player2: null
-    },
-    playerReady: {
-      player1: false,
-      player2: false
-    },
-    matchSettings: {
-      ...DEFAULT_MATCH_SETTINGS,
-      ...matchSettings
-    },
-    coinFlipWinnerSeed: coinFlipWinner,
-    coinFlipWinner: null,
-    dealer: null,
-    firstPlayer: null,
-    currentTurn: null,
-    phase: "waiting",
-    handNumber: 0,
-    game: createEmptyGameState(),
-    appliedActionIds: [],
-    pendingDeck: deck,
-    createdAt: now,
-    updatedAt: now
+      coinFlipWinnerSeed: coinFlipWinner,
+      coinFlipWinner: null,
+      dealer: null,
+      firstPlayer: null,
+      currentTurn: null,
+      phase: "waiting",
+      handNumber: 0,
+      game: createEmptyGameState(),
+      appliedActionIds: [],
+      pendingDeck: deck,
+      createdAt: now,
+      updatedAt: now
+    }
   });
 }
 
@@ -65,69 +62,11 @@ export function joinRoom(room, {
   playerId,
   displayName = "Player 2"
 } = {}) {
-  const existingSeat = getViewerSeat(room, { seatToken, playerId });
-  if (existingSeat !== "spectator") {
-    return {
-      room: markConnected(room, existingSeat),
-      seat: existingSeat,
-      seatToken: room.players[existingSeat].seatToken,
-      alreadySeated: true
-    };
-  }
-
-  const normalizedPlayerId = normalizePlayerId(playerId);
-  if (normalizedPlayerId && playerIdMatchesSeatedPlayer(room, normalizedPlayerId)) {
-    throw roomError(409, "This player is already seated in this room");
-  }
-
-  if (room.players.player2) {
-    return {
-      room,
-      seat: "spectator",
-      seatToken: null,
-      alreadySeated: false
-    };
-  }
-
-  const nextSeatToken = seatToken || generateSeatToken();
-  return {
-    room: syncRoom({
-      ...room,
-      players: {
-        ...room.players,
-        player2: {
-          seat: "player2",
-          seatToken: nextSeatToken,
-          playerId: normalizedPlayerId,
-          displayName: normalizeDisplayName(displayName),
-          connected: true
-        }
-      },
-      updatedAt: new Date().toISOString()
-    }),
-    seat: "player2",
-    seatToken: nextSeatToken,
-    alreadySeated: false
-  };
+  return roomLifecycle.joinRoomShell(room, { seatToken, playerId, displayName });
 }
 
 export function leaveRoom(room, { seatToken, playerId } = {}) {
-  const seat = getViewerSeat(room, { seatToken, playerId });
-  if (!PLAYERS.includes(seat)) {
-    return syncRoom(room);
-  }
-
-  return syncRoom({
-    ...room,
-    players: {
-      ...room.players,
-      [seat]: {
-        ...room.players[seat],
-        connected: false
-      }
-    },
-    updatedAt: new Date().toISOString()
-  });
+  return roomLifecycle.leaveRoomShell(room, { seatToken, playerId });
 }
 
 export function applyRoomAction(room, action = {}) {
@@ -156,27 +95,13 @@ function applyRoomActionOnce(room, action = {}) {
 
   if (action.type === "ready") {
     ensurePhase(room, "waiting");
-    const nextRoom = syncRoom({
-      ...room,
-      playerReady: {
-        ...room.playerReady,
-        [seat]: true
-      },
-      updatedAt: new Date().toISOString()
-    });
+    const nextRoom = roomLifecycle.markReady(room, seat, true);
     return maybeStartHand(nextRoom);
   }
 
   if (action.type === "unready") {
     ensurePhase(room, "waiting");
-    return syncRoom({
-      ...room,
-      playerReady: {
-        ...room.playerReady,
-        [seat]: false
-      },
-      updatedAt: new Date().toISOString()
-    });
+    return roomLifecycle.markReady(room, seat, false);
   }
 
   if (action.type === "bid") {
@@ -217,14 +142,7 @@ function applyRoomActionOnce(room, action = {}) {
 }
 
 export function getViewerSeat(room, { seatToken, playerId } = {}) {
-  const normalizedPlayerId = normalizePlayerId(playerId);
-  for (const seat of PLAYERS) {
-    const player = room.players?.[seat];
-    if (!player) continue;
-    if (seatToken && player.seatToken === seatToken) return seat;
-    if (normalizedPlayerId && player.playerId === normalizedPlayerId) return seat;
-  }
-  return "spectator";
+  return roomLifecycle.getViewerSeat(room, { seatToken, playerId });
 }
 
 export function sanitizeRoomForViewer(room, viewer = {}) {
@@ -338,12 +256,7 @@ function startNextHand(room, { deck = null } = {}) {
 }
 
 function startNewMatch(room, { deck = null } = {}) {
-  return syncRoom({
-    ...room,
-    playerReady: {
-      player1: false,
-      player2: false
-    },
+  return roomLifecycle.resetForNewMatch(room, {
     coinFlipWinner: null,
     dealer: null,
     firstPlayer: null,
@@ -353,7 +266,6 @@ function startNewMatch(room, { deck = null } = {}) {
     game: createEmptyGameState(),
     appliedActionIds: [],
     pendingDeck: deck,
-    updatedAt: new Date().toISOString()
   });
 }
 
@@ -513,14 +425,7 @@ function createEmptyGameState() {
 }
 
 function sanitizePlayers(players) {
-  return Object.fromEntries(PLAYERS.map((seat) => {
-    const player = players?.[seat];
-    return [seat, player ? {
-      seat,
-      displayName: player.displayName,
-      connected: player.connected
-    } : null];
-  }));
+  return roomLifecycle.sanitizePlayers(players);
 }
 
 function sanitizeBids(bids, phase) {
@@ -662,7 +567,7 @@ function syncRoom(room) {
 }
 
 function ensureSeated(seat) {
-  if (!PLAYERS.includes(seat)) {
+  if (!roomLifecycle.isPlayerSeat(seat)) {
     throw roomError(403, "Join this room before taking a player action");
   }
 }
@@ -698,26 +603,9 @@ function otherPlayer(player) {
   return player === "player1" ? "player2" : "player1";
 }
 
-function playerIdMatchesSeatedPlayer(room, playerId) {
-  return PLAYERS.some((seat) => room.players?.[seat]?.playerId === playerId);
-}
-
-function normalizePlayerId(playerId) {
-  const value = String(playerId ?? "").trim();
-  return value ? value.slice(0, 80) : null;
-}
-
 function normalizeActionId(actionId) {
   const value = String(actionId ?? "").trim();
   return value ? value.slice(0, 160) : null;
-}
-
-function normalizeDisplayName(displayName) {
-  const value = String(displayName ?? "").trim();
-  if (!value) {
-    throw roomError(400, "Enter a display name");
-  }
-  return value.slice(0, 32);
 }
 
 function generateRoomCode() {

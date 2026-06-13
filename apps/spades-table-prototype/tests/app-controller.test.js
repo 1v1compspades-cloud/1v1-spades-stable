@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createSpadesAppController } from "../src/app-controller.js";
-import { loadSavedActiveRoom } from "../src/local-room-session.js";
+import { createLocalRoomSessionStorage } from "../../../packages/game-shell-core/src/index.js";
+
+const { loadSavedActiveRoom } = createLocalRoomSessionStorage({ namespace: "spades" });
 
 test("create room stores active session and returns sanitized status", () => {
   const storage = createMemoryStorage();
@@ -497,6 +499,49 @@ test("local match history records immutable completed match summaries", () => {
   waiting.createRoom({ roomCode: "HIST01", seatToken: "seat-history" });
 
   assert.throws(() => waiting.recordMatchHistory(), /completed matches/);
+});
+
+test("multiple sequential matches can be recorded without leaking hidden hands", () => {
+  const { host, guest } = playingControllers({
+    deck: player1WinsEveryTrickDeck(),
+    hostBid: 4,
+    guestBid: 3,
+    matchSettings: { targetScore: 40 }
+  });
+  const firstMatch = playFullHandWithControllers(host, guest);
+
+  assert.equal(firstMatch.status.phase, "match_complete");
+  host.recordMatchHistory({ timestamp: "2026-06-13T13:00:00.000Z" });
+
+  const reset = host.startNewMatch({ deck: player1WinsEveryTrickDeck() });
+
+  assert.equal(reset.status.phase, "waiting");
+  assert.deepEqual(reset.status.score, { player1: 0, player2: 0 });
+  assert.deepEqual(host.getRoomStatus("PLAY01").hand, []);
+
+  host.readyPlayer();
+  guest.readyPlayer();
+
+  const spectatorBiddingView = host.getRoomStatus("PLAY01");
+  assert.equal(spectatorBiddingView.viewerSeat, "spectator");
+  assert.deepEqual(spectatorBiddingView.hand, []);
+  assert.deepEqual(spectatorBiddingView.hiddenHandCounts, { player1: 13, player2: 13 });
+
+  host.submitBid({ bid: 4 });
+  guest.submitBid({ bid: 3 });
+  const secondMatch = playFullHandWithControllers(host, guest);
+
+  assert.equal(secondMatch.status.phase, "match_complete");
+  host.recordMatchHistory({ timestamp: "2026-06-13T13:05:00.000Z" });
+
+  const history = host.getMatchHistory();
+  assert.equal(history.length, 2);
+  assert.deepEqual(history.map((entry) => entry.winner), ["player1", "player1"]);
+  assert.deepEqual(history.map((entry) => entry.finalScore), [
+    { player1: 49, player2: -30 },
+    { player1: 49, player2: -30 }
+  ]);
+  assert.deepEqual(host.getRoomStatus("PLAY01").hand, []);
 });
 
 function createMemoryStorage() {

@@ -1,6 +1,12 @@
 import { createSpadesAppController } from "./app-controller.js";
-import { createInMemoryRoomRepository } from "./room-repository.js";
 import { renderRoomShellText } from "./room-shell.js";
+import {
+  createInMemoryRoomRepository,
+  createMemoryStorage,
+  listFixturePresetNames,
+  requireFixturePreset,
+  selectFixtureView
+} from "../../../packages/game-shell-core/src/index.js";
 
 export const MANUAL_FIXTURE_PRESETS = Object.freeze({
   "nil-made": Object.freeze({
@@ -52,13 +58,14 @@ export const MANUAL_FIXTURE_PRESETS = Object.freeze({
 });
 
 export function listManualFixturePresets() {
-  return Object.keys(MANUAL_FIXTURE_PRESETS);
+  return listFixturePresetNames(MANUAL_FIXTURE_PRESETS);
 }
 
 export function createTwoSeatManualHarness({
   roomCode = "LOCAL1",
   hostStorage = createMemoryStorage(),
-  guestStorage = createMemoryStorage()
+  guestStorage = createMemoryStorage(),
+  spectatorStorage = createMemoryStorage()
 } = {}) {
   const repository = createInMemoryRoomRepository();
   const host = createSpadesAppController({
@@ -71,11 +78,17 @@ export function createTwoSeatManualHarness({
     storage: guestStorage,
     createPlayerId: () => "manual-guest"
   });
+  const spectator = createSpadesAppController({
+    repository,
+    storage: spectatorStorage,
+    createPlayerId: () => "manual-spectator"
+  });
 
   return {
     repository,
     host,
     guest,
+    spectator,
     setup({ deck, matchSettings } = {}) {
       const created = host.createRoom({
         roomCode,
@@ -89,8 +102,13 @@ export function createTwoSeatManualHarness({
         seatToken: "manual-guest-seat",
         displayName: "Guest"
       });
+      const spectated = spectator.joinRoom({
+        roomCode,
+        seatToken: "manual-spectator-seat",
+        displayName: "Spectator"
+      });
 
-      return { created, joined };
+      return { created, joined, spectated };
     },
     readyBoth() {
       return {
@@ -133,11 +151,15 @@ export function createTwoSeatManualHarness({
     listPresets() {
       return listManualFixturePresets();
     },
+    statusForView(view = "host") {
+      return selectFixtureView({
+        host: host.getActiveRoomStatus(),
+        guest: guest.getActiveRoomStatus(),
+        spectator: spectator.getRoomStatus(roomCode)
+      }, view);
+    },
     runPreset(name) {
-      const preset = MANUAL_FIXTURE_PRESETS[name];
-      if (!preset) {
-        throw new Error(`Unknown manual fixture preset: ${name}`);
-      }
+      const preset = requireFixturePreset(MANUAL_FIXTURE_PRESETS, name);
 
       this.setup({
         deck: preset.deck(),
@@ -162,23 +184,9 @@ export function createTwoSeatManualHarness({
         guestStatus: guest.getActiveRoomStatus()
       };
     },
-    statusText(controller = host) {
-      return renderRoomShellText(controller.getActiveRoomStatus());
-    }
-  };
-}
-
-function createMemoryStorage() {
-  const values = new Map();
-  return {
-    getItem(key) {
-      return values.has(key) ? values.get(key) : null;
-    },
-    setItem(key, value) {
-      values.set(key, String(value));
-    },
-    removeItem(key) {
-      values.delete(key);
+    statusText(viewer = host) {
+      const status = typeof viewer === "string" ? this.statusForView(viewer) : viewer.getActiveRoomStatus();
+      return status ? renderRoomShellText(status) : "Manual harness idle.";
     }
   };
 }

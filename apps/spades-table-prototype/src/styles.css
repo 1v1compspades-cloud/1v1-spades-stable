@@ -11,7 +11,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -44,7 +45,9 @@ h2 {
 .controls,
 .room-actions,
 .bid-controls,
-.play-controls {
+.play-controls,
+.fixture-controls,
+.qa-status-grid {
   display: grid;
   gap: 12px;
 }
@@ -57,7 +60,8 @@ label {
   font-weight: 700;
 }
 
-input {
+input,
+select {
   width: 100%;
   padding: 12px;
   border: 1px solid rgba(248, 244, 235, 0.24);
@@ -68,6 +72,7 @@ input {
 
 button {
   min-height: 44px;
+  width: 100%;
   border: 0;
   border-radius: 6px;
   color: #10251c;
@@ -92,9 +97,27 @@ pre {
   font-weight: 800;
 }
 
+.status-chip {
+  min-height: 44px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid rgba(248, 244, 235, 0.16);
+  border-radius: 6px;
+  color: #f8f4eb;
+  background: rgba(255, 255, 255, 0.06);
+  font-weight: 800;
+}
+
 .error-line {
   min-height: 20px;
   margin: 0 0 16px;
   color: #ffb4a8;
   font-weight: 800;
+}
+
+@media (min-width: 640px) {
+  .qa-status-grid,
+  .fixture-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
