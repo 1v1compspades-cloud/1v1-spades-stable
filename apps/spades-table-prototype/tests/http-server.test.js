@@ -1,0 +1,304 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { createSpadesHttpServer } from "../src/http-server.js";
+import { sanitizeRoomForViewer } from "../src/room-state.js";
+
+test("HTTP server exposes health and sanitized create join ready bid responses", async () => {
+  const fixture = await startHttpFixture();
+
+  try {
+    const health = await fixture.get("/health");
+    assert.deepEqual(health, {
+      ok: true,
+      service: "spades-table-prototype",
+      transport: "http-local"
+    });
+
+    const created = await fixture.post("/api/rooms", {
+      roomCode: "HTTP01",
+      displayName: "Host",
+      identity: hostIdentity(),
+      requestId: "create-http"
+    });
+    const joined = await fixture.post("/api/rooms/HTTP01/join", {
+      displayName: "Guest",
+      identity: guestIdentity(),
+      requestId: "join-http"
+    });
+    const spectator = await fixture.post("/api/rooms/HTTP01/join", {
+      displayName: "Viewer",
+      identity: spectatorIdentity(),
+      requestId: "spectator-http"
+    });
+    const hostReady = await fixture.post("/api/rooms/HTTP01/ready", {
+      identity: hostIdentity(),
+      actionId: "HTTP01:player1:ready:1"
+    });
+    const guestReady = await fixture.post("/api/rooms/HTTP01/ready", {
+      identity: guestIdentity(),
+      actionId: "HTTP01:player2:ready:1"
+    });
+    const bid = await fixture.post("/api/rooms/HTTP01/bid", {
+      identity: hostIdentity(),
+      bid: 4,
+      actionId: "HTTP01:player1:bid:1"
+    });
+
+    assert.equal(created.ok, true);
+    assert.equal(created.view.viewerSeat, "player1");
+    assert.equal(joined.view.viewerSeat, "player2");
+    assert.equal(spectator.view.viewerSeat, "spectator");
+    assert.deepEqual(spectator.view.hand, []);
+    assert.equal(hostReady.actionId, "HTTP01:player1:ready:1");
+    assert.equal(guestReady.view.phase, "bidding");
+    assert.equal(guestReady.view.hand.length, 13);
+    assert.deepEqual(guestReady.spectatorView.hand, []);
+    assert.equal(bid.actionId, "HTTP01:player1:bid:1");
+    assert.deepEqual(bid.view.bids, { player1: "locked", player2: null });
+    assert.deepEqual(bid.spectatorView.hand, []);
+    assertNoSpectatorLeak(bid);
+  } finally {
+    await fixture.close();
+  }
+});
+
+test("HTTP endpoints preserve duplicate and stale action protection", async () => {
+  const fixture = await startHttpFixture();
+
+  try {
+    await readyRoom(fixture, "HTTP02");
+    const first = await fixture.post("/api/rooms/HTTP02/bid", {
+      identity: hostIdentity(),
+      bid: 5,
+      actionId: "HTTP02:player1:bid:7"
+    });
+    const duplicate = await fixture.post("/api/rooms/HTTP02/bid", {
+      identity: hostIdentity(),
+      bid: 6,
+      actionId: "HTTP02:player1:bid:7"
+    });
+    const guestBid = await fixture.post("/api/rooms/HTTP02/bid", {
+      identity: guestIdentity(),
+      bid: 3,
+      actionId: "HTTP02:player2:bid:1"
+    });
+    const stale = await fixture.post("/api/rooms/HTTP02/bid", {
+      identity: hostIdentity(),
+      bid: 2,
+      actionId: "HTTP02:player1:bid:8"
+    }, { expectedStatus: 409 });
+
+    assert.equal(first.ok, true);
+    assert.equal(duplicate.ok, true);
+    assert.equal(duplicate.duplicate, true);
+    assert.equal(duplicate.view.appliedActionCount, first.view.appliedActionCount);
+    assert.equal(guestBid.view.phase, "playing");
+    assert.equal(stale.ok, false);
+    assert.match(stale.error.message, /Stale action expected bidding phase/);
+    assert.deepEqual(stale.spectatorView.hand, []);
+  } finally {
+    await fixture.close();
+  }
+});
+
+test("HTTP play-card endpoint returns sanitized JSON and blocks hidden hand leaks", async () => {
+  const fixture = await startHttpFixture();
+
+  try {
+    await playingRoom(fixture, "HTTP03");
+    const room = fixture.repository.get("HTTP03");
+    const leader = room.currentTurn;
+    const identity = identityForSeat(leader);
+    const cardId = sanitizedView(fixture, "HTTP03", leader).playableCardStatus.cardIds[0];
+    const played = await fixture.post("/api/rooms/HTTP03/play-card", {
+      identity,
+      cardId,
+      actionId: `HTTP03:${leader}:playCard:1`
+    });
+
+    assert.equal(played.ok, true);
+    assert.equal(played.view.viewerSeat, leader);
+    assert.equal(played.view.hiddenHandCounts[leader], 12);
+    assert.deepEqual(played.spectatorView.hand, []);
+    assert.equal(played.spectatorView.currentTrick.length, 1);
+    assertNoOpponentLeak(played.view);
+  } finally {
+    await fixture.close();
+  }
+});
+
+test("HTTP leave next-hand and new-match endpoints return sanitized responses", async () => {
+  const fixture = await startHttpFixture();
+
+  try {
+    await playingRoom(fixture, "HTTP04", {
+      deck: player1WinsEveryTrickDeck(),
+      matchSettings: { targetScore: 500 }
+    });
+    await completeHandThroughHttp(fixture, "HTTP04");
+    assert.equal(fixture.repository.get("HTTP04").phase, "hand_complete");
+
+    const next = await fixture.post("/api/rooms/HTTP04/next-hand", {
+      identity: hostIdentity(),
+      actionId: "HTTP04:player1:nextHand:1"
+    });
+
+    assert.equal(next.ok, true);
+    assert.equal(next.view.phase, "bidding");
+    assert.deepEqual(next.spectatorView.hand, []);
+
+    await playingRoom(fixture, "HTTP05", {
+      deck: player1WinsEveryTrickDeck(),
+      matchSettings: { targetScore: 40 }
+    });
+    await completeHandThroughHttp(fixture, "HTTP05");
+    assert.equal(fixture.repository.get("HTTP05").phase, "match_complete");
+
+    const newMatch = await fixture.post("/api/rooms/HTTP05/new-match", {
+      identity: hostIdentity(),
+      actionId: "HTTP05:player1:newMatch:1"
+    });
+    const left = await fixture.post("/api/rooms/HTTP05/leave", {
+      identity: hostIdentity(),
+      actionId: "HTTP05:player1:leaveRoom:1"
+    });
+
+    assert.equal(newMatch.ok, true);
+    assert.equal(newMatch.view.phase, "waiting");
+    assert.deepEqual(newMatch.spectatorView.hand, []);
+    assert.equal(left.ok, true);
+    assert.equal(left.session, null);
+    assert.equal(left.view.viewerSeat, "spectator");
+  } finally {
+    await fixture.close();
+  }
+});
+
+async function startHttpFixture() {
+  const { app, repository } = createSpadesHttpServer();
+  const server = await new Promise((resolve) => {
+    const listening = app.listen(0, () => resolve(listening));
+  });
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  return {
+    repository,
+    get(path) {
+      return requestJson(`${baseUrl}${path}`);
+    },
+    post(path, body, options) {
+      return requestJson(`${baseUrl}${path}`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify(body)
+      }, options);
+    },
+    close() {
+      return new Promise((resolve, reject) => {
+        server.close((error) => error ? reject(error) : resolve());
+      });
+    }
+  };
+}
+
+async function requestJson(url, init, { expectedStatus = 200 } = {}) {
+  const response = await fetch(url, init);
+  const json = await response.json();
+  assert.equal(response.status, expectedStatus, JSON.stringify(json));
+  return json;
+}
+
+async function readyRoom(fixture, roomCode, options = {}) {
+  await fixture.post("/api/rooms", {
+    roomCode,
+    identity: hostIdentity(),
+    matchSettings: options.matchSettings,
+    deck: options.deck
+  });
+  await fixture.post(`/api/rooms/${roomCode}/join`, {
+    identity: guestIdentity()
+  });
+  await fixture.post(`/api/rooms/${roomCode}/ready`, {
+    identity: hostIdentity(),
+    actionId: `${roomCode}:player1:ready:1`
+  });
+  await fixture.post(`/api/rooms/${roomCode}/ready`, {
+    identity: guestIdentity(),
+    actionId: `${roomCode}:player2:ready:1`
+  });
+}
+
+async function playingRoom(fixture, roomCode, options = {}) {
+  await readyRoom(fixture, roomCode, options);
+  await fixture.post(`/api/rooms/${roomCode}/bid`, {
+    identity: hostIdentity(),
+    bid: 4,
+    actionId: `${roomCode}:player1:bid:1`
+  });
+  await fixture.post(`/api/rooms/${roomCode}/bid`, {
+    identity: guestIdentity(),
+    bid: 3,
+    actionId: `${roomCode}:player2:bid:1`
+  });
+}
+
+async function completeHandThroughHttp(fixture, roomCode) {
+  let sequence = 1;
+  while (fixture.repository.get(roomCode).phase === "playing") {
+    const seat = fixture.repository.get(roomCode).currentTurn;
+    const cardId = sanitizedView(fixture, roomCode, seat).playableCardStatus.cardIds[0];
+    await fixture.post(`/api/rooms/${roomCode}/play-card`, {
+      identity: identityForSeat(seat),
+      cardId,
+      actionId: `${roomCode}:${seat}:playCard:${sequence}`
+    });
+    sequence += 1;
+  }
+}
+
+function sanitizedView(fixture, roomCode, seat) {
+  return sanitizeRoomForViewer(fixture.repository.get(roomCode), identityForSeat(seat));
+}
+
+function hostIdentity() {
+  return { playerId: "host", seatToken: "seat-host" };
+}
+
+function guestIdentity() {
+  return { playerId: "guest", seatToken: "seat-guest" };
+}
+
+function spectatorIdentity() {
+  return { playerId: "viewer", seatToken: "seat-viewer" };
+}
+
+function identityForSeat(seat) {
+  return seat === "player1" ? hostIdentity() : guestIdentity();
+}
+
+function assertNoSpectatorLeak(payload) {
+  assert.deepEqual(payload.spectatorView.hand, []);
+  assert.equal(payload.spectatorView.viewerSeat, "spectator");
+}
+
+function assertNoOpponentLeak(view) {
+  const viewerCount = view.hiddenHandCounts[view.viewerSeat];
+  const opponent = view.viewerSeat === "player1" ? "player2" : "player1";
+  assert.equal(view.hand.length, viewerCount);
+  assert.notEqual(view.hiddenHandCounts[opponent], undefined);
+}
+
+function player1WinsEveryTrickDeck() {
+  return [
+    ...cards("spades", ["A", "K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3", "2"]),
+    ...cards("clubs", ["A", "K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3", "2"]),
+    ...cards("hearts", ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]),
+    ...cards("diamonds", ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"])
+  ];
+}
+
+function cards(suit, ranks) {
+  return ranks.map((rank) => ({ rank, suit }));
+}
