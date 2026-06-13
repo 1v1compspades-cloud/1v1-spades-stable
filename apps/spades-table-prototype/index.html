@@ -13,6 +13,14 @@
         <h1 id="home-title">1v1 Spades</h1>
         <div class="controls">
           <label>
+            Transport mode
+            <select id="transport-mode">
+              <option value="direct">Direct local</option>
+              <option value="live-sync">Live Sync QA</option>
+            </select>
+          </label>
+          <p id="transport-mode-status" class="status-line">Transport: direct local</p>
+          <label>
             Player name
             <input id="display-name" autocomplete="nickname" value="Player">
           </label>
@@ -23,6 +31,7 @@
           </label>
           <button id="join-room" type="button">Join Room</button>
           <button id="restore-room" type="button">Restore Active Room</button>
+          <button id="reconnect-live-sync" type="button">Reconnect Live Sync Snapshot</button>
           <button id="clear-room" type="button">Clear Active Room</button>
         </div>
       </section>

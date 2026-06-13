@@ -62,7 +62,8 @@ export function buildVisualQaReport(status, {
   errorMessage = "",
   lastSuccessfulAction = "none",
   fixturePreset = "none",
-  matchHistoryCount = 0
+  matchHistoryCount = 0,
+  transportMode = "direct"
 } = {}) {
   const model = buildVisualShellModel(status);
   const hasStatus = Boolean(status);
@@ -71,6 +72,7 @@ export function buildVisualQaReport(status, {
     qaCheck("selected viewer", hasStatus, model.viewerSeat),
     qaCheck("hidden-hand status", hiddenHandProtected(status), hiddenDetail),
     qaCheck("phase", hasStatus && model.phase !== "none", model.phase),
+    qaCheck("transport mode", Boolean(transportMode), transportMode),
     qaCheck("last successful action", lastSuccessfulAction !== "none", lastSuccessfulAction),
     qaCheck("fixture preset", fixturePreset !== "none", fixturePreset),
     qaCheck("match/history status", hasStatus, formatMatchHistoryStatus(status, matchHistoryCount))

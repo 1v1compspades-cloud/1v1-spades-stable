@@ -11,9 +11,12 @@ test("basic shell exposes create join ready leave and status targets", () => {
   const html = readFileSync(resolve(appDir, "index.html"), "utf8");
 
   assert.match(html, /id="create-room"/);
+  assert.match(html, /id="transport-mode"/);
+  assert.match(html, /id="transport-mode-status"/);
   assert.match(html, /id="join-code"/);
   assert.match(html, /id="join-room"/);
   assert.match(html, /id="restore-room"/);
+  assert.match(html, /id="reconnect-live-sync"/);
   assert.match(html, /id="clear-room"/);
   assert.match(html, /id="room-status"/);
   assert.match(html, /id="phase-status"/);
@@ -95,6 +98,8 @@ test("home client wires the shell through the local app controller", () => {
 
   assert.match(client, /createSpadesAppController/);
   assert.match(client, /createLocalActionLog/);
+  assert.match(client, /createSpadesLiveSyncClient/);
+  assert.match(client, /createMockSpadesSocketTransport/);
   assert.match(client, /buildVisualShellModel/);
   assert.match(client, /buildVisualQaReport/);
   assert.match(client, /renderTableLayout/);
@@ -102,6 +107,13 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /qaReportItem/);
   assert.match(client, /lastSuccessfulAction/);
   assert.match(client, /activeFixturePreset/);
+  assert.match(client, /transportMode/);
+  assert.match(client, /transportModeSelect/);
+  assert.match(client, /reconnectLiveSyncSnapshot/);
+  assert.match(client, /activeShellActions/);
+  assert.match(client, /isLiveSyncMode/);
+  assert.match(client, /liveSyncActions/);
+  assert.match(client, /directActions/);
   assert.match(client, /actionLog\.record/);
   assert.match(client, /renderActionLog/);
   assert.match(client, /formatActionLogEntry/);

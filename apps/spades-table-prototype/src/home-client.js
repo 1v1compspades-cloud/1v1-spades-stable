@@ -1,9 +1,11 @@
 import { createSpadesAppController } from "./app-controller.js";
 import { createLocalActionLog } from "./action-log.js";
+import { createSpadesLiveSyncClient } from "./live-sync-client.js";
 import {
   createTwoSeatManualHarness,
   listManualFixturePresets
 } from "./manual-harness.js";
+import { createMockSpadesSocketTransport } from "./mock-socket-transport.js";
 import { renderRoomShellText } from "./room-shell.js";
 import {
   buildVisualQaReport,
@@ -17,9 +19,19 @@ import {
 const controller = createSpadesAppController({
   createPlayerId: loadOrCreatePlayerId
 });
+const liveSyncServer = createMockSpadesSocketTransport();
+const liveSyncPlayerId = loadOrCreatePlayerId();
+const liveSyncClient = createSpadesLiveSyncClient({
+  socketServer: liveSyncServer,
+  clientId: "shell-live-sync-client",
+  playerId: liveSyncPlayerId,
+  seatToken: loadOrCreateSeatToken(liveSyncPlayerId)
+});
 
 const displayNameInput = document.querySelector("#display-name");
 const joinCodeInput = document.querySelector("#join-code");
+const transportModeSelect = document.querySelector("#transport-mode");
+const transportModeStatusOutput = document.querySelector("#transport-mode-status");
 const phaseStatusOutput = document.querySelector("#phase-status");
 const seatStatusOutput = document.querySelector("#seat-status");
 const turnStatusOutput = document.querySelector("#turn-status");
@@ -73,6 +85,7 @@ const visualQaStatusOutput = document.querySelector("#visual-qa-status");
 let manualHarness = createTwoSeatManualHarness();
 let lastSuccessfulAction = "none";
 let activeFixturePreset = "none";
+let transportMode = "direct";
 const actionLog = createLocalActionLog();
 
 for (const presetName of listManualFixturePresets().filter((name) => !name.startsWith("reconnect-"))) {
@@ -90,52 +103,60 @@ for (const scriptName of listVisualQaScripts()) {
 }
 
 document.querySelector("#create-room").addEventListener("click", () => {
-  runShellAction(() => controller.createRoom({
+  runShellAction(() => activeShellActions().createRoom({
     displayName: displayNameInput.value || "Player"
-  }).status, "create room");
+  }), "create room");
 });
 
 document.querySelector("#join-room").addEventListener("click", () => {
-  runShellAction(() => controller.joinRoom({
+  runShellAction(() => activeShellActions().joinRoom({
     roomCode: joinCodeInput.value,
     displayName: displayNameInput.value || "Player"
-  }).status, "join room");
+  }), "join room");
 });
 
 document.querySelector("#restore-room").addEventListener("click", () => {
-  runShellAction(() => controller.restoreActiveRoom().status, "restore active room");
+  runShellAction(() => activeShellActions().restoreRoom(), "restore active room");
+});
+
+document.querySelector("#reconnect-live-sync").addEventListener("click", () => {
+  runShellAction(() => reconnectLiveSyncSnapshot(), "reconnect live sync snapshot");
 });
 
 document.querySelector("#clear-room").addEventListener("click", () => {
-  controller.clearActiveRoom();
+  if (isLiveSyncMode()) {
+    liveSyncClient.disconnect();
+  } else {
+    controller.clearActiveRoom();
+  }
   lastSuccessfulAction = "clear active room";
   actionLog.record("clear active room", null);
   renderStatus(null);
 });
 
 document.querySelector("#ready-player").addEventListener("click", () => {
-  runShellAction(() => controller.readyPlayer().status, "ready");
+  runShellAction(() => activeShellActions().readyPlayer(), "ready");
 });
 
 document.querySelector("#leave-room").addEventListener("click", () => {
-  runShellAction(() => controller.leaveRoom().status, "leave room");
+  runShellAction(() => activeShellActions().leaveRoom(), "leave room");
 });
 
 document.querySelector("#submit-bid").addEventListener("click", () => {
-  runShellAction(() => controller.submitBid({
+  runShellAction(() => activeShellActions().submitBid({
     bid: Number(bidInput.value)
-  }).status, "bid");
+  }), "bid");
 });
 
 document.querySelector("#submit-nil").addEventListener("click", () => {
   bidInput.value = "0";
-  runShellAction(() => controller.submitBid({ bid: 0 }).status, "bid");
+  runShellAction(() => activeShellActions().submitBid({ bid: 0 }), "bid");
 });
 
 document.querySelector("#submit-play-card").addEventListener("click", () => {
-  runShellAction(() => controller.submitPlayCardById({
+  runShellAction(() => activeShellActions().submitPlayCardById({
     cardId: playCardIdInput.value
-  }).status, "play card");
+  }), "play card");
 });
 
 document.querySelector("#play-full-hand").addEventListener("click", () => {
@@ -143,7 +164,7 @@ document.querySelector("#play-full-hand").addEventListener("click", () => {
 });
 
 document.querySelector("#start-next-hand").addEventListener("click", () => {
-  runShellAction(() => controller.startNextHand().status, "next hand");
+  runShellAction(() => activeShellActions().startNextHand(), "next hand");
 });
 
 document.querySelector("#record-match-history").addEventListener("click", () => {
@@ -154,11 +175,11 @@ document.querySelector("#record-match-history").addEventListener("click", () => 
 });
 
 document.querySelector("#start-new-match").addEventListener("click", () => {
-  runShellAction(() => controller.startNewMatch().status, "reset/new match");
+  runShellAction(() => activeShellActions().startNewMatch(), "reset/new match");
 });
 
 document.querySelector("#table-leave-room").addEventListener("click", () => {
-  runShellAction(() => controller.leaveRoom().status, "leave room");
+  runShellAction(() => activeShellActions().leaveRoom(), "leave room");
 });
 
 document.querySelector("#table-record-history").addEventListener("click", () => {
@@ -169,11 +190,11 @@ document.querySelector("#table-record-history").addEventListener("click", () => 
 });
 
 document.querySelector("#table-start-next-hand").addEventListener("click", () => {
-  runShellAction(() => controller.startNextHand().status, "next hand");
+  runShellAction(() => activeShellActions().startNextHand(), "next hand");
 });
 
 document.querySelector("#table-start-new-match").addEventListener("click", () => {
-  runShellAction(() => controller.startNewMatch().status, "reset/new match");
+  runShellAction(() => activeShellActions().startNewMatch(), "reset/new match");
 });
 
 document.querySelector("#manual-setup").addEventListener("click", () => {
@@ -246,6 +267,17 @@ manualViewSelect.addEventListener("change", () => {
   renderManualStatus();
 });
 
+transportModeSelect.addEventListener("change", () => {
+  transportMode = transportModeSelect.value;
+  renderStatus(isLiveSyncMode() ? liveSyncClient.status : controller.getActiveRoomStatus());
+});
+
+liveSyncClient.onStatus((update) => {
+  if (isLiveSyncMode()) {
+    renderStatus(update.view);
+  }
+});
+
 renderStatus(controller.restoreActiveRoom().status);
 
 function runShellAction(action, successLabel = "completed action") {
@@ -257,7 +289,7 @@ function runShellAction(action, successLabel = "completed action") {
     renderStatus(status);
   } catch (error) {
     const message = error?.message ?? "Action failed";
-    const status = controller.getActiveRoomStatus();
+    const status = currentShellStatus();
     actionLog.record(successLabel, status, { outcome: "failure", message });
     showError(message);
     renderActionLog();
@@ -268,7 +300,100 @@ function runShellAction(action, successLabel = "completed action") {
   }
 }
 
+function activeShellActions() {
+  return isLiveSyncMode() ? liveSyncActions() : directActions();
+}
+
+function directActions() {
+  return {
+    createRoom(options) {
+      return controller.createRoom(options).status;
+    },
+    joinRoom(options) {
+      return controller.joinRoom(options).status;
+    },
+    restoreRoom() {
+      return controller.restoreActiveRoom().status;
+    },
+    readyPlayer() {
+      return controller.readyPlayer().status;
+    },
+    leaveRoom() {
+      return controller.leaveRoom().status;
+    },
+    submitBid(options) {
+      return controller.submitBid(options).status;
+    },
+    submitPlayCardById(options) {
+      return controller.submitPlayCardById(options).status;
+    },
+    startNextHand() {
+      return controller.startNextHand().status;
+    },
+    startNewMatch() {
+      return controller.startNewMatch().status;
+    }
+  };
+}
+
+function liveSyncActions() {
+  return {
+    createRoom(options) {
+      return liveSyncStatusFromResponse(liveSyncClient.createRoom(options));
+    },
+    joinRoom(options) {
+      return liveSyncStatusFromResponse(liveSyncClient.joinRoom(options));
+    },
+    restoreRoom() {
+      return reconnectLiveSyncSnapshot();
+    },
+    readyPlayer() {
+      return liveSyncStatusFromResponse(liveSyncClient.readyPlayer());
+    },
+    leaveRoom() {
+      return liveSyncStatusFromResponse(liveSyncClient.leaveRoom());
+    },
+    submitBid(options) {
+      return liveSyncStatusFromResponse(liveSyncClient.submitBid(options));
+    },
+    submitPlayCardById(options) {
+      return liveSyncStatusFromResponse(liveSyncClient.submitPlayCardById(options));
+    },
+    startNextHand() {
+      return liveSyncStatusFromResponse(liveSyncClient.startNextHand());
+    },
+    startNewMatch() {
+      return liveSyncStatusFromResponse(liveSyncClient.startNewMatch());
+    }
+  };
+}
+
+function liveSyncStatusFromResponse(response) {
+  if (!response.ok) {
+    throw new Error(response.error?.message ?? "Live sync action failed");
+  }
+  return response.view;
+}
+
+function reconnectLiveSyncSnapshot() {
+  const result = liveSyncClient.reconnect();
+  return result.status ?? liveSyncClient.status;
+}
+
+function currentShellStatus() {
+  return isLiveSyncMode() ? liveSyncClient.status : controller.getActiveRoomStatus();
+}
+
+function isLiveSyncMode() {
+  return transportMode === "live-sync";
+}
+
+function renderTransportModeStatus() {
+  transportModeStatusOutput.textContent = `Transport: ${isLiveSyncMode() ? "live sync QA" : "direct local"}`;
+}
+
 function renderStatus(status) {
+  renderTransportModeStatus();
   phaseStatusOutput.textContent = `Phase: ${status?.phase ?? "none"}`;
   seatStatusOutput.textContent = `Seat: ${status?.viewerSeat ?? "none"}${status?.alreadySeated ? " seated" : ""}`;
   turnStatusOutput.textContent = `Turn: ${status?.currentTurn ?? "none"}`;
@@ -297,7 +422,7 @@ function renderStatus(status) {
 function renderVisualShell(status) {
   const playCard = (card) => {
     playCardIdInput.value = card.id;
-    runShellAction(() => controller.submitPlayCardById({ cardId: card.id }).status, "play card");
+    runShellAction(() => activeShellActions().submitPlayCardById({ cardId: card.id }), "play card");
   };
   renderVisualShellInto(status, {
     phase: visualPhaseOutput,
@@ -315,7 +440,8 @@ function renderVisualShell(status) {
     edges: qaEdgeListOutput
   }, {
     lastSuccessfulAction,
-    fixturePreset: activeFixturePreset
+    fixturePreset: activeFixturePreset,
+    transportMode
   });
 }
 
@@ -379,7 +505,8 @@ function renderQaReport(status, errorMessage, targets, context = {}) {
     errorMessage,
     lastSuccessfulAction: context.lastSuccessfulAction ?? lastSuccessfulAction,
     fixturePreset: context.fixturePreset ?? activeFixturePreset,
-    matchHistoryCount: context.matchHistoryCount ?? controller.getMatchHistory().length
+    matchHistoryCount: context.matchHistoryCount ?? controller.getMatchHistory().length,
+    transportMode: context.transportMode ?? transportMode
   });
   targets.checks.replaceChildren(
     ...report.contextMessages.map((check) => qaReportItem(check.pass, check.name, check.detail)),
@@ -589,4 +716,14 @@ function loadOrCreatePlayerId() {
   const nextId = `player-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
   localStorage.setItem(key, nextId);
   return nextId;
+}
+
+function loadOrCreateSeatToken(playerId) {
+  const key = "spadesPrototypeLiveSeatToken";
+  const existing = localStorage.getItem(key);
+  if (existing) return existing;
+
+  const nextToken = `seat-${String(playerId ?? "shell").slice(0, 12)}-${Date.now().toString(36)}`;
+  localStorage.setItem(key, nextToken);
+  return nextToken;
 }

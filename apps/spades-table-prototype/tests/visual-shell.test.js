@@ -166,7 +166,8 @@ test("visual QA report shows pass fail checks from sanitized views", () => {
   const emptyReport = buildVisualQaReport(null);
 
   assert.equal(hostReport.overallPass, true);
-  assert.equal(hostReport.contextMessages.length, 6);
+  assert.equal(hostReport.contextMessages.length, 7);
+  assert.equal(hostReport.contextMessages.find((check) => check.name === "transport mode").detail, "direct");
   assert.equal(hostReport.contextMessages.at(-1).name, "match/history status");
   assert.equal(hostReport.checks.length, 8);
   assert.equal(hostReport.checks.every((check) => check.pass), true);
