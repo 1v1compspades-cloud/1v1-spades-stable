@@ -208,6 +208,11 @@ function applyRoomActionOnce(room, action = {}) {
     return startNextHand(room, { deck: action.deck });
   }
 
+  if (action.type === "startNewMatch") {
+    ensurePhase(room, "match_complete");
+    return startNewMatch(room, { deck: action.deck });
+  }
+
   throw roomError(400, `Unsupported room action: ${action.type}`);
 }
 
@@ -328,6 +333,26 @@ function startNextHand(room, { deck = null } = {}) {
       }
     },
     pendingDeck: null,
+    updatedAt: new Date().toISOString()
+  });
+}
+
+function startNewMatch(room, { deck = null } = {}) {
+  return syncRoom({
+    ...room,
+    playerReady: {
+      player1: false,
+      player2: false
+    },
+    coinFlipWinner: null,
+    dealer: null,
+    firstPlayer: null,
+    currentTurn: null,
+    phase: "waiting",
+    handNumber: 0,
+    game: createEmptyGameState(),
+    appliedActionIds: [],
+    pendingDeck: deck,
     updatedAt: new Date().toISOString()
   });
 }

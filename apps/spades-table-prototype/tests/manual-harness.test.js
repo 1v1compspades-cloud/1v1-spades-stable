@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createTwoSeatManualHarness } from "../src/manual-harness.js";
+import {
+  createTwoSeatManualHarness,
+  listManualFixturePresets
+} from "../src/manual-harness.js";
 
 test("manual harness creates two local seats with shared repository", () => {
   const harness = createTwoSeatManualHarness({ roomCode: "LOCAL1" });
@@ -47,4 +50,37 @@ test("manual harness can play a full hand without networking", () => {
 
   assert.ok(completed.followed.status.phase === "hand_complete" || completed.followed.status.phase === "match_complete");
   assert.match(harness.statusText(), /Hand summary:/);
+});
+
+test("manual harness exposes Phase 11 fixture presets", () => {
+  assert.deepEqual(listManualFixturePresets(), [
+    "nil-made",
+    "nil-failed",
+    "bag-penalty",
+    "close-game",
+    "match-win",
+    "reconnect-after-hand",
+    "reconnect-after-match-complete"
+  ]);
+});
+
+test("manual fixture preset can produce nil made and nil failed summaries", () => {
+  const nilMade = createTwoSeatManualHarness({ roomCode: "PRE001" }).runPreset("nil-made");
+  const nilFailed = createTwoSeatManualHarness({ roomCode: "PRE002" }).runPreset("nil-failed");
+
+  assert.equal(nilMade.hostStatus.handSummary.players.player2.nilResult, "made");
+  assert.equal(nilFailed.hostStatus.handSummary.players.player2.nilResult, "failed");
+});
+
+test("manual fixture preset can complete a local match and reconnect safely", () => {
+  const matchWin = createTwoSeatManualHarness({ roomCode: "PRE003" }).runPreset("match-win");
+  const reconnectAfterHand = createTwoSeatManualHarness({ roomCode: "PRE004" }).runPreset("reconnect-after-hand");
+  const reconnectAfterMatch = createTwoSeatManualHarness({ roomCode: "PRE005" }).runPreset("reconnect-after-match-complete");
+
+  assert.equal(matchWin.hostStatus.phase, "match_complete");
+  assert.equal(matchWin.hostStatus.winner, "player1");
+  assert.equal(reconnectAfterHand.restored.host.status.phase, "hand_complete");
+  assert.equal(reconnectAfterHand.restored.guest.status.viewerSeat, "player2");
+  assert.equal(reconnectAfterMatch.restored.host.status.phase, "match_complete");
+  assert.equal(reconnectAfterMatch.restored.guest.status.alreadySeated, true);
 });

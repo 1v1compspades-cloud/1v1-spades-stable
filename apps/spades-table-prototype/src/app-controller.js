@@ -12,11 +12,13 @@ import {
   loadSavedActiveRoom,
   saveActiveRoomSession
 } from "./local-room-session.js";
+import { createInMemoryMatchHistory } from "./match-history.js";
 
 export function createSpadesAppController({
   repository = createInMemoryRoomRepository(),
   storage = localStorage,
-  createPlayerId = defaultPlayerId
+  createPlayerId = defaultPlayerId,
+  matchHistory = createInMemoryMatchHistory()
 } = {}) {
   let playerId = null;
   const actionSequences = new Map();
@@ -240,6 +242,40 @@ export function createSpadesAppController({
     };
   }
 
+  function startNewMatch({ deck, actionSequence = nextActionSequence("startNewMatch") } = {}) {
+    const { room, session } = requireActiveRoom();
+    const actionId = createActionId({
+      roomCode: room.roomCode,
+      seat: session.seat,
+      type: "startNewMatch",
+      sequence: actionSequence
+    });
+    const nextRoom = applyRoomAction(room, {
+      type: "startNewMatch",
+      seatToken: session.seatToken,
+      playerId: session.playerId,
+      deck,
+      actionId,
+      expectedPhase: "match_complete"
+    });
+    repository.save(nextRoom);
+
+    return {
+      room: nextRoom,
+      session,
+      status: sanitizeRoomForViewer(nextRoom, session)
+    };
+  }
+
+  function recordMatchHistory(options = {}) {
+    const { room } = requireActiveRoom();
+    return matchHistory.record(room, options);
+  }
+
+  function getMatchHistory() {
+    return matchHistory.list();
+  }
+
   function playFullHand({ maxActions = 26 } = {}) {
     let result = null;
     for (let action = 0; action < maxActions; action += 1) {
@@ -324,6 +360,9 @@ export function createSpadesAppController({
     submitPlayCard,
     submitPlayCardById,
     startNextHand,
+    startNewMatch,
+    recordMatchHistory,
+    getMatchHistory,
     playFullHand,
     getCurrentPlayerStatus,
     getPlayableCardStatus,

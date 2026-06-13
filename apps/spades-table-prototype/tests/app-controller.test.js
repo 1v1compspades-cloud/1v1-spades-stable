@@ -409,6 +409,96 @@ test("match complete prevents next hand unless a new match is created", () => {
   assert.throws(() => host.startNextHand({ deck: player2HighDeck() }), /Stale action expected hand_complete phase/);
 });
 
+test("new match reset after match complete preserves seats and clears match state", () => {
+  const { host, guest } = playingControllers({
+    deck: player1WinsEveryTrickDeck(),
+    hostBid: 4,
+    guestBid: 3,
+    matchSettings: { targetScore: 40 }
+  });
+  const completed = playFullHandWithControllers(host, guest);
+
+  assert.equal(completed.status.phase, "match_complete");
+  assert.equal(completed.status.winner, "player1");
+
+  const reset = host.startNewMatch({ deck: player2HighDeck() });
+  const guestStatus = guest.getActiveRoomStatus();
+
+  assert.equal(reset.status.phase, "waiting");
+  assert.equal(reset.status.players.player1.displayName, "Player 1");
+  assert.equal(reset.status.players.player2.displayName, "Player 2");
+  assert.deepEqual(reset.status.playerReady, { player1: false, player2: false });
+  assert.deepEqual(reset.status.score, { player1: 0, player2: 0 });
+  assert.deepEqual(reset.status.bags, { player1: 0, player2: 0 });
+  assert.deepEqual(reset.status.bids, { player1: null, player2: null });
+  assert.deepEqual(reset.status.tricksTaken, { player1: 0, player2: 0 });
+  assert.equal(reset.status.handNumber, 0);
+  assert.equal(reset.status.lastTrick, null);
+  assert.equal(reset.status.handSummary, null);
+  assert.equal(reset.status.winner, null);
+  assert.deepEqual(reset.status.hand, []);
+  assert.equal(guestStatus.viewerSeat, "player2");
+  assert.equal(guestStatus.alreadySeated, true);
+});
+
+test("new match reset is rejected before match completion", () => {
+  const waiting = createSpadesAppController({
+    storage: createMemoryStorage(),
+    createPlayerId: () => "device-waiting"
+  });
+  waiting.createRoom({ roomCode: "RESET1", seatToken: "seat-waiting" });
+
+  assert.throws(() => waiting.startNewMatch(), /Stale action expected match_complete phase/);
+
+  const { host } = playingControllers();
+  assert.throws(() => host.startNewMatch(), /Stale action expected match_complete phase/);
+
+  const leadCard = host.getActiveRoomStatus().hand.find((card) => card.suit === "clubs");
+  host.submitPlayCard({ card: leadCard, actionSequence: 1 });
+
+  assert.throws(() => host.startNewMatch(), /Stale action expected match_complete phase/);
+});
+
+test("local match history records immutable completed match summaries", () => {
+  const { host, guest } = playingControllers({
+    deck: player1WinsEveryTrickDeck(),
+    hostBid: 4,
+    guestBid: 0,
+    matchSettings: { targetScore: 90 }
+  });
+  const completed = playFullHandWithControllers(host, guest);
+
+  assert.equal(completed.status.phase, "match_complete");
+  assert.equal(completed.status.winner, "player2");
+
+  const entry = host.recordMatchHistory({ timestamp: "2026-06-13T12:00:00.000Z" });
+
+  assert.equal(entry.winner, "player2");
+  assert.deepEqual(entry.finalScore, { player1: 49, player2: 100 });
+  assert.deepEqual(entry.bids, { player1: 4, player2: 0 });
+  assert.deepEqual(entry.bags, { player1: 9, player2: 0 });
+  assert.deepEqual(entry.nilResults, { player1: null, player2: "made" });
+  assert.equal(entry.timestamp, "2026-06-13T12:00:00.000Z");
+  assert.throws(() => {
+    entry.finalScore.player1 = 0;
+  }, /Cannot assign/);
+
+  const listed = host.getMatchHistory();
+  assert.throws(() => {
+    listed[0].finalScore.player2 = -1;
+  }, /Cannot assign/);
+
+  assert.deepEqual(host.getMatchHistory()[0].finalScore, { player1: 49, player2: 100 });
+
+  const waiting = createSpadesAppController({
+    storage: createMemoryStorage(),
+    createPlayerId: () => "device-waiting-history"
+  });
+  waiting.createRoom({ roomCode: "HIST01", seatToken: "seat-history" });
+
+  assert.throws(() => waiting.recordMatchHistory(), /completed matches/);
+});
+
 function createMemoryStorage() {
   const values = new Map();
   return {

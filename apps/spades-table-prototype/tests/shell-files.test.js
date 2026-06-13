@@ -30,10 +30,13 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /id="playable-status"/);
   assert.match(html, /id="trick-status"/);
   assert.match(html, /id="hand-summary"/);
+  assert.match(html, /id="match-history"/);
   assert.match(html, /id="play-card-id"/);
   assert.match(html, /id="submit-play-card"/);
   assert.match(html, /id="play-full-hand"/);
   assert.match(html, /id="start-next-hand"/);
+  assert.match(html, /id="record-match-history"/);
+  assert.match(html, /id="start-new-match"/);
   assert.match(html, /id="manual-full-hand"/);
   assert.match(html, /id="manual-next-hand"/);
   assert.match(html, /id="ready-player"/);
@@ -54,6 +57,9 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /controller\.submitPlayCardById/);
   assert.match(client, /controller\.playFullHand/);
   assert.match(client, /controller\.startNextHand/);
+  assert.match(client, /controller\.recordMatchHistory/);
+  assert.match(client, /controller\.getMatchHistory/);
+  assert.match(client, /controller\.startNewMatch/);
   assert.match(client, /createTwoSeatManualHarness/);
   assert.match(client, /showError/);
   assert.match(client, /clearError/);

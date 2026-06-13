@@ -14,6 +14,7 @@ const handStatusOutput = document.querySelector("#hand-status");
 const playableStatusOutput = document.querySelector("#playable-status");
 const trickStatusOutput = document.querySelector("#trick-status");
 const handSummaryOutput = document.querySelector("#hand-summary");
+const matchHistoryOutput = document.querySelector("#match-history");
 const errorOutput = document.querySelector("#shell-error");
 const bidInput = document.querySelector("#bid-input");
 const playCardIdInput = document.querySelector("#play-card-id");
@@ -75,6 +76,17 @@ document.querySelector("#start-next-hand").addEventListener("click", () => {
   runShellAction(() => controller.startNextHand().status);
 });
 
+document.querySelector("#record-match-history").addEventListener("click", () => {
+  runShellAction(() => {
+    controller.recordMatchHistory();
+    return controller.getActiveRoomStatus();
+  });
+});
+
+document.querySelector("#start-new-match").addEventListener("click", () => {
+  runShellAction(() => controller.startNewMatch().status);
+});
+
 document.querySelector("#manual-setup").addEventListener("click", () => {
   manualHarness.setup();
   renderManualStatus();
@@ -133,6 +145,7 @@ function renderStatus(status) {
   handSummaryOutput.textContent = status?.handSummary
     ? `Hand summary: ${formatHandSummary(status.handSummary)}`
     : "Hand summary: none";
+  matchHistoryOutput.textContent = formatMatchHistory(controller.getMatchHistory());
 }
 
 function renderManualStatus(controllerForView = manualHarness.host) {
@@ -161,6 +174,13 @@ function formatHandSummary(summary) {
     const row = summary.players[player];
     return `${player} bid ${row.bid}, tricks ${row.tricks}, bags ${row.bags}, nil ${row.nilResult ?? "none"}, change ${row.scoreChange}, total ${row.totalScore}`;
   }).join(" | ");
+}
+
+function formatMatchHistory(history) {
+  if (!history.length) return "Match history: none";
+  return `Match history: ${history.map((entry) => (
+    `${entry.timestamp} ${entry.winner} ${entry.finalScore.player1}-${entry.finalScore.player2}`
+  )).join(" | ")}`;
 }
 
 function loadOrCreatePlayerId() {
