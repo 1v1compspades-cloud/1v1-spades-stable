@@ -69,6 +69,8 @@ const fixturePresetSelect = document.querySelector("#fixture-preset");
 const visualQaScriptSelect = document.querySelector("#visual-qa-script");
 const visualQaStatusOutput = document.querySelector("#visual-qa-status");
 let manualHarness = createTwoSeatManualHarness();
+let lastSuccessfulAction = "none";
+let activeFixturePreset = "none";
 
 for (const presetName of listManualFixturePresets().filter((name) => !name.startsWith("reconnect-"))) {
   const option = document.createElement("option");
@@ -87,18 +89,18 @@ for (const scriptName of listVisualQaScripts()) {
 document.querySelector("#create-room").addEventListener("click", () => {
   runShellAction(() => controller.createRoom({
     displayName: displayNameInput.value || "Player"
-  }).status);
+  }).status, "created room");
 });
 
 document.querySelector("#join-room").addEventListener("click", () => {
   runShellAction(() => controller.joinRoom({
     roomCode: joinCodeInput.value,
     displayName: displayNameInput.value || "Player"
-  }).status);
+  }).status, "joined room");
 });
 
 document.querySelector("#restore-room").addEventListener("click", () => {
-  runShellAction(() => controller.restoreActiveRoom().status);
+  runShellAction(() => controller.restoreActiveRoom().status, "restored active room");
 });
 
 document.querySelector("#clear-room").addEventListener("click", () => {
@@ -107,47 +109,66 @@ document.querySelector("#clear-room").addEventListener("click", () => {
 });
 
 document.querySelector("#ready-player").addEventListener("click", () => {
-  runShellAction(() => controller.readyPlayer().status);
+  runShellAction(() => controller.readyPlayer().status, "readied active player");
 });
 
 document.querySelector("#leave-room").addEventListener("click", () => {
-  runShellAction(() => controller.leaveRoom().status);
+  runShellAction(() => controller.leaveRoom().status, "left active room");
 });
 
 document.querySelector("#submit-bid").addEventListener("click", () => {
   runShellAction(() => controller.submitBid({
     bid: Number(bidInput.value)
-  }).status);
+  }).status, "submitted bid");
 });
 
 document.querySelector("#submit-nil").addEventListener("click", () => {
   bidInput.value = "0";
-  runShellAction(() => controller.submitBid({ bid: 0 }).status);
+  runShellAction(() => controller.submitBid({ bid: 0 }).status, "submitted nil bid");
 });
 
 document.querySelector("#submit-play-card").addEventListener("click", () => {
   runShellAction(() => controller.submitPlayCardById({
     cardId: playCardIdInput.value
-  }).status);
+  }).status, "played card");
 });
 
 document.querySelector("#play-full-hand").addEventListener("click", () => {
-  runShellAction(() => controller.playFullHand().status);
+  runShellAction(() => controller.playFullHand().status, "auto-played text hand");
 });
 
 document.querySelector("#start-next-hand").addEventListener("click", () => {
-  runShellAction(() => controller.startNextHand().status);
+  runShellAction(() => controller.startNextHand().status, "started next hand");
 });
 
 document.querySelector("#record-match-history").addEventListener("click", () => {
   runShellAction(() => {
     controller.recordMatchHistory();
     return controller.getActiveRoomStatus();
-  });
+  }, "recorded match history");
 });
 
 document.querySelector("#start-new-match").addEventListener("click", () => {
-  runShellAction(() => controller.startNewMatch().status);
+  runShellAction(() => controller.startNewMatch().status, "started new match");
+});
+
+document.querySelector("#table-leave-room").addEventListener("click", () => {
+  runShellAction(() => controller.leaveRoom().status, "left active room from table");
+});
+
+document.querySelector("#table-record-history").addEventListener("click", () => {
+  runShellAction(() => {
+    controller.recordMatchHistory();
+    return controller.getActiveRoomStatus();
+  }, "recorded match history from table");
+});
+
+document.querySelector("#table-start-next-hand").addEventListener("click", () => {
+  runShellAction(() => controller.startNextHand().status, "started next hand from table");
+});
+
+document.querySelector("#table-start-new-match").addEventListener("click", () => {
+  runShellAction(() => controller.startNewMatch().status, "started new match from table");
 });
 
 document.querySelector("#manual-setup").addEventListener("click", () => {
@@ -182,7 +203,8 @@ document.querySelector("#manual-next-hand").addEventListener("click", () => {
 
 document.querySelector("#run-fixture").addEventListener("click", () => {
   manualHarness = createTwoSeatManualHarness();
-  manualHarness.runPreset(fixturePresetSelect.value);
+  activeFixturePreset = fixturePresetSelect.value;
+  manualHarness.runPreset(activeFixturePreset);
   renderManualStatus();
 });
 
@@ -195,8 +217,10 @@ document.querySelector("#reset-fixture").addEventListener("click", () => {
 document.querySelector("#run-visual-qa-script").addEventListener("click", () => {
   try {
     clearError();
-    const result = runVisualQaScript(visualQaScriptSelect.value);
+    activeFixturePreset = visualQaScriptSelect.value;
+    const result = runVisualQaScript(activeFixturePreset);
     manualHarness = result.harness;
+    lastSuccessfulAction = `ran visual QA ${activeFixturePreset}`;
     visualQaStatusOutput.textContent = formatVisualQaResult(result);
     renderManualStatus();
   } catch (error) {
@@ -210,10 +234,12 @@ manualViewSelect.addEventListener("change", () => {
 
 renderStatus(controller.restoreActiveRoom().status);
 
-function runShellAction(action) {
+function runShellAction(action, successLabel = "completed action") {
   try {
     clearError();
-    renderStatus(action());
+    const status = action();
+    lastSuccessfulAction = successLabel;
+    renderStatus(status);
   } catch (error) {
     showError(error?.message ?? "Action failed");
     renderQaReport(controller.getActiveRoomStatus(), error?.message ?? "Action failed", {
@@ -249,6 +275,10 @@ function renderStatus(status) {
 }
 
 function renderVisualShell(status) {
+  const playCard = (card) => {
+    playCardIdInput.value = card.id;
+    runShellAction(() => controller.submitPlayCardById({ cardId: card.id }).status, `played ${card.id}`);
+  };
   renderVisualShellInto(status, {
     phase: visualPhaseOutput,
     seat: visualSeatOutput,
@@ -258,14 +288,14 @@ function renderVisualShell(status) {
     hand: visualHandOutput,
     currentTrick: visualCurrentTrickOutput,
     lastTrick: visualLastTrickOutput
-  }, (card) => {
-    playCardIdInput.value = card.id;
-    runShellAction(() => controller.submitPlayCardById({ cardId: card.id }).status);
-  });
-  renderTableLayout(status);
+  }, playCard);
+  renderTableLayout(status, playCard);
   renderQaReport(status, errorOutput.textContent, {
     checks: qaCheckListOutput,
     edges: qaEdgeListOutput
+  }, {
+    lastSuccessfulAction,
+    fixturePreset: activeFixturePreset
   });
 }
 
@@ -299,7 +329,7 @@ function renderVisualShellInto(status, targets, onPlayableCard) {
   }
 }
 
-function renderTableLayout(status) {
+function renderTableLayout(status, onPlayableCard) {
   const model = buildVisualShellModel(status);
   tableOpponentAreaOutput.textContent = status
     ? `Opponent: ${model.viewerSeat === "player1" ? "player2" : "player1"} | turn ${model.currentTurn}`
@@ -309,12 +339,30 @@ function renderTableLayout(status) {
     : "Score/status: waiting";
   tableCenterTrickAreaOutput.textContent = `Current trick: ${model.currentTrick}`;
   tableLastTrickAreaOutput.textContent = `Last trick: ${model.lastTrick}`;
-  tablePlayerHandAreaOutput.textContent = `Player hand: ${model.handCards.length} visible cards`;
+  const handLabel = document.createElement("p");
+  handLabel.className = "table-hand-label";
+  handLabel.textContent = `Player hand: ${model.handCards.length} visible cards`;
+  const handGrid = document.createElement("div");
+  handGrid.className = "card-button-grid table-hand-grid";
+  handGrid.append(...model.handCards.map((card) => visualCardButton(card, onPlayableCard)));
+  if (!model.handCards.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "No visible hand for this view.";
+    handGrid.append(empty);
+  }
+  tablePlayerHandAreaOutput.replaceChildren(handLabel, handGrid);
 }
 
-function renderQaReport(status, errorMessage, targets) {
-  const report = buildVisualQaReport(status, { errorMessage });
-  targets.checks.replaceChildren(...report.checks.map((check) => qaReportItem(
+function renderQaReport(status, errorMessage, targets, context = {}) {
+  const report = buildVisualQaReport(status, {
+    errorMessage,
+    lastSuccessfulAction: context.lastSuccessfulAction ?? lastSuccessfulAction,
+    fixturePreset: context.fixturePreset ?? activeFixturePreset
+  });
+  targets.checks.replaceChildren(
+    ...report.contextMessages.map((check) => qaReportItem(check.pass, check.name, check.detail)),
+    ...report.checks.map((check) => qaReportItem(
     check.pass,
     check.name,
     check.detail
@@ -386,6 +434,9 @@ function renderManualStatus(view = manualViewSelect.value) {
   renderQaReport(status, "", {
     checks: manualQaCheckListOutput,
     edges: manualQaEdgeListOutput
+  }, {
+    lastSuccessfulAction,
+    fixturePreset: activeFixturePreset
   });
   renderTwoSeatVisualCompare();
 }

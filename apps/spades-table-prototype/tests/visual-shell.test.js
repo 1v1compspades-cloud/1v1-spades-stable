@@ -166,6 +166,7 @@ test("visual QA report shows pass fail checks from sanitized views", () => {
   const emptyReport = buildVisualQaReport(null);
 
   assert.equal(hostReport.overallPass, true);
+  assert.equal(hostReport.contextMessages.length, 5);
   assert.equal(hostReport.checks.length, 8);
   assert.equal(hostReport.checks.every((check) => check.pass), true);
   assert.equal(spectatorReport.overallPass, true);

@@ -1,4 +1,7 @@
-import { createTwoSeatManualHarness } from "./manual-harness.js";
+import {
+  MANUAL_FIXTURE_PRESETS,
+  createTwoSeatManualHarness
+} from "./manual-harness.js";
 import { buildVisualShellModel } from "./visual-shell.js";
 
 export const VISUAL_QA_SCRIPTS = Object.freeze({
@@ -62,6 +65,62 @@ export function runVisualQaScript(name, { roomCode = scriptRoomCode(name) } = {}
     verificationLog,
     hostStatus: harness.statusForView("host"),
     guestStatus: harness.statusForView("guest"),
+    spectatorStatus: harness.statusForView("spectator")
+  };
+}
+
+export function runFullLocalGameSmokeFlow({ roomCode = "SMOKE1" } = {}) {
+  const harness = createTwoSeatManualHarness({ roomCode });
+  const steps = [];
+  const preset = MANUAL_FIXTURE_PRESETS["nil-made"];
+
+  const setup = harness.setup({
+    deck: preset.deck(),
+    matchSettings: { targetScore: 120 }
+  });
+  steps.push(step("create room", setup.created.status.phase));
+  steps.push(step("join player2", setup.joined.status.viewerSeat));
+  steps.push(step("spectator view", setup.spectated.status.viewerSeat));
+
+  const ready = harness.readyBoth();
+  steps.push(step("ready both players", ready.guest.status.phase));
+
+  const bids = harness.bidBoth({ hostBid: 4, guestBid: 0 });
+  steps.push(step("bid both players", bids.guest.status.phase));
+
+  const verificationLog = [verifyVisualSeatViews(harness, "smoke-after-bids")];
+  for (let trick = 0; trick < 3; trick += 1) {
+    playNextVisualCard(harness);
+    playNextVisualCard(harness);
+    verificationLog.push(verifyVisualSeatViews(harness, `smoke-after-trick-${trick + 1}`));
+  }
+  steps.push(step("play multiple tricks", harness.host.getActiveRoomStatus().lastTrick?.winner ?? "none"));
+
+  const firstHand = playFullHandWithVisualCards(harness, { verificationLog });
+  steps.push(step("complete hand", firstHand.hostStatus.phase));
+
+  const nextHand = harness.host.startNextHand({ deck: preset.deck() });
+  steps.push(step("start next hand", nextHand.status.phase));
+
+  harness.bidBoth({ hostBid: 4, guestBid: 0 });
+  const secondHand = playFullHandWithVisualCards(harness, { verificationLog });
+  steps.push(step("complete second hand", secondHand.hostStatus.phase));
+
+  const matchStatus = secondHand.hostStatus;
+  steps.push(step("complete match", matchStatus.winner ?? "none"));
+
+  const historyEntry = harness.host.recordMatchHistory({ timestamp: "2026-06-13T18:00:00.000Z" });
+  steps.push(step("record history", historyEntry.winner));
+
+  const reset = harness.startNewMatch();
+  steps.push(step("start new match", reset.status.phase));
+
+  return {
+    harness,
+    steps,
+    verificationLog,
+    history: harness.host.getMatchHistory(),
+    finalStatus: harness.host.getActiveRoomStatus(),
     spectatorStatus: harness.statusForView("spectator")
   };
 }
@@ -153,4 +212,8 @@ function assertPublicModelsMatch(expected, model) {
 
 function scriptRoomCode(name) {
   return `VQA${String(name).replace(/[^a-z0-9]/gi, "").slice(0, 3).toUpperCase()}`;
+}
+
+function step(name, result) {
+  return { name, result };
 }

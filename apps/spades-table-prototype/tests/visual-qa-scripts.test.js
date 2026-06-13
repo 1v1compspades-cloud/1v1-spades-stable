@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   listVisualQaScripts,
   playFullHandWithVisualCards,
+  runFullLocalGameSmokeFlow,
   runVisualQaScript,
   verifyVisualSeatViews
 } from "../src/visual-qa-scripts.js";
@@ -77,4 +78,30 @@ test("visual full-hand playthrough updates trick summaries and preserves hidden 
   assert.match(verificationLog[1].publicState.lastTrick, /winner player[12]/);
   assert.equal(verificationLog.at(-1).hostHandCount, 0);
   assert.equal(verificationLog.at(-1).guestHandCount, 0);
+});
+
+test("full local game smoke flow reaches new match and preserves history", () => {
+  const result = runFullLocalGameSmokeFlow({ roomCode: "SMK001" });
+
+  assert.deepEqual(result.steps.map((step) => step.name), [
+    "create room",
+    "join player2",
+    "spectator view",
+    "ready both players",
+    "bid both players",
+    "play multiple tricks",
+    "complete hand",
+    "start next hand",
+    "complete second hand",
+    "complete match",
+    "record history",
+    "start new match"
+  ]);
+  assert.equal(result.history.length, 1);
+  assert.equal(result.history[0].winner, "player2");
+  assert.equal(result.finalStatus.phase, "waiting");
+  assert.deepEqual(result.finalStatus.score, { player1: 0, player2: 0 });
+  assert.equal(result.spectatorStatus.viewerSeat, "spectator");
+  assert.deepEqual(result.spectatorStatus.hand, []);
+  assert.equal(result.verificationLog.every((entry) => entry.valid), true);
 });

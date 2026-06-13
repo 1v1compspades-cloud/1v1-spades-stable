@@ -83,6 +83,7 @@ export function createTwoSeatManualHarness({
     storage: spectatorStorage,
     createPlayerId: () => "manual-spectator"
   });
+  let bidSequence = 0;
 
   return {
     repository,
@@ -117,9 +118,10 @@ export function createTwoSeatManualHarness({
       };
     },
     bidBoth({ hostBid = 4, guestBid = 3 } = {}) {
+      bidSequence += 1;
       return {
-        host: host.submitBid({ bid: hostBid, actionSequence: 1 }),
-        guest: guest.submitBid({ bid: guestBid, actionSequence: 1 })
+        host: host.submitBid({ bid: hostBid, actionSequence: bidSequence }),
+        guest: guest.submitBid({ bid: guestBid, actionSequence: bidSequence })
       };
     },
     playOneTrick() {

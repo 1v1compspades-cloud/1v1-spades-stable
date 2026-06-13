@@ -129,6 +129,19 @@ select:focus-visible {
   border-color: rgba(248, 244, 235, 0.3);
 }
 
+.table-controls {
+  display: grid;
+  gap: 10px;
+}
+
+.table-hand-label {
+  margin: 0 0 10px;
+}
+
+.table-hand-grid {
+  margin-top: 10px;
+}
+
 .visual-status,
 .summary-item,
 .trick-text,
@@ -338,7 +351,8 @@ pre {
   }
 
   .center-trick-area,
-  .player-hand-area {
+  .player-hand-area,
+  .table-controls {
     grid-column: 1 / -1;
   }
 

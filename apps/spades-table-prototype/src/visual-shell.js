@@ -58,12 +58,24 @@ export function buildVisualShellModel(status) {
   };
 }
 
-export function buildVisualQaReport(status, { errorMessage = "" } = {}) {
+export function buildVisualQaReport(status, {
+  errorMessage = "",
+  lastSuccessfulAction = "none",
+  fixturePreset = "none"
+} = {}) {
   const model = buildVisualShellModel(status);
   const hasStatus = Boolean(status);
+  const hiddenDetail = hiddenHandDetail(status);
+  const contextMessages = [
+    qaCheck("selected viewer", hasStatus, model.viewerSeat),
+    qaCheck("hidden-hand status", hiddenHandProtected(status), hiddenDetail),
+    qaCheck("phase", hasStatus && model.phase !== "none", model.phase),
+    qaCheck("last successful action", lastSuccessfulAction !== "none", lastSuccessfulAction),
+    qaCheck("fixture preset", fixturePreset !== "none", fixturePreset)
+  ];
   const checks = [
     qaCheck("current viewer seat", hasStatus && ["player1", "player2", "spectator"].includes(model.viewerSeat), model.viewerSeat),
-    qaCheck("hidden hand protection", hiddenHandProtected(status), hiddenHandDetail(status)),
+    qaCheck("hidden hand protection", hiddenHandProtected(status), hiddenDetail),
     qaCheck("current phase", hasStatus && model.phase !== "none", model.phase),
     qaCheck("current turn", hasStatus && Boolean(model.currentTurn), model.currentTurn),
     qaCheck("playable card count", hasStatus && Number.isInteger(status.playableCardStatus?.count), model.playableStatus),
@@ -76,6 +88,7 @@ export function buildVisualQaReport(status, { errorMessage = "" } = {}) {
 
   return {
     overallPass: checks.every((check) => check.pass) && edgeMessages.every((message) => message.pass),
+    contextMessages,
     checks,
     edgeMessages
   };
