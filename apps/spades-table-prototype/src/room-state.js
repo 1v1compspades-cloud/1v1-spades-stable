@@ -151,6 +151,8 @@ export function createActionId({ roomCode, seat, type, sequence } = {}) {
 function applyRoomActionOnce(room, action = {}) {
   const seat = getViewerSeat(room, action);
   ensureSeated(seat);
+  ensureExpectedPhase(room, action.expectedPhase);
+  ensureExpectedTurn(room, action.expectedTurn);
 
   if (action.type === "ready") {
     ensurePhase(room, "waiting");
@@ -198,6 +200,11 @@ function applyRoomActionOnce(room, action = {}) {
 
   if (action.type === "playCard") {
     return playCard(room, seat, action.card);
+  }
+
+  if (action.type === "startNextHand") {
+    ensurePhase(room, "hand_complete");
+    return startNextHand(room, { deck: action.deck });
   }
 
   throw roomError(400, `Unsupported room action: ${action.type}`);
@@ -268,6 +275,36 @@ function maybeStartHand(room) {
   return syncRoom({
     ...room,
     coinFlipWinner,
+    dealer,
+    firstPlayer,
+    currentTurn: firstPlayer,
+    phase: "bidding",
+    handNumber,
+    game: {
+      ...createEmptyGameState(),
+      phase: "bidding",
+      hands: dealt.hands,
+      stock: dealt.stock,
+      score: {
+        ...room.game.score
+      },
+      bags: {
+        ...room.game.bags
+      }
+    },
+    pendingDeck: null,
+    updatedAt: new Date().toISOString()
+  });
+}
+
+function startNextHand(room, { deck = null } = {}) {
+  const dealer = otherPlayer(room.dealer ?? "player2");
+  const firstPlayer = otherPlayer(dealer);
+  const dealt = deal(deck ?? room.pendingDeck ?? createDeck());
+  const handNumber = room.handNumber + 1;
+
+  return syncRoom({
+    ...room,
     dealer,
     firstPlayer,
     currentTurn: firstPlayer,
@@ -510,6 +547,18 @@ function ensureSeated(seat) {
 function ensurePhase(room, phase) {
   if (room.phase !== phase) {
     throw roomError(409, `Room must be in ${phase} phase`);
+  }
+}
+
+function ensureExpectedPhase(room, expectedPhase) {
+  if (expectedPhase && room.phase !== expectedPhase) {
+    throw roomError(409, `Stale action expected ${expectedPhase} phase`);
+  }
+}
+
+function ensureExpectedTurn(room, expectedTurn) {
+  if (expectedTurn && room.currentTurn !== expectedTurn) {
+    throw roomError(409, `Stale action expected ${expectedTurn} turn`);
   }
 }
 

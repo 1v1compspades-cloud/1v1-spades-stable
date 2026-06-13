@@ -271,6 +271,68 @@ test("reconnect views restore by player id after leave without leaking opponent 
   assert.notDeepEqual(view.hand, room.game.hands.player2);
 });
 
+test("starts the next hand after hand_complete and carries score and bags forward", () => {
+  let room = playOutRoom(biddingCompleteRoom({
+    deck: player1WinsEveryTrickDeck(),
+    matchSettings: { targetScore: 500 }
+  }));
+
+  assert.equal(room.phase, "hand_complete");
+  assert.equal(room.handNumber, 1);
+  assert.equal(room.dealer, "player2");
+  assert.equal(room.game.score.player1, 49);
+
+  room = applyRoomAction(room, {
+    type: "startNextHand",
+    seatToken: PLAYER1_TOKEN,
+    deck: player2HighDeck(),
+    expectedPhase: "hand_complete"
+  });
+
+  assert.equal(room.phase, "bidding");
+  assert.equal(room.handNumber, 2);
+  assert.equal(room.dealer, "player1");
+  assert.equal(room.firstPlayer, "player2");
+  assert.equal(room.currentTurn, "player2");
+  assert.deepEqual(room.game.score, { player1: 49, player2: -30 });
+  assert.deepEqual(room.game.bags, { player1: 9, player2: 0 });
+  assert.equal(room.game.hands.player1.length, 13);
+  assert.equal(room.game.lastTrick, null);
+});
+
+test("rejects startNextHand outside hand_complete phase", () => {
+  const room = biddingCompleteRoom();
+
+  assert.throws(() => applyRoomAction(room, {
+    type: "startNextHand",
+    seatToken: PLAYER1_TOKEN
+  }), /hand_complete phase/);
+});
+
+test("rejects stale phase and stale turn actions before mutation", () => {
+  let room = readyStartedRoom();
+
+  assert.throws(() => applyRoomAction(room, {
+    type: "bid",
+    seatToken: PLAYER1_TOKEN,
+    bid: 4,
+    expectedPhase: "waiting"
+  }), /Stale action expected waiting phase/);
+  assert.deepEqual(room.game.bids, { player1: null, player2: null });
+
+  room = biddingCompleteRoom();
+  const card = room.game.hands.player1.find((candidate) => candidate.suit === "clubs");
+
+  assert.throws(() => applyRoomAction(room, {
+    type: "playCard",
+    seatToken: PLAYER1_TOKEN,
+    card,
+    expectedTurn: "player2"
+  }), /Stale action expected player2 turn/);
+  assert.equal(room.game.hands.player1.length, 13);
+  assert.equal(room.game.currentTrick.length, 0);
+});
+
 function readyStartedRoom({ deck = player2HighDeck(), matchSettings = {}, coinFlipWinner = "player2" } = {}) {
   let room = createRoom({
     roomCode: "SPADES",
