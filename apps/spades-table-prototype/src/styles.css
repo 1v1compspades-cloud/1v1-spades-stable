@@ -47,7 +47,10 @@ h2 {
 .bid-controls,
 .play-controls,
 .fixture-controls,
-.qa-status-grid {
+.qa-status-grid,
+.visual-status-band,
+.summary-grid,
+.card-button-grid {
   display: grid;
   gap: 12px;
 }
@@ -78,6 +81,86 @@ button {
   color: #10251c;
   background: #d6b25e;
   font-weight: 800;
+}
+
+.visual-shell {
+  display: grid;
+  gap: 16px;
+  margin: 0 0 18px;
+  padding: 14px;
+  border: 1px solid rgba(248, 244, 235, 0.18);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.visual-status,
+.summary-item,
+.trick-text,
+.empty-state {
+  margin: 0;
+}
+
+.visual-status,
+.summary-item {
+  min-height: 44px;
+  padding: 12px;
+  border: 1px solid rgba(248, 244, 235, 0.14);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #f8f4eb;
+  font-weight: 800;
+}
+
+.visual-zone {
+  display: grid;
+  gap: 10px;
+}
+
+h3 {
+  margin: 0;
+  color: #f8f4eb;
+  font-size: 15px;
+}
+
+.card-button-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.two-seat-visual-shell {
+  margin-top: 16px;
+}
+
+.viewer-compare-grid {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 16px;
+}
+
+.card-button {
+  min-height: 48px;
+  overflow-wrap: anywhere;
+  color: #d7d1c3;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(248, 244, 235, 0.2);
+}
+
+.card-button.playable {
+  color: #10251c;
+  background: #d6b25e;
+}
+
+.card-button:disabled {
+  opacity: 0.58;
+}
+
+.trick-text,
+.empty-state {
+  min-height: 44px;
+  padding: 12px;
+  border-radius: 6px;
+  color: #d7d1c3;
+  background: rgba(0, 0, 0, 0.22);
+  font-weight: 700;
 }
 
 pre {
@@ -117,7 +200,14 @@ pre {
 
 @media (min-width: 640px) {
   .qa-status-grid,
-  .fixture-controls {
+  .fixture-controls,
+  .visual-status-band,
+  .summary-grid,
+  .viewer-compare-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .card-button-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }

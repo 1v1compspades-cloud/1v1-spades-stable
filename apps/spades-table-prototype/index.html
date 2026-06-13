@@ -35,6 +35,27 @@
           <p id="turn-status" class="status-chip">Turn: none</p>
           <p id="action-status" class="status-chip">Action: none</p>
         </div>
+        <div class="visual-shell" aria-label="Visual local gameplay shell">
+          <div class="visual-status-band">
+            <p id="visual-phase" class="visual-status">Phase: none</p>
+            <p id="visual-seat" class="visual-status">Seat: none</p>
+            <p id="visual-action" class="visual-status">Action: No active room</p>
+          </div>
+          <div id="visual-score-summary" class="summary-grid" aria-label="Score summary"></div>
+          <div id="visual-bid-bag-summary" class="summary-grid" aria-label="Bid and bag summary"></div>
+          <section class="visual-zone" aria-labelledby="visual-hand-title">
+            <h3 id="visual-hand-title">Current Hand</h3>
+            <div id="visual-hand" class="card-button-grid" aria-label="Current hand card buttons"></div>
+          </section>
+          <section class="visual-zone" aria-labelledby="visual-current-trick-title">
+            <h3 id="visual-current-trick-title">Current Trick</h3>
+            <p id="visual-current-trick" class="trick-text">none</p>
+          </section>
+          <section class="visual-zone" aria-labelledby="visual-last-trick-title">
+            <h3 id="visual-last-trick-title">Last Trick</h3>
+            <p id="visual-last-trick" class="trick-text">none</p>
+          </section>
+        </div>
         <pre id="room-status">No active room.</pre>
         <p id="bid-status" class="status-line">Bid next: none</p>
         <pre id="hand-status">Hand IDs: none</pre>
@@ -94,6 +115,32 @@
           <button id="manual-full-hand" type="button">Play Full Hand</button>
           <button id="manual-next-hand" type="button">Start Next Hand</button>
         </div>
+        <div class="visual-shell two-seat-visual-shell" aria-label="Two-seat visual QA shell">
+          <div class="visual-status-band">
+            <p id="manual-visual-room" class="visual-status">Room: none</p>
+            <p id="manual-visual-phase" class="visual-status">Phase: none</p>
+            <p id="manual-visual-seat" class="visual-status">Seat: none</p>
+            <p id="manual-visual-action" class="visual-status">Action: none</p>
+            <p id="manual-visual-turn" class="visual-status">Turn: none</p>
+            <p id="manual-visual-bid" class="visual-status">Bid next: none</p>
+            <p id="manual-visual-playable" class="visual-status">Playable: 0</p>
+          </div>
+          <div id="manual-visual-score-summary" class="summary-grid" aria-label="Manual score summary"></div>
+          <div id="manual-visual-bid-bag-summary" class="summary-grid" aria-label="Manual bid and bag summary"></div>
+          <section class="visual-zone" aria-labelledby="manual-visual-hand-title">
+            <h3 id="manual-visual-hand-title">Selected Viewer Hand</h3>
+            <div id="manual-visual-hand" class="card-button-grid" aria-label="Selected viewer hand card buttons"></div>
+          </section>
+          <section class="visual-zone" aria-labelledby="manual-visual-current-trick-title">
+            <h3 id="manual-visual-current-trick-title">Public Current Trick</h3>
+            <p id="manual-visual-current-trick" class="trick-text">none</p>
+          </section>
+          <section class="visual-zone" aria-labelledby="manual-visual-last-trick-title">
+            <h3 id="manual-visual-last-trick-title">Public Last Trick</h3>
+            <p id="manual-visual-last-trick" class="trick-text">none</p>
+          </section>
+        </div>
+        <div id="two-seat-visual-compare" class="viewer-compare-grid" aria-label="Two-seat sanitized view comparison"></div>
         <pre id="manual-status">Manual harness idle.</pre>
       </section>
     </main>

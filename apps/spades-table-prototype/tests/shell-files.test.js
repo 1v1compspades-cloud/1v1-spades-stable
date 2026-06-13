@@ -20,6 +20,14 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /id="seat-status"/);
   assert.match(html, /id="turn-status"/);
   assert.match(html, /id="action-status"/);
+  assert.match(html, /id="visual-phase"/);
+  assert.match(html, /id="visual-seat"/);
+  assert.match(html, /id="visual-action"/);
+  assert.match(html, /id="visual-score-summary"/);
+  assert.match(html, /id="visual-bid-bag-summary"/);
+  assert.match(html, /id="visual-hand"/);
+  assert.match(html, /id="visual-current-trick"/);
+  assert.match(html, /id="visual-last-trick"/);
   assert.match(html, /id="bid-status"/);
   assert.match(html, /id="bid-input"/);
   assert.match(html, /id="submit-bid"/);
@@ -47,6 +55,19 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /id="start-new-match"/);
   assert.match(html, /id="manual-full-hand"/);
   assert.match(html, /id="manual-next-hand"/);
+  assert.match(html, /id="manual-visual-room"/);
+  assert.match(html, /id="manual-visual-phase"/);
+  assert.match(html, /id="manual-visual-seat"/);
+  assert.match(html, /id="manual-visual-action"/);
+  assert.match(html, /id="manual-visual-turn"/);
+  assert.match(html, /id="manual-visual-bid"/);
+  assert.match(html, /id="manual-visual-playable"/);
+  assert.match(html, /id="manual-visual-score-summary"/);
+  assert.match(html, /id="manual-visual-bid-bag-summary"/);
+  assert.match(html, /id="manual-visual-hand"/);
+  assert.match(html, /id="manual-visual-current-trick"/);
+  assert.match(html, /id="manual-visual-last-trick"/);
+  assert.match(html, /id="two-seat-visual-compare"/);
   assert.match(html, /id="ready-player"/);
   assert.match(html, /id="leave-room"/);
   assert.doesNotMatch(html, /card-table|leaderboard|tournament/i);
@@ -56,6 +77,7 @@ test("home client wires the shell through the local app controller", () => {
   const client = readFileSync(resolve(appDir, "src/home-client.js"), "utf8");
 
   assert.match(client, /createSpadesAppController/);
+  assert.match(client, /buildVisualShellModel/);
   assert.match(client, /listManualFixturePresets/);
   assert.match(client, /controller\.createRoom/);
   assert.match(client, /controller\.joinRoom/);
@@ -64,6 +86,8 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /controller\.leaveRoom/);
   assert.match(client, /controller\.submitBid/);
   assert.match(client, /controller\.submitPlayCardById/);
+  assert.match(client, /visualCardButton/);
+  assert.match(client, /replaceChildren/);
   assert.match(client, /controller\.playFullHand/);
   assert.match(client, /controller\.startNextHand/);
   assert.match(client, /controller\.recordMatchHistory/);
@@ -71,6 +95,10 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /controller\.startNewMatch/);
   assert.match(client, /createTwoSeatManualHarness/);
   assert.match(client, /manualViewSelect/);
+  assert.match(client, /manualVisualHandOutput/);
+  assert.match(client, /renderVisualShellInto/);
+  assert.match(client, /renderTwoSeatVisualCompare/);
+  assert.match(client, /manualCardActionForView/);
   assert.match(client, /fixturePresetSelect/);
   assert.match(client, /runPreset/);
   assert.match(client, /showError/);

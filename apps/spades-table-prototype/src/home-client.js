@@ -4,6 +4,7 @@ import {
   listManualFixturePresets
 } from "./manual-harness.js";
 import { renderRoomShellText } from "./room-shell.js";
+import { buildVisualShellModel } from "./visual-shell.js";
 
 const controller = createSpadesAppController({
   createPlayerId: loadOrCreatePlayerId
@@ -15,6 +16,27 @@ const phaseStatusOutput = document.querySelector("#phase-status");
 const seatStatusOutput = document.querySelector("#seat-status");
 const turnStatusOutput = document.querySelector("#turn-status");
 const actionStatusOutput = document.querySelector("#action-status");
+const visualPhaseOutput = document.querySelector("#visual-phase");
+const visualSeatOutput = document.querySelector("#visual-seat");
+const visualActionOutput = document.querySelector("#visual-action");
+const visualScoreSummaryOutput = document.querySelector("#visual-score-summary");
+const visualBidBagSummaryOutput = document.querySelector("#visual-bid-bag-summary");
+const visualHandOutput = document.querySelector("#visual-hand");
+const visualCurrentTrickOutput = document.querySelector("#visual-current-trick");
+const visualLastTrickOutput = document.querySelector("#visual-last-trick");
+const manualVisualRoomOutput = document.querySelector("#manual-visual-room");
+const manualVisualPhaseOutput = document.querySelector("#manual-visual-phase");
+const manualVisualSeatOutput = document.querySelector("#manual-visual-seat");
+const manualVisualActionOutput = document.querySelector("#manual-visual-action");
+const manualVisualTurnOutput = document.querySelector("#manual-visual-turn");
+const manualVisualBidOutput = document.querySelector("#manual-visual-bid");
+const manualVisualPlayableOutput = document.querySelector("#manual-visual-playable");
+const manualVisualScoreSummaryOutput = document.querySelector("#manual-visual-score-summary");
+const manualVisualBidBagSummaryOutput = document.querySelector("#manual-visual-bid-bag-summary");
+const manualVisualHandOutput = document.querySelector("#manual-visual-hand");
+const manualVisualCurrentTrickOutput = document.querySelector("#manual-visual-current-trick");
+const manualVisualLastTrickOutput = document.querySelector("#manual-visual-last-trick");
+const twoSeatVisualCompareOutput = document.querySelector("#two-seat-visual-compare");
 const statusOutput = document.querySelector("#room-status");
 const bidStatusOutput = document.querySelector("#bid-status");
 const handStatusOutput = document.querySelector("#hand-status");
@@ -125,7 +147,7 @@ document.querySelector("#manual-trick").addEventListener("click", () => {
 
 document.querySelector("#manual-full-hand").addEventListener("click", () => {
   manualHarness.playFullHand();
-  renderManualStatus(manualHarness.guest);
+  renderManualStatus();
 });
 
 document.querySelector("#manual-next-hand").addEventListener("click", () => {
@@ -165,6 +187,7 @@ function renderStatus(status) {
   seatStatusOutput.textContent = `Seat: ${status?.viewerSeat ?? "none"}${status?.alreadySeated ? " seated" : ""}`;
   turnStatusOutput.textContent = `Turn: ${status?.currentTurn ?? "none"}`;
   actionStatusOutput.textContent = status ? formatActionStatus(status) : "Action: none";
+  renderVisualShell(status);
   statusOutput.textContent = status ? renderRoomShellText(status) : "No active room.";
   bidStatusOutput.textContent = status?.biddingStatus
     ? `Bid next: ${status.biddingStatus.nextBidder ?? "none"}`
@@ -184,8 +207,115 @@ function renderStatus(status) {
   matchHistoryOutput.textContent = formatMatchHistory(controller.getMatchHistory());
 }
 
+function renderVisualShell(status) {
+  renderVisualShellInto(status, {
+    phase: visualPhaseOutput,
+    seat: visualSeatOutput,
+    action: visualActionOutput,
+    scoreSummary: visualScoreSummaryOutput,
+    bidBagSummary: visualBidBagSummaryOutput,
+    hand: visualHandOutput,
+    currentTrick: visualCurrentTrickOutput,
+    lastTrick: visualLastTrickOutput
+  }, (card) => {
+    playCardIdInput.value = card.id;
+    runShellAction(() => controller.submitPlayCardById({ cardId: card.id }).status);
+  });
+}
+
+function renderVisualShellInto(status, targets, onPlayableCard) {
+  const model = buildVisualShellModel(status);
+  if (targets.room) targets.room.textContent = `Room: ${model.roomCode}`;
+  if (targets.turn) targets.turn.textContent = `Turn: ${model.currentTurn}`;
+  if (targets.bid) targets.bid.textContent = model.bidStatus;
+  if (targets.playable) targets.playable.textContent = model.playableStatus;
+  targets.phase.textContent = `Phase: ${model.phase}`;
+  targets.seat.textContent = `Seat: ${model.viewerSeat}`;
+  targets.action.textContent = `Action: ${model.action}`;
+  targets.currentTrick.textContent = model.currentTrick;
+  targets.lastTrick.textContent = model.lastTrick;
+  targets.scoreSummary.replaceChildren(...model.scoreRows.map((row) => visualSummaryItem(
+    row.seat,
+    `Score ${row.score}`,
+    `Tricks ${row.tricks}`
+  )));
+  targets.bidBagSummary.replaceChildren(...model.bidBagRows.map((row) => visualSummaryItem(
+    row.seat,
+    `Bid ${row.bid ?? "none"}`,
+    `Bags ${row.bags} | Ready ${row.ready ? "yes" : "no"}`
+  )));
+  targets.hand.replaceChildren(...model.handCards.map((card) => visualCardButton(card, onPlayableCard)));
+  if (!model.handCards.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "No visible hand for this view.";
+    targets.hand.append(empty);
+  }
+}
+
+function visualSummaryItem(label, primary, secondary) {
+  const item = document.createElement("p");
+  item.className = "summary-item";
+  item.textContent = `${label}: ${primary} | ${secondary}`;
+  return item;
+}
+
+function visualCardButton(card, onPlayableCard) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = card.playable ? "card-button playable" : "card-button";
+  button.textContent = card.label;
+  button.disabled = !card.playable || !onPlayableCard;
+  button.addEventListener("click", () => {
+    if (onPlayableCard) onPlayableCard(card);
+  });
+  return button;
+}
+
 function renderManualStatus(view = manualViewSelect.value) {
-  manualStatusOutput.textContent = manualHarness.statusText(view);
+  const status = manualHarness.statusForView(view);
+  manualStatusOutput.textContent = status ? manualHarness.statusText(view) : "Manual harness idle.";
+  renderVisualShellInto(status, {
+    room: manualVisualRoomOutput,
+    phase: manualVisualPhaseOutput,
+    seat: manualVisualSeatOutput,
+    action: manualVisualActionOutput,
+    turn: manualVisualTurnOutput,
+    bid: manualVisualBidOutput,
+    playable: manualVisualPlayableOutput,
+    scoreSummary: manualVisualScoreSummaryOutput,
+    bidBagSummary: manualVisualBidBagSummaryOutput,
+    hand: manualVisualHandOutput,
+    currentTrick: manualVisualCurrentTrickOutput,
+    lastTrick: manualVisualLastTrickOutput
+  }, manualCardActionForView(view));
+  renderTwoSeatVisualCompare();
+}
+
+function manualCardActionForView(view) {
+  const controllerForView = view === "host"
+    ? manualHarness.host
+    : (view === "guest" ? manualHarness.guest : null);
+  if (!controllerForView) return null;
+
+  return (card) => {
+    controllerForView.submitPlayCardById({ cardId: card.id });
+    renderManualStatus(view);
+  };
+}
+
+function renderTwoSeatVisualCompare() {
+  const views = ["host", "guest", "spectator"].map((view) => ({
+    view,
+    status: manualHarness.statusForView(view)
+  }));
+  twoSeatVisualCompareOutput.replaceChildren(...views.map(({ view, status }) => {
+    const model = buildVisualShellModel(status);
+    const item = document.createElement("p");
+    item.className = "summary-item";
+    item.textContent = `${view}: ${model.viewerSeat} | hand ${model.handCards.length} | ${model.bidStatus} | ${model.playableStatus} | trick ${model.currentTrick} | last ${model.lastTrick}`;
+    return item;
+  }));
 }
 
 function showError(message) {
