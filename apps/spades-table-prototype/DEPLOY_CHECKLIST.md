@@ -1,11 +1,12 @@
 # Spades Hosted Multiplayer Prototype Checklist
 
-This is for external beta smoke testing only. It is free play. It is not a production account, payment, prize, gambling, tournament payout, or App Store build.
+This is for external beta smoke testing only. It is a free-play tester build, not a production account or App Store build.
 
 Related launch docs:
 - `docs/PRODUCTION_CONFIG_CHECKLIST.md`
 - `docs/BETA_TESTER_INVITE.md`
 - `docs/SPADES_BETA_RELEASE_NOTES.md`
+- `docs/SPADES_HOSTED_BETA_PHASE_40_TESTER_RUN.md`
 - `docs/FINAL_SMOKE_TEST_CHECKLIST.md`
 
 ## Local Run
@@ -35,7 +36,7 @@ The server health response echoes the public API/WebSocket URLs only. It does no
 
 ## Production Config Checklist
 
-1. Confirm the hosted app serves the Phase 39 beta build label.
+1. Confirm the hosted app serves the Phase 40 beta build label.
 2. Confirm `SPADES_PUBLIC_API_URL` is an absolute `https://` URL for hosted beta.
 3. Confirm `SPADES_PUBLIC_WS_URL` is an absolute `wss://` URL ending in `/ws` for hosted beta.
 4. Confirm local fallback URLs use `http://127.0.0.1:<port>` and `ws://127.0.0.1:<port>/ws`.
@@ -112,7 +113,7 @@ Use this sequence for each hosted beta invite:
 6. Ready both players, bid, and play at least one hand.
 7. Refresh during a room and use Restore Active Room to test reconnect.
 8. Use the Beta Feedback Report panel to report a bug with diagnostics.
-9. Remind testers this is free play only with no cash prizes, no gambling, no payments, and no tournament payouts.
+9. Remind testers this is free play only.
 
 ## External Tester Hardening Checks
 
@@ -127,7 +128,7 @@ Use this sequence for each hosted beta invite:
 ## Launch Candidate Final Smoke Test
 
 1. Confirm the beta build label reads as a launch candidate.
-2. Confirm all public text is free play only and makes no cash, prize, gambling, payment, or payout claims.
+2. Confirm all public text uses free-play wording only.
 3. Confirm advanced diagnostics and local preview tools are collapsed by default.
 4. Confirm the copyable diagnostics section remains visible for bug reports.
 5. Confirm known issues are visible to testers.
@@ -136,6 +137,7 @@ Use this sequence for each hosted beta invite:
 8. Run the final smoke-test checklist in `docs/FINAL_SMOKE_TEST_CHECKLIST.md`.
 9. Confirm release notes in `docs/SPADES_BETA_RELEASE_NOTES.md` match the deployed build.
 10. Confirm tester invite copy in `docs/BETA_TESTER_INVITE.md` uses free-play wording only.
+11. Run the Phase 40 tester-run checklist in `docs/SPADES_HOSTED_BETA_PHASE_40_TESTER_RUN.md`.
 
 ## API And UI Safety Confirmations
 
@@ -144,7 +146,7 @@ Use this sequence for each hosted beta invite:
 - Diagnostics do not include hidden hands, private seat tokens, admin keys, secrets, or host-only data.
 - Event logs show sanitized action summaries only.
 - Health responses expose only operational status and public URLs.
-- Tester copy says free play only and does not mention real prizes, payments, gambling, or tournament payouts.
+- Tester copy says free play only.
 
 ## Known Issues For Testers
 

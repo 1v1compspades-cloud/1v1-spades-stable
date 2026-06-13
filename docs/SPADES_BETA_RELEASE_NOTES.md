@@ -1,8 +1,8 @@
 # Spades Hosted Beta Release Notes
 
-Build: `Spades Hosted Beta v0.1.0 Launch Candidate / Phase 39`
+Build: `Spades Hosted Beta v0.1.0 Launch Candidate / Phase 40`
 
-This beta is free play only. There are no cash prizes, no gambling, no payments, and no tournament payouts.
+This beta is free play only.
 
 ## What Is Included
 
@@ -31,7 +31,7 @@ This beta is free play only. There are no cash prizes, no gambling, no payments,
 - AFK/disconnect timing is a placeholder.
 - Rooms are stored in memory for the prototype and reset when the server restarts.
 - Local stats, leaderboard preview, and tournament history preview are local-only.
-- There is no real login, production database, payment system, prize system, or tournament payout system.
+- There is no real login or production database.
 
 ## Smoke Test
 
@@ -49,4 +49,3 @@ The smoke test validates health, create room, join room, WebSocket connection, o
 - Restore previous public API/WebSocket environment variables if they changed.
 - Restart the service to clear in-memory rooms.
 - Re-run the hosted smoke test before sending testers back in.
-

@@ -1,6 +1,6 @@
 # Spades Hosted Beta Production Config Checklist
 
-This checklist is for the free-play hosted beta only. It does not enable payments, prizes, gambling, tournament payouts, real login, or a production account database.
+This checklist is for the free-play hosted beta only. It does not enable real login or a production account database.
 
 ## Production Config Checklist
 
@@ -8,10 +8,10 @@ This checklist is for the free-play hosted beta only. It does not enable payment
 - Use `npm install` as the build command.
 - Use `npm start` as the start command.
 - Confirm the health endpoint returns `ok: true`.
-- Confirm the hosted app loads the visible `Spades Hosted Beta v0.1.0 Launch Candidate / Phase 39` build label.
+- Confirm the hosted app loads the visible `Spades Hosted Beta v0.1.0 Launch Candidate / Phase 40` build label.
 - Confirm WebSocket traffic is accepted by the host.
 - Confirm server logs do not include hidden hands, private seat tokens, request bodies, admin keys, or secrets.
-- Confirm tester-facing UI says free play only and does not mention cash prizes, gambling, payments, or tournament payouts.
+- Confirm tester-facing UI says free play only.
 
 ## Environment Variable Checklist
 
@@ -73,4 +73,3 @@ Manual fallback:
 4. Restart the service to clear in-memory rooms.
 5. Re-run the hosted smoke test.
 6. Send testers the updated link or a short pause notice.
-

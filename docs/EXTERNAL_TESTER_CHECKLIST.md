@@ -1,6 +1,6 @@
 # Spades External Tester Checklist
 
-This beta is free play only. There are no cash prizes, no gambling, no payments, and no tournament payouts.
+This beta is free play only.
 
 ## Before Testing
 

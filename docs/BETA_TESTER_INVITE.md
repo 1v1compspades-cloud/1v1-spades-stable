@@ -1,6 +1,6 @@
 # Spades Hosted Beta Tester Invite Copy
 
-Use this copy for the first external tester group. Keep it free-play only and avoid any claims about prizes, gambling, payments, rankings, or tournament payouts.
+Use this copy for the first external tester group. Keep it free-play only and avoid ranking or reward claims.
 
 ## Short Invite
 
@@ -14,7 +14,7 @@ Please try:
 - Refresh during a room and use Restore Active Room.
 - Use Report Bug if anything feels confusing or breaks.
 
-Safety note: this is free play only. There are no cash prizes, no gambling, no payments, and no tournament payouts.
+Safety note: this is free play only.
 
 When reporting a bug, please include the copyable diagnostics bundle, what you expected to happen, what actually happened, and a screenshot if possible.
 
@@ -40,4 +40,3 @@ Please send:
 - Refresh recovery depends on the same browser/device identity.
 - Local stats, leaderboard preview, and tournament history preview are local-only.
 - Rooms are in memory and may reset when the hosted service restarts.
-

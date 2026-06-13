@@ -1,15 +1,16 @@
 # Spades Launch Candidate Final Smoke-Test Checklist
 
-This launch candidate is free play only. There are no cash prizes, no gambling, no payments, and no tournament payouts.
+This launch candidate is free play only.
 
 ## Public Text Check
 
 - The beta build label is visible and intentional.
 - Public text says free play only.
-- Public text does not advertise prizes, cash, gambling, payments, or payouts.
+- Public text uses free-play wording only.
 - Local previews are clearly described as local previews, not production rankings.
 - Release notes in `docs/SPADES_BETA_RELEASE_NOTES.md` match the deployed beta build.
 - Tester invite copy in `docs/BETA_TESTER_INVITE.md` uses free-play wording only.
+- Phase 40 tester-run steps in `docs/SPADES_HOSTED_BETA_PHASE_40_TESTER_RUN.md` are ready.
 
 ## Production Config Check
 

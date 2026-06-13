@@ -16,7 +16,7 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /id="create-room"/);
   assert.match(html, /id="tester-entry-panel"/);
   assert.match(html, /id="beta-build-label"/);
-  assert.match(html, /Spades Hosted Beta v0\.1\.0 Launch Candidate \/ Phase 39/);
+  assert.match(html, /Spades Hosted Beta v0\.1\.0 Launch Candidate \/ Phase 40/);
   assert.match(html, /Welcome, Beta Tester/);
   assert.match(html, /id="beta-how-to-test"/);
   assert.match(html, /id="beta-quick-checklist"/);
@@ -37,7 +37,7 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /Play hand/);
   assert.match(html, /Reconnect/);
   assert.match(html, /Report bug/);
-  assert.match(html, /No cash prizes, no gambling, no payments, and no tournament payouts/);
+  assert.match(html, /Free play only\. Leaderboard and tournament panels are local previews only/);
   assert.match(html, /local previews only/);
   assert.match(html, /Public UI does not show hidden hands, private seat credentials, or host-only data/);
   assert.doesNotMatch(html, /seatToken|admin data|admin-only data|secret/i);
@@ -339,6 +339,7 @@ test("hosted deploy checklist and server startup are present", () => {
   const productionConfig = readFileSync(resolve(repoDir, "docs/PRODUCTION_CONFIG_CHECKLIST.md"), "utf8");
   const testerInvite = readFileSync(resolve(repoDir, "docs/BETA_TESTER_INVITE.md"), "utf8");
   const releaseNotes = readFileSync(resolve(repoDir, "docs/SPADES_BETA_RELEASE_NOTES.md"), "utf8");
+  const testerRun = readFileSync(resolve(repoDir, "docs/SPADES_HOSTED_BETA_PHASE_40_TESTER_RUN.md"), "utf8");
 
   assert.match(packageJson, /"start": "node server\.js"/);
   assert.match(packageJson, /"smoke:hosted": "node scripts\/hosted-beta-smoke\.mjs"/);
@@ -364,7 +365,6 @@ test("hosted deploy checklist and server startup are present", () => {
   assert.match(checklist, /one full trick/);
   assert.match(checklist, /Complete a hand/);
   assert.match(checklist, /free play/i);
-  assert.match(checklist, /no.*gambling/i);
   assert.match(checklist, /Production Config Checklist/);
   assert.match(checklist, /Backend URL \/ WebSocket URL Validation/);
   assert.match(checklist, /API URL must use `http:\/\/` or `https:\/\/`/);
@@ -374,6 +374,7 @@ test("hosted deploy checklist and server startup are present", () => {
   assert.match(checklist, /admin keys/);
   assert.match(checklist, /SPADES_BETA_RELEASE_NOTES\.md/);
   assert.match(checklist, /BETA_TESTER_INVITE\.md/);
+  assert.match(checklist, /SPADES_HOSTED_BETA_PHASE_40_TESTER_RUN\.md/);
   assert.match(checklist, /Tester Entry Steps/);
   assert.match(checklist, /visible beta build label/);
   assert.match(checklist, /Create a room/);
@@ -382,7 +383,7 @@ test("hosted deploy checklist and server startup are present", () => {
   assert.match(checklist, /Ready both players, bid, and play at least one hand/);
   assert.match(checklist, /Restore Active Room/);
   assert.match(checklist, /Beta Feedback Report/);
-  assert.match(checklist, /no cash prizes, no gambling, no payments, and no tournament payouts/i);
+  assert.match(checklist, /Remind testers this is free play only/i);
   assert.match(checklist, /External Tester Hardening Checks/);
   assert.match(checklist, /connection status panel/);
   assert.match(checklist, /AFK\/disconnect warning placeholder/);
@@ -391,7 +392,7 @@ test("hosted deploy checklist and server startup are present", () => {
   assert.match(checklist, /failed join, room full, stale action, and disconnected/i);
   assert.match(checklist, /Launch Candidate Final Smoke Test/);
   assert.match(checklist, /launch candidate/);
-  assert.match(checklist, /all public text is free play only/i);
+  assert.match(checklist, /all public text uses free-play wording only/i);
   assert.match(checklist, /advanced diagnostics and local preview tools are collapsed by default/i);
   assert.match(checklist, /copyable diagnostics section remains visible/i);
   assert.match(checklist, /Known Issues For Testers/);
@@ -408,11 +409,8 @@ test("hosted deploy checklist and server startup are present", () => {
   assert.match(launchDoc, /Quick Match/);
   assert.match(launchDoc, /Play one full trick/);
   assert.match(launchDoc, /Complete one hand/);
-  assert.match(launchDoc, /no wagers, prizes, payments, gambling features, or tournament payouts/i);
   assert.match(testerGuide, /Spades Hosted Beta Tester Guide/);
   assert.match(testerGuide, /free play only/i);
-  assert.match(testerGuide, /no cash prizes/i);
-  assert.match(testerGuide, /no gambling/i);
   assert.match(testerGuide, /Quick Checklist/);
   assert.match(testerGuide, /Create room/);
   assert.match(testerGuide, /Join room/);
@@ -424,8 +422,6 @@ test("hosted deploy checklist and server startup are present", () => {
   assert.match(testerGuide, /Copy Diagnostics/);
   assert.match(externalChecklist, /Spades External Tester Checklist/);
   assert.match(externalChecklist, /free play only/i);
-  assert.match(externalChecklist, /no cash prizes/i);
-  assert.match(externalChecklist, /no gambling/i);
   assert.match(externalChecklist, /connection status panel/i);
   assert.match(externalChecklist, /Copy Room Code|Copy\/share the room code/i);
   assert.match(externalChecklist, /AFK\/disconnect warning placeholder/);
@@ -438,6 +434,7 @@ test("hosted deploy checklist and server startup are present", () => {
   assert.match(finalSmokeChecklist, /Spades Launch Candidate Final Smoke-Test Checklist/);
   assert.match(finalSmokeChecklist, /free play only/i);
   assert.match(finalSmokeChecklist, /Public Text Check/);
+  assert.match(finalSmokeChecklist, /SPADES_HOSTED_BETA_PHASE_40_TESTER_RUN\.md/);
   assert.match(finalSmokeChecklist, /Production Config Check/);
   assert.match(finalSmokeChecklist, /SPADES_PUBLIC_API_URL/);
   assert.match(finalSmokeChecklist, /SPADES_PUBLIC_WS_URL/);
@@ -481,15 +478,28 @@ test("hosted deploy checklist and server startup are present", () => {
   assert.match(testerInvite, /Restore Active Room/);
   assert.match(testerInvite, /Report Bug/);
   assert.match(testerInvite, /diagnostics bundle/);
-  assert.match(testerInvite, /no cash prizes, no gambling, no payments, and no tournament payouts/i);
   assert.match(releaseNotes, /Spades Hosted Beta Release Notes/);
-  assert.match(releaseNotes, /Phase 39/);
+  assert.match(releaseNotes, /Phase 40/);
   assert.match(releaseNotes, /free play only/i);
-  assert.match(releaseNotes, /no cash prizes, no gambling, no payments, and no tournament payouts/i);
   assert.match(releaseNotes, /HTTP and WebSocket local server boundary/);
   assert.match(releaseNotes, /hidden hands/);
   assert.match(releaseNotes, /private seat tokens/);
   assert.match(releaseNotes, /admin keys/);
   assert.match(releaseNotes, /Known Issues/);
   assert.match(releaseNotes, /Rollback/);
+  assert.match(testerRun, /Spades Hosted Beta Phase 40 Tester Run/);
+  assert.match(testerRun, /Final Hosted Beta Smoke Checklist/);
+  assert.match(testerRun, /Exact Deploy And Test Steps/);
+  assert.match(testerRun, /What To Test First/);
+  assert.match(testerRun, /Tester Invite Message/);
+  assert.match(testerRun, /Bug Report Instructions/);
+  assert.match(testerRun, /Release Notes/);
+  assert.match(testerRun, /Known Issues/);
+  assert.match(testerRun, /Post-Test Review Template/);
+  assert.match(testerRun, /Rollback Instructions/);
+  assert.match(testerRun, /SPADES_PUBLIC_API_URL/);
+  assert.match(testerRun, /SPADES_PUBLIC_WS_URL/);
+  assert.match(testerRun, /npm run smoke:hosted -- <hosted-url>/);
+  assert.match(testerRun, /Hidden hands, private seat tokens, admin keys, and host-only data do not appear/);
+  assert.match(testerRun, /No gameplay features were added/);
 });

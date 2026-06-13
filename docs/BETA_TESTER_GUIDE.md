@@ -2,7 +2,7 @@
 
 Welcome to the Spades hosted beta. This build is for testing room entry, reconnect, Quick Match, bidding, hand play, and issue reporting.
 
-Safety/legal note: this beta is free play only. There are no cash prizes, no gambling, no payments, and no tournament payouts.
+Safety note: this beta is free play only.
 
 ## Before You Start
 
@@ -72,8 +72,4 @@ Report bug:
 ## Known Limits
 
 - No real accounts database.
-- No payments.
-- No prizes.
-- No gambling.
-- No tournament payouts.
 - Leaderboard and tournament panels are local previews only.

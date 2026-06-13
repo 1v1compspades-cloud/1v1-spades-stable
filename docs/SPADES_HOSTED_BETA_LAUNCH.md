@@ -1,6 +1,6 @@
 # Spades Hosted Beta Launch Flow
 
-This beta is free play only. It has no gambling, prizes, payments, tournament payouts, or production account system. Leaderboard and tournament panels are local previews for architecture testing only.
+This beta is free play only. It has no production account system. Leaderboard and tournament panels are local previews for architecture testing only.
 
 ## Tester Entry Flow
 
@@ -32,9 +32,9 @@ Ask testers to report:
 
 Known limitations:
 - No real login or production account database.
-- No production leaderboard or tournament payouts.
+- No production leaderboard.
 - Local stats, leaderboard preview, and tournament history prep are prototype-only.
-- No payments, prizes, gambling, or wagering.
+- Free-play tester build only.
 - Visual card art and final animations are not included yet.
 
 Reset if stuck:
@@ -74,4 +74,4 @@ Saved beta reports remain local to the tester device until exported or cleared.
 
 Use this language in beta invites:
 
-> This is a free-play Spades beta for testing room flow, reconnect, Quick Match, and gameplay reliability. There are no wagers, prizes, payments, gambling features, or tournament payouts. Local leaderboard and tournament panels are previews only.
+> This is a free-play Spades beta for testing room flow, reconnect, Quick Match, and gameplay reliability. Local leaderboard and tournament panels are previews only.

@@ -1,6 +1,6 @@
 # Spades Beta Feedback Reporting
 
-This hosted beta is free play only. Do not describe issues as involving gambling, prizes, payments, wagers, or tournament payouts because those systems do not exist in this prototype.
+This hosted beta is free play only. Keep issue reports focused on room entry, reconnect, Quick Match, bidding, hand play, and diagnostics.
 
 ## What Testers Should Send
 
