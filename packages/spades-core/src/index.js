@@ -11,7 +11,9 @@ export const DEFAULT_MATCH_SETTINGS = Object.freeze({
   bagPenalty: -100
 });
 
-export function phase0Placeholder(featureName) {
-  throw new Error(`${featureName} is reserved for Phase 1 implementation`);
-}
-
+export * from "./deck.js";
+export * from "./bidding.js";
+export * from "./legal-play.js";
+export * from "./trick-winner.js";
+export * from "./scoring.js";
+export * from "./match-complete.js";
