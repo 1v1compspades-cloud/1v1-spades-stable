@@ -4,7 +4,14 @@ import {
   listManualFixturePresets
 } from "./manual-harness.js";
 import { renderRoomShellText } from "./room-shell.js";
-import { buildVisualShellModel } from "./visual-shell.js";
+import {
+  buildVisualQaReport,
+  buildVisualShellModel
+} from "./visual-shell.js";
+import {
+  listVisualQaScripts,
+  runVisualQaScript
+} from "./visual-qa-scripts.js";
 
 const controller = createSpadesAppController({
   createPlayerId: loadOrCreatePlayerId
@@ -24,6 +31,13 @@ const visualBidBagSummaryOutput = document.querySelector("#visual-bid-bag-summar
 const visualHandOutput = document.querySelector("#visual-hand");
 const visualCurrentTrickOutput = document.querySelector("#visual-current-trick");
 const visualLastTrickOutput = document.querySelector("#visual-last-trick");
+const tableOpponentAreaOutput = document.querySelector("#table-opponent-area");
+const tableScoreAreaOutput = document.querySelector("#table-score-area");
+const tableCenterTrickAreaOutput = document.querySelector("#table-center-trick-area");
+const tableLastTrickAreaOutput = document.querySelector("#table-last-trick-area");
+const tablePlayerHandAreaOutput = document.querySelector("#table-player-hand-area");
+const qaCheckListOutput = document.querySelector("#qa-check-list");
+const qaEdgeListOutput = document.querySelector("#qa-edge-list");
 const manualVisualRoomOutput = document.querySelector("#manual-visual-room");
 const manualVisualPhaseOutput = document.querySelector("#manual-visual-phase");
 const manualVisualSeatOutput = document.querySelector("#manual-visual-seat");
@@ -36,6 +50,8 @@ const manualVisualBidBagSummaryOutput = document.querySelector("#manual-visual-b
 const manualVisualHandOutput = document.querySelector("#manual-visual-hand");
 const manualVisualCurrentTrickOutput = document.querySelector("#manual-visual-current-trick");
 const manualVisualLastTrickOutput = document.querySelector("#manual-visual-last-trick");
+const manualQaCheckListOutput = document.querySelector("#manual-qa-check-list");
+const manualQaEdgeListOutput = document.querySelector("#manual-qa-edge-list");
 const twoSeatVisualCompareOutput = document.querySelector("#two-seat-visual-compare");
 const statusOutput = document.querySelector("#room-status");
 const bidStatusOutput = document.querySelector("#bid-status");
@@ -50,6 +66,8 @@ const playCardIdInput = document.querySelector("#play-card-id");
 const manualStatusOutput = document.querySelector("#manual-status");
 const manualViewSelect = document.querySelector("#manual-view");
 const fixturePresetSelect = document.querySelector("#fixture-preset");
+const visualQaScriptSelect = document.querySelector("#visual-qa-script");
+const visualQaStatusOutput = document.querySelector("#visual-qa-status");
 let manualHarness = createTwoSeatManualHarness();
 
 for (const presetName of listManualFixturePresets().filter((name) => !name.startsWith("reconnect-"))) {
@@ -57,6 +75,13 @@ for (const presetName of listManualFixturePresets().filter((name) => !name.start
   option.value = presetName;
   option.textContent = presetName;
   fixturePresetSelect.append(option);
+}
+
+for (const scriptName of listVisualQaScripts()) {
+  const option = document.createElement("option");
+  option.value = scriptName;
+  option.textContent = scriptName;
+  visualQaScriptSelect.append(option);
 }
 
 document.querySelector("#create-room").addEventListener("click", () => {
@@ -167,6 +192,18 @@ document.querySelector("#reset-fixture").addEventListener("click", () => {
   renderManualStatus();
 });
 
+document.querySelector("#run-visual-qa-script").addEventListener("click", () => {
+  try {
+    clearError();
+    const result = runVisualQaScript(visualQaScriptSelect.value);
+    manualHarness = result.harness;
+    visualQaStatusOutput.textContent = formatVisualQaResult(result);
+    renderManualStatus();
+  } catch (error) {
+    showError(error?.message ?? "Visual QA script failed");
+  }
+});
+
 manualViewSelect.addEventListener("change", () => {
   renderManualStatus();
 });
@@ -179,6 +216,10 @@ function runShellAction(action) {
     renderStatus(action());
   } catch (error) {
     showError(error?.message ?? "Action failed");
+    renderQaReport(controller.getActiveRoomStatus(), error?.message ?? "Action failed", {
+      checks: qaCheckListOutput,
+      edges: qaEdgeListOutput
+    });
   }
 }
 
@@ -221,6 +262,11 @@ function renderVisualShell(status) {
     playCardIdInput.value = card.id;
     runShellAction(() => controller.submitPlayCardById({ cardId: card.id }).status);
   });
+  renderTableLayout(status);
+  renderQaReport(status, errorOutput.textContent, {
+    checks: qaCheckListOutput,
+    edges: qaEdgeListOutput
+  });
 }
 
 function renderVisualShellInto(status, targets, onPlayableCard) {
@@ -251,6 +297,40 @@ function renderVisualShellInto(status, targets, onPlayableCard) {
     empty.textContent = "No visible hand for this view.";
     targets.hand.append(empty);
   }
+}
+
+function renderTableLayout(status) {
+  const model = buildVisualShellModel(status);
+  tableOpponentAreaOutput.textContent = status
+    ? `Opponent: ${model.viewerSeat === "player1" ? "player2" : "player1"} | turn ${model.currentTurn}`
+    : "Opponent: waiting";
+  tableScoreAreaOutput.textContent = model.scoreRows.length
+    ? `${model.scoreRows.map((row) => `${row.seat} ${row.score}`).join(" | ")} | ${model.bidStatus} | ${model.playableStatus}`
+    : "Score/status: waiting";
+  tableCenterTrickAreaOutput.textContent = `Current trick: ${model.currentTrick}`;
+  tableLastTrickAreaOutput.textContent = `Last trick: ${model.lastTrick}`;
+  tablePlayerHandAreaOutput.textContent = `Player hand: ${model.handCards.length} visible cards`;
+}
+
+function renderQaReport(status, errorMessage, targets) {
+  const report = buildVisualQaReport(status, { errorMessage });
+  targets.checks.replaceChildren(...report.checks.map((check) => qaReportItem(
+    check.pass,
+    check.name,
+    check.detail
+  )));
+  targets.edges.replaceChildren(...report.edgeMessages.map((edge) => qaReportItem(
+    edge.pass,
+    edge.name,
+    edge.message
+  )));
+}
+
+function qaReportItem(pass, name, detail) {
+  const item = document.createElement("p");
+  item.className = pass ? "qa-check pass" : "qa-check fail";
+  item.textContent = `${pass ? "PASS" : "FAIL"} ${name}: ${detail}`;
+  return item;
 }
 
 function visualSummaryItem(label, primary, secondary) {
@@ -303,6 +383,10 @@ function renderManualStatus(view = manualViewSelect.value) {
     currentTrick: manualVisualCurrentTrickOutput,
     lastTrick: manualVisualLastTrickOutput
   }, manualCardActionForView(view));
+  renderQaReport(status, "", {
+    checks: manualQaCheckListOutput,
+    edges: manualQaEdgeListOutput
+  });
   renderTwoSeatVisualCompare();
 }
 
@@ -380,6 +464,16 @@ function formatMatchHistory(history) {
   return `Match history: ${history.map((entry) => (
     `${entry.timestamp} ${entry.winner} ${entry.finalScore.player1}-${entry.finalScore.player2}`
   )).join(" | ")}`;
+}
+
+function formatVisualQaResult(result) {
+  const finalPhase = result.hostStatus.phase;
+  const trickCount = result.played.completedTricks;
+  const checks = result.verificationLog.length;
+  const restoreText = result.restored
+    ? ` | restored ${result.restored.host.status.viewerSeat}/${result.restored.guest.status.viewerSeat}`
+    : "";
+  return `Visual QA ${result.name}: ${finalPhase}, tricks ${trickCount}, checks ${checks}${restoreText}`;
 }
 
 function loadOrCreatePlayerId() {

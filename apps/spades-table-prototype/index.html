@@ -36,6 +36,13 @@
           <p id="action-status" class="status-chip">Action: none</p>
         </div>
         <div class="visual-shell" aria-label="Visual local gameplay shell">
+          <div class="table-layout-shell" aria-label="Non-final mobile table layout">
+            <div id="table-opponent-area" class="table-area opponent-area">Opponent: waiting</div>
+            <div id="table-score-area" class="table-area score-area">Score/status: waiting</div>
+            <div id="table-center-trick-area" class="table-area center-trick-area">Current trick: none</div>
+            <div id="table-last-trick-area" class="table-area last-trick-area">Last trick: none</div>
+            <div id="table-player-hand-area" class="table-area player-hand-area">Player hand: waiting</div>
+          </div>
           <div class="visual-status-band">
             <p id="visual-phase" class="visual-status">Phase: none</p>
             <p id="visual-seat" class="visual-status">Seat: none</p>
@@ -56,6 +63,11 @@
             <p id="visual-last-trick" class="trick-text">none</p>
           </section>
         </div>
+        <section class="qa-report-panel" aria-labelledby="qa-report-title">
+          <h3 id="qa-report-title">Visual QA Report</h3>
+          <div id="qa-check-list" class="qa-check-list"></div>
+          <div id="qa-edge-list" class="qa-check-list"></div>
+        </section>
         <pre id="room-status">No active room.</pre>
         <p id="bid-status" class="status-line">Bid next: none</p>
         <pre id="hand-status">Hand IDs: none</pre>
@@ -106,6 +118,11 @@
           </label>
           <button id="run-fixture" type="button">Run Selected Preset</button>
           <button id="reset-fixture" type="button">Reset Clean Local Room</button>
+          <label>
+            Visual QA script
+            <select id="visual-qa-script"></select>
+          </label>
+          <button id="run-visual-qa-script" type="button">Run Visual QA Script</button>
         </div>
         <div class="room-actions">
           <button id="manual-setup" type="button">Setup Host/Guest</button>
@@ -140,7 +157,13 @@
             <p id="manual-visual-last-trick" class="trick-text">none</p>
           </section>
         </div>
+        <section class="qa-report-panel" aria-labelledby="manual-qa-report-title">
+          <h3 id="manual-qa-report-title">Selected View QA Report</h3>
+          <div id="manual-qa-check-list" class="qa-check-list"></div>
+          <div id="manual-qa-edge-list" class="qa-check-list"></div>
+        </section>
         <div id="two-seat-visual-compare" class="viewer-compare-grid" aria-label="Two-seat sanitized view comparison"></div>
+        <pre id="visual-qa-status">Visual QA idle.</pre>
         <pre id="manual-status">Manual harness idle.</pre>
       </section>
     </main>

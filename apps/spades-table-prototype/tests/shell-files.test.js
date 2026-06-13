@@ -28,6 +28,13 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /id="visual-hand"/);
   assert.match(html, /id="visual-current-trick"/);
   assert.match(html, /id="visual-last-trick"/);
+  assert.match(html, /id="table-opponent-area"/);
+  assert.match(html, /id="table-score-area"/);
+  assert.match(html, /id="table-center-trick-area"/);
+  assert.match(html, /id="table-last-trick-area"/);
+  assert.match(html, /id="table-player-hand-area"/);
+  assert.match(html, /id="qa-check-list"/);
+  assert.match(html, /id="qa-edge-list"/);
   assert.match(html, /id="bid-status"/);
   assert.match(html, /id="bid-input"/);
   assert.match(html, /id="submit-bid"/);
@@ -38,6 +45,9 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /id="fixture-preset"/);
   assert.match(html, /id="run-fixture"/);
   assert.match(html, /id="reset-fixture"/);
+  assert.match(html, /id="visual-qa-script"/);
+  assert.match(html, /id="run-visual-qa-script"/);
+  assert.match(html, /id="visual-qa-status"/);
   assert.match(html, /id="manual-ready"/);
   assert.match(html, /id="manual-bid"/);
   assert.match(html, /id="manual-trick"/);
@@ -67,6 +77,8 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /id="manual-visual-hand"/);
   assert.match(html, /id="manual-visual-current-trick"/);
   assert.match(html, /id="manual-visual-last-trick"/);
+  assert.match(html, /id="manual-qa-check-list"/);
+  assert.match(html, /id="manual-qa-edge-list"/);
   assert.match(html, /id="two-seat-visual-compare"/);
   assert.match(html, /id="ready-player"/);
   assert.match(html, /id="leave-room"/);
@@ -78,6 +90,12 @@ test("home client wires the shell through the local app controller", () => {
 
   assert.match(client, /createSpadesAppController/);
   assert.match(client, /buildVisualShellModel/);
+  assert.match(client, /buildVisualQaReport/);
+  assert.match(client, /renderTableLayout/);
+  assert.match(client, /renderQaReport/);
+  assert.match(client, /qaReportItem/);
+  assert.match(client, /runVisualQaScript/);
+  assert.match(client, /listVisualQaScripts/);
   assert.match(client, /listManualFixturePresets/);
   assert.match(client, /controller\.createRoom/);
   assert.match(client, /controller\.joinRoom/);
@@ -106,6 +124,7 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /manualCardActionForView/);
   assert.match(client, /fixturePresetSelect/);
   assert.match(client, /runPreset/);
+  assert.match(client, /formatVisualQaResult/);
   assert.match(client, /showError/);
   assert.match(client, /clearError/);
   assert.match(client, /biddingStatus/);
@@ -125,4 +144,16 @@ test("card button styling keeps mobile tap and accessibility states visible", ()
   assert.match(css, /\.card-suit/);
   assert.match(css, /\.card-id/);
   assert.match(css, /\.card-state/);
+});
+
+test("visual QA and table layout styling is present", () => {
+  const css = readFileSync(resolve(appDir, "src/styles.css"), "utf8");
+
+  assert.match(css, /\.table-layout-shell/);
+  assert.match(css, /\.table-area/);
+  assert.match(css, /\.center-trick-area/);
+  assert.match(css, /\.player-hand-area/);
+  assert.match(css, /\.qa-report-panel/);
+  assert.match(css, /\.qa-check\.pass/);
+  assert.match(css, /\.qa-check\.fail/);
 });

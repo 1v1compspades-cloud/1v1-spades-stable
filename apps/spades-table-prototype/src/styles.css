@@ -50,7 +50,9 @@ h2 {
 .qa-status-grid,
 .visual-status-band,
 .summary-grid,
-.card-button-grid {
+.card-button-grid,
+.table-layout-shell,
+.qa-check-list {
   display: grid;
   gap: 12px;
 }
@@ -101,6 +103,32 @@ select:focus-visible {
   background: rgba(0, 0, 0, 0.16);
 }
 
+.table-layout-shell {
+  padding: 12px;
+  border: 1px solid rgba(248, 244, 235, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.table-area {
+  min-height: 52px;
+  padding: 12px;
+  border: 1px solid rgba(248, 244, 235, 0.14);
+  border-radius: 6px;
+  color: #f8f4eb;
+  background: rgba(0, 0, 0, 0.22);
+  font-weight: 800;
+}
+
+.center-trick-area {
+  min-height: 76px;
+  border-color: rgba(214, 178, 94, 0.55);
+}
+
+.player-hand-area {
+  border-color: rgba(248, 244, 235, 0.3);
+}
+
 .visual-status,
 .summary-item,
 .trick-text,
@@ -122,6 +150,36 @@ select:focus-visible {
 .visual-zone {
   display: grid;
   gap: 10px;
+}
+
+.qa-report-panel {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 18px;
+  padding: 14px;
+  border: 1px solid rgba(248, 244, 235, 0.18);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.qa-check {
+  min-height: 44px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-weight: 800;
+}
+
+.qa-check.pass {
+  color: #e7f7df;
+  background: rgba(74, 130, 82, 0.32);
+  border: 1px solid rgba(180, 231, 170, 0.32);
+}
+
+.qa-check.fail {
+  color: #ffe4dd;
+  background: rgba(142, 52, 38, 0.34);
+  border: 1px solid rgba(255, 180, 168, 0.38);
 }
 
 h3 {
@@ -270,8 +328,18 @@ pre {
   .fixture-controls,
   .visual-status-band,
   .summary-grid,
-  .viewer-compare-grid {
+  .viewer-compare-grid,
+  .qa-check-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .table-layout-shell {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .center-trick-area,
+  .player-hand-area {
+    grid-column: 1 / -1;
   }
 
   .card-button-grid {

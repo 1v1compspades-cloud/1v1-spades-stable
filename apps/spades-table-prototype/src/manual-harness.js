@@ -159,17 +159,8 @@ export function createTwoSeatManualHarness({
       }, view);
     },
     runPreset(name) {
-      const preset = requireFixturePreset(MANUAL_FIXTURE_PRESETS, name);
-
-      this.setup({
-        deck: preset.deck(),
-        matchSettings: preset.matchSettings
-      });
-      this.readyBoth();
-      this.bidBoth({
-        hostBid: preset.hostBid,
-        guestBid: preset.guestBid
-      });
+      const started = this.startPreset(name);
+      const preset = started.preset;
       const played = this.playFullHand();
       const restored = preset.restoreAfter ? {
         host: host.restoreActiveRoom(),
@@ -178,10 +169,34 @@ export function createTwoSeatManualHarness({
 
       return {
         preset,
+        started,
         played,
         restored,
         hostStatus: host.getActiveRoomStatus(),
         guestStatus: guest.getActiveRoomStatus()
+      };
+    },
+    startPreset(name) {
+      const preset = requireFixturePreset(MANUAL_FIXTURE_PRESETS, name);
+
+      const setup = this.setup({
+        deck: preset.deck(),
+        matchSettings: preset.matchSettings
+      });
+      const ready = this.readyBoth();
+      const bids = this.bidBoth({
+        hostBid: preset.hostBid,
+        guestBid: preset.guestBid
+      });
+
+      return {
+        preset,
+        setup,
+        ready,
+        bids,
+        hostStatus: host.getActiveRoomStatus(),
+        guestStatus: guest.getActiveRoomStatus(),
+        spectatorStatus: spectator.getRoomStatus(roomCode)
       };
     },
     statusText(viewer = host) {

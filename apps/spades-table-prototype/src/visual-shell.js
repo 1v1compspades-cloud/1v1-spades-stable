@@ -58,6 +58,58 @@ export function buildVisualShellModel(status) {
   };
 }
 
+export function buildVisualQaReport(status, { errorMessage = "" } = {}) {
+  const model = buildVisualShellModel(status);
+  const hasStatus = Boolean(status);
+  const checks = [
+    qaCheck("current viewer seat", hasStatus && ["player1", "player2", "spectator"].includes(model.viewerSeat), model.viewerSeat),
+    qaCheck("hidden hand protection", hiddenHandProtected(status), hiddenHandDetail(status)),
+    qaCheck("current phase", hasStatus && model.phase !== "none", model.phase),
+    qaCheck("current turn", hasStatus && Boolean(model.currentTurn), model.currentTurn),
+    qaCheck("playable card count", hasStatus && Number.isInteger(status.playableCardStatus?.count), model.playableStatus),
+    qaCheck("current trick", hasStatus && typeof model.currentTrick === "string", model.currentTrick),
+    qaCheck("last trick", hasStatus && typeof model.lastTrick === "string", model.lastTrick),
+    qaCheck("score/bag/bid summary", model.scoreRows.length === 2 && model.bidBagRows.length === 2, formatSummaryCheck(model))
+  ];
+
+  const edgeMessages = buildEdgeMessages(status, errorMessage);
+
+  return {
+    overallPass: checks.every((check) => check.pass) && edgeMessages.every((message) => message.pass),
+    checks,
+    edgeMessages
+  };
+}
+
+export function buildEdgeMessages(status, errorMessage = "") {
+  const message = String(errorMessage ?? "");
+  const messages = [];
+
+  if (message) {
+    messages.push(edgeMessage("last action", false, classifyActionError(message)));
+  }
+  if (!status) {
+    messages.push(edgeMessage("reconnect/restore state", false, "No active sanitized room view"));
+    return messages;
+  }
+  if (status.viewerSeat === "spectator") {
+    messages.push(edgeMessage("room full/spectator", true, "Spectator view active; no private hand visible"));
+  }
+  if (status.phase === "match_complete") {
+    messages.push(edgeMessage("match complete", true, `Winner ${status.winner ?? "pending"}`));
+  }
+  if (status.phase === "hand_complete") {
+    messages.push(edgeMessage("hand complete", true, "Next hand controls are available"));
+  }
+  if (status.phase === "playing" && !status.currentPlayerStatus?.canAct) {
+    messages.push(edgeMessage("stale turn", true, `Waiting for ${status.currentTurn}`));
+  }
+
+  return messages.length ? messages : [
+    edgeMessage("edge states", true, "No edge-state warnings")
+  ];
+}
+
 export function cardIdFor(card) {
   return `${card.rank}-${card.suit}`;
 }
@@ -86,4 +138,52 @@ function formatActionStatus(status) {
     return "Match complete: record history or reset";
   }
   return "No action";
+}
+
+function qaCheck(name, pass, detail) {
+  return {
+    name,
+    pass: Boolean(pass),
+    detail: String(detail ?? "")
+  };
+}
+
+function edgeMessage(name, pass, message) {
+  return {
+    name,
+    pass: Boolean(pass),
+    message
+  };
+}
+
+function hiddenHandProtected(status) {
+  if (!status) return false;
+  if (status.viewerSeat === "spectator") return status.hand.length === 0;
+  if (["player1", "player2"].includes(status.viewerSeat)) {
+    return status.hand.length === (status.hiddenHandCounts?.[status.viewerSeat] ?? status.hand.length);
+  }
+  return false;
+}
+
+function hiddenHandDetail(status) {
+  if (!status) return "No view";
+  return `${status.viewerSeat} hand ${status.hand.length}; hidden ${status.hiddenHandCounts.player1}-${status.hiddenHandCounts.player2}`;
+}
+
+function formatSummaryCheck(model) {
+  return [
+    ...model.scoreRows.map((row) => `${row.seat} score ${row.score} tricks ${row.tricks}`),
+    ...model.bidBagRows.map((row) => `${row.seat} bid ${row.bid ?? "none"} bags ${row.bags}`)
+  ].join(" | ");
+}
+
+function classifyActionError(message) {
+  if (/Stale action expected .* turn|not this player's turn|bid turn/i.test(message)) return `Stale turn or wrong player action: ${message}`;
+  if (/Stale action expected .* phase|Room must be in .* phase/i.test(message)) return `Stale phase: ${message}`;
+  if (/0 through 13|invalid bid/i.test(message)) return `Invalid bid: ${message}`;
+  if (/Illegal Spades play|not in the current player's hand|card/i.test(message)) return `Invalid card play: ${message}`;
+  if (/spectator|Join this room|room full|already seated/i.test(message)) return `Room full/spectator: ${message}`;
+  if (/match_complete|match complete|completed matches/i.test(message)) return `Match complete: ${message}`;
+  if (/No active room|restore|reconnect/i.test(message)) return `Reconnect/restore state: ${message}`;
+  return message;
 }
