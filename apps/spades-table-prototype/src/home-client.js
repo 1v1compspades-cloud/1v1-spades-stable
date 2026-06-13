@@ -639,8 +639,8 @@ function renderStatus(status) {
     ? `Bid next: ${status.biddingStatus.nextBidder ?? "none"}`
     : "Bid next: none";
   handStatusOutput.textContent = status?.hand?.length
-    ? `Hand IDs: ${status.hand.map(cardIdFor).join(", ")}`
-    : "Hand IDs: none";
+    ? `Visible hand IDs: ${status.hand.map(cardIdFor).join(", ")}`
+    : "Visible hand IDs: none";
   playableStatusOutput.textContent = status?.playableCardStatus
     ? `Playable IDs: ${status.playableCardStatus.cardIds.join(", ") || "none"}`
     : "Playable IDs: none";
@@ -982,12 +982,12 @@ function recordLocalCompletedMatch(options = {}) {
 function recordLocalTournamentSnapshot() {
   const matches = accountStats.listResults();
   if (!matches.length) {
-    throw new Error("Record at least one completed match before creating a tournament snapshot");
+    throw new Error("Record at least one completed match before creating a local history snapshot");
   }
   const nextNumber = tournamentHistory.listTournaments().length + 1;
   const tournament = tournamentHistory.recordTournament({
-    id: `local-tournament-${nextNumber}`,
-    name: `Local Tournament ${nextNumber}`,
+    id: `local-history-${nextNumber}`,
+    name: `Local History ${nextNumber}`,
     matches
   });
   renderTournamentHistoryPanel();
@@ -1009,7 +1009,7 @@ function renderAccountsLitePanel() {
       `#${index + 1} ${row.displayName}`,
       `${row.wins}W ${row.losses}L | games ${row.gamesPlayed} | nil ${row.nilMade}/${row.nilFailed} | bags ${row.bags}`
     ))
-    : [accountStatItem("Leaderboard", "No local completed matches yet")]));
+    : [accountStatItem("Local preview", "No local completed matches yet")]));
 
   const results = accountStats.listResults({ playerId: localIdentity.playerId });
   accountMatchResultsOutput.textContent = results.length
@@ -1143,7 +1143,7 @@ function betaWebSocketStatus() {
 function renderTournamentHistoryPanel() {
   const summary = tournamentHistory.getSummary();
   tournamentSummaryOutput.replaceChildren(
-    accountStatItem("Tournaments", String(summary.tournamentCount)),
+    accountStatItem("Local snapshots", String(summary.tournamentCount)),
     accountStatItem("Grouped matches", String(summary.matchCount)),
     accountStatItem("Latest", summary.latest ? `${summary.latest.name} (${summary.latest.matchIds.length} matches)` : "none")
   );
@@ -1158,10 +1158,10 @@ function renderTournamentHistoryPanel() {
 
   const tournaments = tournamentHistory.listTournaments({ playerId: localIdentity.playerId });
   tournamentHistoryOutput.textContent = tournaments.length
-    ? `Tournament history: ${tournaments.map((entry) => (
+    ? `Local history: ${tournaments.map((entry) => (
       `${entry.timestamp} ${entry.name} matches ${entry.matchIds.length} players ${entry.players.length}`
     )).join(" | ")}`
-    : "Tournament history: none";
+    : "Local history: none";
 }
 
 function formatVisualQaResult(result) {

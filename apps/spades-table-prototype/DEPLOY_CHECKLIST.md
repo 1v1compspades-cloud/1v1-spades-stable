@@ -94,6 +94,25 @@ Use this sequence for each hosted beta invite:
 6. Confirm the Report Bug button remains visible while scrolling.
 7. Trigger failed join, room full, stale action, and disconnected states when possible and verify friendly tester messages.
 
+## Launch Candidate Final Smoke Test
+
+1. Confirm the beta build label reads as a launch candidate.
+2. Confirm all public text is free play only and makes no cash, prize, gambling, payment, or payout claims.
+3. Confirm advanced diagnostics and local preview tools are collapsed by default.
+4. Confirm the copyable diagnostics section remains visible for bug reports.
+5. Confirm known issues are visible to testers.
+6. Confirm hidden hands, private seat credentials, host-only data, and admin-only data are not visible in the public UI.
+7. Confirm the mobile layout has no horizontal scrolling and the Report Bug button stays reachable.
+8. Run the final smoke-test checklist in `docs/FINAL_SMOKE_TEST_CHECKLIST.md`.
+
+## Known Issues For Testers
+
+- Visual polish is still beta-level.
+- AFK/disconnect timing is a placeholder.
+- Local stats and history previews are local-only.
+- Refresh recovery depends on the same browser/device identity.
+- No production account database exists yet.
+
 ## Rollback Notes
 
 - Roll back to the previous hosted release from the provider dashboard.

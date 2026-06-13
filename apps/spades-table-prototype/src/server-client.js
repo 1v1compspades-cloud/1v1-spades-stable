@@ -374,16 +374,23 @@ export function createSpadesServerClient({
   }
 }
 
-function waitForSocketOpen(socket) {
+function waitForSocketOpen(socket, timeoutMs = 5000) {
   return new Promise((resolve, reject) => {
     if (socket.readyState === 1) {
       resolve();
       return;
     }
-    socket.addEventListener?.("open", resolve, { once: true });
-    socket.addEventListener?.("error", reject, { once: true });
-    socket.once?.("open", resolve);
-    socket.once?.("error", reject);
+    const timeout = setTimeout(() => {
+      reject(new Error("Timed out waiting for Spades server client socket to connect"));
+    }, timeoutMs);
+    const finish = (callback) => (value) => {
+      clearTimeout(timeout);
+      callback(value);
+    };
+    socket.addEventListener?.("open", finish(resolve), { once: true });
+    socket.addEventListener?.("error", finish(reject), { once: true });
+    socket.once?.("open", finish(resolve));
+    socket.once?.("error", finish(reject));
   });
 }
 

@@ -13,7 +13,7 @@
         <p class="eyebrow">Spades Master</p>
         <h1 id="home-title">1v1 Spades</h1>
         <section id="tester-entry-panel" class="tester-entry-panel" aria-labelledby="tester-entry-title">
-          <p id="beta-build-label" class="beta-build-label">Hosted Beta Build: Phase 37 / v0.1.0</p>
+          <p id="beta-build-label" class="beta-build-label">Spades Hosted Beta v0.1.0 Launch Candidate / Phase 38</p>
           <h2 id="tester-entry-title">Welcome, Beta Tester</h2>
           <p id="tester-entry-summary">
             Free play only. This tester build is for checking room entry, bidding, hand play,
@@ -38,6 +38,26 @@
               <p class="account-stat-item">Report bug</p>
             </div>
           </section>
+          <section id="final-smoke-test-checklist" class="beta-onboarding-block" aria-labelledby="final-smoke-test-title">
+            <h3 id="final-smoke-test-title">Final smoke-test checklist</h3>
+            <div class="account-stat-grid" aria-label="Launch candidate smoke-test checklist">
+              <p class="account-stat-item">Health check passes</p>
+              <p class="account-stat-item">Room code join works</p>
+              <p class="account-stat-item">Quick Match pairs two testers</p>
+              <p class="account-stat-item">One full hand completes</p>
+              <p class="account-stat-item">Reconnect restores the same seat</p>
+              <p class="account-stat-item">Bug report diagnostics copy</p>
+            </div>
+          </section>
+          <section id="known-issues" class="beta-onboarding-block" aria-labelledby="known-issues-title">
+            <h3 id="known-issues-title">Known issues</h3>
+            <div class="account-stat-grid" aria-label="Known beta limitations">
+              <p class="account-stat-item">Visual polish is still beta-level.</p>
+              <p class="account-stat-item">AFK timing is a placeholder.</p>
+              <p class="account-stat-item">Local previews are not production rankings.</p>
+              <p class="account-stat-item">Refresh recovery depends on the same local browser identity.</p>
+            </div>
+          </section>
           <div id="tester-entry-steps" class="account-stat-grid" aria-label="Tester entry steps">
             <p class="account-stat-item">1. Enter a display name for this device.</p>
             <p class="account-stat-item">2. Create a room or join with a room code.</p>
@@ -53,9 +73,9 @@
           <label>
             Transport mode
             <select id="transport-mode">
-              <option value="direct">Direct local</option>
-              <option value="live-sync">Live Sync QA</option>
-              <option value="real-server">Real Local Server</option>
+              <option value="direct">Direct local test</option>
+              <option value="live-sync">Live sync test</option>
+              <option value="real-server">Hosted server</option>
             </select>
           </label>
           <p id="transport-mode-status" class="status-line">Transport: direct local</p>
@@ -127,15 +147,13 @@
             <p id="visual-last-trick" class="trick-text">none</p>
           </section>
         </div>
-        <section class="qa-report-panel" aria-labelledby="qa-report-title">
-          <h3 id="qa-report-title">Visual QA Report</h3>
-          <div id="qa-check-list" class="qa-check-list"></div>
-          <div id="qa-edge-list" class="qa-check-list"></div>
-        </section>
         <section class="beta-safety-panel" aria-labelledby="beta-safety-title">
           <h3 id="beta-safety-title">Beta Safety Checklist</h3>
           <div id="beta-safety-check-list" class="qa-check-list"></div>
           <div id="manual-beta-flow-list" class="account-stat-grid" aria-label="Manual beta test flows"></div>
+          <p id="public-data-safety-note" class="tester-entry-note">
+            Public UI does not show hidden hands, private seat credentials, or host-only data. Bug reports use sanitized diagnostics.
+          </p>
         </section>
         <section class="beta-feedback-panel" aria-labelledby="beta-feedback-title">
           <h3 id="beta-feedback-title">Beta Feedback Report</h3>
@@ -174,32 +192,43 @@
           <p id="beta-feedback-status" class="status-line">Feedback reports: none saved</p>
           <pre id="beta-report-history">Saved beta reports: none</pre>
         </section>
-        <section class="action-log-panel" aria-labelledby="action-log-title">
-          <h3 id="action-log-title">Recent Local Actions</h3>
-          <div id="action-log-list" class="action-log-list"></div>
-        </section>
-        <pre id="room-status">No active room.</pre>
-        <p id="bid-status" class="status-line">Bid next: none</p>
-        <pre id="hand-status">Hand IDs: none</pre>
-        <p id="playable-status" class="status-line">Playable IDs: none</p>
-        <p id="trick-status" class="status-line">Current trick: none</p>
-        <pre id="hand-summary">Hand summary: none</pre>
-        <pre id="match-history">Match history: none</pre>
-        <section class="accounts-lite-panel" aria-labelledby="accounts-lite-title">
-          <h3 id="accounts-lite-title">Accounts-Lite Preview</h3>
-          <div id="local-player-stats" class="account-stat-grid" aria-label="Local player stats"></div>
-          <div id="leaderboard-preview" class="account-stat-grid" aria-label="Local leaderboard preview"></div>
-          <pre id="account-match-results">Local match results: none</pre>
-          <button id="reset-local-stats" type="button">Reset Local Stats</button>
-        </section>
-        <section class="tournament-history-panel" aria-labelledby="tournament-history-title">
-          <h3 id="tournament-history-title">Tournament History Prep</h3>
-          <button id="record-tournament-snapshot" type="button">Record Local Tournament Snapshot</button>
-          <button id="reset-tournament-history" type="button">Reset Tournament History</button>
-          <div id="tournament-summary" class="account-stat-grid" aria-label="Local tournament summary"></div>
-          <div id="tournament-placements" class="account-stat-grid" aria-label="Local tournament placements"></div>
-          <pre id="tournament-history">Tournament history: none</pre>
-        </section>
+        <details id="advanced-diagnostics" class="developer-details">
+          <summary>Advanced diagnostics</summary>
+          <section class="qa-report-panel" aria-labelledby="qa-report-title">
+            <h3 id="qa-report-title">Sanitized QA Report</h3>
+            <div id="qa-check-list" class="qa-check-list"></div>
+            <div id="qa-edge-list" class="qa-check-list"></div>
+          </section>
+          <section class="action-log-panel" aria-labelledby="action-log-title">
+            <h3 id="action-log-title">Recent Local Actions</h3>
+            <div id="action-log-list" class="action-log-list"></div>
+          </section>
+          <pre id="room-status">No active room.</pre>
+          <p id="bid-status" class="status-line">Bid next: none</p>
+          <pre id="hand-status">Visible hand IDs: none</pre>
+          <p id="playable-status" class="status-line">Playable IDs: none</p>
+          <p id="trick-status" class="status-line">Current trick: none</p>
+          <pre id="hand-summary">Hand summary: none</pre>
+          <pre id="match-history">Match history: none</pre>
+        </details>
+        <details id="local-preview-tools" class="developer-details">
+          <summary>Local preview tools</summary>
+          <section class="accounts-lite-panel" aria-labelledby="accounts-lite-title">
+            <h3 id="accounts-lite-title">Local Stats Preview</h3>
+            <div id="local-player-stats" class="account-stat-grid" aria-label="Local player stats"></div>
+            <div id="leaderboard-preview" class="account-stat-grid" aria-label="Local leaderboard preview"></div>
+            <pre id="account-match-results">Local match results: none</pre>
+            <button id="reset-local-stats" type="button">Reset Local Stats</button>
+          </section>
+          <section class="tournament-history-panel" aria-labelledby="tournament-history-title">
+            <h3 id="tournament-history-title">Local History Preview</h3>
+            <button id="record-tournament-snapshot" type="button">Record Local History Snapshot</button>
+            <button id="reset-tournament-history" type="button">Reset Local History</button>
+            <div id="tournament-summary" class="account-stat-grid" aria-label="Local tournament summary"></div>
+            <div id="tournament-placements" class="account-stat-grid" aria-label="Local tournament placements"></div>
+            <pre id="tournament-history">Local history: none</pre>
+          </section>
+        </details>
         <p id="shell-error" class="error-line" role="status"></p>
         <div class="bid-controls" aria-label="Bidding controls">
           <label>
@@ -227,8 +256,8 @@
         </div>
       </section>
 
-      <section class="manual-panel" aria-labelledby="manual-title">
-        <h2 id="manual-title">Local Two-Seat Test</h2>
+      <details id="manual-test-tools" class="manual-panel developer-details">
+        <summary id="manual-title">Manual local test tools</summary>
         <div class="fixture-controls" aria-label="Fixture controls">
           <label>
             View as
@@ -284,14 +313,14 @@
           </section>
         </div>
         <section class="qa-report-panel" aria-labelledby="manual-qa-report-title">
-          <h3 id="manual-qa-report-title">Selected View QA Report</h3>
+          <h3 id="manual-qa-report-title">Selected View Sanitized QA Report</h3>
           <div id="manual-qa-check-list" class="qa-check-list"></div>
           <div id="manual-qa-edge-list" class="qa-check-list"></div>
         </section>
         <div id="two-seat-visual-compare" class="viewer-compare-grid" aria-label="Two-seat sanitized view comparison"></div>
         <pre id="visual-qa-status">Visual QA idle.</pre>
         <pre id="manual-status">Manual harness idle.</pre>
-      </section>
+      </details>
     </main>
 
     <script type="module" src="./src/home-client.js"></script>

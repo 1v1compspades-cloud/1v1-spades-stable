@@ -166,6 +166,11 @@ test("WebSocket play-card broadcasts player and spectator safe channels", async 
       cardId,
       actionId: `WS05:${leader}:playCard:1`
     });
+    await Promise.all([
+      host.waitRoomEvent((event) => event.actionId === `WS05:${leader}:playCard:1`),
+      guest.waitRoomEvent((event) => event.actionId === `WS05:${leader}:playCard:1`),
+      spectator.waitRoomEvent((event) => event.actionId === `WS05:${leader}:playCard:1`)
+    ]);
 
     assert.equal(played.ok, true);
     assert.equal(host.lastRoomEvent().view.viewerSeat, "player1");
