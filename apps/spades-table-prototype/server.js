@@ -1,8 +1,12 @@
+import { createServer } from "node:http";
 import { createSpadesHttpServer } from "./src/http-server.js";
+import { attachSpadesWebSocketServer } from "./src/websocket-server.js";
 
 const port = Number(process.env.PORT ?? 5175);
-const { app } = createSpadesHttpServer();
+const { app, boundary } = createSpadesHttpServer();
+const httpServer = createServer(app);
+attachSpadesWebSocketServer({ httpServer, boundary });
 
-app.listen(port, () => {
-  console.log(`Spades local HTTP boundary listening on http://localhost:${port}`);
+httpServer.listen(port, () => {
+  console.log(`Spades local HTTP/WebSocket boundary listening on http://localhost:${port}`);
 });
