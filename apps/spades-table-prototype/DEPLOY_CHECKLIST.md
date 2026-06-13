@@ -70,6 +70,20 @@ The script checks health, create room, join room, WebSocket connection, one tric
 9. Use Quick Match with two testers and confirm player1/player2 assignment.
 10. Confirm the beta safety panel shows hidden-hand safe.
 
+## Tester Entry Steps
+
+Use this sequence for each hosted beta invite:
+
+1. Open the hosted URL and confirm the visible beta build label.
+2. Enter a display name.
+3. Create a room and share the room code with another tester.
+4. Join a room by code from a second browser or device.
+5. Try Quick Match with two testers.
+6. Ready both players, bid, and play at least one hand.
+7. Refresh during a room and use Restore Active Room to test reconnect.
+8. Use the Beta Feedback Report panel to report a bug with diagnostics.
+9. Remind testers this is free play only with no cash prizes, no gambling, no payments, and no tournament payouts.
+
 ## Rollback Notes
 
 - Roll back to the previous hosted release from the provider dashboard.

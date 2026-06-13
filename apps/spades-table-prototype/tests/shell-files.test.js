@@ -13,10 +13,22 @@ test("basic shell exposes create join ready leave and status targets", () => {
 
   assert.match(html, /id="create-room"/);
   assert.match(html, /id="tester-entry-panel"/);
+  assert.match(html, /id="beta-build-label"/);
+  assert.match(html, /Hosted Beta Build: Phase 36 \/ v0\.1\.0/);
+  assert.match(html, /Welcome, Beta Tester/);
+  assert.match(html, /id="beta-how-to-test"/);
+  assert.match(html, /id="beta-quick-checklist"/);
   assert.match(html, /id="tester-entry-steps"/);
   assert.match(html, /id="tester-safety-copy"/);
-  assert.match(html, /Free-play tester build only/);
-  assert.match(html, /No gambling, prizes, payments, or tournament payouts/);
+  assert.match(html, /Free play only/);
+  assert.match(html, /Create room/);
+  assert.match(html, /Join room/);
+  assert.match(html, /Quick Match/);
+  assert.match(html, /Bid/);
+  assert.match(html, /Play hand/);
+  assert.match(html, /Reconnect/);
+  assert.match(html, /Report bug/);
+  assert.match(html, /No cash prizes, no gambling, no payments, and no tournament payouts/);
   assert.match(html, /local previews only/);
   assert.match(html, /id="transport-mode"/);
   assert.match(html, /id="transport-mode-status"/);
@@ -246,6 +258,8 @@ test("visual QA and table layout styling is present", () => {
   const css = readFileSync(resolve(appDir, "src/styles.css"), "utf8");
 
   assert.match(css, /\.tester-entry-panel/);
+  assert.match(css, /\.beta-build-label/);
+  assert.match(css, /\.beta-onboarding-block/);
   assert.match(css, /\.tester-entry-note/);
   assert.match(css, /\.table-layout-shell/);
   assert.match(css, /\.table-area/);
@@ -273,6 +287,7 @@ test("hosted deploy checklist and server startup are present", () => {
   const server = readFileSync(resolve(appDir, "server.js"), "utf8");
   const checklist = readFileSync(resolve(appDir, "DEPLOY_CHECKLIST.md"), "utf8");
   const smokeScript = readFileSync(resolve(appDir, "scripts/hosted-beta-smoke.mjs"), "utf8");
+  const testerGuide = readFileSync(resolve(repoDir, "docs/BETA_TESTER_GUIDE.md"), "utf8");
   const launchDoc = readFileSync(resolve(repoDir, "docs/SPADES_HOSTED_BETA_LAUNCH.md"), "utf8");
   const feedbackDoc = readFileSync(resolve(repoDir, "docs/SPADES_BETA_FEEDBACK.md"), "utf8");
 
@@ -295,6 +310,15 @@ test("hosted deploy checklist and server startup are present", () => {
   assert.match(checklist, /Complete a hand/);
   assert.match(checklist, /free play/i);
   assert.match(checklist, /no.*gambling/i);
+  assert.match(checklist, /Tester Entry Steps/);
+  assert.match(checklist, /visible beta build label/);
+  assert.match(checklist, /Create a room/);
+  assert.match(checklist, /Join a room by code/);
+  assert.match(checklist, /Quick Match/);
+  assert.match(checklist, /Ready both players, bid, and play at least one hand/);
+  assert.match(checklist, /Restore Active Room/);
+  assert.match(checklist, /Beta Feedback Report/);
+  assert.match(checklist, /no cash prizes, no gambling, no payments, and no tournament payouts/i);
   assert.match(checklist, /Render/);
   assert.match(checklist, /Railway/);
   assert.match(checklist, /Fly/);
@@ -307,6 +331,19 @@ test("hosted deploy checklist and server startup are present", () => {
   assert.match(launchDoc, /Play one full trick/);
   assert.match(launchDoc, /Complete one hand/);
   assert.match(launchDoc, /no wagers, prizes, payments, gambling features, or tournament payouts/i);
+  assert.match(testerGuide, /Spades Hosted Beta Tester Guide/);
+  assert.match(testerGuide, /free play only/i);
+  assert.match(testerGuide, /no cash prizes/i);
+  assert.match(testerGuide, /no gambling/i);
+  assert.match(testerGuide, /Quick Checklist/);
+  assert.match(testerGuide, /Create room/);
+  assert.match(testerGuide, /Join room/);
+  assert.match(testerGuide, /Quick Match/);
+  assert.match(testerGuide, /Bid/);
+  assert.match(testerGuide, /Play hand/);
+  assert.match(testerGuide, /Reconnect/);
+  assert.match(testerGuide, /Report bug/);
+  assert.match(testerGuide, /Copy Diagnostics/);
   assert.match(feedbackDoc, /copyable diagnostics bundle/i);
   assert.match(feedbackDoc, /room code/i);
   assert.match(feedbackDoc, /phase/i);

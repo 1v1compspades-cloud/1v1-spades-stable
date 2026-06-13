@@ -75,6 +75,23 @@ h2 {
   font-size: 18px;
 }
 
+.beta-build-label {
+  width: fit-content;
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid rgba(214, 178, 94, 0.52);
+  border-radius: 6px;
+  color: #10251c;
+  background: #d6b25e;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.beta-onboarding-block {
+  display: grid;
+  gap: 10px;
+}
+
 #tester-entry-summary,
 .tester-entry-note {
   margin: 0;
