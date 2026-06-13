@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Spades Master Prototype</title>
+    <link rel="stylesheet" href="./src/styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="home-panel" aria-labelledby="home-title">
+        <p class="eyebrow">Spades Master</p>
+        <h1 id="home-title">1v1 Spades</h1>
+        <div class="controls">
+          <label>
+            Player name
+            <input id="display-name" autocomplete="nickname" value="Player">
+          </label>
+          <button id="create-room" type="button">Create Room</button>
+          <label>
+            Room code
+            <input id="join-code" autocomplete="off" inputmode="text" placeholder="ABC123">
+          </label>
+          <button id="join-room" type="button">Join Room</button>
+          <button id="restore-room" type="button">Restore Active Room</button>
+          <button id="clear-room" type="button">Clear Active Room</button>
+        </div>
+      </section>
+
+      <section class="status-panel" aria-labelledby="status-title">
+        <h2 id="status-title">Room Status</h2>
+        <pre id="room-status">No active room.</pre>
+        <p id="bid-status" class="status-line">Bid next: none</p>
+        <div class="room-actions">
+          <button id="ready-player" type="button">Ready</button>
+          <button id="leave-room" type="button">Leave Room</button>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./src/home-client.js"></script>
+  </body>
+</html>

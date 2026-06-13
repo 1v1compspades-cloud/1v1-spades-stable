@@ -250,6 +250,7 @@ export function sanitizeRoomForViewer(room, viewer = {}) {
       ...room.game.bags
     },
     bids: sanitizeBids(room.game.bids, room.phase),
+    biddingStatus: biddingStatus(room),
     tricksTaken: {
       ...room.game.tricksTaken
     },
@@ -493,6 +494,23 @@ function sanitizeBids(bids, phase) {
   return {
     player1: bids?.player1 ?? null,
     player2: bids?.player2 ?? null
+  };
+}
+
+function biddingStatus(room) {
+  const bids = room.game.bids;
+  const bidOrder = PLAYERS;
+  const nextBidder = room.phase === "bidding"
+    ? bidOrder.find((seat) => bids?.[seat] === null || bids?.[seat] === undefined) ?? null
+    : null;
+
+  return {
+    nextBidder,
+    complete: Boolean(bids?.player1 !== null && bids?.player1 !== undefined && bids?.player2 !== null && bids?.player2 !== undefined),
+    locked: {
+      player1: bids?.player1 !== null && bids?.player1 !== undefined,
+      player2: bids?.player2 !== null && bids?.player2 !== undefined
+    }
   };
 }
 

@@ -27,6 +27,8 @@ test("builds a non-gameplay shell model from sanitized room state", () => {
   assert.equal(model.title, "Room SHELL1");
   assert.equal(model.phase, "waiting");
   assert.equal(model.viewerSeat, "player1");
+  assert.equal(model.roomFull, true);
+  assert.equal(model.spectator, false);
   assert.deepEqual(model.players.player1, {
     seat: "player1",
     displayName: "North",
@@ -54,7 +56,9 @@ test("renders sanitized room state without card or table UI details", () => {
   assert.match(text, /Room SHELL2/);
   assert.match(text, /Phase: bidding/);
   assert.match(text, /Viewer: spectator/);
+  assert.match(text, /Bid next: player1/);
+  assert.match(text, /Room full: true/);
+  assert.match(text, /Spectator: true/);
   assert.match(text, /Hidden cards: 13-13/);
   assert.doesNotMatch(text, /clubs|diamonds|hearts|spades|A|K|Q|J/);
 });
-
