@@ -43,7 +43,8 @@ h2 {
 
 .controls,
 .room-actions,
-.bid-controls {
+.bid-controls,
+.play-controls {
   display: grid;
   gap: 12px;
 }

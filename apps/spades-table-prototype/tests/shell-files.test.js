@@ -24,10 +24,16 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /id="manual-setup"/);
   assert.match(html, /id="manual-ready"/);
   assert.match(html, /id="manual-bid"/);
+  assert.match(html, /id="manual-trick"/);
   assert.match(html, /id="manual-status"/);
+  assert.match(html, /id="hand-status"/);
+  assert.match(html, /id="playable-status"/);
+  assert.match(html, /id="trick-status"/);
+  assert.match(html, /id="play-card-id"/);
+  assert.match(html, /id="submit-play-card"/);
   assert.match(html, /id="ready-player"/);
   assert.match(html, /id="leave-room"/);
-  assert.doesNotMatch(html, /play-card|card-table|leaderboard|tournament/i);
+  assert.doesNotMatch(html, /card-table|leaderboard|tournament/i);
 });
 
 test("home client wires the shell through the local app controller", () => {
@@ -40,10 +46,11 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /controller\.readyPlayer/);
   assert.match(client, /controller\.leaveRoom/);
   assert.match(client, /controller\.submitBid/);
+  assert.match(client, /controller\.submitPlayCardById/);
   assert.match(client, /createTwoSeatManualHarness/);
   assert.match(client, /showError/);
   assert.match(client, /clearError/);
   assert.match(client, /biddingStatus/);
-  assert.doesNotMatch(client, /submitPlayCard|play-card|card-table/i);
+  assert.doesNotMatch(client, /card-table|WebSocket|fetch|leaderboard|tournament/i);
   assert.doesNotMatch(client, /WebSocket|fetch|leaderboard|tournament/i);
 });

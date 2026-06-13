@@ -31,6 +31,9 @@
         <h2 id="status-title">Room Status</h2>
         <pre id="room-status">No active room.</pre>
         <p id="bid-status" class="status-line">Bid next: none</p>
+        <pre id="hand-status">Hand IDs: none</pre>
+        <p id="playable-status" class="status-line">Playable IDs: none</p>
+        <p id="trick-status" class="status-line">Current trick: none</p>
         <p id="shell-error" class="error-line" role="status"></p>
         <div class="bid-controls" aria-label="Bidding controls">
           <label>
@@ -44,6 +47,13 @@
           <button id="ready-player" type="button">Ready</button>
           <button id="leave-room" type="button">Leave Room</button>
         </div>
+        <div class="play-controls" aria-label="Text play-card controls">
+          <label>
+            Card ID
+            <input id="play-card-id" autocomplete="off" placeholder="2-clubs">
+          </label>
+          <button id="submit-play-card" type="button">Play Card ID</button>
+        </div>
       </section>
 
       <section class="manual-panel" aria-labelledby="manual-title">
@@ -52,6 +62,7 @@
           <button id="manual-setup" type="button">Setup Host/Guest</button>
           <button id="manual-ready" type="button">Ready Both</button>
           <button id="manual-bid" type="button">Bid Both</button>
+          <button id="manual-trick" type="button">Play One Trick</button>
         </div>
         <pre id="manual-status">Manual harness idle.</pre>
       </section>

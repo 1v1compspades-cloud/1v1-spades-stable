@@ -294,6 +294,33 @@ test("play-card action resolves trick and preserves public last trick summary", 
   assert.equal(spectatorStatus.lastTrick.winner, "player2");
 });
 
+test("play-card action can submit by text card id", () => {
+  const { host } = playingControllers();
+  const leadCard = host.getActiveRoomStatus().hand.find((card) => card.suit === "clubs");
+  const cardId = `${leadCard.rank}-${leadCard.suit}`;
+
+  const result = host.submitPlayCardById({ cardId, actionSequence: 1 });
+
+  assert.equal(result.status.currentTrick.length, 1);
+  assert.equal(result.status.currentTrick[0].card.rank, leadCard.rank);
+  assert.equal(result.status.hiddenHandCounts.player1, 12);
+});
+
+test("play-card by id reports invalid and unplayable card errors clearly", () => {
+  const { host, guest } = playingControllers();
+
+  assert.throws(() => host.submitPlayCardById({ cardId: "not-in-hand" }), /not in the current player's hand/);
+
+  const leadCard = host.getActiveRoomStatus().hand.find((card) => card.suit === "clubs");
+  host.submitPlayCardById({ cardId: `${leadCard.rank}-${leadCard.suit}`, actionSequence: 1 });
+  const offSuit = guest.getActiveRoomStatus().hand.find((card) => card.suit === "diamonds");
+
+  assert.throws(() => guest.submitPlayCardById({
+    cardId: `${offSuit.rank}-${offSuit.suit}`,
+    actionSequence: 1
+  }), /Illegal Spades play/);
+});
+
 test("duplicate play-card action is idempotent and stale turn is rejected", () => {
   const { host, guest } = playingControllers();
   const leadCard = host.getActiveRoomStatus().hand.find((card) => card.suit === "clubs");

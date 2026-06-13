@@ -201,6 +201,20 @@ export function createSpadesAppController({
     };
   }
 
+  function submitPlayCardById({ cardId, actionSequence } = {}) {
+    const status = getActiveRoomStatus();
+    if (!status) {
+      throw new Error("No active room session");
+    }
+
+    const card = status.hand.find((candidate) => cardIdFor(candidate) === normalizeCardId(cardId));
+    if (!card) {
+      throw new Error("Card id is not in the current player's hand");
+    }
+
+    return submitPlayCard({ card, actionSequence });
+  }
+
   function getCurrentPlayerStatus() {
     return getActiveRoomStatus()?.currentPlayerStatus ?? null;
   }
@@ -262,6 +276,7 @@ export function createSpadesAppController({
     submitBid,
     getBiddingStatus,
     submitPlayCard,
+    submitPlayCardById,
     getCurrentPlayerStatus,
     getPlayableCardStatus,
     leaveRoom: leaveActiveRoom,
@@ -275,6 +290,14 @@ export function createSpadesAppController({
     actionSequences.set(type, next);
     return next;
   }
+}
+
+export function cardIdFor(card) {
+  return `${card?.rank}-${card?.suit}`;
+}
+
+function normalizeCardId(cardId) {
+  return String(cardId ?? "").trim();
 }
 
 function defaultPlayerId() {

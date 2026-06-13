@@ -18,6 +18,10 @@ export function buildRoomShellModel(sanitizedRoom) {
     biddingStatus: sanitizedRoom.biddingStatus,
     currentPlayerStatus: sanitizedRoom.currentPlayerStatus,
     playableCardStatus: sanitizedRoom.playableCardStatus,
+    handCardIds: sanitizedRoom.hand.map(cardIdFor),
+    currentTrickText: formatTrick(sanitizedRoom.currentTrick),
+    lastTrickText: sanitizedRoom.lastTrick ? formatTrick(sanitizedRoom.lastTrick.plays) : "none",
+    lastTrickWinner: sanitizedRoom.lastTrick?.winner ?? null,
     roomFull: Boolean(sanitizedRoom.players.player1 && sanitizedRoom.players.player2),
     spectator: sanitizedRoom.viewerSeat === "spectator"
   };
@@ -40,10 +44,24 @@ export function renderRoomShellText(sanitizedRoom) {
     `Turn: ${model.currentTurn ?? "none"}`,
     `Bid next: ${model.biddingStatus?.nextBidder ?? "none"}`,
     `Can act: ${Boolean(model.currentPlayerStatus?.canAct)}`,
+    `Hand IDs: ${model.handCardIds.join(", ") || "none"}`,
     `Playable cards: ${model.playableCardStatus?.count ?? 0}`,
+    `Playable IDs: ${model.playableCardStatus?.cardIds?.join(", ") || "none"}`,
+    `Current trick: ${model.currentTrickText}`,
+    `Last trick: ${model.lastTrickText}`,
+    `Trick winner: ${model.lastTrickWinner ?? "none"}`,
     `Room full: ${model.roomFull}`,
     `Spectator: ${model.spectator}`,
     `Hidden cards: ${model.hiddenHandCounts.player1}-${model.hiddenHandCounts.player2}`,
     `Winner: ${model.winner ?? "none"}`
   ].join("\n");
+}
+
+export function cardIdFor(card) {
+  return `${card.rank}-${card.suit}`;
+}
+
+function formatTrick(plays = []) {
+  if (!plays.length) return "none";
+  return plays.map((play) => `${play.player}:${cardIdFor(play.card)}`).join(", ");
 }

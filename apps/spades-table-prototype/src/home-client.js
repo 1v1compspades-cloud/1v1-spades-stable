@@ -10,8 +10,12 @@ const displayNameInput = document.querySelector("#display-name");
 const joinCodeInput = document.querySelector("#join-code");
 const statusOutput = document.querySelector("#room-status");
 const bidStatusOutput = document.querySelector("#bid-status");
+const handStatusOutput = document.querySelector("#hand-status");
+const playableStatusOutput = document.querySelector("#playable-status");
+const trickStatusOutput = document.querySelector("#trick-status");
 const errorOutput = document.querySelector("#shell-error");
 const bidInput = document.querySelector("#bid-input");
+const playCardIdInput = document.querySelector("#play-card-id");
 const manualStatusOutput = document.querySelector("#manual-status");
 const manualHarness = createTwoSeatManualHarness();
 
@@ -56,6 +60,12 @@ document.querySelector("#submit-nil").addEventListener("click", () => {
   runShellAction(() => controller.submitBid({ bid: 0 }).status);
 });
 
+document.querySelector("#submit-play-card").addEventListener("click", () => {
+  runShellAction(() => controller.submitPlayCardById({
+    cardId: playCardIdInput.value
+  }).status);
+});
+
 document.querySelector("#manual-setup").addEventListener("click", () => {
   manualHarness.setup();
   renderManualStatus();
@@ -68,6 +78,11 @@ document.querySelector("#manual-ready").addEventListener("click", () => {
 
 document.querySelector("#manual-bid").addEventListener("click", () => {
   manualHarness.bidBoth();
+  renderManualStatus(manualHarness.guest);
+});
+
+document.querySelector("#manual-trick").addEventListener("click", () => {
+  manualHarness.playOneTrick();
   renderManualStatus(manualHarness.guest);
 });
 
@@ -87,6 +102,15 @@ function renderStatus(status) {
   bidStatusOutput.textContent = status?.biddingStatus
     ? `Bid next: ${status.biddingStatus.nextBidder ?? "none"}`
     : "Bid next: none";
+  handStatusOutput.textContent = status?.hand?.length
+    ? `Hand IDs: ${status.hand.map(cardIdFor).join(", ")}`
+    : "Hand IDs: none";
+  playableStatusOutput.textContent = status?.playableCardStatus
+    ? `Playable IDs: ${status.playableCardStatus.cardIds.join(", ") || "none"}`
+    : "Playable IDs: none";
+  trickStatusOutput.textContent = status
+    ? `Current trick: ${formatTrick(status.currentTrick)} | Last trick: ${status.lastTrick ? formatTrick(status.lastTrick.plays) : "none"} | Winner: ${status.lastTrick?.winner ?? "none"}`
+    : "Current trick: none";
 }
 
 function renderManualStatus(controllerForView = manualHarness.host) {
@@ -99,6 +123,15 @@ function showError(message) {
 
 function clearError() {
   errorOutput.textContent = "";
+}
+
+function cardIdFor(card) {
+  return `${card.rank}-${card.suit}`;
+}
+
+function formatTrick(plays = []) {
+  if (!plays.length) return "none";
+  return plays.map((play) => `${play.player}:${cardIdFor(play.card)}`).join(", ");
 }
 
 function loadOrCreatePlayerId() {
