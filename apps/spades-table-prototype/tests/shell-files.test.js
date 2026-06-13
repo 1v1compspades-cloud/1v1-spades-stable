@@ -234,3 +234,24 @@ test("visual QA and table layout styling is present", () => {
   assert.match(css, /\.account-stat-grid/);
   assert.match(css, /\.account-stat-item/);
 });
+
+test("hosted deploy checklist and server startup are present", () => {
+  const packageJson = readFileSync(resolve(appDir, "package.json"), "utf8");
+  const server = readFileSync(resolve(appDir, "server.js"), "utf8");
+  const checklist = readFileSync(resolve(appDir, "DEPLOY_CHECKLIST.md"), "utf8");
+
+  assert.match(packageJson, /"start": "node server\.js"/);
+  assert.match(server, /resolveServerEnvConfig/);
+  assert.match(server, /createSpadesHostedServer/);
+  assert.match(server, /logger\.info/);
+  assert.match(server, /SIGTERM/);
+  assert.match(server, /SIGINT/);
+  assert.doesNotMatch(server, /hand|seatToken|secret/i);
+  assert.match(checklist, /SPADES_PUBLIC_API_URL/);
+  assert.match(checklist, /SPADES_PUBLIC_WS_URL/);
+  assert.match(checklist, /Render/);
+  assert.match(checklist, /Railway/);
+  assert.match(checklist, /Fly/);
+  assert.match(checklist, /Hosted Smoke Test/);
+  assert.match(checklist, /Rollback Notes/);
+});

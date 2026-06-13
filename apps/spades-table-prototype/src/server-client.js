@@ -1,6 +1,9 @@
+import { resolveClientEnvConfig } from "./env-config.js";
+
 export function createSpadesServerClient({
-  baseUrl = "http://127.0.0.1:5175",
-  wsUrl = "ws://127.0.0.1:5175/ws",
+  config = resolveClientEnvConfig(),
+  baseUrl = config.publicApiUrl,
+  wsUrl = config.publicWebSocketUrl,
   fetchImpl = globalThis.fetch,
   WebSocketImpl = globalThis.WebSocket,
   playerId,

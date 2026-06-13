@@ -6,7 +6,8 @@ export function createSpadesHttpServer({
   boundary = createSpadesServerBoundary(),
   onBoundaryResponse = null,
   quickMatchQueue = createQuickMatchQueue({ boundary }),
-  onQueueResponse = null
+  onQueueResponse = null,
+  config = null
 } = {}) {
   const app = express();
   app.use(express.json({ limit: "128kb" }));
@@ -15,7 +16,10 @@ export function createSpadesHttpServer({
     response.json({
       ok: true,
       service: "spades-table-prototype",
-      transport: "http-local"
+      transport: "http-local",
+      websocket: "enabled",
+      publicApiUrl: config?.publicApiUrl ?? null,
+      publicWebSocketUrl: config?.publicWebSocketUrl ?? null
     });
   });
 

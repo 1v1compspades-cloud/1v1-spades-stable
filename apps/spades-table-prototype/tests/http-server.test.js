@@ -11,7 +11,10 @@ test("HTTP server exposes health and sanitized create join ready bid responses",
     assert.deepEqual(health, {
       ok: true,
       service: "spades-table-prototype",
-      transport: "http-local"
+      transport: "http-local",
+      websocket: "enabled",
+      publicApiUrl: null,
+      publicWebSocketUrl: null
     });
 
     const created = await fixture.post("/api/rooms", {
@@ -221,7 +224,7 @@ test("HTTP Quick Match pairs players and handles duplicate and leave queue", asy
 async function startHttpFixture() {
   const { app, repository } = createSpadesHttpServer();
   const server = await new Promise((resolve) => {
-    const listening = app.listen(0, () => resolve(listening));
+    const listening = app.listen(0, "127.0.0.1", () => resolve(listening));
   });
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
 
