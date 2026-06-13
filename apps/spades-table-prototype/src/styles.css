@@ -48,6 +48,7 @@ h2 {
 .bid-controls,
 .play-controls,
 .fixture-controls,
+.connection-help-panel,
 .qa-status-grid,
 .visual-status-band,
 .summary-grid,
@@ -58,6 +59,18 @@ h2 {
 .account-stat-grid {
   display: grid;
   gap: 12px;
+}
+
+.bug-report-fab {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 20;
+  width: auto;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 2px solid #10251c;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.38);
 }
 
 .tester-entry-panel {
@@ -102,6 +115,13 @@ h2 {
 
 .tester-entry-note {
   color: #f8f4eb;
+}
+
+.connection-help-panel {
+  padding: 12px;
+  border: 1px solid rgba(248, 244, 235, 0.18);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.16);
 }
 
 label {

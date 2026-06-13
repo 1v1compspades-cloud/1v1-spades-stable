@@ -84,6 +84,16 @@ Use this sequence for each hosted beta invite:
 8. Use the Beta Feedback Report panel to report a bug with diagnostics.
 9. Remind testers this is free play only with no cash prizes, no gambling, no payments, and no tournament payouts.
 
+## External Tester Hardening Checks
+
+1. Confirm the connection status panel is visible before creating a room.
+2. Confirm reconnect help explains Restore Active Room.
+3. Confirm the AFK/disconnect warning placeholder is visible.
+4. Confirm Copy Room Code works after creating or joining a room.
+5. Confirm Leave Room / Back to Lobby wording appears in table and text controls.
+6. Confirm the Report Bug button remains visible while scrolling.
+7. Trigger failed join, room full, stale action, and disconnected states when possible and verify friendly tester messages.
+
 ## Rollback Notes
 
 - Roll back to the previous hosted release from the provider dashboard.

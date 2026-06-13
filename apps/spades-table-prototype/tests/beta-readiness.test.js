@@ -43,7 +43,11 @@ test("beta safety checklist reports hidden-hand safety and beta context", () => 
 test("tester-friendly errors cover beta failure modes", () => {
   const cases = [
     ["fetch failed", "Connection lost"],
+    ["timed out waiting for Spades server client socket message", "Connection lost"],
+    ["client disconnected before broadcast", "Connection lost"],
     ["No active room session", "Reconnecting did not find"],
+    ["Room code is required", "Join failed"],
+    ["join request failed validation", "Join failed"],
     ["Room not found for snapshot", "Room not found"],
     ["room full", "Room is full"],
     ["This player is already seated in this room", "already seated"],

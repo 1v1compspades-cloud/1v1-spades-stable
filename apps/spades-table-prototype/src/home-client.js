@@ -53,6 +53,10 @@ const displayNameInput = document.querySelector("#display-name");
 const joinCodeInput = document.querySelector("#join-code");
 const transportModeSelect = document.querySelector("#transport-mode");
 const transportModeStatusOutput = document.querySelector("#transport-mode-status");
+const connectionStatusOutput = document.querySelector("#connection-status");
+const reconnectHelpOutput = document.querySelector("#reconnect-help");
+const afkDisconnectWarningOutput = document.querySelector("#afk-disconnect-warning");
+const roomCodeShareStatusOutput = document.querySelector("#room-code-share-status");
 const quickMatchStatusOutput = document.querySelector("#quick-match-status");
 const phaseStatusOutput = document.querySelector("#phase-status");
 const seatStatusOutput = document.querySelector("#seat-status");
@@ -82,6 +86,7 @@ const betaIssueActualInput = document.querySelector("#beta-issue-actual");
 const betaDiagnosticsOutput = document.querySelector("#beta-diagnostics-bundle");
 const betaFeedbackStatusOutput = document.querySelector("#beta-feedback-status");
 const betaReportHistoryOutput = document.querySelector("#beta-report-history");
+const betaFeedbackPanel = document.querySelector(".beta-feedback-panel");
 const actionLogListOutput = document.querySelector("#action-log-list");
 const manualVisualRoomOutput = document.querySelector("#manual-visual-room");
 const manualVisualPhaseOutput = document.querySelector("#manual-visual-phase");
@@ -171,6 +176,16 @@ document.querySelector("#restore-room").addEventListener("click", () => {
 
 document.querySelector("#reconnect-live-sync").addEventListener("click", () => {
   runShellAction(() => reconnectLiveSyncSnapshot(), "reconnect live sync snapshot");
+});
+
+document.querySelector("#copy-room-code").addEventListener("click", () => {
+  copyRoomCode();
+});
+
+document.querySelector("#jump-to-bug-report").addEventListener("click", () => {
+  renderBetaFeedbackPanel(currentShellStatus());
+  betaFeedbackPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  betaIssueTitleInput.focus();
 });
 
 document.querySelector("#join-quick-match").addEventListener("click", () => {
@@ -611,6 +626,8 @@ function renderQuickMatchStatus() {
 
 function renderStatus(status) {
   renderTransportModeStatus();
+  renderConnectionHelp(status);
+  renderRoomCodeShare(status);
   phaseStatusOutput.textContent = `Phase: ${status?.phase ?? "none"}`;
   seatStatusOutput.textContent = `Seat: ${status?.viewerSeat ?? "none"}${status?.alreadySeated ? " seated" : ""}`;
   turnStatusOutput.textContent = `Turn: ${status?.currentTurn ?? "none"}`;
@@ -638,6 +655,33 @@ function renderStatus(status) {
   renderTournamentHistoryPanel();
   renderActionLog();
   renderBetaFeedbackPanel(status);
+}
+
+function renderConnectionHelp(status) {
+  connectionStatusOutput.textContent = `Connection: ${connectionStatusLabel(status)}`;
+  reconnectHelpOutput.textContent = status?.roomCode
+    ? `Reconnect help: if the page refreshes or disconnects, tap Restore Active Room for ${status.roomCode}.`
+    : "Reconnect help: create or join a room first, then Restore Active Room can recover your seat.";
+  afkDisconnectWarningOutput.textContent = status?.roomCode
+    ? "AFK/disconnect warning: timer placeholder only; if you step away, reconnect manually before continuing."
+    : "AFK/disconnect warning: timer placeholder only; no active room yet.";
+}
+
+function connectionStatusLabel(status) {
+  if (isRealServerMode()) {
+    const error = realServerClient.error ? `, ${friendlyTesterError(realServerClient.error)}` : "";
+    return `real server ${realServerClient.connectionStatus}${status?.roomCode ? `, room ${status.roomCode}` : ""}${error}`;
+  }
+  if (isLiveSyncMode()) {
+    return `${liveSyncClient.status ? "mock live-sync connected" : "mock live-sync idle"}${status?.roomCode ? `, room ${status.roomCode}` : ""}`;
+  }
+  return `direct local, no server needed${status?.roomCode ? `, room ${status.roomCode}` : ""}`;
+}
+
+function renderRoomCodeShare(status) {
+  roomCodeShareStatusOutput.textContent = status?.roomCode
+    ? `Room code: ${status.roomCode}. Share this code with another tester.`
+    : "Room code: create or join a room to share.";
 }
 
 function renderVisualShell(status) {
@@ -1047,6 +1091,29 @@ async function copyDiagnosticsBundle() {
     betaFeedbackStatusOutput.textContent = "Diagnostics selected for copying.";
   } catch (error) {
     betaFeedbackStatusOutput.textContent = `Copy failed: ${friendlyTesterError(error?.message ?? "copy failed")}`;
+  }
+}
+
+async function copyRoomCode() {
+  const roomCode = currentShellStatus()?.roomCode;
+  if (!roomCode) {
+    roomCodeShareStatusOutput.textContent = "Room code: create or join a room before copying.";
+    return;
+  }
+
+  try {
+    if (globalThis.navigator?.clipboard?.writeText) {
+      await globalThis.navigator.clipboard.writeText(roomCode);
+      roomCodeShareStatusOutput.textContent = `Room code copied: ${roomCode}`;
+      return;
+    }
+    joinCodeInput.value = roomCode;
+    joinCodeInput.focus();
+    joinCodeInput.select();
+    document.execCommand?.("copy");
+    roomCodeShareStatusOutput.textContent = `Room code selected for sharing: ${roomCode}`;
+  } catch (error) {
+    roomCodeShareStatusOutput.textContent = `Could not copy room code: ${friendlyTesterError(error?.message ?? "copy failed")}`;
   }
 }
 

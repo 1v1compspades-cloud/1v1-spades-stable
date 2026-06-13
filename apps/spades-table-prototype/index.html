@@ -7,12 +7,13 @@
     <link rel="stylesheet" href="./src/styles.css">
   </head>
   <body>
+    <button id="jump-to-bug-report" class="bug-report-fab" type="button">Report Bug</button>
     <main class="app-shell">
       <section class="home-panel" aria-labelledby="home-title">
         <p class="eyebrow">Spades Master</p>
         <h1 id="home-title">1v1 Spades</h1>
         <section id="tester-entry-panel" class="tester-entry-panel" aria-labelledby="tester-entry-title">
-          <p id="beta-build-label" class="beta-build-label">Hosted Beta Build: Phase 36 / v0.1.0</p>
+          <p id="beta-build-label" class="beta-build-label">Hosted Beta Build: Phase 37 / v0.1.0</p>
           <h2 id="tester-entry-title">Welcome, Beta Tester</h2>
           <p id="tester-entry-summary">
             Free play only. This tester build is for checking room entry, bidding, hand play,
@@ -58,6 +59,11 @@
             </select>
           </label>
           <p id="transport-mode-status" class="status-line">Transport: direct local</p>
+          <div id="connection-help-panel" class="connection-help-panel" aria-label="Connection and reconnect help">
+            <p id="connection-status" class="status-chip">Connection: direct local, no server needed</p>
+            <p id="reconnect-help" class="status-chip">Reconnect help: refresh or disconnect? Tap Restore Active Room.</p>
+            <p id="afk-disconnect-warning" class="status-chip">AFK/disconnect warning: timer placeholder only; reconnect manually if you step away.</p>
+          </div>
           <label>
             Player name
             <input id="display-name" autocomplete="nickname" value="Player">
@@ -70,10 +76,12 @@
           <button id="join-room" type="button">Join Room</button>
           <button id="restore-room" type="button">Restore Active Room</button>
           <button id="reconnect-live-sync" type="button">Reconnect Live Sync Snapshot</button>
+          <button id="copy-room-code" type="button">Copy Room Code</button>
+          <p id="room-code-share-status" class="status-line">Room code: create or join a room to share.</p>
           <button id="join-quick-match" type="button">Join Quick Match</button>
           <button id="leave-quick-match" type="button">Cancel Quick Match</button>
           <p id="quick-match-status" class="status-line">Quick Match: idle</p>
-          <button id="clear-room" type="button">Clear Active Room</button>
+          <button id="clear-room" type="button">Back to Lobby / Clear Active Room</button>
         </div>
       </section>
 
@@ -93,7 +101,7 @@
             <div id="table-last-trick-area" class="table-area last-trick-area">Last trick: none</div>
             <div id="table-player-hand-area" class="table-area player-hand-area">Player hand: waiting</div>
             <div class="table-controls table-area">
-              <button id="table-leave-room" type="button">Leave</button>
+              <button id="table-leave-room" type="button">Leave Room / Back to Lobby</button>
               <button id="table-record-history" type="button">Record History</button>
               <button id="table-start-next-hand" type="button">Next Hand</button>
               <button id="table-start-new-match" type="button">New Match</button>
@@ -203,8 +211,9 @@
         </div>
         <div class="room-actions">
           <button id="ready-player" type="button">Mark Active Seat Ready</button>
-          <button id="leave-room" type="button">Leave Active Room</button>
+          <button id="leave-room" type="button">Leave Room / Back to Lobby</button>
         </div>
+        <p id="leave-room-help" class="status-line">Leave Room / Back to Lobby clears your active seat view. Rejoin with the room code or restore if needed.</p>
         <div class="play-controls" aria-label="Text play-card controls">
           <label>
             Card ID

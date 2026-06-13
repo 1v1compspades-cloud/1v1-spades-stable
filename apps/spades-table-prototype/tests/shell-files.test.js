@@ -11,10 +11,12 @@ const repoDir = resolve(appDir, "../..");
 test("basic shell exposes create join ready leave and status targets", () => {
   const html = readFileSync(resolve(appDir, "index.html"), "utf8");
 
+  assert.match(html, /id="jump-to-bug-report"/);
+  assert.match(html, /Report Bug/);
   assert.match(html, /id="create-room"/);
   assert.match(html, /id="tester-entry-panel"/);
   assert.match(html, /id="beta-build-label"/);
-  assert.match(html, /Hosted Beta Build: Phase 36 \/ v0\.1\.0/);
+  assert.match(html, /Hosted Beta Build: Phase 37 \/ v0\.1\.0/);
   assert.match(html, /Welcome, Beta Tester/);
   assert.match(html, /id="beta-how-to-test"/);
   assert.match(html, /id="beta-quick-checklist"/);
@@ -32,15 +34,25 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /local previews only/);
   assert.match(html, /id="transport-mode"/);
   assert.match(html, /id="transport-mode-status"/);
+  assert.match(html, /id="connection-help-panel"/);
+  assert.match(html, /id="connection-status"/);
+  assert.match(html, /id="reconnect-help"/);
+  assert.match(html, /id="afk-disconnect-warning"/);
+  assert.match(html, /Restore Active Room/);
+  assert.match(html, /AFK\/disconnect warning/);
   assert.match(html, /value="real-server"/);
   assert.match(html, /id="join-code"/);
   assert.match(html, /id="join-room"/);
   assert.match(html, /id="restore-room"/);
   assert.match(html, /id="reconnect-live-sync"/);
+  assert.match(html, /id="copy-room-code"/);
+  assert.match(html, /id="room-code-share-status"/);
+  assert.match(html, /Copy Room Code/);
   assert.match(html, /id="join-quick-match"/);
   assert.match(html, /id="leave-quick-match"/);
   assert.match(html, /id="quick-match-status"/);
   assert.match(html, /id="clear-room"/);
+  assert.match(html, /Back to Lobby \/ Clear Active Room/);
   assert.match(html, /id="room-status"/);
   assert.match(html, /id="phase-status"/);
   assert.match(html, /id="seat-status"/);
@@ -60,6 +72,7 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /id="table-last-trick-area"/);
   assert.match(html, /id="table-player-hand-area"/);
   assert.match(html, /id="table-leave-room"/);
+  assert.match(html, /Leave Room \/ Back to Lobby/);
   assert.match(html, /id="table-record-history"/);
   assert.match(html, /id="table-start-next-hand"/);
   assert.match(html, /id="table-start-new-match"/);
@@ -138,6 +151,7 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /id="two-seat-visual-compare"/);
   assert.match(html, /id="ready-player"/);
   assert.match(html, /id="leave-room"/);
+  assert.match(html, /id="leave-room-help"/);
   assert.doesNotMatch(html, /card-table/i);
 });
 
@@ -159,6 +173,11 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /currentDiagnosticsBundle/);
   assert.match(client, /renderBetaFeedbackPanel/);
   assert.match(client, /copyDiagnosticsBundle/);
+  assert.match(client, /copyRoomCode/);
+  assert.match(client, /renderConnectionHelp/);
+  assert.match(client, /connectionStatusLabel/);
+  assert.match(client, /renderRoomCodeShare/);
+  assert.match(client, /scrollIntoView/);
   assert.match(client, /hiddenHandSafe/);
   assert.match(client, /friendlyTesterError/);
   assert.match(client, /listManualBetaFlows/);
@@ -258,8 +277,11 @@ test("visual QA and table layout styling is present", () => {
   const css = readFileSync(resolve(appDir, "src/styles.css"), "utf8");
 
   assert.match(css, /\.tester-entry-panel/);
+  assert.match(css, /\.bug-report-fab/);
+  assert.match(css, /position:\s*fixed/);
   assert.match(css, /\.beta-build-label/);
   assert.match(css, /\.beta-onboarding-block/);
+  assert.match(css, /\.connection-help-panel/);
   assert.match(css, /\.tester-entry-note/);
   assert.match(css, /\.table-layout-shell/);
   assert.match(css, /\.table-area/);
@@ -288,6 +310,7 @@ test("hosted deploy checklist and server startup are present", () => {
   const checklist = readFileSync(resolve(appDir, "DEPLOY_CHECKLIST.md"), "utf8");
   const smokeScript = readFileSync(resolve(appDir, "scripts/hosted-beta-smoke.mjs"), "utf8");
   const testerGuide = readFileSync(resolve(repoDir, "docs/BETA_TESTER_GUIDE.md"), "utf8");
+  const externalChecklist = readFileSync(resolve(repoDir, "docs/EXTERNAL_TESTER_CHECKLIST.md"), "utf8");
   const launchDoc = readFileSync(resolve(repoDir, "docs/SPADES_HOSTED_BETA_LAUNCH.md"), "utf8");
   const feedbackDoc = readFileSync(resolve(repoDir, "docs/SPADES_BETA_FEEDBACK.md"), "utf8");
 
@@ -319,6 +342,12 @@ test("hosted deploy checklist and server startup are present", () => {
   assert.match(checklist, /Restore Active Room/);
   assert.match(checklist, /Beta Feedback Report/);
   assert.match(checklist, /no cash prizes, no gambling, no payments, and no tournament payouts/i);
+  assert.match(checklist, /External Tester Hardening Checks/);
+  assert.match(checklist, /connection status panel/);
+  assert.match(checklist, /AFK\/disconnect warning placeholder/);
+  assert.match(checklist, /Copy Room Code/);
+  assert.match(checklist, /Report Bug button/);
+  assert.match(checklist, /failed join, room full, stale action, and disconnected/i);
   assert.match(checklist, /Render/);
   assert.match(checklist, /Railway/);
   assert.match(checklist, /Fly/);
@@ -344,6 +373,19 @@ test("hosted deploy checklist and server startup are present", () => {
   assert.match(testerGuide, /Reconnect/);
   assert.match(testerGuide, /Report bug/);
   assert.match(testerGuide, /Copy Diagnostics/);
+  assert.match(externalChecklist, /Spades External Tester Checklist/);
+  assert.match(externalChecklist, /free play only/i);
+  assert.match(externalChecklist, /no cash prizes/i);
+  assert.match(externalChecklist, /no gambling/i);
+  assert.match(externalChecklist, /connection status panel/i);
+  assert.match(externalChecklist, /Copy Room Code|Copy\/share the room code/i);
+  assert.match(externalChecklist, /AFK\/disconnect warning placeholder/);
+  assert.match(externalChecklist, /Leave Room \/ Back to Lobby/);
+  assert.match(externalChecklist, /always-visible Report Bug button/);
+  assert.match(externalChecklist, /failed join/i);
+  assert.match(externalChecklist, /room full/i);
+  assert.match(externalChecklist, /stale action/i);
+  assert.match(externalChecklist, /disconnected/i);
   assert.match(feedbackDoc, /copyable diagnostics bundle/i);
   assert.match(feedbackDoc, /room code/i);
   assert.match(feedbackDoc, /phase/i);

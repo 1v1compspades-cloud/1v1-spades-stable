@@ -73,11 +73,14 @@ export function listManualBetaFlows() {
 export function friendlyTesterError(message) {
   const text = String(message ?? "").trim();
   if (!text) return "";
-  if (/connection.*lost|socket.*closed|network.*fail|ECONN|fetch failed|WebSocket.*required/i.test(text)) {
+  if (/connection.*lost|socket.*closed|network.*fail|ECONN|fetch failed|WebSocket.*required|disconnected|timed out waiting|not connected/i.test(text)) {
     return "Connection lost. Check that the local server is running, then reconnect.";
   }
   if (/reconnect|restore|No active room/i.test(text)) {
     return "Reconnecting did not find an active room. Create or join a room again.";
+  }
+  if (/join.*failed|Room code.*required|invalid room code|missing room code/i.test(text)) {
+    return "Join failed. Check the room code, then try Join Room again.";
   }
   if (/Room not found|not found for snapshot|No room found/i.test(text)) {
     return "Room not found. Check the room code and try again.";
