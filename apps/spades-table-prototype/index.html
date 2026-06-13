@@ -31,10 +31,29 @@
         <h2 id="status-title">Room Status</h2>
         <pre id="room-status">No active room.</pre>
         <p id="bid-status" class="status-line">Bid next: none</p>
+        <p id="shell-error" class="error-line" role="status"></p>
+        <div class="bid-controls" aria-label="Bidding controls">
+          <label>
+            Bid
+            <input id="bid-input" type="number" min="0" max="13" inputmode="numeric" value="4">
+          </label>
+          <button id="submit-bid" type="button">Submit Bid</button>
+          <button id="submit-nil" type="button">Nil</button>
+        </div>
         <div class="room-actions">
           <button id="ready-player" type="button">Ready</button>
           <button id="leave-room" type="button">Leave Room</button>
         </div>
+      </section>
+
+      <section class="manual-panel" aria-labelledby="manual-title">
+        <h2 id="manual-title">Local Two-Seat Test</h2>
+        <div class="room-actions">
+          <button id="manual-setup" type="button">Setup Host/Guest</button>
+          <button id="manual-ready" type="button">Ready Both</button>
+          <button id="manual-bid" type="button">Bid Both</button>
+        </div>
+        <pre id="manual-status">Manual harness idle.</pre>
       </section>
     </main>
 

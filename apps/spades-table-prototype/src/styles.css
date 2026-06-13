@@ -22,7 +22,8 @@ input {
 }
 
 .home-panel,
-.status-panel {
+.status-panel,
+.manual-panel {
   padding: 20px 0;
   border-bottom: 1px solid rgba(248, 244, 235, 0.18);
 }
@@ -41,7 +42,8 @@ h2 {
 }
 
 .controls,
-.room-actions {
+.room-actions,
+.bid-controls {
   display: grid;
   gap: 12px;
 }
@@ -86,5 +88,12 @@ pre {
 .status-line {
   margin: 0 0 16px;
   color: #d7d1c3;
+  font-weight: 800;
+}
+
+.error-line {
+  min-height: 20px;
+  margin: 0 0 16px;
+  color: #ffb4a8;
   font-weight: 800;
 }

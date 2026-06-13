@@ -19,6 +19,7 @@ export function createSpadesAppController({
   createPlayerId = defaultPlayerId
 } = {}) {
   let playerId = null;
+  const actionSequences = new Map();
 
   function currentPlayerId() {
     if (!playerId) {
@@ -145,7 +146,7 @@ export function createSpadesAppController({
     };
   }
 
-  function submitBid({ bid, actionSequence = 1 } = {}) {
+  function submitBid({ bid, actionSequence = nextActionSequence("bid") } = {}) {
     const { room, session } = requireActiveRoom();
     const actionId = createActionId({
       roomCode: room.roomCode,
@@ -230,6 +231,13 @@ export function createSpadesAppController({
     getActiveRoomStatus,
     getRoomStatus
   };
+
+  function nextActionSequence(type) {
+    const current = actionSequences.get(type) ?? 0;
+    const next = current + 1;
+    actionSequences.set(type, next);
+    return next;
+  }
 }
 
 function defaultPlayerId() {

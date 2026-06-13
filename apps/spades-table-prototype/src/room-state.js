@@ -181,6 +181,7 @@ function applyRoomActionOnce(room, action = {}) {
 
   if (action.type === "bid") {
     ensurePhase(room, "bidding");
+    ensureBidTurn(room, seat);
     const bidding = placeBid(room.game.bidding, seat, action.bid);
     const nextGame = {
       ...room.game,
@@ -577,6 +578,15 @@ function ensureExpectedPhase(room, expectedPhase) {
 function ensureExpectedTurn(room, expectedTurn) {
   if (expectedTurn && room.currentTurn !== expectedTurn) {
     throw roomError(409, `Stale action expected ${expectedTurn} turn`);
+  }
+}
+
+function ensureBidTurn(room, seat) {
+  const nextBidder = PLAYERS.find((player) => (
+    room.game.bids?.[player] === null || room.game.bids?.[player] === undefined
+  ));
+  if (nextBidder && seat !== nextBidder) {
+    throw roomError(403, "It is not this player's bid turn");
   }
 }
 

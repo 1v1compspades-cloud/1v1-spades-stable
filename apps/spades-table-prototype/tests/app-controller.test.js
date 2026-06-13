@@ -170,7 +170,52 @@ test("duplicate and stale bid actions are protected by controller action ids", (
 
   assert.equal(replayedBid.room, firstBid.room);
   assert.deepEqual(replayedBid.status.bids, { player1: "locked", player2: null });
-  assert.throws(() => controller.submitBid({ bid: 6, actionSequence: 8 }), /already bid/);
+  assert.throws(() => controller.submitBid({ bid: 6, actionSequence: 8 }), /bid turn/);
+});
+
+test("wrong player cannot bid before their turn", () => {
+  const host = createSpadesAppController({
+    storage: createMemoryStorage(),
+    createPlayerId: () => "device-host"
+  });
+  const guest = createSpadesAppController({
+    repository: host.repository,
+    storage: createMemoryStorage(),
+    createPlayerId: () => "device-guest"
+  });
+  host.createRoom({ roomCode: "BID003", seatToken: "seat-host" });
+  guest.joinRoom({ roomCode: "BID003", seatToken: "seat-guest" });
+  host.readyPlayer();
+  guest.readyPlayer();
+
+  assert.throws(() => guest.submitBid({ bid: 3 }), /bid turn/);
+  assert.equal(host.getBiddingStatus().nextBidder, "player1");
+});
+
+test("invalid bids and stale phase submissions return clear errors without corrupting state", () => {
+  const host = createSpadesAppController({
+    storage: createMemoryStorage(),
+    createPlayerId: () => "device-host"
+  });
+  const guest = createSpadesAppController({
+    repository: host.repository,
+    storage: createMemoryStorage(),
+    createPlayerId: () => "device-guest"
+  });
+  host.createRoom({ roomCode: "BID004", seatToken: "seat-host" });
+  guest.joinRoom({ roomCode: "BID004", seatToken: "seat-guest" });
+  host.readyPlayer();
+  guest.readyPlayer();
+
+  assert.throws(() => host.submitBid({ bid: 14 }), /0 through 13/);
+  assert.deepEqual(host.getActiveRoomStatus().bids, { player1: null, player2: null });
+
+  host.submitBid({ bid: 0 });
+  const guestBid = guest.submitBid({ bid: 2 });
+
+  assert.equal(guestBid.status.phase, "playing");
+  assert.throws(() => host.submitBid({ bid: 1 }), /Stale action expected bidding phase/);
+  assert.equal(host.getActiveRoomStatus().phase, "playing");
 });
 
 test("third visitor becomes spectator and receives public room-full status only", () => {

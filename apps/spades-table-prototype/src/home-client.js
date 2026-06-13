@@ -1,4 +1,5 @@
 import { createSpadesAppController } from "./app-controller.js";
+import { createTwoSeatManualHarness } from "./manual-harness.js";
 import { renderRoomShellText } from "./room-shell.js";
 
 const controller = createSpadesAppController({
@@ -9,6 +10,10 @@ const displayNameInput = document.querySelector("#display-name");
 const joinCodeInput = document.querySelector("#join-code");
 const statusOutput = document.querySelector("#room-status");
 const bidStatusOutput = document.querySelector("#bid-status");
+const errorOutput = document.querySelector("#shell-error");
+const bidInput = document.querySelector("#bid-input");
+const manualStatusOutput = document.querySelector("#manual-status");
+const manualHarness = createTwoSeatManualHarness();
 
 document.querySelector("#create-room").addEventListener("click", () => {
   runShellAction(() => controller.createRoom({
@@ -40,13 +45,40 @@ document.querySelector("#leave-room").addEventListener("click", () => {
   runShellAction(() => controller.leaveRoom().status);
 });
 
+document.querySelector("#submit-bid").addEventListener("click", () => {
+  runShellAction(() => controller.submitBid({
+    bid: Number(bidInput.value)
+  }).status);
+});
+
+document.querySelector("#submit-nil").addEventListener("click", () => {
+  bidInput.value = "0";
+  runShellAction(() => controller.submitBid({ bid: 0 }).status);
+});
+
+document.querySelector("#manual-setup").addEventListener("click", () => {
+  manualHarness.setup();
+  renderManualStatus();
+});
+
+document.querySelector("#manual-ready").addEventListener("click", () => {
+  manualHarness.readyBoth();
+  renderManualStatus();
+});
+
+document.querySelector("#manual-bid").addEventListener("click", () => {
+  manualHarness.bidBoth();
+  renderManualStatus(manualHarness.guest);
+});
+
 renderStatus(controller.restoreActiveRoom().status);
 
 function runShellAction(action) {
   try {
+    clearError();
     renderStatus(action());
   } catch (error) {
-    statusOutput.textContent = error?.message ?? "Action failed";
+    showError(error?.message ?? "Action failed");
   }
 }
 
@@ -55,6 +87,18 @@ function renderStatus(status) {
   bidStatusOutput.textContent = status?.biddingStatus
     ? `Bid next: ${status.biddingStatus.nextBidder ?? "none"}`
     : "Bid next: none";
+}
+
+function renderManualStatus(controllerForView = manualHarness.host) {
+  manualStatusOutput.textContent = manualHarness.statusText(controllerForView);
+}
+
+function showError(message) {
+  errorOutput.textContent = message;
+}
+
+function clearError() {
+  errorOutput.textContent = "";
 }
 
 function loadOrCreatePlayerId() {
