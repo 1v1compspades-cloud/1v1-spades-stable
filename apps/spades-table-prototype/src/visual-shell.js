@@ -19,10 +19,15 @@ export function buildVisualShellModel(status) {
   const playableIds = new Set(status.playableCardStatus?.cardIds ?? []);
   const handCards = (status.hand ?? []).map((card) => {
     const id = cardIdFor(card);
+    const playable = playableIds.has(id);
     return {
       id,
       label: id,
-      playable: playableIds.has(id)
+      rank: card.rank,
+      suit: card.suit,
+      playable,
+      ariaLabel: `${playable ? "Play" : "Unavailable"} ${card.rank} of ${card.suit}`,
+      stateLabel: playable ? "Playable" : "Blocked"
     };
   });
 

@@ -35,8 +35,24 @@ test("visual shell model builds card buttons from sanitized hand only", () => {
   assert.equal(model.phase, "playing");
   assert.equal(model.action, "Play one highlighted card");
   assert.deepEqual(model.handCards, [
-    { id: "A-spades", label: "A-spades", playable: true },
-    { id: "2-clubs", label: "2-clubs", playable: false }
+    {
+      id: "A-spades",
+      label: "A-spades",
+      rank: "A",
+      suit: "spades",
+      playable: true,
+      ariaLabel: "Play A of spades",
+      stateLabel: "Playable"
+    },
+    {
+      id: "2-clubs",
+      label: "2-clubs",
+      rank: "2",
+      suit: "clubs",
+      playable: false,
+      ariaLabel: "Unavailable 2 of clubs",
+      stateLabel: "Blocked"
+    }
   ]);
   assert.equal(model.currentTrick, "player1:A-spades");
   assert.equal(model.lastTrick, "player1:2-clubs, player2:A-clubs | winner player2");

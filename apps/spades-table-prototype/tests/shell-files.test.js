@@ -87,6 +87,11 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /controller\.submitBid/);
   assert.match(client, /controller\.submitPlayCardById/);
   assert.match(client, /visualCardButton/);
+  assert.match(client, /aria-label/);
+  assert.match(client, /dataset\.cardId/);
+  assert.match(client, /card-rank/);
+  assert.match(client, /card-suit/);
+  assert.match(client, /card-state/);
   assert.match(client, /replaceChildren/);
   assert.match(client, /controller\.playFullHand/);
   assert.match(client, /controller\.startNextHand/);
@@ -106,4 +111,18 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /biddingStatus/);
   assert.doesNotMatch(client, /card-table|WebSocket|fetch|leaderboard|tournament/i);
   assert.doesNotMatch(client, /WebSocket|fetch|leaderboard|tournament/i);
+});
+
+test("card button styling keeps mobile tap and accessibility states visible", () => {
+  const css = readFileSync(resolve(appDir, "src/styles.css"), "utf8");
+
+  assert.match(css, /\.card-button/);
+  assert.match(css, /min-height:\s*112px/);
+  assert.match(css, /\.card-button\.playable/);
+  assert.match(css, /\.card-button:disabled/);
+  assert.match(css, /\.card-button:focus-visible/);
+  assert.match(css, /\.card-rank/);
+  assert.match(css, /\.card-suit/);
+  assert.match(css, /\.card-id/);
+  assert.match(css, /\.card-state/);
 });

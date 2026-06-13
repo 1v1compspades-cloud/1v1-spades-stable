@@ -264,12 +264,26 @@ function visualCardButton(card, onPlayableCard) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = card.playable ? "card-button playable" : "card-button";
-  button.textContent = card.label;
+  button.setAttribute("aria-label", card.ariaLabel);
+  button.dataset.cardId = card.id;
+  button.append(
+    visualCardText("card-rank", card.rank),
+    visualCardText("card-suit", card.suit),
+    visualCardText("card-id", card.id),
+    visualCardText("card-state", card.stateLabel)
+  );
   button.disabled = !card.playable || !onPlayableCard;
   button.addEventListener("click", () => {
     if (onPlayableCard) onPlayableCard(card);
   });
   return button;
+}
+
+function visualCardText(className, text) {
+  const span = document.createElement("span");
+  span.className = className;
+  span.textContent = text;
+  return span;
 }
 
 function renderManualStatus(view = manualViewSelect.value) {
