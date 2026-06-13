@@ -252,6 +252,7 @@ export function sanitizeRoomForViewer(room, viewer = {}) {
     },
     bids: sanitizeBids(room.game.bids, room.phase),
     biddingStatus: biddingStatus(room),
+    handSummary: handSummary(room),
     tricksTaken: {
       ...room.game.tricksTaken
     },
@@ -408,6 +409,9 @@ function playCard(room, seat, card) {
     bags: room.game.bags,
     settings: room.matchSettings
   });
+  const previousScore = {
+    ...room.game.score
+  };
   const winner = getMatchWinner({
     score: scoring.score,
     targetScore: room.matchSettings.targetScore
@@ -431,6 +435,7 @@ function playCard(room, seat, card) {
       bags: scoring.bags,
       handScores: scoring.handScores,
       bagPenalties: scoring.bagPenalties,
+      previousScore,
       winner
     },
     updatedAt: new Date().toISOString()
@@ -470,6 +475,10 @@ function createEmptyGameState() {
       player2: 0
     },
     bagPenalties: {
+      player1: 0,
+      player2: 0
+    },
+    previousScore: {
       player1: 0,
       player2: 0
     },
@@ -514,6 +523,37 @@ function biddingStatus(room) {
       player1: bids?.player1 !== null && bids?.player1 !== undefined,
       player2: bids?.player2 !== null && bids?.player2 !== undefined
     }
+  };
+}
+
+function handSummary(room) {
+  if (!["hand_complete", "match_complete"].includes(room.phase)) {
+    return null;
+  }
+
+  const players = Object.fromEntries(PLAYERS.map((player) => {
+    const bid = room.game.bids[player];
+    const tricks = room.game.tricksTaken[player];
+    const nilBid = bid === 0;
+    return [player, {
+      bid,
+      tricks,
+      bags: room.game.bags[player],
+      nilBid,
+      nilResult: nilBid ? (tricks === 0 ? "made" : "failed") : null,
+      handScore: room.game.handScores[player],
+      bagPenalty: room.game.bagPenalties[player],
+      scoreChange: room.game.score[player] - room.game.previousScore[player],
+      totalScore: room.game.score[player]
+    }];
+  }));
+
+  return {
+    players,
+    handWinner: room.game.score.player1 === room.game.score.player2
+      ? null
+      : (room.game.score.player1 > room.game.score.player2 ? "player1" : "player2"),
+    matchWinner: room.game.winner
   };
 }
 

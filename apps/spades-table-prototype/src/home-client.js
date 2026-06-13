@@ -13,6 +13,7 @@ const bidStatusOutput = document.querySelector("#bid-status");
 const handStatusOutput = document.querySelector("#hand-status");
 const playableStatusOutput = document.querySelector("#playable-status");
 const trickStatusOutput = document.querySelector("#trick-status");
+const handSummaryOutput = document.querySelector("#hand-summary");
 const errorOutput = document.querySelector("#shell-error");
 const bidInput = document.querySelector("#bid-input");
 const playCardIdInput = document.querySelector("#play-card-id");
@@ -66,6 +67,14 @@ document.querySelector("#submit-play-card").addEventListener("click", () => {
   }).status);
 });
 
+document.querySelector("#play-full-hand").addEventListener("click", () => {
+  runShellAction(() => controller.playFullHand().status);
+});
+
+document.querySelector("#start-next-hand").addEventListener("click", () => {
+  runShellAction(() => controller.startNextHand().status);
+});
+
 document.querySelector("#manual-setup").addEventListener("click", () => {
   manualHarness.setup();
   renderManualStatus();
@@ -84,6 +93,16 @@ document.querySelector("#manual-bid").addEventListener("click", () => {
 document.querySelector("#manual-trick").addEventListener("click", () => {
   manualHarness.playOneTrick();
   renderManualStatus(manualHarness.guest);
+});
+
+document.querySelector("#manual-full-hand").addEventListener("click", () => {
+  manualHarness.playFullHand();
+  renderManualStatus(manualHarness.guest);
+});
+
+document.querySelector("#manual-next-hand").addEventListener("click", () => {
+  manualHarness.startNextHand();
+  renderManualStatus();
 });
 
 renderStatus(controller.restoreActiveRoom().status);
@@ -111,6 +130,9 @@ function renderStatus(status) {
   trickStatusOutput.textContent = status
     ? `Current trick: ${formatTrick(status.currentTrick)} | Last trick: ${status.lastTrick ? formatTrick(status.lastTrick.plays) : "none"} | Winner: ${status.lastTrick?.winner ?? "none"}`
     : "Current trick: none";
+  handSummaryOutput.textContent = status?.handSummary
+    ? `Hand summary: ${formatHandSummary(status.handSummary)}`
+    : "Hand summary: none";
 }
 
 function renderManualStatus(controllerForView = manualHarness.host) {
@@ -132,6 +154,13 @@ function cardIdFor(card) {
 function formatTrick(plays = []) {
   if (!plays.length) return "none";
   return plays.map((play) => `${play.player}:${cardIdFor(play.card)}`).join(", ");
+}
+
+function formatHandSummary(summary) {
+  return ["player1", "player2"].map((player) => {
+    const row = summary.players[player];
+    return `${player} bid ${row.bid}, tricks ${row.tricks}, bags ${row.bags}, nil ${row.nilResult ?? "none"}, change ${row.scoreChange}, total ${row.totalScore}`;
+  }).join(" | ");
 }
 
 function loadOrCreatePlayerId() {

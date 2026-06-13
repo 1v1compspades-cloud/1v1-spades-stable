@@ -54,13 +54,23 @@ export function createTwoSeatManualHarness({
       const leader = hostStatus.currentTurn === "player1" ? host : guest;
       const follower = hostStatus.currentTurn === "player1" ? guest : host;
       const leadCard = leader.getActiveRoomStatus().hand[0];
-      const led = leader.submitPlayCard({ card: leadCard, actionSequence: 1 });
+      const led = leader.submitPlayCard({ card: leadCard });
       const followCard = follower.getActiveRoomStatus().hand.find((card) => (
         follower.getPlayableCardStatus().cardIds.includes(`${card.rank}-${card.suit}`)
       ));
-      const followed = follower.submitPlayCard({ card: followCard, actionSequence: 1 });
+      const followed = follower.submitPlayCard({ card: followCard });
 
       return { led, followed };
+    },
+    playFullHand({ maxTricks = 13 } = {}) {
+      let latest = null;
+      for (let trick = 0; trick < maxTricks && host.getActiveRoomStatus()?.phase === "playing"; trick += 1) {
+        latest = this.playOneTrick();
+      }
+      return latest;
+    },
+    startNextHand(controller = host) {
+      return controller.startNextHand();
     },
     statusText(controller = host) {
       return renderRoomShellText(controller.getActiveRoomStatus());

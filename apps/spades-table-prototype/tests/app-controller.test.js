@@ -338,6 +338,77 @@ test("duplicate play-card action is idempotent and stale turn is rejected", () =
   assert.equal(followed.status.lastTrick.winner, "player2");
 });
 
+test("full hand can complete with score, bags, and hand summary", () => {
+  const { host, guest } = playingControllers({
+    deck: player1WinsEveryTrickDeck(),
+    hostBid: 4,
+    guestBid: 3
+  });
+
+  const completed = playFullHandWithControllers(host, guest);
+
+  assert.equal(completed.status.phase, "hand_complete");
+  assert.deepEqual(completed.status.tricksTaken, { player1: 13, player2: 0 });
+  assert.deepEqual(completed.status.score, { player1: 49, player2: -30 });
+  assert.deepEqual(completed.status.bags, { player1: 9, player2: 0 });
+  assert.equal(completed.status.handSummary.players.player1.scoreChange, 49);
+  assert.equal(completed.status.handSummary.players.player1.bags, 9);
+  assert.equal(completed.status.handSummary.players.player2.scoreChange, -30);
+});
+
+test("nil scoring works in the hand summary", () => {
+  const { host, guest } = playingControllers({
+    deck: player1WinsEveryTrickDeck(),
+    hostBid: 4,
+    guestBid: 0
+  });
+
+  const completed = playFullHandWithControllers(host, guest);
+
+  assert.equal(completed.status.phase, "hand_complete");
+  assert.equal(completed.status.handSummary.players.player2.nilBid, true);
+  assert.equal(completed.status.handSummary.players.player2.nilResult, "made");
+  assert.equal(completed.status.handSummary.players.player2.scoreChange, 100);
+  assert.equal(completed.status.score.player2, 100);
+});
+
+test("next hand starts cleanly and preserves match score", () => {
+  const { host, guest } = playingControllers({
+    deck: player1WinsEveryTrickDeck(),
+    hostBid: 4,
+    guestBid: 3
+  });
+  const completed = playFullHandWithControllers(host, guest);
+
+  assert.equal(completed.status.phase, "hand_complete");
+
+  const next = host.startNextHand({
+    deck: player2HighDeck()
+  });
+
+  assert.equal(next.status.phase, "bidding");
+  assert.equal(next.status.handNumber, 2);
+  assert.deepEqual(next.status.score, { player1: 49, player2: -30 });
+  assert.deepEqual(next.status.tricksTaken, { player1: 0, player2: 0 });
+  assert.equal(next.status.lastTrick, null);
+  assert.equal(next.status.handSummary, null);
+  assert.equal(next.status.hiddenHandCounts.player1, 13);
+});
+
+test("match complete prevents next hand unless a new match is created", () => {
+  const { host, guest } = playingControllers({
+    deck: player1WinsEveryTrickDeck(),
+    hostBid: 4,
+    guestBid: 3,
+    matchSettings: { targetScore: 40 }
+  });
+  const completed = playFullHandWithControllers(host, guest);
+
+  assert.equal(completed.status.phase, "match_complete");
+  assert.equal(completed.status.winner, "player1");
+  assert.throws(() => host.startNextHand({ deck: player2HighDeck() }), /Stale action expected hand_complete phase/);
+});
+
 function createMemoryStorage() {
   const values = new Map();
   return {
@@ -353,7 +424,7 @@ function createMemoryStorage() {
   };
 }
 
-function playingControllers() {
+function playingControllers({ deck = player2HighDeck(), hostBid = 4, guestBid = 3, matchSettings = {} } = {}) {
   const host = createSpadesAppController({
     storage: createMemoryStorage(),
     createPlayerId: () => "device-host"
@@ -368,15 +439,35 @@ function playingControllers() {
     roomCode: "PLAY01",
     seatToken: "seat-host",
     coinFlipWinner: "player2",
-    deck: player2HighDeck()
+    deck,
+    matchSettings
   });
   guest.joinRoom({ roomCode: "PLAY01", seatToken: "seat-guest" });
   host.readyPlayer();
   guest.readyPlayer();
-  host.submitBid({ bid: 4 });
-  guest.submitBid({ bid: 3 });
+  host.submitBid({ bid: hostBid });
+  guest.submitBid({ bid: guestBid });
 
   return { host, guest };
+}
+
+function playFullHandWithControllers(host, guest) {
+  let latest = null;
+  while (host.getActiveRoomStatus().phase === "playing") {
+    const active = host.getActiveRoomStatus().currentTurn === "player1" ? host : guest;
+    const cardId = active.getPlayableCardStatus().cardIds[0];
+    latest = active.submitPlayCardById({ cardId });
+  }
+  return latest;
+}
+
+function player1WinsEveryTrickDeck() {
+  return [
+    ...cards("spades", ["A", "K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3", "2"]),
+    ...cards("clubs", ["A", "K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3", "2"]),
+    ...cards("hearts", ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]),
+    ...cards("diamonds", ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"])
+  ];
 }
 
 function player2HighDeck() {

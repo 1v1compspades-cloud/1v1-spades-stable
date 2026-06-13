@@ -36,3 +36,15 @@ test("manual harness can play a scripted trick without card graphics", () => {
   assert.equal(trick.followed.status.lastTrick.plays.length, 2);
   assert.match(harness.statusText(), /Playable cards:/);
 });
+
+test("manual harness can play a full hand without networking", () => {
+  const harness = createTwoSeatManualHarness({ roomCode: "LOCAL4" });
+  harness.setup();
+  harness.readyBoth();
+  harness.bidBoth({ hostBid: 4, guestBid: 3 });
+
+  const completed = harness.playFullHand();
+
+  assert.ok(completed.followed.status.phase === "hand_complete" || completed.followed.status.phase === "match_complete");
+  assert.match(harness.statusText(), /Hand summary:/);
+});

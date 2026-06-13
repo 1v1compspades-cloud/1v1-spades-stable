@@ -215,6 +215,52 @@ export function createSpadesAppController({
     return submitPlayCard({ card, actionSequence });
   }
 
+  function startNextHand({ deck, actionSequence = nextActionSequence("startNextHand") } = {}) {
+    const { room, session } = requireActiveRoom();
+    const actionId = createActionId({
+      roomCode: room.roomCode,
+      seat: session.seat,
+      type: "startNextHand",
+      sequence: actionSequence
+    });
+    const nextRoom = applyRoomAction(room, {
+      type: "startNextHand",
+      seatToken: session.seatToken,
+      playerId: session.playerId,
+      deck,
+      actionId,
+      expectedPhase: "hand_complete"
+    });
+    repository.save(nextRoom);
+
+    return {
+      room: nextRoom,
+      session,
+      status: sanitizeRoomForViewer(nextRoom, session)
+    };
+  }
+
+  function playFullHand({ maxActions = 26 } = {}) {
+    let result = null;
+    for (let action = 0; action < maxActions; action += 1) {
+      const status = getActiveRoomStatus();
+      if (!status || status.phase !== "playing") break;
+
+      const cardId = status.playableCardStatus.cardIds[0];
+      if (!cardId) {
+        throw new Error("No playable card available");
+      }
+
+      result = submitPlayCardById({ cardId });
+    }
+
+    return result ?? {
+      room: null,
+      session: loadSavedActiveRoom(storage),
+      status: getActiveRoomStatus()
+    };
+  }
+
   function getCurrentPlayerStatus() {
     return getActiveRoomStatus()?.currentPlayerStatus ?? null;
   }
@@ -277,6 +323,8 @@ export function createSpadesAppController({
     getBiddingStatus,
     submitPlayCard,
     submitPlayCardById,
+    startNextHand,
+    playFullHand,
     getCurrentPlayerStatus,
     getPlayableCardStatus,
     leaveRoom: leaveActiveRoom,

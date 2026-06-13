@@ -16,6 +16,7 @@ export function buildRoomShellModel(sanitizedRoom) {
     lastTrick: sanitizedRoom.lastTrick,
     hiddenHandCounts: sanitizedRoom.hiddenHandCounts,
     biddingStatus: sanitizedRoom.biddingStatus,
+    handSummary: sanitizedRoom.handSummary,
     currentPlayerStatus: sanitizedRoom.currentPlayerStatus,
     playableCardStatus: sanitizedRoom.playableCardStatus,
     handCardIds: sanitizedRoom.hand.map(cardIdFor),
@@ -50,6 +51,7 @@ export function renderRoomShellText(sanitizedRoom) {
     `Current trick: ${model.currentTrickText}`,
     `Last trick: ${model.lastTrickText}`,
     `Trick winner: ${model.lastTrickWinner ?? "none"}`,
+    `Hand summary: ${formatHandSummary(model.handSummary)}`,
     `Room full: ${model.roomFull}`,
     `Spectator: ${model.spectator}`,
     `Hidden cards: ${model.hiddenHandCounts.player1}-${model.hiddenHandCounts.player2}`,
@@ -64,4 +66,16 @@ export function cardIdFor(card) {
 function formatTrick(plays = []) {
   if (!plays.length) return "none";
   return plays.map((play) => `${play.player}:${cardIdFor(play.card)}`).join(", ");
+}
+
+function formatHandSummary(summary) {
+  if (!summary) return "none";
+  return [
+    ...["player1", "player2"].map((player) => {
+      const row = summary.players[player];
+      return `${player} bid ${row.bid}, tricks ${row.tricks}, bags ${row.bags}, nil ${row.nilResult ?? "none"}, change ${row.scoreChange}, total ${row.totalScore}`;
+    }),
+    `handWinner ${summary.handWinner ?? "none"}`,
+    `matchWinner ${summary.matchWinner ?? "none"}`
+  ].join(" | ");
 }
