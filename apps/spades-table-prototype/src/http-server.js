@@ -6,6 +6,7 @@ import { createSpadesServerBoundary } from "./server-boundary.js";
 
 const sourceDir = dirname(fileURLToPath(import.meta.url));
 const appDir = resolve(sourceDir, "..");
+const repoDir = resolve(appDir, "../..");
 const indexPath = resolve(appDir, "index.html");
 
 export function createSpadesHttpServer({
@@ -83,6 +84,14 @@ export function createSpadesHttpServer({
   });
 
   app.use("/src", express.static(sourceDir, {
+    index: false,
+    fallthrough: true
+  }));
+  app.use("/packages/spades-core/src", express.static(resolve(repoDir, "packages/spades-core/src"), {
+    index: false,
+    fallthrough: true
+  }));
+  app.use("/packages/game-shell-core/src", express.static(resolve(repoDir, "packages/game-shell-core/src"), {
     index: false,
     fallthrough: true
   }));

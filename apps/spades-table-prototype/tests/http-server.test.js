@@ -10,6 +10,10 @@ test("HTTP server serves hosted UI shell and keeps API routes separate", async (
     const home = await fixture.getText("/");
     const css = await fixture.getText("/src/styles.css");
     const client = await fixture.getText("/src/home-client.js");
+    const spadesCore = await fixture.getText("/packages/spades-core/src/index.js");
+    const spadesDeck = await fixture.getText("/packages/spades-core/src/deck.js");
+    const shellCore = await fixture.getText("/packages/game-shell-core/src/index.js");
+    const roomLifecycle = await fixture.getText("/packages/game-shell-core/src/room-lifecycle.js");
     const missingApi = await fixture.get("/api/not-found", { expectedStatus: 404 });
     const health = await fixture.get("/health");
 
@@ -20,6 +24,14 @@ test("HTTP server serves hosted UI shell and keeps API routes separate", async (
     assert.match(css.contentType, /text\/css/);
     assert.match(client.body, /createSpadesAppController/);
     assert.match(client.contentType, /javascript/);
+    assert.match(spadesCore.body, /DEFAULT_MATCH_SETTINGS/);
+    assert.match(spadesCore.contentType, /javascript/);
+    assert.match(spadesDeck.body, /createDeck/);
+    assert.match(spadesDeck.contentType, /javascript/);
+    assert.match(shellCore.body, /room-lifecycle\.js/);
+    assert.match(shellCore.contentType, /javascript/);
+    assert.match(roomLifecycle.body, /createTwoPlayerRoomLifecycle/);
+    assert.match(roomLifecycle.contentType, /javascript/);
     assert.equal(missingApi.ok, false);
     assert.match(missingApi.error.message, /route not found/i);
     assert.equal(health.ok, true);
