@@ -168,6 +168,13 @@ textarea:focus-visible {
   outline-offset: 3px;
 }
 
+body.tester-mode .developer-transport-control,
+body.tester-mode #advanced-diagnostics,
+body.tester-mode #local-preview-tools,
+body.tester-mode #manual-test-tools {
+  display: none;
+}
+
 .visual-shell {
   display: grid;
   gap: 16px;

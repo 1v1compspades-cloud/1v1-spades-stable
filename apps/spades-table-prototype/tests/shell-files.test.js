@@ -42,6 +42,7 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /Public UI does not show hidden hands, private seat credentials, or host-only data/);
   assert.doesNotMatch(html, /seatToken|admin data|admin-only data|secret/i);
   assert.match(html, /id="transport-mode"/);
+  assert.match(html, /class="developer-transport-control"/);
   assert.match(html, /id="transport-mode-status"/);
   assert.match(html, /id="connection-help-panel"/);
   assert.match(html, /id="connection-status"/);
@@ -178,6 +179,11 @@ test("home client wires the shell through the local app controller", () => {
   const client = readFileSync(resolve(appDir, "src/home-client.js"), "utf8");
 
   assert.match(client, /createSpadesAppController/);
+  assert.match(client, /readLaunchParams/);
+  assert.match(client, /shouldUseTesterMode/);
+  assert.match(client, /transportMode = "real-server"/);
+  assert.match(client, /realServerClient\.connect/);
+  assert.match(client, /document\.body\.classList\.add\("tester-mode"\)/);
   assert.match(client, /createLocalActionLog/);
   assert.match(client, /createSpadesLiveSyncClient/);
   assert.match(client, /createMockSpadesSocketTransport/);

@@ -132,7 +132,10 @@ const actionLog = createLocalActionLog();
 const accountStats = createLocalAccountStatsStore();
 const tournamentHistory = createLocalTournamentHistoryStore();
 const betaFeedback = createLocalBetaFeedbackStore();
+const launchParams = readLaunchParams();
+const testerMode = shouldUseTesterMode(launchParams);
 displayNameInput.value = localIdentity.displayName;
+applyLaunchMode();
 renderManualBetaFlows();
 
 for (const presetName of listManualFixturePresets().filter((name) => !name.startsWith("reconnect-"))) {
@@ -437,7 +440,52 @@ realServerClient.onStatus((update) => {
   }
 });
 
-renderStatus(controller.restoreActiveRoom().status);
+renderInitialStatus();
+
+function readLaunchParams() {
+  return new URLSearchParams(window.location.search);
+}
+
+function shouldUseTesterMode(params) {
+  const tester = String(params.get("tester") ?? "").toLowerCase();
+  return [
+    "ios",
+    "ios-wrapper",
+    "ios-testflight",
+    "testflight",
+    "beta",
+    "1",
+    "true"
+  ].includes(tester);
+}
+
+function applyLaunchMode() {
+  const requestedTransport = launchParams.get("transport");
+  if (["direct", "live-sync", "real-server"].includes(requestedTransport)) {
+    transportMode = requestedTransport;
+    transportModeSelect.value = requestedTransport;
+  }
+
+  if (testerMode) {
+    document.body.classList.add("tester-mode");
+    transportMode = "real-server";
+    transportModeSelect.value = "real-server";
+  }
+}
+
+function renderInitialStatus() {
+  if (isRealServerMode()) {
+    realServerClient.connect()
+      .then(() => renderStatus(realServerClient.status))
+      .catch((error) => {
+        showError(error?.message ?? "Hosted server unavailable");
+        renderStatus(realServerClient.status);
+      });
+    return;
+  }
+
+  renderStatus(controller.restoreActiveRoom().status);
+}
 
 async function runShellAction(action, successLabel = "completed action") {
   try {
