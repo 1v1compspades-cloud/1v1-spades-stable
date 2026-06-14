@@ -3,6 +3,31 @@ import assert from "node:assert/strict";
 import { createSpadesHttpServer } from "../src/http-server.js";
 import { sanitizeRoomForViewer } from "../src/room-state.js";
 
+test("HTTP server serves hosted UI shell and keeps API routes separate", async () => {
+  const fixture = await startHttpFixture();
+
+  try {
+    const home = await fixture.getText("/");
+    const css = await fixture.getText("/src/styles.css");
+    const client = await fixture.getText("/src/home-client.js");
+    const missingApi = await fixture.get("/api/not-found", { expectedStatus: 404 });
+    const health = await fixture.get("/health");
+
+    assert.match(home.body, /<title>Spades Master Prototype<\/title>/);
+    assert.match(home.body, /id="tester-entry-panel"/);
+    assert.match(home.contentType, /text\/html/);
+    assert.match(css.body, /\.app-shell/);
+    assert.match(css.contentType, /text\/css/);
+    assert.match(client.body, /createSpadesAppController/);
+    assert.match(client.contentType, /javascript/);
+    assert.equal(missingApi.ok, false);
+    assert.match(missingApi.error.message, /route not found/i);
+    assert.equal(health.ok, true);
+  } finally {
+    await fixture.close();
+  }
+});
+
 test("HTTP server exposes health and sanitized create join ready bid responses", async () => {
   const fixture = await startHttpFixture();
 
@@ -230,8 +255,17 @@ async function startHttpFixture() {
 
   return {
     repository,
-    get(path) {
-      return requestJson(`${baseUrl}${path}`);
+    get(path, options) {
+      return requestJson(`${baseUrl}${path}`, undefined, options);
+    },
+    async getText(path, { expectedStatus = 200 } = {}) {
+      const response = await fetch(`${baseUrl}${path}`);
+      const body = await response.text();
+      assert.equal(response.status, expectedStatus, body);
+      return {
+        body,
+        contentType: response.headers.get("content-type") ?? ""
+      };
     },
     post(path, body, options) {
       return requestJson(`${baseUrl}${path}`, {

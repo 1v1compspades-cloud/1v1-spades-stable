@@ -1,6 +1,12 @@
 import express from "express";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createQuickMatchQueue } from "./quick-match.js";
 import { createSpadesServerBoundary } from "./server-boundary.js";
+
+const sourceDir = dirname(fileURLToPath(import.meta.url));
+const appDir = resolve(sourceDir, "..");
+const indexPath = resolve(appDir, "index.html");
 
 export function createSpadesHttpServer({
   boundary = createSpadesServerBoundary(),
@@ -71,6 +77,15 @@ export function createSpadesHttpServer({
       type: "leaveQueue"
     })), onQueueResponse);
   });
+
+  app.get("/", (_request, response) => {
+    response.sendFile(indexPath);
+  });
+
+  app.use("/src", express.static(sourceDir, {
+    index: false,
+    fallthrough: true
+  }));
 
   app.use((_request, response) => {
     response.status(404).json({
