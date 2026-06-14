@@ -56,6 +56,8 @@ const transportModeStatusOutput = document.querySelector("#transport-mode-status
 const connectionStatusOutput = document.querySelector("#connection-status");
 const reconnectHelpOutput = document.querySelector("#reconnect-help");
 const afkDisconnectWarningOutput = document.querySelector("#afk-disconnect-warning");
+const playerScreenStatusOutput = document.querySelector("#player-screen-status");
+const playerScreenTabs = Array.from(document.querySelectorAll("[data-screen-target]"));
 const roomCodeShareStatusOutput = document.querySelector("#room-code-share-status");
 const quickMatchStatusOutput = document.querySelector("#quick-match-status");
 const phaseStatusOutput = document.querySelector("#phase-status");
@@ -128,6 +130,8 @@ let manualHarness = createTwoSeatManualHarness();
 let lastSuccessfulAction = "none";
 let activeFixturePreset = "none";
 let transportMode = "direct";
+let activePlayerScreen = "lobby";
+let playerChoseScreen = false;
 const actionLog = createLocalActionLog();
 const accountStats = createLocalAccountStatsStore();
 const tournamentHistory = createLocalTournamentHistoryStore();
@@ -229,6 +233,7 @@ document.querySelector("#clear-room").addEventListener("click", () => {
   }
   localIdentity = identityStore.clearSession();
   lastSuccessfulAction = "clear active room";
+  playerChoseScreen = false;
   actionLog.record("clear active room", null);
   renderStatus(null);
 });
@@ -427,6 +432,12 @@ transportModeSelect.addEventListener("change", () => {
   renderStatus(currentShellStatus());
 });
 
+for (const tabButton of playerScreenTabs) {
+  tabButton.addEventListener("click", () => {
+    setActivePlayerScreen(tabButton.dataset.screenTarget, { manual: true });
+  });
+}
+
 liveSyncClient.onStatus((update) => {
   if (isLiveSyncMode()) {
     renderStatus(update.view);
@@ -479,6 +490,8 @@ function applyLaunchMode() {
     transportMode = "real-server";
     transportModeSelect.value = "real-server";
   }
+
+  setActivePlayerScreen("lobby");
 }
 
 function renderInitialStatus() {
@@ -681,6 +694,7 @@ function renderQuickMatchStatus() {
 }
 
 function renderStatus(status) {
+  updatePlayerScreenForStatus(status);
   renderTransportModeStatus();
   renderConnectionHelp(status);
   renderRoomCodeShare(status);
@@ -711,6 +725,42 @@ function renderStatus(status) {
   renderTournamentHistoryPanel();
   renderActionLog();
   renderBetaFeedbackPanel(status);
+}
+
+function setActivePlayerScreen(screen, { manual = false } = {}) {
+  if (!["lobby", "table", "play"].includes(screen)) return;
+  activePlayerScreen = screen;
+  if (manual) {
+    playerChoseScreen = true;
+  }
+  document.body.dataset.activeScreen = screen;
+  for (const tabButton of playerScreenTabs) {
+    const selected = tabButton.dataset.screenTarget === screen;
+    tabButton.classList.toggle("active", selected);
+    tabButton.setAttribute("aria-pressed", selected ? "true" : "false");
+  }
+}
+
+function updatePlayerScreenForStatus(status) {
+  updatePlayerChrome(status);
+  const preferredScreen = preferredPlayerScreen(status);
+  if (!status || !playerChoseScreen) {
+    setActivePlayerScreen(preferredScreen);
+    return;
+  }
+}
+
+function preferredPlayerScreen(status) {
+  if (!status?.roomCode) return "lobby";
+  if (["bidding", "playing"].includes(status.phase)) return "play";
+  return "table";
+}
+
+function updatePlayerChrome(status) {
+  if (!playerScreenStatusOutput) return;
+  const roomLabel = status?.roomCode ? `Room ${status.roomCode}` : "Lobby";
+  const phaseLabel = status?.phase ? status.phase.replace("_", " ") : "ready";
+  playerScreenStatusOutput.textContent = `${roomLabel} · ${phaseLabel}`;
 }
 
 function renderConnectionHelp(status) {

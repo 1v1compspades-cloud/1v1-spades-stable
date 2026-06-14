@@ -24,6 +24,11 @@ textarea {
   padding: 24px 18px;
 }
 
+.player-app-chrome,
+.player-screen-tabs {
+  display: none;
+}
+
 .home-panel,
 .status-panel,
 .manual-panel {
@@ -224,6 +229,193 @@ body.tester-mode #table-record-history,
 body.tester-mode #record-match-history,
 body.tester-mode #play-full-hand {
   display: none;
+}
+
+body.tester-mode {
+  min-height: 100dvh;
+  padding-bottom: 86px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(10, 18, 18, 0.35), rgba(10, 18, 18, 0.72)),
+    radial-gradient(circle at 50% 38%, rgba(40, 118, 82, 0.72), rgba(16, 37, 28, 0.18) 42%, rgba(7, 16, 16, 0.86) 82%),
+    #071416;
+}
+
+body.tester-mode .app-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100dvh;
+  width: min(100%, 860px);
+  padding: 14px 14px 92px;
+}
+
+body.tester-mode .player-app-chrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 2px 12px;
+}
+
+body.tester-mode .player-app-chrome h1 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1;
+}
+
+body.tester-mode .player-app-chrome .eyebrow {
+  margin-bottom: 4px;
+}
+
+body.tester-mode .player-screen-status {
+  flex: 0 0 auto;
+  max-width: 45%;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(214, 178, 94, 0.44);
+  border-radius: 999px;
+  color: #f8f4eb;
+  background: rgba(0, 0, 0, 0.28);
+  font-size: 12px;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.tester-mode .player-screen-tabs {
+  position: fixed;
+  left: max(12px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 30;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 8px;
+  border: 1px solid rgba(248, 244, 235, 0.14);
+  border-radius: 16px;
+  background: rgba(5, 13, 14, 0.92);
+  box-shadow: 0 -12px 28px rgba(0, 0, 0, 0.34);
+}
+
+body.tester-mode .screen-tab-button {
+  min-height: 46px;
+  border-radius: 12px;
+  color: #f8f4eb;
+  background: transparent;
+}
+
+body.tester-mode .screen-tab-button.active {
+  color: #10251c;
+  background: #d6b25e;
+}
+
+body.tester-mode .home-panel,
+body.tester-mode .status-panel {
+  display: none;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 0 18px;
+}
+
+body.tester-mode[data-active-screen="lobby"] .home-panel,
+body.tester-mode[data-active-screen="table"] .status-panel,
+body.tester-mode[data-active-screen="play"] .status-panel {
+  display: grid;
+}
+
+body.tester-mode .home-panel > .eyebrow,
+body.tester-mode .home-panel > h1 {
+  display: none;
+}
+
+body.tester-mode .tester-entry-panel {
+  min-height: 0;
+  padding: 18px;
+  border-color: rgba(214, 178, 94, 0.58);
+  background:
+    linear-gradient(160deg, rgba(214, 178, 94, 0.16), rgba(255, 255, 255, 0.04)),
+    rgba(0, 0, 0, 0.22);
+}
+
+body.tester-mode .tester-entry-panel h2 {
+  font-size: 28px;
+  line-height: 1.05;
+}
+
+body.tester-mode .player-onboarding-block {
+  padding: 14px;
+  border: 1px solid rgba(248, 244, 235, 0.14);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+body.tester-mode .controls {
+  padding: 14px;
+  border: 1px solid rgba(248, 244, 235, 0.14);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.24);
+}
+
+body.tester-mode .status-panel > h2 {
+  margin-bottom: 10px;
+  font-size: 20px;
+}
+
+body.tester-mode[data-active-screen="table"] .bid-controls,
+body.tester-mode[data-active-screen="table"] .status-panel > .room-actions,
+body.tester-mode[data-active-screen="table"] #leave-room-help,
+body.tester-mode[data-active-screen="table"] .visual-zone {
+  display: none;
+}
+
+body.tester-mode[data-active-screen="play"] .table-layout-shell {
+  display: none;
+}
+
+body.tester-mode[data-active-screen="play"] .visual-shell {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+body.tester-mode[data-active-screen="play"] .bid-controls,
+body.tester-mode[data-active-screen="play"] .status-panel > .room-actions {
+  padding: 12px;
+  border: 1px solid rgba(248, 244, 235, 0.14);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+body.tester-mode .table-layout-shell {
+  min-height: 50dvh;
+  border-radius: 18px;
+  border-color: rgba(214, 178, 94, 0.38);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.08), transparent 22%),
+    radial-gradient(ellipse at center, rgba(32, 118, 78, 0.82), rgba(19, 74, 54, 0.72) 58%, rgba(7, 22, 18, 0.86));
+  box-shadow:
+    inset 0 0 0 3px rgba(214, 178, 94, 0.08),
+    0 18px 36px rgba(0, 0, 0, 0.34);
+}
+
+body.tester-mode .table-area {
+  border-radius: 12px;
+  background: rgba(2, 12, 12, 0.38);
+}
+
+body.tester-mode .center-trick-area {
+  min-height: 108px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+
+body.tester-mode .player-hand-area {
+  min-height: 132px;
 }
 
 .visual-shell {

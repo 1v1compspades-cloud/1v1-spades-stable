@@ -13,6 +13,12 @@ test("basic shell exposes create join ready leave and status targets", () => {
 
   assert.match(html, /id="jump-to-bug-report"/);
   assert.match(html, /Support/);
+  assert.match(html, /id="player-app-chrome"/);
+  assert.match(html, /id="player-screen-status"/);
+  assert.match(html, /id="player-screen-tabs"/);
+  assert.match(html, /data-screen-target="lobby"/);
+  assert.match(html, /data-screen-target="table"/);
+  assert.match(html, /data-screen-target="play"/);
   assert.match(html, /id="create-room"/);
   assert.match(html, /id="tester-entry-panel"/);
   assert.match(html, /id="beta-build-label"/);
@@ -203,6 +209,11 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /renderConnectionHelp/);
   assert.match(client, /connectionStatusLabel/);
   assert.match(client, /renderRoomCodeShare/);
+  assert.match(client, /setActivePlayerScreen/);
+  assert.match(client, /updatePlayerScreenForStatus/);
+  assert.match(client, /preferredPlayerScreen/);
+  assert.match(client, /playerChoseScreen/);
+  assert.match(client, /document\.body\.dataset\.activeScreen/);
   assert.match(client, /scrollIntoView/);
   assert.match(client, /hiddenHandSafe/);
   assert.match(client, /friendlyTesterError/);
@@ -303,6 +314,9 @@ test("visual QA and table layout styling is present", () => {
   const css = readFileSync(resolve(appDir, "src/styles.css"), "utf8");
 
   assert.match(css, /\.tester-entry-panel/);
+  assert.match(css, /\.player-app-chrome/);
+  assert.match(css, /\.player-screen-tabs/);
+  assert.match(css, /\.screen-tab-button\.active/);
   assert.match(css, /\.bug-report-fab/);
   assert.match(css, /position:\s*fixed/);
   assert.match(css, /\.beta-build-label/);
@@ -313,6 +327,9 @@ test("visual QA and table layout styling is present", () => {
   assert.match(css, /body\.tester-mode \.developer-details/);
   assert.match(css, /body\.tester-mode \.bug-report-fab/);
   assert.match(css, /body\.tester-mode #table-record-history/);
+  assert.match(css, /body\.tester-mode\[data-active-screen="lobby"\] \.home-panel/);
+  assert.match(css, /body\.tester-mode\[data-active-screen="table"\] \.status-panel/);
+  assert.match(css, /body\.tester-mode\[data-active-screen="play"\] \.status-panel/);
   assert.match(css, /\.tester-entry-note/);
   assert.match(css, /\.table-layout-shell/);
   assert.match(css, /\.table-area/);
