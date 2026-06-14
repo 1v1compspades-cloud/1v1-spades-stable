@@ -2,6 +2,8 @@ import { WebSocketServer } from "ws";
 import { sanitizeRoomForViewer } from "./room-state.js";
 
 const OPEN_SOCKET = 1;
+const CONNECTING_SOCKET = 0;
+const CLOSED_SOCKET = 3;
 
 export function attachSpadesWebSocketServer({
   httpServer,
@@ -200,10 +202,46 @@ export function attachSpadesWebSocketServer({
     subscriptions,
     broadcastRoom,
     broadcastQueue,
-    close() {
-      return new Promise((resolve) => wss.close(resolve));
+    async close() {
+      const closingSockets = [...wss.clients].map((socket) => closeClientSocket(socket));
+      await Promise.all(closingSockets);
+      await new Promise((resolve, reject) => {
+        wss.close((error) => error ? reject(error) : resolve());
+      });
     }
   };
+}
+
+function closeClientSocket(socket, timeoutMs = 1000) {
+  if (!socket || socket.readyState === CLOSED_SOCKET) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      socket.off?.("close", finish);
+      socket.off?.("error", finish);
+      resolve();
+    };
+    const timeout = setTimeout(() => {
+      if (socket.readyState !== CLOSED_SOCKET) {
+        socket.terminate?.();
+      }
+      finish();
+    }, timeoutMs);
+    timeout.unref?.();
+
+    socket.once?.("close", finish);
+    socket.once?.("error", finish);
+
+    if ([CONNECTING_SOCKET, OPEN_SOCKET].includes(socket.readyState)) {
+      socket.close(1001, "Spades server shutdown");
+    }
+  });
 }
 
 function matchForClient(match, identity) {

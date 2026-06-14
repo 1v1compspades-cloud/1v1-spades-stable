@@ -306,26 +306,41 @@ export function createSpadesServerClient({
     return new Promise((resolve, reject) => {
       const waiter = {
         predicate,
+        timeout: null,
         resolve(message) {
-          clearTimeout(timeout);
+          clearTimeout(waiter.timeout);
           resolve(message);
+        },
+        reject(error) {
+          clearTimeout(waiter.timeout);
+          reject(error);
         }
       };
-      const timeout = setTimeout(() => {
+      waiter.timeout = setTimeout(() => {
         pending = pending.filter((candidate) => candidate !== waiter);
-        reject(new Error("Timed out waiting for Spades server client socket message"));
+        waiter.reject(new Error("Timed out waiting for Spades server client socket message"));
       }, timeoutMs);
+      waiter.timeout.unref?.();
       pending.push(waiter);
     });
   }
 
   function closeSocket() {
-    if (socket && connected) {
+    rejectPendingMessages(new Error("Spades server client disconnected"));
+    if (socket && socket.readyState !== 3) {
       socket.close();
     }
     connected = false;
     socket = null;
     pending = [];
+  }
+
+  function rejectPendingMessages(error) {
+    const waiters = pending;
+    pending = [];
+    for (const waiter of waiters) {
+      waiter.reject(error);
+    }
   }
 
   function requestIdentity(options = {}) {
