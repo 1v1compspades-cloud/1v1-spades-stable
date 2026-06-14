@@ -77,6 +77,9 @@ const tableScoreAreaOutput = document.querySelector("#table-score-area");
 const tableCenterTrickAreaOutput = document.querySelector("#table-center-trick-area");
 const tableLastTrickAreaOutput = document.querySelector("#table-last-trick-area");
 const tablePlayerHandAreaOutput = document.querySelector("#table-player-hand-area");
+const tableLeaveRoomButton = document.querySelector("#table-leave-room");
+const tableStartNextHandButton = document.querySelector("#table-start-next-hand");
+const tableStartNewMatchButton = document.querySelector("#table-start-new-match");
 const qaCheckListOutput = document.querySelector("#qa-check-list");
 const qaEdgeListOutput = document.querySelector("#qa-edge-list");
 const betaSafetyCheckListOutput = document.querySelector("#beta-safety-check-list");
@@ -121,6 +124,10 @@ const tournamentHistoryOutput = document.querySelector("#tournament-history");
 const errorOutput = document.querySelector("#shell-error");
 const bidInput = document.querySelector("#bid-input");
 const playCardIdInput = document.querySelector("#play-card-id");
+const bidControls = document.querySelector(".bid-controls");
+const readyPlayerButton = document.querySelector("#ready-player");
+const leaveRoomButton = document.querySelector("#leave-room");
+const leaveRoomHelp = document.querySelector("#leave-room-help");
 const manualStatusOutput = document.querySelector("#manual-status");
 const manualViewSelect = document.querySelector("#manual-view");
 const fixturePresetSelect = document.querySelector("#fixture-preset");
@@ -190,6 +197,10 @@ document.querySelector("#copy-room-code").addEventListener("click", () => {
 });
 
 document.querySelector("#jump-to-bug-report").addEventListener("click", () => {
+  document.body.dataset.reportOpen = "true";
+  if (testerMode) {
+    setActivePlayerScreen("play", { manual: true });
+  }
   renderBetaFeedbackPanel(currentShellStatus());
   betaFeedbackPanel.scrollIntoView({ behavior: "smooth", block: "start" });
   betaIssueTitleInput.focus();
@@ -344,6 +355,7 @@ document.querySelector("#save-beta-report").addEventListener("click", () => {
   betaFeedback.record(report);
   betaFeedbackStatusOutput.textContent = `Saved local beta report: ${report.title}`;
   renderBetaFeedbackHistory();
+  document.body.dataset.reportOpen = "false";
 });
 
 document.querySelector("#export-beta-reports").addEventListener("click", () => {
@@ -355,6 +367,7 @@ document.querySelector("#clear-beta-reports").addEventListener("click", () => {
   betaFeedback.clear();
   renderBetaFeedbackHistory();
   betaFeedbackStatusOutput.textContent = "Saved beta reports cleared locally.";
+  document.body.dataset.reportOpen = "false";
 });
 
 document.querySelector("#manual-setup").addEventListener("click", () => {
@@ -695,6 +708,7 @@ function renderQuickMatchStatus() {
 
 function renderStatus(status) {
   updatePlayerScreenForStatus(status);
+  updatePlayerActionVisibility(status);
   renderTransportModeStatus();
   renderConnectionHelp(status);
   renderRoomCodeShare(status);
@@ -761,6 +775,31 @@ function updatePlayerChrome(status) {
   const roomLabel = status?.roomCode ? `Room ${status.roomCode}` : "Lobby";
   const phaseLabel = status?.phase ? status.phase.replace("_", " ") : "ready";
   playerScreenStatusOutput.textContent = `${roomLabel} · ${phaseLabel}`;
+}
+
+function updatePlayerActionVisibility(status) {
+  const phase = status?.phase ?? "none";
+  document.body.dataset.gamePhase = phase;
+  document.body.dataset.hasRoom = status?.roomCode ? "true" : "false";
+
+  const isWaiting = phase === "waiting";
+  const isBidding = phase === "bidding";
+  const isHandComplete = phase === "hand_complete";
+  const isMatchComplete = phase === "match_complete";
+  const hasRoom = Boolean(status?.roomCode);
+
+  setHidden(bidControls, !isBidding);
+  setHidden(readyPlayerButton, !isWaiting);
+  setHidden(leaveRoomButton, !hasRoom);
+  setHidden(leaveRoomHelp, !hasRoom);
+  setHidden(tableLeaveRoomButton, !hasRoom);
+  setHidden(tableStartNextHandButton, !isHandComplete);
+  setHidden(tableStartNewMatchButton, !(isHandComplete || isMatchComplete));
+}
+
+function setHidden(element, hidden) {
+  if (!element) return;
+  element.hidden = hidden;
 }
 
 function renderConnectionHelp(status) {
