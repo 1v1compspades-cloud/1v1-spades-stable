@@ -447,8 +447,12 @@ function readLaunchParams() {
 }
 
 function shouldUseTesterMode(params) {
+  if (["1", "true"].includes(String(params.get("dev") ?? "").toLowerCase())) {
+    return false;
+  }
+
   const tester = String(params.get("tester") ?? "").toLowerCase();
-  return [
+  if ([
     "ios",
     "ios-wrapper",
     "ios-testflight",
@@ -456,7 +460,11 @@ function shouldUseTesterMode(params) {
     "beta",
     "1",
     "true"
-  ].includes(tester);
+  ].includes(tester)) {
+    return true;
+  }
+
+  return true;
 }
 
 function applyLaunchMode() {
@@ -728,7 +736,7 @@ function connectionStatusLabel(status) {
 
 function renderRoomCodeShare(status) {
   roomCodeShareStatusOutput.textContent = status?.roomCode
-    ? `Room code: ${status.roomCode}. Share this code with another tester.`
+    ? `Room code: ${status.roomCode}. Share this code with another player.`
     : "Room code: create or join a room to share.";
 }
 

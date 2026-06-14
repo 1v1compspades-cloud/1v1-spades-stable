@@ -12,12 +12,12 @@ test("basic shell exposes create join ready leave and status targets", () => {
   const html = readFileSync(resolve(appDir, "index.html"), "utf8");
 
   assert.match(html, /id="jump-to-bug-report"/);
-  assert.match(html, /Report Bug/);
+  assert.match(html, /Support/);
   assert.match(html, /id="create-room"/);
   assert.match(html, /id="tester-entry-panel"/);
   assert.match(html, /id="beta-build-label"/);
-  assert.match(html, /Spades Hosted Beta v0\.1\.0 Launch Candidate \/ Phase 40/);
-  assert.match(html, /Welcome, Beta Tester/);
+  assert.match(html, /Free Play/);
+  assert.match(html, /Play a Friend/);
   assert.match(html, /id="beta-how-to-test"/);
   assert.match(html, /id="beta-quick-checklist"/);
   assert.match(html, /id="final-smoke-test-checklist"/);
@@ -30,15 +30,15 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /id="tester-entry-steps"/);
   assert.match(html, /id="tester-safety-copy"/);
   assert.match(html, /Free play only/);
-  assert.match(html, /Create room/);
-  assert.match(html, /Join room/);
+  assert.match(html, /Create a room/);
+  assert.match(html, /Join by code/);
   assert.match(html, /Quick Match/);
   assert.match(html, /Bid/);
-  assert.match(html, /Play hand/);
+  assert.match(html, /play each trick/);
   assert.match(html, /Reconnect/);
-  assert.match(html, /Report bug/);
-  assert.match(html, /Free play only\. Leaderboard and tournament panels are local previews only/);
-  assert.match(html, /local previews only/);
+  assert.match(html, /Support/);
+  assert.match(html, /Create a private table/);
+  assert.match(html, /Free play only\./);
   assert.match(html, /Public UI does not show hidden hands, private seat credentials, or host-only data/);
   assert.doesNotMatch(html, /seatToken|admin data|admin-only data|secret/i);
   assert.match(html, /id="transport-mode"/);
@@ -181,6 +181,7 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /createSpadesAppController/);
   assert.match(client, /readLaunchParams/);
   assert.match(client, /shouldUseTesterMode/);
+  assert.match(client, /params\.get\("dev"\)/);
   assert.match(client, /transportMode = "real-server"/);
   assert.match(client, /realServerClient\.connect/);
   assert.match(client, /document\.body\.classList\.add\("tester-mode"\)/);
@@ -309,7 +310,9 @@ test("visual QA and table layout styling is present", () => {
   assert.match(css, /\.connection-help-panel/);
   assert.match(css, /\.developer-details/);
   assert.match(css, /\.developer-details > summary/);
-  assert.match(css, /padding-bottom:\s*80px/);
+  assert.match(css, /body\.tester-mode \.developer-details/);
+  assert.match(css, /body\.tester-mode \.bug-report-fab/);
+  assert.match(css, /body\.tester-mode #table-record-history/);
   assert.match(css, /\.tester-entry-note/);
   assert.match(css, /\.table-layout-shell/);
   assert.match(css, /\.table-area/);

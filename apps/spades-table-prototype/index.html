@@ -7,38 +7,32 @@
     <link rel="stylesheet" href="./src/styles.css">
   </head>
   <body>
-    <button id="jump-to-bug-report" class="bug-report-fab" type="button">Report Bug</button>
+    <button id="jump-to-bug-report" class="bug-report-fab" type="button">Support</button>
     <main class="app-shell">
       <section class="home-panel" aria-labelledby="home-title">
         <p class="eyebrow">Spades Master</p>
         <h1 id="home-title">1v1 Spades</h1>
-        <section id="tester-entry-panel" class="tester-entry-panel" aria-labelledby="tester-entry-title">
-          <p id="beta-build-label" class="beta-build-label">Spades Hosted Beta v0.1.0 Launch Candidate / Phase 40</p>
-          <h2 id="tester-entry-title">Welcome, Beta Tester</h2>
+        <section id="tester-entry-panel" class="tester-entry-panel player-entry-panel" aria-labelledby="tester-entry-title">
+          <p id="beta-build-label" class="beta-build-label">Free Play</p>
+          <h2 id="tester-entry-title">Play a Friend</h2>
           <p id="tester-entry-summary">
-            Free play only. This tester build is for checking room entry, bidding, hand play,
-            reconnect, Quick Match, and bug reporting before a wider hosted beta.
+            Create a private table, share the room code, and play head-to-head Spades for fun.
           </p>
-          <section id="beta-how-to-test" class="beta-onboarding-block" aria-labelledby="beta-how-to-test-title">
-            <h3 id="beta-how-to-test-title">How to test</h3>
+          <section id="beta-how-to-test" class="beta-onboarding-block player-onboarding-block" aria-labelledby="beta-how-to-test-title">
+            <h3 id="beta-how-to-test-title">How to play</h3>
             <p class="tester-entry-note">
-              Enter a display name, create or join a room, ready both players, bid, play a hand,
-              refresh once to test reconnect, then report anything confusing with diagnostics.
+              Enter your name, create or join a room, ready up, bid, and play each trick.
             </p>
           </section>
-          <section id="beta-quick-checklist" class="beta-onboarding-block" aria-labelledby="beta-quick-checklist-title">
-            <h3 id="beta-quick-checklist-title">Quick checklist</h3>
-            <div class="account-stat-grid" aria-label="Beta tester quick checklist">
-              <p class="account-stat-item">Create room</p>
-              <p class="account-stat-item">Join room</p>
+          <section id="beta-quick-checklist" class="beta-onboarding-block player-onboarding-block" aria-labelledby="beta-quick-checklist-title">
+            <h3 id="beta-quick-checklist-title">Choose your table</h3>
+            <div class="account-stat-grid" aria-label="Player options">
+              <p class="account-stat-item">Create a room</p>
+              <p class="account-stat-item">Join by code</p>
               <p class="account-stat-item">Quick Match</p>
-              <p class="account-stat-item">Bid</p>
-              <p class="account-stat-item">Play hand</p>
-              <p class="account-stat-item">Reconnect</p>
-              <p class="account-stat-item">Report bug</p>
             </div>
           </section>
-          <section id="final-smoke-test-checklist" class="beta-onboarding-block" aria-labelledby="final-smoke-test-title">
+          <section id="final-smoke-test-checklist" class="beta-onboarding-block developer-details" aria-labelledby="final-smoke-test-title">
             <h3 id="final-smoke-test-title">Final smoke-test checklist</h3>
             <div class="account-stat-grid" aria-label="Launch candidate smoke-test checklist">
               <p class="account-stat-item">Health check passes</p>
@@ -49,7 +43,7 @@
               <p class="account-stat-item">Bug report diagnostics copy</p>
             </div>
           </section>
-          <section id="known-issues" class="beta-onboarding-block" aria-labelledby="known-issues-title">
+          <section id="known-issues" class="beta-onboarding-block developer-details" aria-labelledby="known-issues-title">
             <h3 id="known-issues-title">Known issues</h3>
             <div class="account-stat-grid" aria-label="Known beta limitations">
               <p class="account-stat-item">Visual polish is still beta-level.</p>
@@ -58,14 +52,14 @@
               <p class="account-stat-item">Refresh recovery depends on the same local browser identity.</p>
             </div>
           </section>
-          <div id="tester-entry-steps" class="account-stat-grid" aria-label="Tester entry steps">
+          <div id="tester-entry-steps" class="account-stat-grid developer-details" aria-label="Tester entry steps">
             <p class="account-stat-item">1. Enter a display name for this device.</p>
             <p class="account-stat-item">2. Create a room or join with a room code.</p>
             <p class="account-stat-item">3. Use Quick Match to pair two local tester identities.</p>
             <p class="account-stat-item">4. Restore Active Room if the page refreshes.</p>
           </div>
           <p id="tester-safety-copy" class="tester-entry-note">
-            Free play only. Leaderboard and tournament panels are local previews only.
+            Free play only.
           </p>
         </section>
         <div class="controls">
@@ -77,11 +71,11 @@
               <option value="real-server">Hosted server</option>
             </select>
           </label>
-          <p id="transport-mode-status" class="status-line">Transport: direct local</p>
+          <p id="transport-mode-status" class="status-line developer-transport-control">Transport: direct local</p>
           <div id="connection-help-panel" class="connection-help-panel" aria-label="Connection and reconnect help">
             <p id="connection-status" class="status-chip">Connection: direct local, no server needed</p>
-            <p id="reconnect-help" class="status-chip">Reconnect help: refresh or disconnect? Tap Restore Active Room.</p>
-            <p id="afk-disconnect-warning" class="status-chip">AFK/disconnect warning: timer placeholder only; reconnect manually if you step away.</p>
+            <p id="reconnect-help" class="status-chip developer-details">Reconnect help: refresh or disconnect? Tap Restore Active Room.</p>
+            <p id="afk-disconnect-warning" class="status-chip developer-details">AFK/disconnect warning: timer placeholder only; reconnect manually if you step away.</p>
           </div>
           <label>
             Player name
@@ -105,15 +99,15 @@
       </section>
 
       <section class="status-panel" aria-labelledby="status-title">
-        <h2 id="status-title">Room Status</h2>
-        <div class="qa-status-grid" aria-label="Current text gameplay status">
+        <h2 id="status-title">Table</h2>
+        <div class="qa-status-grid developer-details" aria-label="Current text gameplay status">
           <p id="phase-status" class="status-chip">Phase: none</p>
           <p id="seat-status" class="status-chip">Seat: none</p>
           <p id="turn-status" class="status-chip">Turn: none</p>
           <p id="action-status" class="status-chip">Action: none</p>
         </div>
         <div class="visual-shell" aria-label="Visual local gameplay shell">
-          <div class="table-layout-shell" aria-label="Non-final mobile table layout">
+          <div class="table-layout-shell" aria-label="Spades table">
             <div id="table-opponent-area" class="table-area opponent-area">Opponent: waiting</div>
             <div id="table-score-area" class="table-area score-area">Score/status: waiting</div>
             <div id="table-center-trick-area" class="table-area center-trick-area">Current trick: none</div>
@@ -146,7 +140,7 @@
             <p id="visual-last-trick" class="trick-text">none</p>
           </section>
         </div>
-        <section class="beta-safety-panel" aria-labelledby="beta-safety-title">
+        <section class="beta-safety-panel developer-details" aria-labelledby="beta-safety-title">
           <h3 id="beta-safety-title">Beta Safety Checklist</h3>
           <div id="beta-safety-check-list" class="qa-check-list"></div>
           <div id="manual-beta-flow-list" class="account-stat-grid" aria-label="Manual beta test flows"></div>
@@ -154,7 +148,7 @@
             Public UI does not show hidden hands, private seat credentials, or host-only data. Bug reports use sanitized diagnostics.
           </p>
         </section>
-        <section class="beta-feedback-panel" aria-labelledby="beta-feedback-title">
+        <section class="beta-feedback-panel developer-details" aria-labelledby="beta-feedback-title">
           <h3 id="beta-feedback-title">Beta Feedback Report</h3>
           <p class="tester-entry-note">
             Send this to dev when something feels wrong. It uses local-only storage and avoids hidden card details.
@@ -234,20 +228,20 @@
             Bid
             <input id="bid-input" type="number" min="0" max="13" inputmode="numeric" value="4">
           </label>
-          <button id="submit-bid" type="button">Submit Bid for Active Seat</button>
+          <button id="submit-bid" type="button">Submit Bid</button>
           <button id="submit-nil" type="button">Submit Nil Bid</button>
         </div>
         <div class="room-actions">
-          <button id="ready-player" type="button">Mark Active Seat Ready</button>
+          <button id="ready-player" type="button">Ready</button>
           <button id="leave-room" type="button">Leave Room / Back to Lobby</button>
         </div>
-        <p id="leave-room-help" class="status-line">Leave Room / Back to Lobby clears your active seat view. Rejoin with the room code or restore if needed.</p>
+        <p id="leave-room-help" class="status-line">Leave Room / Back to Lobby closes your current table. Rejoin with the room code or restore if needed.</p>
         <div class="play-controls" aria-label="Text play-card controls">
           <label>
             Card ID
             <input id="play-card-id" autocomplete="off" placeholder="2-clubs">
           </label>
-          <button id="submit-play-card" type="button">Play Card ID for Active Seat</button>
+          <button id="submit-play-card" type="button">Play Card ID</button>
           <button id="play-full-hand" type="button">Auto-Play Text Hand</button>
           <button id="start-next-hand" type="button">Start Next Hand from Summary</button>
           <button id="record-match-history" type="button">Record Completed Match</button>

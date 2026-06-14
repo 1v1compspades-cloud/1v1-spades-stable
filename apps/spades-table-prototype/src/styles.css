@@ -5,7 +5,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  padding-bottom: 80px;
+  padding-bottom: 24px;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #f8f4eb;
   background: #10251c;
@@ -21,13 +21,13 @@ textarea {
 .app-shell {
   width: min(100%, 760px);
   margin: 0 auto;
-  padding: 24px;
+  padding: 24px 18px;
 }
 
 .home-panel,
 .status-panel,
 .manual-panel {
-  padding: 20px 0;
+  padding: 18px 0;
   border-bottom: 1px solid rgba(248, 244, 235, 0.18);
 }
 
@@ -171,7 +171,58 @@ textarea:focus-visible {
 body.tester-mode .developer-transport-control,
 body.tester-mode #advanced-diagnostics,
 body.tester-mode #local-preview-tools,
-body.tester-mode #manual-test-tools {
+body.tester-mode #manual-test-tools,
+body.tester-mode .play-controls,
+body.tester-mode .developer-details,
+body.tester-mode .bug-report-fab {
+  display: none;
+}
+
+body.tester-mode .home-panel {
+  display: grid;
+  gap: 16px;
+  border-bottom: 0;
+}
+
+body.tester-mode .status-panel {
+  border-bottom: 0;
+}
+
+body.tester-mode .player-entry-panel {
+  margin-bottom: 4px;
+}
+
+body.tester-mode .connection-help-panel {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+body.tester-mode #connection-status {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #d6b25e;
+}
+
+body.tester-mode #room-code-share-status,
+body.tester-mode #quick-match-status,
+body.tester-mode #leave-room-help {
+  color: #d7d1c3;
+}
+
+body.tester-mode #clear-room,
+body.tester-mode #leave-quick-match,
+body.tester-mode #restore-room,
+body.tester-mode #copy-room-code {
+  background: rgba(248, 244, 235, 0.12);
+  color: #f8f4eb;
+}
+
+body.tester-mode #table-record-history,
+body.tester-mode #record-match-history,
+body.tester-mode #play-full-hand {
   display: none;
 }
 
