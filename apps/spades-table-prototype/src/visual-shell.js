@@ -17,19 +17,21 @@ export function buildVisualShellModel(status) {
   }
 
   const playableIds = new Set(status.playableCardStatus?.cardIds ?? []);
-  const handCards = (status.hand ?? []).map((card) => {
-    const id = cardIdFor(card);
-    const playable = playableIds.has(id);
-    return {
-      id,
-      label: id,
-      rank: card.rank,
-      suit: card.suit,
-      playable,
-      ariaLabel: `${playable ? "Play" : "Unavailable"} ${card.rank} of ${card.suit}`,
-      stateLabel: playable ? "Playable" : "Blocked"
-    };
-  });
+  const handCards = (status.hand ?? [])
+    .map((card) => {
+      const id = cardIdFor(card);
+      const playable = playableIds.has(id);
+      return {
+        id,
+        label: id,
+        rank: card.rank,
+        suit: card.suit,
+        playable,
+        ariaLabel: `${playable ? "Play" : "Unavailable"} ${card.rank} of ${card.suit}`,
+        stateLabel: playable ? "Playable" : "Blocked"
+      };
+    })
+    .sort(compareHandCards);
 
   return {
     roomCode: status.roomCode,
@@ -137,6 +139,35 @@ export function buildEdgeMessages(status, errorMessage = "") {
 
 export function cardIdFor(card) {
   return `${card.rank}-${card.suit}`;
+}
+
+const rankDisplayOrder = new Map([
+  ["A", 0],
+  ["K", 1],
+  ["Q", 2],
+  ["J", 3],
+  ["10", 4],
+  ["9", 5],
+  ["8", 6],
+  ["7", 7],
+  ["6", 8],
+  ["5", 9],
+  ["4", 10],
+  ["3", 11],
+  ["2", 12]
+]);
+
+const suitDisplayOrder = new Map([
+  ["spades", 0],
+  ["hearts", 1],
+  ["diamonds", 2],
+  ["clubs", 3]
+]);
+
+function compareHandCards(left, right) {
+  const rankDiff = (rankDisplayOrder.get(left.rank) ?? 99) - (rankDisplayOrder.get(right.rank) ?? 99);
+  if (rankDiff !== 0) return rankDiff;
+  return (suitDisplayOrder.get(left.suit) ?? 99) - (suitDisplayOrder.get(right.suit) ?? 99);
 }
 
 function formatTrick(plays = []) {

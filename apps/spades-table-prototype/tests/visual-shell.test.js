@@ -92,6 +92,41 @@ test("visual shell model handles spectator or empty sanitized views", () => {
   assert.deepEqual(spectator.handCards, []);
 });
 
+test("visual shell model sorts displayed hands ace down to two", () => {
+  const model = buildVisualShellModel({
+    phase: "playing",
+    viewerSeat: "player1",
+    playerReady: { player1: true, player2: true },
+    currentTurn: "player1",
+    currentPlayerStatus: { canAct: false },
+    biddingStatus: { nextBidder: null },
+    score: { player1: 0, player2: 0 },
+    tricksTaken: { player1: 0, player2: 0 },
+    bids: { player1: 0, player2: 0 },
+    bags: { player1: 0, player2: 0 },
+    playableCardStatus: { cardIds: [] },
+    hand: [
+      { rank: "2", suit: "clubs" },
+      { rank: "A", suit: "hearts" },
+      { rank: "10", suit: "diamonds" },
+      { rank: "K", suit: "spades" },
+      { rank: "A", suit: "spades" },
+      { rank: "3", suit: "clubs" }
+    ],
+    currentTrick: [],
+    lastTrick: null
+  });
+
+  assert.deepEqual(model.handCards.map((card) => card.id), [
+    "A-spades",
+    "A-hearts",
+    "K-spades",
+    "10-diamonds",
+    "3-clubs",
+    "2-clubs"
+  ]);
+});
+
 test("visual shell models player1 player2 and spectator sanitized hands only", () => {
   const harness = createTwoSeatManualHarness({ roomCode: "VIS001" });
   harness.setup();

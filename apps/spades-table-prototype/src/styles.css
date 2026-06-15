@@ -1101,9 +1101,16 @@ body.tester-mode .card-button-grid {
 }
 
 body.tester-mode[data-active-screen="play"] #visual-hand,
-body.tester-mode[data-active-screen="play"] .card-button-grid {
-  grid-template-columns: 1fr;
-  gap: 8px;
+body.tester-mode[data-active-screen="play"] .card-button-grid,
+body.tester-mode .table-hand-grid {
+  display: flex;
+  grid-template-columns: none;
+  gap: 9px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 2px 12px;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
 }
 
 .card-button,
@@ -1153,12 +1160,20 @@ body.tester-mode .card-button {
 
 body.tester-mode[data-active-screen="play"] .card-button {
   grid-template-areas:
-    "rank suit state"
-    "id id id";
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  min-height: 64px;
-  padding: 10px 12px;
+    "rank state"
+    "suit suit"
+    "id id";
+  grid-template-columns: 1fr auto;
+  flex: 0 0 76px;
+  min-height: 112px;
+  padding: 10px;
+  scroll-snap-align: start;
+}
+
+body.tester-mode .table-hand-grid .card-button {
+  flex: 0 0 72px;
+  min-height: 104px;
+  scroll-snap-align: start;
 }
 
 body.tester-mode[data-active-screen="play"] .card-button::after {
@@ -1173,8 +1188,8 @@ body.tester-mode .card-rank {
 }
 
 body.tester-mode[data-active-screen="play"] .card-rank {
-  min-width: 42px;
-  font-size: 32px;
+  min-width: 0;
+  font-size: 34px;
 }
 
 .card-suit {
@@ -1198,8 +1213,8 @@ body.tester-mode[data-active-screen="play"] .card-rank {
 }
 
 body.tester-mode[data-active-screen="play"] .card-suit {
-  justify-self: start;
-  font-size: 30px;
+  justify-self: center;
+  font-size: 34px;
 }
 
 .card-id {
@@ -1221,7 +1236,7 @@ body.tester-mode .card-button:disabled .card-state {
 }
 
 body.tester-mode[data-active-screen="play"] .card-state {
-  min-width: 74px;
+  min-width: 0;
   text-align: center;
 }
 
@@ -1245,7 +1260,8 @@ body.tester-mode[data-active-screen="play"] .card-state {
   }
 
   body.tester-mode[data-active-screen="play"] .card-button {
-    min-height: 62px;
+    flex-basis: 72px;
+    min-height: 108px;
   }
 }
 
