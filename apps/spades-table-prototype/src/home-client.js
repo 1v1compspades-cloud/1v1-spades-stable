@@ -64,7 +64,11 @@ const globalRoomInviteBar = document.querySelector("#global-room-invite-bar");
 const globalRoomCodeOutput = document.querySelector("#global-room-code");
 const globalInviteRoomButton = document.querySelector("#global-invite-room");
 const globalCopyRoomCodeButton = document.querySelector("#global-copy-room-code");
+const globalBackLobbyButton = document.querySelector("#global-back-lobby");
 const copyFeedbackToast = document.querySelector("#copy-feedback-toast");
+const coinFlipPanel = document.querySelector("#coin-flip-panel");
+const coinFlipTitleOutput = document.querySelector("#coin-flip-title");
+const coinFlipDetailOutput = document.querySelector("#coin-flip-detail");
 const playerScreenTabs = Array.from(document.querySelectorAll("[data-screen-target]"));
 const roomCodeShareStatusOutput = document.querySelector("#room-code-share-status");
 const roomInvitePanel = document.querySelector("#room-invite-panel");
@@ -159,6 +163,8 @@ let lastNotificationStatusKey = "";
 let lastNotificationAt = 0;
 let titleFlashTimer = null;
 let copyFeedbackTimer = null;
+let coinFlipTimer = null;
+let lastCoinFlipKey = "";
 let launchInviteRoomCode = "";
 let launchInviteJoinAttempted = false;
 let expoPushToken = String(globalThis.__SPADES_EXPO_PUSH_TOKEN ?? "").trim();
@@ -194,6 +200,10 @@ globalInviteRoomButton?.addEventListener("click", () => {
 
 globalCopyRoomCodeButton?.addEventListener("click", () => {
   copyRoomCode();
+});
+
+globalBackLobbyButton?.addEventListener("click", () => {
+  clearActiveRoom();
 });
 
 document.querySelector("#create-room").addEventListener("click", () => {
@@ -287,6 +297,10 @@ document.querySelector("#leave-quick-match").addEventListener("click", () => {
 });
 
 document.querySelector("#clear-room").addEventListener("click", () => {
+  clearActiveRoom();
+});
+
+function clearActiveRoom() {
   if (isLiveSyncMode()) {
     liveSyncClient.disconnect();
   } else if (isRealServerMode()) {
@@ -298,9 +312,11 @@ document.querySelector("#clear-room").addEventListener("click", () => {
   lastSuccessfulAction = "clear active room";
   playerChoseScreen = false;
   lastGuidedScreenKey = "";
+  lastCoinFlipKey = "";
+  hideCoinFlip();
   actionLog.record("clear active room", null);
   renderStatus(null);
-});
+}
 
 document.querySelector("#ready-player").addEventListener("click", () => {
   requestGameNotificationPermission();
@@ -838,6 +854,7 @@ function renderStatus(status) {
   renderActionLog();
   renderBetaFeedbackPanel(status);
   renderPlayerGuide(status);
+  renderCoinFlip(status);
 }
 
 function renderPlayerGuide(status) {
@@ -1031,6 +1048,38 @@ function updatePlayerChrome(status) {
   const roomLabel = status?.roomCode ? `Room ${status.roomCode}` : "Lobby";
   const phaseLabel = status?.phase ? status.phase.replace("_", " ") : "ready";
   playerScreenStatusOutput.textContent = `${roomLabel} · ${phaseLabel}`;
+}
+
+function renderCoinFlip(status) {
+  if (!coinFlipPanel || !status?.roomCode || status.phase !== "bidding" || !status.coinFlipWinner) return;
+  const key = `${status.roomCode}:${status.coinFlipWinner}:${status.dealer}:${status.firstPlayer}`;
+  if (key === lastCoinFlipKey) return;
+  lastCoinFlipKey = key;
+
+  const winnerName = status.players?.[status.coinFlipWinner]?.displayName ?? seatName(status.coinFlipWinner);
+  const leaderName = status.players?.[status.firstPlayer]?.displayName ?? seatName(status.firstPlayer);
+  if (coinFlipTitleOutput) coinFlipTitleOutput.textContent = `${winnerName} won the flip`;
+  if (coinFlipDetailOutput) coinFlipDetailOutput.textContent = `${winnerName} deals first. ${leaderName} leads the first trick.`;
+
+  coinFlipPanel.hidden = false;
+  coinFlipPanel.classList.remove("show");
+  void coinFlipPanel.offsetWidth;
+  coinFlipPanel.classList.add("show");
+  clearTimeout(coinFlipTimer);
+  coinFlipTimer = setTimeout(hideCoinFlip, 2600);
+}
+
+function hideCoinFlip() {
+  clearTimeout(coinFlipTimer);
+  coinFlipTimer = null;
+  coinFlipPanel?.classList.remove("show");
+  if (coinFlipPanel) coinFlipPanel.hidden = true;
+}
+
+function seatName(seat) {
+  if (seat === "player1") return "Player 1";
+  if (seat === "player2") return "Player 2";
+  return "Opponent";
 }
 
 function updatePlayerActionVisibility(status) {
