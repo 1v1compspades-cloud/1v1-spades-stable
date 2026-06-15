@@ -274,6 +274,31 @@ export function createSpadesAppController({
     };
   }
 
+  function requestRematch({ deck, actionSequence = nextActionSequence("requestRematch") } = {}) {
+    const { room, session } = requireActiveRoom();
+    const actionId = createActionId({
+      roomCode: room.roomCode,
+      seat: session.seat,
+      type: "requestRematch",
+      sequence: actionSequence
+    });
+    const nextRoom = applyRoomAction(room, {
+      type: "requestRematch",
+      seatToken: session.seatToken,
+      playerId: session.playerId,
+      deck,
+      actionId,
+      expectedPhase: "match_complete"
+    });
+    repository.save(nextRoom);
+
+    return {
+      room: nextRoom,
+      session,
+      status: sanitizeRoomForViewer(nextRoom, session)
+    };
+  }
+
   function recordMatchHistory(options = {}) {
     const { room } = requireActiveRoom();
     return matchHistory.record(room, options);
@@ -368,6 +393,7 @@ export function createSpadesAppController({
     submitPlayCardById,
     startNextHand,
     startNewMatch,
+    requestRematch,
     recordMatchHistory,
     getMatchHistory,
     playFullHand,

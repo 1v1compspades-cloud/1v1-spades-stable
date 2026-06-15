@@ -132,6 +132,15 @@ export function createSpadesLiveSyncClient({
       });
     },
 
+    requestRematch(options = {}) {
+      return sendAction("rematch", {
+        roomCode: options.roomCode,
+        actionId: options.actionId,
+        actionSequence: options.actionSequence,
+        deck: options.deck
+      });
+    },
+
     disconnect() {
       return socket.disconnect();
     },
@@ -228,7 +237,7 @@ function createRequestId(type) {
 }
 
 function isPlayerAction(type) {
-  return ["ready", "bid", "playCard", "leaveRoom", "nextHand", "newMatch"].includes(type);
+  return ["ready", "bid", "playCard", "leaveRoom", "nextHand", "newMatch", "rematch"].includes(type);
 }
 
 function stripUndefined(value) {

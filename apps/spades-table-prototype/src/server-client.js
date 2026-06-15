@@ -118,6 +118,10 @@ export function createSpadesServerClient({
       return playerAction("new-match", endpointRoomCode(options), options);
     },
 
+    requestRematch(options = {}) {
+      return playerAction("rematch", endpointRoomCode(options), options);
+    },
+
     async joinQuickMatch(options = {}) {
       await subscribeQueue();
       const response = await postJson("/api/quick-match/join", {
@@ -422,7 +426,8 @@ function endpointToActionType(endpoint) {
     "play-card": "playCard",
     leave: "leaveRoom",
     "next-hand": "nextHand",
-    "new-match": "newMatch"
+    "new-match": "newMatch",
+    rematch: "rematch"
   }[endpoint] ?? endpoint;
 }
 

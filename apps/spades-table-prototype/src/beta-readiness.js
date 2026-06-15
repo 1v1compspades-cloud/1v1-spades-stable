@@ -37,7 +37,7 @@ export const MANUAL_BETA_FLOWS = Object.freeze([
   {
     id: "new-match",
     label: "New match",
-    steps: ["Complete match", "Reset to New Match", "Confirm players remain and scores reset"]
+    steps: ["Complete match", "Ask for Rematch", "Confirm one player waits and both players start the next match"]
   }
 ]);
 

@@ -36,7 +36,8 @@ This beta is free play only.
 
 ## Leaving
 
-- Use Leave Room / Back to Lobby when done with a room.
+- Use Leave Game during an active match.
+- At match complete, use Return to Lobby or Ask for Rematch.
 - Rejoin with the room code if continuing.
 - Use Back to Lobby / Clear Active Room if the local session gets stuck.
 

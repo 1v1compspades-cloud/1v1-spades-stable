@@ -92,10 +92,11 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /id="table-last-trick-area"/);
   assert.match(html, /id="table-player-hand-area"/);
   assert.match(html, /id="table-leave-room"/);
-  assert.match(html, /Leave Room \/ Back to Lobby/);
+  assert.match(html, /Leave Game/);
   assert.match(html, /id="table-record-history"/);
   assert.match(html, /id="table-start-next-hand"/);
-  assert.match(html, /id="table-start-new-match"/);
+  assert.match(html, /id="table-start-rematch"/);
+  assert.match(html, /Ask for Rematch/);
   assert.match(html, /id="qa-check-list"/);
   assert.match(html, /id="qa-edge-list"/);
   assert.match(html, /id="beta-safety-check-list"/);
@@ -159,7 +160,7 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /id="play-full-hand"/);
   assert.match(html, /id="start-next-hand"/);
   assert.match(html, /id="record-match-history"/);
-  assert.match(html, /id="start-new-match"/);
+  assert.match(html, /id="start-rematch"/);
   assert.match(html, /id="manual-test-tools"/);
   assert.match(html, /Manual local test tools/);
   assert.match(html, /id="manual-full-hand"/);
@@ -218,6 +219,8 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /connectionStatusLabel/);
   assert.match(client, /renderRoomCodeShare/);
   assert.match(client, /setActivePlayerScreen/);
+  assert.match(client, /setActivePlayerScreen\("play"/);
+  assert.match(client, /ready-countdown/);
   assert.match(client, /updatePlayerScreenForStatus/);
   assert.match(client, /updatePlayerActionVisibility/);
   assert.match(client, /dataset\.gamePhase/);
@@ -273,7 +276,8 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /actionLog\.record/);
   assert.match(client, /renderActionLog/);
   assert.match(client, /formatActionLogEntry/);
-  assert.match(client, /table-start-new-match/);
+  assert.match(client, /table-start-rematch/);
+  assert.match(client, /requestRematch/);
   assert.match(client, /runVisualQaScript/);
   assert.match(client, /listVisualQaScripts/);
   assert.match(client, /listManualFixturePresets/);
@@ -468,7 +472,7 @@ test("hosted deploy checklist and server startup are present", () => {
   assert.match(externalChecklist, /connection status panel/i);
   assert.match(externalChecklist, /Copy Room Code|Copy\/share the room code/i);
   assert.match(externalChecklist, /AFK\/disconnect warning placeholder/);
-  assert.match(externalChecklist, /Leave Room \/ Back to Lobby/);
+  assert.match(externalChecklist, /Leave Game|Return to Lobby/);
   assert.match(externalChecklist, /always-visible Report Bug button/);
   assert.match(externalChecklist, /failed join/i);
   assert.match(externalChecklist, /room full/i);

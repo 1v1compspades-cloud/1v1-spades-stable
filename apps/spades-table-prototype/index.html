@@ -34,7 +34,7 @@
         <div class="global-room-actions">
           <button id="global-invite-room" class="primary-invite-button" type="button">Invite / Share Room</button>
           <button id="global-copy-room-code" type="button">Copy Room Code</button>
-          <button id="global-back-lobby" type="button">Back to Lobby</button>
+          <button id="global-back-lobby" type="button">Return to Lobby</button>
         </div>
       </section>
       <section id="coin-flip-panel" class="coin-flip-panel" aria-live="polite" hidden>
@@ -177,10 +177,10 @@
             <div id="table-player-hand-area" class="table-area player-hand-area">Player hand: waiting</div>
             <div class="table-controls table-area">
               <button id="table-copy-invite-link" class="primary-invite-button" type="button" hidden>Send Invite Link</button>
-              <button id="table-leave-room" type="button">Leave Room / Back to Lobby</button>
+              <button id="table-leave-room" type="button">Leave Game</button>
               <button id="table-record-history" type="button">Record History</button>
               <button id="table-start-next-hand" type="button">Next Hand</button>
-              <button id="table-start-new-match" type="button">New Match</button>
+              <button id="table-start-rematch" type="button">Ask for Rematch</button>
             </div>
           </div>
           <div class="visual-status-band">
@@ -296,9 +296,10 @@
         </div>
         <div class="room-actions">
           <button id="ready-player" type="button">Ready</button>
-          <button id="leave-room" type="button">Leave Room / Back to Lobby</button>
+          <button id="leave-room" type="button">Leave Game</button>
+          <button id="ask-rematch" type="button">Ask for Rematch</button>
         </div>
-        <p id="leave-room-help" class="status-line">Leave Room / Back to Lobby closes your current table. Rejoin with the room code or restore if needed.</p>
+        <p id="leave-room-help" class="status-line">Leave Game exits your current table. Return to Lobby appears when the match is complete.</p>
         <div class="play-controls" aria-label="Text play-card controls">
           <label>
             Card ID
@@ -308,7 +309,7 @@
           <button id="play-full-hand" type="button">Auto-Play Text Hand</button>
           <button id="start-next-hand" type="button">Start Next Hand from Summary</button>
           <button id="record-match-history" type="button">Record Completed Match</button>
-          <button id="start-new-match" type="button">Reset to New Match</button>
+          <button id="start-rematch" type="button">Ask for Rematch</button>
         </div>
       </section>
 

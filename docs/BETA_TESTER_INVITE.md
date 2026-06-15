@@ -20,7 +20,7 @@ When reporting a bug, please include the copyable diagnostics bundle, what you e
 
 ## Stuck Tester Reply
 
-Thanks for testing. If you get stuck, use Leave Room / Back to Lobby, then Restore Active Room if you were already seated. If that does not work, refresh the page and include the diagnostics bundle in your report.
+Thanks for testing. If you get stuck during a live match, use Leave Game. When a match is complete, use Return to Lobby or Ask for Rematch. If reconnect does not work, refresh the page and include the diagnostics bundle in your report.
 
 ## Bug Report Prompt
 

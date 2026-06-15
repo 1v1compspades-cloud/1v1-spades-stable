@@ -49,6 +49,7 @@ export function createRoom({
       phase: "waiting",
       handNumber: 0,
       game: createEmptyGameState(),
+      rematchRequests: createEmptySeatFlags(),
       appliedActionIds: [],
       pendingDeck: deck,
       createdAt: now,
@@ -147,6 +148,29 @@ function applyRoomActionOnce(room, action = {}) {
     return startNewMatch(room, { deck: action.deck });
   }
 
+  if (action.type === "requestRematch") {
+    ensurePhase(room, "match_complete");
+    const requested = {
+      ...createEmptySeatFlags(),
+      ...(room.rematchRequests ?? {}),
+      [seat]: true
+    };
+    const requestedRoom = syncRoom({
+      ...room,
+      rematchRequests: requested,
+      updatedAt: new Date().toISOString()
+    });
+    if (!PLAYERS.every((player) => requested[player])) return requestedRoom;
+
+    const resetRoom = startNewMatch(requestedRoom, { deck: action.deck });
+    const readyRoom = roomLifecycle.markReady(
+      roomLifecycle.markReady(resetRoom, "player1", true),
+      "player2",
+      true
+    );
+    return maybeStartHand(readyRoom);
+  }
+
   throw roomError(400, `Unsupported room action: ${action.type}`);
 }
 
@@ -166,6 +190,10 @@ export function sanitizeRoomForViewer(room, viewer = {}) {
     players: sanitizePlayers(room.players),
     playerReady: {
       ...room.playerReady
+    },
+    rematchRequests: {
+      ...createEmptySeatFlags(),
+      ...(room.rematchRequests ?? {})
     },
     matchSettings: {
       ...room.matchSettings
@@ -259,6 +287,7 @@ function startNextHand(room, { deck = null } = {}) {
         ...room.game.bags
       }
     },
+    rematchRequests: createEmptySeatFlags(),
     pendingDeck: null,
     updatedAt: new Date().toISOString()
   });
@@ -273,6 +302,7 @@ function startNewMatch(room, { deck = null } = {}) {
     phase: "waiting",
     handNumber: 0,
     game: createEmptyGameState(),
+    rematchRequests: createEmptySeatFlags(),
     appliedActionIds: [],
     pendingDeck: deck,
   });
@@ -430,6 +460,13 @@ function createEmptyGameState() {
     },
     spadesBroken: false,
     winner: null
+  };
+}
+
+function createEmptySeatFlags() {
+  return {
+    player1: false,
+    player2: false
   };
 }
 

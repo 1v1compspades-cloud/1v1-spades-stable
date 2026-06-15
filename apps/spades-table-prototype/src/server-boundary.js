@@ -17,7 +17,8 @@ export const SPADES_REQUEST_TYPES = Object.freeze([
   "playCard",
   "leaveRoom",
   "nextHand",
-  "newMatch"
+  "newMatch",
+  "rematch"
 ]);
 
 const PLAYER_ACTION_TYPES = new Set([
@@ -26,7 +27,8 @@ const PLAYER_ACTION_TYPES = new Set([
   "playCard",
   "leaveRoom",
   "nextHand",
-  "newMatch"
+  "newMatch",
+  "rematch"
 ]);
 
 const ROOM_ACTION_TYPES = Object.freeze({
@@ -34,14 +36,16 @@ const ROOM_ACTION_TYPES = Object.freeze({
   bid: "bid",
   playCard: "playCard",
   nextHand: "startNextHand",
-  newMatch: "startNewMatch"
+  newMatch: "startNewMatch",
+  rematch: "requestRematch"
 });
 
 const EXPECTED_PHASES = Object.freeze({
   bid: "bidding",
   playCard: "playing",
   nextHand: "hand_complete",
-  newMatch: "match_complete"
+  newMatch: "match_complete",
+  rematch: "match_complete"
 });
 
 export function createMockSpadesTransport(options = {}) {

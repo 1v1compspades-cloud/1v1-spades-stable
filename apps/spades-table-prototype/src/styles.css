@@ -1818,9 +1818,7 @@ body.tester-mode[data-active-screen="table"] .table-layout-shell {
 }
 
 body.tester-mode[data-active-screen="table"] .table-controls #table-copy-invite-link,
-body.tester-mode[data-active-screen="table"] .table-controls #table-record-history,
-body.tester-mode[data-active-screen="table"] .table-controls #table-start-next-hand,
-body.tester-mode[data-active-screen="table"] .table-controls #table-start-new-match {
+body.tester-mode[data-active-screen="table"] .table-controls #table-record-history {
   display: none !important;
 }
 
@@ -2668,6 +2666,243 @@ body.tester-mode .table-hand-grid .card-button.playable {
     inset 0 1px 0 rgba(255, 255, 255, 0.92);
 }
 
+body.tester-mode[data-active-screen="play"][data-game-phase="bidding"] .player-guide,
+body.tester-mode[data-active-screen="play"][data-game-phase="playing"] .player-guide {
+  display: none;
+}
+
+body.tester-mode[data-active-screen="play"] .status-panel {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.tester-mode[data-active-screen="play"] .visual-status-band,
+body.tester-mode[data-active-screen="play"] #visual-bid-bag-summary,
+body.tester-mode[data-active-screen="play"] #visual-last-trick-title,
+body.tester-mode[data-active-screen="play"] #visual-last-trick {
+  display: none !important;
+}
+
+body.tester-mode[data-active-screen="play"] .visual-shell {
+  display: grid;
+  grid-template-rows: 122px minmax(210px, 1fr) 118px 150px;
+  gap: 0;
+  min-height: min(690px, calc(100dvh - 138px));
+  margin-inline: calc(var(--app-gutter, 12px) * -1);
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background:
+    radial-gradient(ellipse at center, rgba(4, 15, 11, 0.96), rgba(1, 5, 4, 0.99) 68%),
+    #020605;
+  box-shadow: inset 0 1px 0 rgba(120, 171, 148, 0.28);
+}
+
+body.tester-mode[data-active-screen="play"] #visual-score-summary {
+  display: contents;
+}
+
+body.tester-mode[data-active-screen="play"] .scoreboard-rail {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) auto auto auto auto;
+  grid-template-areas:
+    "identity pts bags bid tricks"
+    "name pts bags bid tricks";
+  align-items: center;
+  column-gap: 10px;
+  min-height: 118px;
+  padding: 17px 18px 15px;
+  border: solid rgba(111, 151, 132, 0.35);
+  border-width: 1px 0;
+  border-radius: 0;
+  background: linear-gradient(180deg, rgba(16, 39, 31, 0.96), rgba(6, 23, 18, 0.98));
+  box-shadow: inset 0 -1px 0 rgba(247, 209, 90, 0.12);
+}
+
+body.tester-mode[data-active-screen="play"] .opponent-rail {
+  order: 1;
+}
+
+body.tester-mode[data-active-screen="play"] .viewer-rail {
+  order: 3;
+  border-top-color: rgba(247, 209, 90, 0.36);
+  background: linear-gradient(180deg, rgba(9, 30, 23, 0.98), rgba(11, 35, 28, 0.98));
+}
+
+body.tester-mode[data-active-screen="play"] .rail-seat {
+  grid-area: identity;
+  color: rgba(220, 235, 226, 0.68);
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+body.tester-mode[data-active-screen="play"] .rail-name {
+  grid-area: name;
+  min-width: 0;
+  overflow: hidden;
+  color: #fff8e7;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(25px, 7vw, 34px);
+  font-weight: 900;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.tester-mode[data-active-screen="play"] .rail-ready {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  color: #14d99a;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+body.tester-mode[data-active-screen="play"] .rail-ready::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 7px;
+  border-radius: 999px;
+  background: #14d99a;
+  box-shadow: 0 0 14px rgba(20, 217, 154, 0.75);
+}
+
+body.tester-mode[data-active-screen="play"] .rail-metric {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  min-width: 54px;
+  color: #fff8e7;
+  font-family: "Courier New", monospace;
+  font-weight: 900;
+}
+
+body.tester-mode[data-active-screen="play"] .rail-pts {
+  grid-area: pts;
+}
+
+body.tester-mode[data-active-screen="play"] .rail-bags {
+  grid-area: bags;
+}
+
+body.tester-mode[data-active-screen="play"] .rail-bid {
+  grid-area: bid;
+}
+
+body.tester-mode[data-active-screen="play"] .rail-tricks {
+  grid-area: tricks;
+}
+
+body.tester-mode[data-active-screen="play"] .rail-metric-value {
+  min-width: 46px;
+  padding: 5px 8px;
+  border: 2px solid rgba(240, 242, 229, 0.74);
+  border-radius: 9px;
+  text-align: center;
+  font-size: 18px;
+  line-height: 1;
+}
+
+body.tester-mode[data-active-screen="play"] .rail-bid .rail-metric-value,
+body.tester-mode[data-active-screen="play"] .rail-tricks .rail-metric-value {
+  border: 0;
+  font-size: 32px;
+}
+
+body.tester-mode[data-active-screen="play"] .rail-metric-label {
+  color: rgba(220, 235, 226, 0.66);
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+body.tester-mode[data-active-screen="play"] #visual-current-trick-title {
+  margin: 0;
+  color: #d6a92f;
+  font-family: "Courier New", monospace;
+  font-size: 18px;
+  font-weight: 850;
+  letter-spacing: 0.42em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+body.tester-mode[data-active-screen="play"] .visual-zone[aria-labelledby="visual-current-trick-title"] {
+  order: 2;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  min-height: 0;
+  padding: 24px 18px;
+  border: 0;
+  background:
+    radial-gradient(ellipse at center, rgba(4, 48, 32, 0.52), transparent 58%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.38), rgba(0, 0, 0, 0.12));
+}
+
+body.tester-mode[data-active-screen="play"] #visual-current-trick {
+  min-height: 44px;
+  max-width: 86%;
+  margin: 18px auto 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 248, 231, 0.92);
+  box-shadow: none;
+  font-size: 20px;
+  font-style: italic;
+  text-align: center;
+}
+
+body.tester-mode[data-active-screen="play"] .visual-zone[aria-labelledby="visual-hand-title"] {
+  order: 4;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: rgba(4, 17, 13, 0.96);
+}
+
+body.tester-mode[data-active-screen="play"] #visual-hand-title {
+  display: none;
+}
+
+body.tester-mode[data-active-screen="play"] #visual-hand {
+  height: 150px;
+  margin: 0;
+  padding: 12px 18px 16px;
+  border: 0;
+  border-top: 1px solid rgba(247, 209, 90, 0.2);
+  border-radius: 0;
+  background: rgba(1, 8, 6, 0.92);
+  mask-image: none;
+}
+
+body.tester-mode[data-active-screen="play"] #visual-hand .card-button {
+  flex: 0 0 92px;
+  min-height: 126px;
+  border-width: 2px;
+  border-radius: 10px;
+}
+
+body.tester-mode[data-active-screen="play"] #visual-hand .card-rank {
+  font-size: 36px;
+}
+
+body.tester-mode[data-active-screen="play"] #visual-hand .card-suit {
+  font-size: 43px;
+}
+
 @media (max-width: 430px) {
   body.tester-mode .app-shell {
     padding-right: 12px;
@@ -2693,5 +2928,51 @@ body.tester-mode .table-hand-grid .card-button.playable {
   body.tester-mode .table-hand-grid .card-button {
     flex-basis: 78px;
     min-height: 114px;
+  }
+
+  body.tester-mode[data-active-screen="play"] .visual-shell {
+    grid-template-rows: 116px minmax(188px, 1fr) 112px 142px;
+    min-height: min(660px, calc(100dvh - 126px));
+  }
+
+  body.tester-mode[data-active-screen="play"] .scoreboard-rail {
+    grid-template-columns: minmax(0, 1.25fr) auto auto auto;
+    grid-template-areas:
+      "identity pts bags tricks"
+      "name pts bags tricks";
+    padding: 15px 13px 13px;
+    column-gap: 7px;
+  }
+
+  body.tester-mode[data-active-screen="play"] .rail-bid {
+    display: none;
+  }
+
+  body.tester-mode[data-active-screen="play"] .rail-name {
+    font-size: clamp(22px, 7vw, 29px);
+  }
+
+  body.tester-mode[data-active-screen="play"] .rail-metric {
+    min-width: 44px;
+  }
+
+  body.tester-mode[data-active-screen="play"] .rail-metric-value {
+    min-width: 40px;
+    padding: 5px 6px;
+    font-size: 16px;
+  }
+
+  body.tester-mode[data-active-screen="play"] .rail-tricks .rail-metric-value {
+    font-size: 28px;
+  }
+
+  body.tester-mode[data-active-screen="play"] #visual-hand {
+    height: 142px;
+    padding-inline: 14px;
+  }
+
+  body.tester-mode[data-active-screen="play"] #visual-hand .card-button {
+    flex-basis: 84px;
+    min-height: 118px;
   }
 }

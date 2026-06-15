@@ -69,6 +69,10 @@ export function createSpadesHttpServer({
     sendBoundaryResponse(response, boundary.handle(roomRequest(request, "newMatch")), onBoundaryResponse);
   });
 
+  app.post("/api/rooms/:roomCode/rematch", (request, response) => {
+    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "rematch")), onBoundaryResponse);
+  });
+
   app.post("/api/push/register", (request, response) => {
     const result = pushNotifier.registerToken(request.body ?? {});
     response.status(result.ok ? 200 : 400).json(result);

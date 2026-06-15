@@ -98,7 +98,7 @@ const tablePlayerHandAreaOutput = document.querySelector("#table-player-hand-are
 const tableInviteLinkButton = document.querySelector("#table-copy-invite-link");
 const tableLeaveRoomButton = document.querySelector("#table-leave-room");
 const tableStartNextHandButton = document.querySelector("#table-start-next-hand");
-const tableStartNewMatchButton = document.querySelector("#table-start-new-match");
+const tableStartRematchButton = document.querySelector("#table-start-rematch");
 const qaCheckListOutput = document.querySelector("#qa-check-list");
 const qaEdgeListOutput = document.querySelector("#qa-edge-list");
 const betaSafetyCheckListOutput = document.querySelector("#beta-safety-check-list");
@@ -146,6 +146,7 @@ const playCardIdInput = document.querySelector("#play-card-id");
 const bidControls = document.querySelector(".bid-controls");
 const readyPlayerButton = document.querySelector("#ready-player");
 const leaveRoomButton = document.querySelector("#leave-room");
+const askRematchButton = document.querySelector("#ask-rematch");
 const leaveRoomHelp = document.querySelector("#leave-room-help");
 const manualStatusOutput = document.querySelector("#manual-status");
 const manualViewSelect = document.querySelector("#manual-view");
@@ -376,8 +377,12 @@ document.querySelector("#record-match-history").addEventListener("click", () => 
   }, "record match history");
 });
 
-document.querySelector("#start-new-match").addEventListener("click", () => {
-  runShellAction(() => activeShellActions().startNewMatch(), "reset/new match");
+document.querySelector("#start-rematch").addEventListener("click", () => {
+  runShellAction(() => activeShellActions().requestRematch(), "ask rematch");
+});
+
+document.querySelector("#ask-rematch").addEventListener("click", () => {
+  runShellAction(() => activeShellActions().requestRematch(), "ask rematch");
 });
 
 document.querySelector("#table-leave-room").addEventListener("click", () => {
@@ -395,8 +400,8 @@ document.querySelector("#table-start-next-hand").addEventListener("click", () =>
   runShellAction(() => activeShellActions().startNextHand(), "next hand");
 });
 
-document.querySelector("#table-start-new-match").addEventListener("click", () => {
-  runShellAction(() => activeShellActions().startNewMatch(), "reset/new match");
+document.querySelector("#table-start-rematch").addEventListener("click", () => {
+  runShellAction(() => activeShellActions().requestRematch(), "ask rematch");
 });
 
 document.querySelector("#reset-local-stats").addEventListener("click", () => {
@@ -975,10 +980,19 @@ function playerGuideForStatus(status) {
   }
 
   if (status.phase === "match_complete") {
+    const rematchRequests = status.rematchRequests ?? {};
+    if (rematchRequests[status.viewerSeat]) {
+      return {
+        title: "Waiting for rematch",
+        detail: "Your rematch request is in. We will start when your opponent asks too.",
+        selector: null,
+        urgent: false
+      };
+    }
     return {
       title: "Match complete",
-      detail: "Start a new match or head back to the lobby.",
-      selector: "#table-start-new-match",
+      detail: "Return to the lobby or ask your opponent for a rematch.",
+      selector: "#ask-rematch",
       urgent: true
     };
   }
@@ -1150,6 +1164,7 @@ function updateReadyCountdown(status) {
   readyCountdownTimer = setTimeout(() => {
     readyCountdownCompletedKey = key;
     clearReadyCountdown({ keepCompleted: true });
+    setActivePlayerScreen("play", { status: currentShellStatus() });
     renderStatus(currentShellStatus());
   }, 5000);
 }
@@ -1182,14 +1197,17 @@ function updatePlayerActionVisibility(status) {
   const isHandComplete = phase === "hand_complete";
   const isMatchComplete = phase === "match_complete";
   const hasRoom = Boolean(status?.roomCode);
+  const rematchRequested = Boolean(status?.rematchRequests?.[status.viewerSeat]);
 
   setHidden(bidControls, !isYourBid || countdownActive);
   setHidden(globalRoomInviteBar, !hasRoom);
   if (globalRoomCodeOutput) globalRoomCodeOutput.textContent = status?.roomCode ?? "------";
   setHidden(globalInviteRoomButton, !isWaiting);
   setHidden(globalCopyRoomCodeButton, !hasRoom);
+  setHidden(globalBackLobbyButton, !isMatchComplete);
   setHidden(readyPlayerButton, !isWaiting);
   setHidden(leaveRoomButton, !hasRoom);
+  setHidden(askRematchButton, !isMatchComplete || rematchRequested);
   setHidden(leaveRoomHelp, !hasRoom);
   setHidden(tableLeaveRoomButton, !hasRoom);
   setHidden(copyInviteLinkButton, !hasRoom);
@@ -1200,7 +1218,9 @@ function updatePlayerActionVisibility(status) {
   setHidden(roomCopyCodeButton, !hasRoom);
   if (roomInviteCodeOutput) roomInviteCodeOutput.textContent = status?.roomCode ?? "------";
   setHidden(tableStartNextHandButton, !isHandComplete);
-  setHidden(tableStartNewMatchButton, !(isHandComplete || isMatchComplete));
+  setHidden(tableStartRematchButton, !isMatchComplete || rematchRequested);
+  if (leaveRoomButton) leaveRoomButton.textContent = isMatchComplete ? "Return to Lobby" : "Leave Game";
+  if (tableLeaveRoomButton) tableLeaveRoomButton.textContent = isMatchComplete ? "Return to Lobby" : "Leave Game";
   updatePlayerScreenTabAvailability(hasRoom);
 }
 
@@ -1517,11 +1537,21 @@ function renderVisualShellInto(status, targets, onPlayableCard) {
   targets.action.textContent = `Action: ${model.action}`;
   targets.currentTrick.textContent = model.currentTrick;
   targets.lastTrick.textContent = model.lastTrick;
-  targets.scoreSummary.replaceChildren(...model.scoreRows.map((row) => visualSummaryItem(
-    seatName(row.seat),
-    `Score ${row.score}`,
-    `Tricks ${row.tricks}`
-  )));
+  const bidRowsBySeat = new Map(model.bidBagRows.map((row) => [row.seat, row]));
+  const scoreRows = [...model.scoreRows].sort((a, b) => {
+    if (a.seat === model.viewerSeat) return 1;
+    if (b.seat === model.viewerSeat) return -1;
+    return a.seat.localeCompare(b.seat);
+  });
+  targets.scoreSummary.replaceChildren(...scoreRows.map((row) => playerRailSummaryItem({
+    seat: row.seat,
+    viewerSeat: model.viewerSeat,
+    score: row.score,
+    tricks: row.tricks,
+    bid: bidRowsBySeat.get(row.seat)?.bid,
+    bags: bidRowsBySeat.get(row.seat)?.bags,
+    ready: bidRowsBySeat.get(row.seat)?.ready
+  })));
   targets.bidBagSummary.replaceChildren(...model.bidBagRows.map((row) => visualSummaryItem(
     seatName(row.seat),
     `Bid ${row.bid ?? "none"}`,
@@ -1630,6 +1660,39 @@ function visualSummaryItem(label, primary, secondary) {
   item.className = "summary-item";
   item.textContent = `${label}: ${primary} | ${secondary}`;
   return item;
+}
+
+function playerRailSummaryItem({ seat, viewerSeat, score, tricks, bid, bags, ready }) {
+  const item = document.createElement("div");
+  item.className = seat === viewerSeat ? "summary-item scoreboard-rail viewer-rail" : "summary-item scoreboard-rail opponent-rail";
+  item.dataset.seat = seat;
+  item.append(
+    railText("rail-seat", seat === viewerSeat ? `${seatName(seat)} · You` : seatName(seat)),
+    railText("rail-name", currentShellStatus()?.players?.[seat]?.displayName ?? seatName(seat)),
+    railMetric("pts", `${score} pts`),
+    railMetric("bags", `${bags ?? 0} bags`),
+    railMetric("bid", bid ?? "–"),
+    railMetric("tricks", tricks ?? 0),
+    railText("rail-ready", ready ? "Online" : "Online")
+  );
+  return item;
+}
+
+function railMetric(label, value) {
+  const metric = document.createElement("span");
+  metric.className = `rail-metric rail-${label}`;
+  metric.append(
+    railText("rail-metric-value", String(value)),
+    railText("rail-metric-label", label)
+  );
+  return metric;
+}
+
+function railText(className, text) {
+  const span = document.createElement("span");
+  span.className = className;
+  span.textContent = text;
+  return span;
 }
 
 function visualCardButton(card, onPlayableCard) {

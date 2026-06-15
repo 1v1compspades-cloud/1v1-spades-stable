@@ -15,7 +15,8 @@ test("server boundary defines request contracts for local transport actions", ()
     "playCard",
     "leaveRoom",
     "nextHand",
-    "newMatch"
+    "newMatch",
+    "rematch"
   ]);
 
   assert.equal(validateRequest({

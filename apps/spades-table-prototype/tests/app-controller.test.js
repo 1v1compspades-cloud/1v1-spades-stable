@@ -443,6 +443,53 @@ test("new match reset after match complete preserves seats and clears match stat
   assert.equal(guestStatus.alreadySeated, true);
 });
 
+test("one-player rematch request waits for opponent without leaking hands", () => {
+  const { host, guest } = playingControllers({
+    deck: player1WinsEveryTrickDeck(),
+    hostBid: 4,
+    guestBid: 3,
+    matchSettings: { targetScore: 40 }
+  });
+  playFullHandWithControllers(host, guest);
+
+  const requested = host.requestRematch({ deck: player2HighDeck() });
+  const guestView = guest.getActiveRoomStatus();
+  const spectatorView = host.getRoomStatus("PLAY01");
+
+  assert.equal(requested.status.phase, "match_complete");
+  assert.deepEqual(requested.status.rematchRequests, { player1: true, player2: false });
+  assert.deepEqual(guestView.rematchRequests, { player1: true, player2: false });
+  assert.deepEqual(spectatorView.hand, []);
+  assert.equal(spectatorView.hiddenHandCounts.player1, 0);
+  assert.equal(spectatorView.hiddenHandCounts.player2, 0);
+});
+
+test("both-player rematch resets and starts a fresh hidden-hand-safe match", () => {
+  const { host, guest } = playingControllers({
+    deck: player1WinsEveryTrickDeck(),
+    hostBid: 4,
+    guestBid: 3,
+    matchSettings: { targetScore: 40 }
+  });
+  playFullHandWithControllers(host, guest);
+
+  host.requestRematch({ deck: player2HighDeck() });
+  const rematch = guest.requestRematch({ deck: player2HighDeck() });
+  const hostStatus = host.getActiveRoomStatus();
+  const spectatorView = host.getRoomStatus("PLAY01");
+
+  assert.equal(rematch.status.phase, "bidding");
+  assert.equal(hostStatus.phase, "bidding");
+  assert.deepEqual(hostStatus.playerReady, { player1: true, player2: true });
+  assert.deepEqual(hostStatus.rematchRequests, { player1: false, player2: false });
+  assert.deepEqual(hostStatus.score, { player1: 0, player2: 0 });
+  assert.deepEqual(hostStatus.bags, { player1: 0, player2: 0 });
+  assert.equal(hostStatus.hand.length, 13);
+  assert.equal(rematch.status.hand.length, 13);
+  assert.deepEqual(spectatorView.hand, []);
+  assert.deepEqual(spectatorView.hiddenHandCounts, { player1: 13, player2: 13 });
+});
+
 test("new match reset is rejected before match completion", () => {
   const waiting = createSpadesAppController({
     storage: createMemoryStorage(),
