@@ -2205,7 +2205,7 @@ body.tester-mode #global-back-lobby {
   --layout1-gold: #f1c65a;
   --layout1-copy: #f8fbf7;
   --layout1-muted: rgba(248, 251, 247, 0.68);
-  --layout1-script: "Snell Roundhand", "Apple Chancery", "Bradley Hand", "Segoe Script", cursive;
+  --layout1-script: "Didot", "Bodoni 72", "Georgia", "Times New Roman", serif;
 }
 
 body.tester-mode {
@@ -2249,6 +2249,7 @@ body.tester-mode #coin-flip-title {
 body.tester-mode .player-app-chrome h1 {
   font-size: 30px;
   line-height: 0.95;
+  font-style: italic;
 }
 
 body.tester-mode .suit-strip {

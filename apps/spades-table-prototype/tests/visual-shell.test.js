@@ -92,7 +92,7 @@ test("visual shell model handles spectator or empty sanitized views", () => {
   assert.deepEqual(spectator.handCards, []);
 });
 
-test("visual shell model sorts displayed hands ace down to two", () => {
+test("visual shell model sorts displayed hands by suit with spades first", () => {
   const model = buildVisualShellModel({
     phase: "playing",
     viewerSeat: "player1",
@@ -111,7 +111,9 @@ test("visual shell model sorts displayed hands ace down to two", () => {
       { rank: "10", suit: "diamonds" },
       { rank: "K", suit: "spades" },
       { rank: "A", suit: "spades" },
-      { rank: "3", suit: "clubs" }
+      { rank: "3", suit: "clubs" },
+      { rank: "Q", suit: "spades" },
+      { rank: "K", suit: "hearts" }
     ],
     currentTrick: [],
     lastTrick: null
@@ -119,8 +121,10 @@ test("visual shell model sorts displayed hands ace down to two", () => {
 
   assert.deepEqual(model.handCards.map((card) => card.id), [
     "A-spades",
-    "A-hearts",
     "K-spades",
+    "Q-spades",
+    "A-hearts",
+    "K-hearts",
     "10-diamonds",
     "3-clubs",
     "2-clubs"

@@ -165,9 +165,9 @@ const suitDisplayOrder = new Map([
 ]);
 
 function compareHandCards(left, right) {
-  const rankDiff = (rankDisplayOrder.get(left.rank) ?? 99) - (rankDisplayOrder.get(right.rank) ?? 99);
-  if (rankDiff !== 0) return rankDiff;
-  return (suitDisplayOrder.get(left.suit) ?? 99) - (suitDisplayOrder.get(right.suit) ?? 99);
+  const suitDiff = (suitDisplayOrder.get(left.suit) ?? 99) - (suitDisplayOrder.get(right.suit) ?? 99);
+  if (suitDiff !== 0) return suitDiff;
+  return (rankDisplayOrder.get(left.rank) ?? 99) - (rankDisplayOrder.get(right.rank) ?? 99);
 }
 
 function formatTrick(plays = []) {
