@@ -78,6 +78,7 @@ const tableScoreAreaOutput = document.querySelector("#table-score-area");
 const tableCenterTrickAreaOutput = document.querySelector("#table-center-trick-area");
 const tableLastTrickAreaOutput = document.querySelector("#table-last-trick-area");
 const tablePlayerHandAreaOutput = document.querySelector("#table-player-hand-area");
+const tableInviteLinkButton = document.querySelector("#table-copy-invite-link");
 const tableLeaveRoomButton = document.querySelector("#table-leave-room");
 const tableStartNextHandButton = document.querySelector("#table-start-next-hand");
 const tableStartNewMatchButton = document.querySelector("#table-start-new-match");
@@ -194,6 +195,10 @@ document.querySelector("#reconnect-live-sync").addEventListener("click", () => {
 });
 
 copyInviteLinkButton?.addEventListener("click", () => {
+  copyInviteLink();
+});
+
+tableInviteLinkButton?.addEventListener("click", () => {
   copyInviteLink();
 });
 
@@ -804,6 +809,7 @@ function updatePlayerActionVisibility(status) {
   setHidden(leaveRoomHelp, !hasRoom);
   setHidden(tableLeaveRoomButton, !hasRoom);
   setHidden(copyInviteLinkButton, !hasRoom);
+  setHidden(tableInviteLinkButton, !hasRoom);
   setHidden(tableStartNextHandButton, !isHandComplete);
   setHidden(tableStartNewMatchButton, !(isHandComplete || isMatchComplete));
 }
@@ -836,7 +842,7 @@ function connectionStatusLabel(status) {
 
 function renderRoomCodeShare(status) {
   roomCodeShareStatusOutput.textContent = status?.roomCode
-    ? `Room ${status.roomCode} is ready. Tap Copy Invite Link and send it to your friend.`
+    ? `Room ${status.roomCode} is ready. Tap Send Invite Link and send it to your friend.`
     : "Room code: create or join a room to share.";
 }
 

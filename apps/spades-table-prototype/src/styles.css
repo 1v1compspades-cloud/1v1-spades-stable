@@ -1218,3 +1218,12 @@ body.tester-mode #room-code-share-status {
   font-size: 13px;
   font-weight: 800;
 }
+
+
+body.tester-mode #table-copy-invite-link {
+  display: block;
+}
+
+body.tester-mode #table-copy-invite-link[hidden] {
+  display: none !important;
+}
