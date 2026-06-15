@@ -442,6 +442,30 @@ body.tester-mode[data-active-screen="play"] .bid-controls label {
   grid-column: 1 / -1;
 }
 
+body.tester-mode[data-active-screen="play"][data-game-phase="bidding"] .bid-controls {
+  position: fixed;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 76px);
+  left: max(12px, env(safe-area-inset-left));
+  z-index: 58;
+  display: grid;
+  max-width: 430px;
+  margin: 0 auto;
+  border-color: rgba(247, 209, 90, 0.62);
+  background:
+    linear-gradient(180deg, rgba(15, 35, 27, 0.97), rgba(2, 10, 8, 0.98)),
+    rgba(0, 0, 0, 0.82);
+  box-shadow: 0 18px 52px rgba(0, 0, 0, 0.62), 0 0 0 1px rgba(247, 209, 90, 0.16);
+}
+
+body.tester-mode[data-active-screen="play"][data-game-phase="bidding"] .visual-shell {
+  padding-bottom: 118px;
+}
+
+body.tester-mode[data-active-screen="play"][data-game-phase="bidding"] #visual-hand {
+  opacity: 0.72;
+}
+
 body.tester-mode .table-layout-shell {
   gap: 10px;
   min-height: auto;
@@ -1990,8 +2014,7 @@ body.tester-mode[data-has-room="false"] .screen-tab-button[data-screen-target="p
 }
 
 body.tester-mode .screen-tab-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+  display: none;
 }
 
 body.tester-mode[data-active-screen="lobby"][data-has-room="true"] .player-guide {

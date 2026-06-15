@@ -1240,13 +1240,16 @@ function updatePlayerActionVisibility(status) {
   setHidden(tableStartRematchButton, !isMatchComplete || rematchRequested);
   if (leaveRoomButton) leaveRoomButton.textContent = isMatchComplete ? "Return to Lobby" : "Leave Game";
   if (tableLeaveRoomButton) tableLeaveRoomButton.textContent = isMatchComplete ? "Return to Lobby" : "Leave Game";
-  updatePlayerScreenTabAvailability(hasRoom);
+  updatePlayerScreenTabAvailability(status);
 }
 
-function updatePlayerScreenTabAvailability(hasRoom) {
+function updatePlayerScreenTabAvailability(status) {
+  const hasRoom = Boolean(status?.roomCode);
+  const tableLocked = hasRoom && !["waiting"].includes(status?.phase);
   for (const tabButton of playerScreenTabs) {
-    const requiresRoom = tabButton.dataset.screenTarget !== "lobby";
-    const locked = requiresRoom && !hasRoom;
+    const target = tabButton.dataset.screenTarget;
+    const requiresRoom = target !== "lobby";
+    const locked = (requiresRoom && !hasRoom) || (target === "table" && tableLocked);
     tabButton.disabled = locked;
     tabButton.setAttribute("aria-disabled", locked ? "true" : "false");
   }
@@ -1585,27 +1588,20 @@ function renderVisualShellInto(status, targets, onPlayableCard) {
   }
 }
 
-function renderTableLayout(status, onPlayableCard) {
+function renderTableLayout(status) {
   const model = buildVisualShellModel(status);
   tableOpponentAreaOutput.textContent = status
     ? `Opponent: ${seatName(model.viewerSeat === "player1" ? "player2" : "player1")} | turn ${seatName(model.currentTurn)}`
     : "Opponent: waiting";
-  tableScoreAreaOutput.textContent = status ? "Scoreboard is on Play." : "Scoreboard: waiting";
-  tableCenterTrickAreaOutput.textContent = `Current trick: ${model.currentTrick}`;
-  tableLastTrickAreaOutput.textContent = `Last trick: ${model.lastTrick}`;
+  tableScoreAreaOutput.textContent = status ? "Gameplay is on Play." : "Table: waiting";
+  tableCenterTrickAreaOutput.textContent = status?.phase === "waiting"
+    ? "Waiting room: invite, copy code, then both players press Ready."
+    : "Active hand: use Play for bidding, cards, tricks, and scoreboard.";
+  tableLastTrickAreaOutput.textContent = status ? `Room ${model.roomCode} | ${model.phase}` : "No active room.";
   const handLabel = document.createElement("p");
   handLabel.className = "table-hand-label";
-  handLabel.textContent = `Player hand: ${model.handCards.length} visible cards`;
-  const handGrid = document.createElement("div");
-  handGrid.className = "card-button-grid table-hand-grid";
-  handGrid.append(...model.handCards.map((card) => visualCardButton(card, onPlayableCard)));
-  if (!model.handCards.length) {
-    const empty = document.createElement("p");
-    empty.className = "empty-state";
-    empty.textContent = "No visible hand for this view.";
-    handGrid.append(empty);
-  }
-  tablePlayerHandAreaOutput.replaceChildren(handLabel, handGrid);
+  handLabel.textContent = "Cards and bidding are only shown on Play.";
+  tablePlayerHandAreaOutput.replaceChildren(handLabel);
 }
 
 function renderQaReport(status, errorMessage, targets, context = {}) {
