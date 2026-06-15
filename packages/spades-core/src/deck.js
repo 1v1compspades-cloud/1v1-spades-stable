@@ -4,6 +4,19 @@ export function createDeck() {
   return SUITS.flatMap((suit) => RANKS.map((rank) => ({ rank, suit })));
 }
 
+export function shuffleDeck(deck = createDeck(), random = Math.random) {
+  const shuffled = deck.map((card) => ({ ...card }));
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled;
+}
+
+export function createShuffledDeck(random = Math.random) {
+  return shuffleDeck(createDeck(), random);
+}
+
 export function assertCard(card) {
   if (!card || !RANKS.includes(card.rank) || !SUITS.includes(card.suit)) {
     throw new Error("Invalid Spades card");

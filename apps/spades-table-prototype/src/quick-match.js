@@ -1,6 +1,9 @@
+import { createShuffledDeck } from "../../../packages/spades-core/src/deck.js";
+
 export function createQuickMatchQueue({
   boundary,
-  createRoomCode = defaultRoomCode
+  createRoomCode = defaultRoomCode,
+  createDeck = createShuffledDeck
 } = {}) {
   if (!boundary) {
     throw new Error("Quick Match requires a Spades server boundary");
@@ -123,6 +126,7 @@ export function createQuickMatchQueue({
       roomCode,
       displayName: player1.displayName,
       identity: player1.identity,
+      deck: request.deck ?? createDeck(),
       requestId: `${request.requestId ?? "quick-match"}:create`
     });
     const joined = boundary.handle({

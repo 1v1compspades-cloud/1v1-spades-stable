@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createQuickMatchQueue } from "./quick-match.js";
 import { createSpadesServerBoundary } from "./server-boundary.js";
 import { createSpadesPushNotifier } from "./push-notifications.js";
+import { createShuffledDeck } from "../../../packages/spades-core/src/deck.js";
 
 const sourceDir = dirname(fileURLToPath(import.meta.url));
 const appDir = resolve(sourceDir, "..");
@@ -35,6 +36,7 @@ export function createSpadesHttpServer({
   app.post("/api/rooms", (request, response) => {
     sendBoundaryResponse(response, boundary.handle({
       ...request.body,
+      deck: request.body?.deck ?? createShuffledDeck(),
       type: "createRoom"
     }), onBoundaryResponse);
   });
@@ -124,9 +126,15 @@ export function createSpadesHttpServer({
 function roomRequest(request, type) {
   return {
     ...request.body,
+    deck: deckForRequest(request, type),
     type,
     roomCode: request.params.roomCode
   };
+}
+
+function deckForRequest(request, type) {
+  if (request.body?.deck) return request.body.deck;
+  return ["nextHand", "newMatch"].includes(type) ? createShuffledDeck() : undefined;
 }
 
 function sendBoundaryResponse(response, payload, onBoundaryResponse) {

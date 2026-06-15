@@ -48,6 +48,30 @@ test("quick match blocks self-match even with a new seat token", () => {
   assert.equal(guest.view.viewerSeat, "player2");
 });
 
+test("quick match uses the supplied deck factory for the matched room", () => {
+  const deck = Array.from({ length: 52 }, (_, index) => {
+    const suits = ["clubs", "diamonds", "hearts", "spades"];
+    const ranks = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"];
+    return { rank: ranks[Math.floor(index / 4)], suit: suits[index % 4] };
+  });
+  const boundary = createSpadesServerBoundary();
+  const queue = createQuickMatchQueue({
+    boundary,
+    createRoomCode: () => "QMSHUF",
+    createDeck: () => deck
+  });
+
+  queue.joinQueue(request("joinQueue", "host", "seat-host", "Host", "q-host"));
+  const matched = queue.joinQueue(request("joinQueue", "guest", "seat-guest", "Guest", "q-guest"));
+  const room = boundary.repository.get("QMSHUF");
+
+  assert.equal(matched.queue.state, "matched");
+  assert.deepEqual(
+    room.pendingDeck.slice(0, 13).map((card) => card.suit),
+    ["clubs", "diamonds", "hearts", "spades", "clubs", "diamonds", "hearts", "spades", "clubs", "diamonds", "hearts", "spades", "clubs"]
+  );
+});
+
 test("quick match leave queue is safe and idempotent", () => {
   const queue = createQuickMatchQueue({ boundary: createSpadesServerBoundary() });
   queue.joinQueue(request("joinQueue", "host", "seat-host", "Host", "join-1"));
