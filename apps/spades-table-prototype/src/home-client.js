@@ -149,6 +149,10 @@ let activeFixturePreset = "none";
 let transportMode = "direct";
 let activePlayerScreen = "lobby";
 let playerChoseScreen = false;
+let lastNotificationStatusKey = "";
+let lastNotificationAt = 0;
+let titleFlashTimer = null;
+const baseDocumentTitle = document.title || "1v1 Spades";
 const actionLog = createLocalActionLog();
 const accountStats = createLocalAccountStatsStore();
 const tournamentHistory = createLocalTournamentHistoryStore();
@@ -182,6 +186,7 @@ globalCopyRoomCodeButton?.addEventListener("click", () => {
 });
 
 document.querySelector("#create-room").addEventListener("click", () => {
+  requestGameNotificationPermission();
   runShellAction(() => {
     saveCurrentDisplayName();
     return activeShellActions().createRoom({
@@ -192,6 +197,7 @@ document.querySelector("#create-room").addEventListener("click", () => {
 });
 
 document.querySelector("#join-room").addEventListener("click", () => {
+  requestGameNotificationPermission();
   runShellAction(() => {
     saveCurrentDisplayName();
     return activeShellActions().joinRoom({
@@ -241,6 +247,7 @@ document.querySelector("#jump-to-bug-report").addEventListener("click", () => {
 });
 
 document.querySelector("#join-quick-match").addEventListener("click", () => {
+  requestGameNotificationPermission();
   runShellAction(async () => {
     if (!isRealServerMode()) {
       throw new Error("Quick Match requires real local server mode");
@@ -284,6 +291,7 @@ document.querySelector("#clear-room").addEventListener("click", () => {
 });
 
 document.querySelector("#ready-player").addEventListener("click", () => {
+  requestGameNotificationPermission();
   runShellAction(() => activeShellActions().readyPlayer(), "ready");
 });
 
@@ -496,6 +504,10 @@ realServerClient.onStatus((update) => {
     renderQuickMatchStatus();
     renderStatus(update.view);
   }
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) clearGameAttentionSignal();
 });
 
 renderInitialStatus();
@@ -746,6 +758,7 @@ function renderQuickMatchStatus() {
 }
 
 function renderStatus(status) {
+  maybeNotifyGameAttention(status);
   updatePlayerScreenForStatus(status);
   updatePlayerActionVisibility(status);
   renderTransportModeStatus();
@@ -849,6 +862,122 @@ function updatePlayerActionVisibility(status) {
 function setHidden(element, hidden) {
   if (!element) return;
   element.hidden = hidden;
+}
+function isPageAway() {
+  return document.hidden || document.visibilityState === "hidden";
+}
+
+function requestGameNotificationPermission() {
+  if (!("Notification" in globalThis)) return;
+  if (Notification.permission !== "default") return;
+  try {
+    void Notification.requestPermission();
+  } catch {
+    // Some webviews do not support permission prompts; title/vibration fallback still works.
+  }
+}
+
+function maybeNotifyGameAttention(status) {
+  if (!status?.roomCode || !["player1", "player2"].includes(status.viewerSeat)) return;
+  const attention = gameAttentionReason(status);
+  if (!attention) return;
+  const key = [status.roomCode, status.viewerSeat, status.phase, attention.type, attention.detail].join(":");
+  if (key === lastNotificationStatusKey) return;
+  lastNotificationStatusKey = key;
+  if (!isPageAway()) return;
+  sendGameAttentionNotification(attention.title, attention.body, key);
+}
+
+function gameAttentionReason(status) {
+  const opponentSeat = status.viewerSeat === "player1" ? "player2" : "player1";
+  const opponent = status.players?.[opponentSeat];
+  const opponentName = opponent?.displayName || "Your opponent";
+  const bothPlayersPresent = Boolean(status.players?.player1 && status.players?.player2);
+  if (status.phase === "waiting" && bothPlayersPresent && !status.playerReady?.[status.viewerSeat]) {
+    return {
+      type: "room-ready",
+      detail: status.players?.[opponentSeat]?.playerId ?? opponentSeat,
+      title: "Opponent joined your Spades room",
+      body: opponentName + " is in room " + status.roomCode + ". Open Spades and press Ready."
+    };
+  }
+  if (status.phase === "bidding" && status.biddingStatus?.nextBidder === status.viewerSeat) {
+    return {
+      type: "bid-turn",
+      detail: status.biddingStatus?.nextBidder,
+      title: "Your Spades bid is up",
+      body: "Room " + status.roomCode + ": open the game and place your bid."
+    };
+  }
+  if (status.phase === "playing" && status.currentPlayerStatus?.canAct) {
+    return {
+      type: "play-turn",
+      detail: status.currentTurn,
+      title: "Your turn in Spades",
+      body: "Room " + status.roomCode + ": open the game and play a card."
+    };
+  }
+  return null;
+}
+
+function sendGameAttentionNotification(title, body, key) {
+  const now = Date.now();
+  if (now - lastNotificationAt < 1200) return;
+  lastNotificationAt = now;
+  flashDocumentTitle(title);
+  postNativeGameAttention(title, body, key);
+  try {
+    globalThis.navigator?.vibrate?.([160, 80, 160]);
+  } catch {
+    // Vibration is best-effort and unavailable in many browsers/webviews.
+  }
+  if (!("Notification" in globalThis) || Notification.permission !== "granted") return;
+  try {
+    const notification = new Notification(title, {
+      body,
+      tag: key,
+      renotify: true,
+      silent: false
+    });
+    notification.onclick = () => {
+      try { globalThis.focus?.(); } catch {}
+      clearGameAttentionSignal();
+      notification.close?.();
+    };
+  } catch {
+    // Notification construction can fail in embedded webviews; fallback already ran.
+  }
+}
+
+function postNativeGameAttention(title, body, key) {
+  try {
+    globalThis.ReactNativeWebView?.postMessage?.(JSON.stringify({
+      type: "spades:game-attention",
+      title,
+      body,
+      key
+    }));
+  } catch {
+    // Native bridge is optional; browser notifications/title flash still work.
+  }
+}
+
+function flashDocumentTitle(title) {
+  if (titleFlashTimer) clearInterval(titleFlashTimer);
+  let on = false;
+  document.title = title;
+  titleFlashTimer = setInterval(() => {
+    on = !on;
+    document.title = on ? title : baseDocumentTitle;
+  }, 1400);
+}
+
+function clearGameAttentionSignal() {
+  if (titleFlashTimer) {
+    clearInterval(titleFlashTimer);
+    titleFlashTimer = null;
+  }
+  document.title = baseDocumentTitle;
 }
 
 function renderConnectionHelp(status) {
