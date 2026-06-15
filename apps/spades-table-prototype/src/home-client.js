@@ -1322,17 +1322,21 @@ function renderVisualShellInto(status, targets, onPlayableCard) {
 
 function renderTableLayout(status, onPlayableCard) {
   const model = buildVisualShellModel(status);
+  const opponentSeat = opponentSeatFor(model.viewerSeat);
+  const opponentName = status?.players?.[opponentSeat]?.displayName ?? seatLabel(opponentSeat);
+  const yourScore = scoreForSeat(model, model.viewerSeat);
+  const opponentScore = scoreForSeat(model, opponentSeat);
   tableOpponentAreaOutput.textContent = status
-    ? `Opponent: ${model.viewerSeat === "player1" ? "player2" : "player1"} | turn ${model.currentTurn}`
+    ? `Opponent: ${opponentName} | ${model.currentTurn === model.viewerSeat ? "Your turn" : "Waiting"}`
     : "Opponent: waiting";
   tableScoreAreaOutput.textContent = model.scoreRows.length
-    ? `${model.scoreRows.map((row) => `${row.seat} ${row.score}`).join(" | ")} | ${model.bidStatus} | ${model.playableStatus}`
+    ? `Score: You ${yourScore} · Opponent ${opponentScore} | ${model.bidStatus} | ${model.playableStatus}`
     : "Score/status: waiting";
   tableCenterTrickAreaOutput.textContent = `Current trick: ${model.currentTrick}`;
   tableLastTrickAreaOutput.textContent = `Last trick: ${model.lastTrick}`;
   const handLabel = document.createElement("p");
   handLabel.className = "table-hand-label";
-  handLabel.textContent = `Player hand: ${model.handCards.length} visible cards`;
+  handLabel.textContent = `Your hand: ${model.handCards.length} cards`;
   const handGrid = document.createElement("div");
   handGrid.className = "card-button-grid table-hand-grid";
   handGrid.append(...model.handCards.map((card) => visualCardButton(card, onPlayableCard)));
@@ -1343,6 +1347,22 @@ function renderTableLayout(status, onPlayableCard) {
     handGrid.append(empty);
   }
   tablePlayerHandAreaOutput.replaceChildren(handLabel, handGrid);
+}
+
+function opponentSeatFor(viewerSeat) {
+  if (viewerSeat === "player1") return "player2";
+  if (viewerSeat === "player2") return "player1";
+  return "player2";
+}
+
+function seatLabel(seat) {
+  if (seat === "player1") return "Player 1";
+  if (seat === "player2") return "Player 2";
+  return "Opponent";
+}
+
+function scoreForSeat(model, seat) {
+  return model.scoreRows.find((row) => row.seat === seat)?.score ?? 0;
 }
 
 function renderQaReport(status, errorMessage, targets, context = {}) {
