@@ -370,6 +370,12 @@ test("visual QA and table layout styling is present", () => {
   assert.match(css, /Final cascade reinforcement for the onyx \+ diamond casino theme/);
   assert.match(css, /data-card-back="true"/);
   assert.match(css, /content:\s*"1v1"/);
+  assert.match(css, /Mobile lobby room-card no-overlap pass/);
+  assert.match(css, /body\.tester-mode\[data-active-screen="lobby"\] \.global-room-invite-bar/);
+  assert.match(css, /flex-direction:\s*column !important/);
+  assert.match(css, /body\.tester-mode\[data-active-screen="lobby"\]\[data-has-room="true"\] \.controls/);
+  assert.match(css, /body\.tester-mode\[data-active-screen="lobby"\]\[data-has-room="false"\] #spectate-room/);
+  assert.match(css, /max-height:\s*64px !important/);
   assert.match(css, /\.tester-entry-note/);
   assert.match(css, /\.table-layout-shell/);
   assert.match(css, /\.table-area/);
