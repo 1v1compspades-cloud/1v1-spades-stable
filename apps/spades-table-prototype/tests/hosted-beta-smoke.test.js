@@ -83,6 +83,31 @@ test("hosted health endpoint reports forwarded public URLs when config is local 
   }
 });
 
+test("hosted health endpoint prefers custom domain request over Render default env", async () => {
+  const { app } = createSpadesHttpServer({
+    config: {
+      publicApiUrl: "https://onev1-spades-beta.onrender.com",
+      publicWebSocketUrl: "wss://onev1-spades-beta.onrender.com/ws"
+    }
+  });
+  const server = await listen(app);
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  try {
+    const health = await (await fetch(`${baseUrl}/health`, {
+      headers: {
+        "x-forwarded-proto": "https",
+        "x-forwarded-host": "1v1spades.com"
+      }
+    })).json();
+    assert.equal(health.publicApiUrl, "https://1v1spades.com");
+    assert.equal(health.publicWebSocketUrl, "wss://1v1spades.com/ws");
+    assert.doesNotMatch(JSON.stringify(health), /onrender\.com|127\.0\.0\.1/);
+  } finally {
+    await closeServer(server);
+  }
+});
+
 test("hosted beta smoke flow covers health create join websocket quick match reconnect and hidden hands", async () => {
   const fixture = await startHostedSmokeFixture();
 

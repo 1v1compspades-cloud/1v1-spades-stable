@@ -130,10 +130,10 @@ export function createSpadesHttpServer({
 
 function publicHealthConfig(config, request) {
   const requestOrigin = publicOriginFromRequest(request);
-  const publicApiUrl = shouldUseRequestOrigin(config?.publicApiUrl) && requestOrigin
+  const publicApiUrl = requestOrigin
     ? requestOrigin
     : config?.publicApiUrl ?? requestOrigin ?? null;
-  const publicWebSocketUrl = shouldUseRequestOrigin(config?.publicWebSocketUrl) && requestOrigin
+  const publicWebSocketUrl = requestOrigin
     ? publicOriginToWebSocketUrl(requestOrigin)
     : config?.publicWebSocketUrl ?? (requestOrigin ? publicOriginToWebSocketUrl(requestOrigin) : null);
 
@@ -158,16 +158,6 @@ function publicOriginToWebSocketUrl(origin) {
   url.search = "";
   url.hash = "";
   return url.toString().replace(/\/$/, "");
-}
-
-function shouldUseRequestOrigin(value) {
-  if (!value) return true;
-  try {
-    const url = new URL(value);
-    return isLocalHostname(url.hostname);
-  } catch {
-    return true;
-  }
 }
 
 function isLocalHostname(hostname) {
