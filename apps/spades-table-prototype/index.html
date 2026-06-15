@@ -115,6 +115,17 @@
           <p id="action-status" class="status-chip">Action: none</p>
         </div>
         <div class="visual-shell" aria-label="Visual local gameplay shell">
+          <section id="room-invite-panel" class="room-invite-panel" aria-label="Room invite controls" hidden>
+            <div class="room-invite-copy">
+              <p class="eyebrow">Room</p>
+              <p id="room-invite-code" class="room-invite-code">------</p>
+              <p id="room-invite-instructions" class="room-invite-instructions">Share this code with your opponent, then both players press Ready on Play.</p>
+            </div>
+            <div class="room-invite-actions">
+              <button id="room-invite-link" class="primary-invite-button" type="button">Invite / Share Room</button>
+              <button id="room-copy-code" type="button">Copy Room Code</button>
+            </div>
+          </section>
           <div class="table-layout-shell" aria-label="Spades table">
             <div id="table-opponent-area" class="table-area opponent-area">Opponent: waiting</div>
             <div id="table-score-area" class="table-area score-area">Score/status: waiting</div>

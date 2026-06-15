@@ -59,6 +59,10 @@ const afkDisconnectWarningOutput = document.querySelector("#afk-disconnect-warni
 const playerScreenStatusOutput = document.querySelector("#player-screen-status");
 const playerScreenTabs = Array.from(document.querySelectorAll("[data-screen-target]"));
 const roomCodeShareStatusOutput = document.querySelector("#room-code-share-status");
+const roomInvitePanel = document.querySelector("#room-invite-panel");
+const roomInviteCodeOutput = document.querySelector("#room-invite-code");
+const roomInviteLinkButton = document.querySelector("#room-invite-link");
+const roomCopyCodeButton = document.querySelector("#room-copy-code");
 const copyInviteLinkButton = document.querySelector("#copy-invite-link");
 const quickMatchStatusOutput = document.querySelector("#quick-match-status");
 const phaseStatusOutput = document.querySelector("#phase-status");
@@ -196,6 +200,14 @@ document.querySelector("#reconnect-live-sync").addEventListener("click", () => {
 
 copyInviteLinkButton?.addEventListener("click", () => {
   copyInviteLink();
+});
+
+roomInviteLinkButton?.addEventListener("click", () => {
+  copyInviteLink();
+});
+
+roomCopyCodeButton?.addEventListener("click", () => {
+  copyRoomCode();
 });
 
 tableInviteLinkButton?.addEventListener("click", () => {
@@ -809,7 +821,11 @@ function updatePlayerActionVisibility(status) {
   setHidden(leaveRoomHelp, !hasRoom);
   setHidden(tableLeaveRoomButton, !hasRoom);
   setHidden(copyInviteLinkButton, !hasRoom);
-  setHidden(tableInviteLinkButton, !hasRoom);
+  setHidden(tableInviteLinkButton, !isWaiting);
+  setHidden(roomInvitePanel, !hasRoom);
+  setHidden(roomInviteLinkButton, !isWaiting);
+  setHidden(roomCopyCodeButton, !hasRoom);
+  if (roomInviteCodeOutput) roomInviteCodeOutput.textContent = status?.roomCode ?? "------";
   setHidden(tableStartNextHandButton, !isHandComplete);
   setHidden(tableStartNewMatchButton, !(isHandComplete || isMatchComplete));
 }
@@ -842,7 +858,7 @@ function connectionStatusLabel(status) {
 
 function renderRoomCodeShare(status) {
   roomCodeShareStatusOutput.textContent = status?.roomCode
-    ? `Room ${status.roomCode} is ready. Tap Send Invite Link and send it to your friend.`
+    ? `Room ${status.roomCode} is ready. Share this code with your opponent, then both players press Ready on Play.`
     : "Room code: create or join a room to share.";
 }
 
