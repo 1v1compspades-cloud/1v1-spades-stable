@@ -59,6 +59,7 @@ const afkDisconnectWarningOutput = document.querySelector("#afk-disconnect-warni
 const playerScreenStatusOutput = document.querySelector("#player-screen-status");
 const playerScreenTabs = Array.from(document.querySelectorAll("[data-screen-target]"));
 const roomCodeShareStatusOutput = document.querySelector("#room-code-share-status");
+const copyInviteLinkButton = document.querySelector("#copy-invite-link");
 const quickMatchStatusOutput = document.querySelector("#quick-match-status");
 const phaseStatusOutput = document.querySelector("#phase-status");
 const seatStatusOutput = document.querySelector("#seat-status");
@@ -190,6 +191,10 @@ document.querySelector("#restore-room").addEventListener("click", () => {
 
 document.querySelector("#reconnect-live-sync").addEventListener("click", () => {
   runShellAction(() => reconnectLiveSyncSnapshot(), "reconnect live sync snapshot");
+});
+
+copyInviteLinkButton?.addEventListener("click", () => {
+  copyInviteLink();
 });
 
 document.querySelector("#copy-room-code").addEventListener("click", () => {
@@ -492,6 +497,11 @@ function shouldUseTesterMode(params) {
 }
 
 function applyLaunchMode() {
+  const invitedRoomCode = String(launchParams.get("room") ?? launchParams.get("code") ?? "").trim().toUpperCase();
+  if (invitedRoomCode) {
+    joinCodeInput.value = invitedRoomCode;
+  }
+
   const requestedTransport = launchParams.get("transport");
   if (["direct", "live-sync", "real-server"].includes(requestedTransport)) {
     transportMode = requestedTransport;
@@ -793,6 +803,7 @@ function updatePlayerActionVisibility(status) {
   setHidden(leaveRoomButton, !hasRoom);
   setHidden(leaveRoomHelp, !hasRoom);
   setHidden(tableLeaveRoomButton, !hasRoom);
+  setHidden(copyInviteLinkButton, !hasRoom);
   setHidden(tableStartNextHandButton, !isHandComplete);
   setHidden(tableStartNewMatchButton, !(isHandComplete || isMatchComplete));
 }
@@ -825,8 +836,40 @@ function connectionStatusLabel(status) {
 
 function renderRoomCodeShare(status) {
   roomCodeShareStatusOutput.textContent = status?.roomCode
-    ? `Room code: ${status.roomCode}. Share this code with another player.`
+    ? `Room ${status.roomCode} is ready. Tap Copy Invite Link and send it to your friend.`
     : "Room code: create or join a room to share.";
+}
+
+function buildInviteLink(roomCode) {
+  const url = new URL(window.location.href);
+  url.search = "";
+  url.hash = "";
+  url.searchParams.set("room", roomCode);
+  url.searchParams.set("transport", "real-server");
+  return url.toString();
+}
+
+async function copyInviteLink() {
+  const roomCode = currentShellStatus()?.roomCode;
+  if (!roomCode) {
+    roomCodeShareStatusOutput.textContent = "Create a room first, then copy the invite link.";
+    return;
+  }
+  const inviteLink = buildInviteLink(roomCode);
+  try {
+    if (globalThis.navigator?.clipboard?.writeText) {
+      await globalThis.navigator.clipboard.writeText(inviteLink);
+      roomCodeShareStatusOutput.textContent = `Invite link copied for room ${roomCode}.`;
+      return;
+    }
+    joinCodeInput.value = inviteLink;
+    joinCodeInput.focus();
+    joinCodeInput.select();
+    document.execCommand?.("copy");
+    roomCodeShareStatusOutput.textContent = `Invite link selected for room ${roomCode}.`;
+  } catch (error) {
+    roomCodeShareStatusOutput.textContent = `Could not copy invite link: ${friendlyTesterError(error?.message ?? "copy failed")}`;
+  }
 }
 
 function renderVisualShell(status) {

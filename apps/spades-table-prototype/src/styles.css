@@ -344,11 +344,9 @@ body.tester-mode .home-panel > h1 {
 body.tester-mode .player-onboarding-block,
 body.tester-mode #tester-entry-title,
 body.tester-mode #tester-entry-summary,
-body.tester-mode #room-code-share-status,
 body.tester-mode #quick-match-status,
 body.tester-mode #leave-quick-match,
 body.tester-mode #clear-room,
-body.tester-mode #copy-room-code,
 body.tester-mode .visual-status-band {
   display: none;
 }
@@ -1189,4 +1187,34 @@ body.tester-mode .card-rank {
   body.tester-mode .card-button {
     min-height: 112px;
   }
+}
+
+
+/* Invite link visibility fix */
+.primary-invite-button {
+  border-color: rgba(255, 235, 166, 0.84);
+  background: linear-gradient(180deg, #fff0a8, #d6a01f);
+  color: #120c04;
+}
+
+body.tester-mode #copy-invite-link,
+body.tester-mode #copy-room-code,
+body.tester-mode #room-code-share-status {
+  display: block;
+}
+
+body.tester-mode #copy-invite-link[hidden],
+body.tester-mode #copy-room-code[hidden],
+body.tester-mode #room-code-share-status[hidden] {
+  display: none !important;
+}
+
+body.tester-mode #room-code-share-status {
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid rgba(247, 209, 90, 0.24);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.28);
+  font-size: 13px;
+  font-weight: 800;
 }
