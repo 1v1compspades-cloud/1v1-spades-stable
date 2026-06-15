@@ -1089,11 +1089,12 @@ function updatePlayerActionVisibility(status) {
 
   const isWaiting = phase === "waiting";
   const isBidding = phase === "bidding";
+  const isYourBid = isBidding && status?.biddingStatus?.nextBidder === status?.viewerSeat;
   const isHandComplete = phase === "hand_complete";
   const isMatchComplete = phase === "match_complete";
   const hasRoom = Boolean(status?.roomCode);
 
-  setHidden(bidControls, !isBidding);
+  setHidden(bidControls, !isYourBid);
   setHidden(globalRoomInviteBar, !hasRoom);
   if (globalRoomCodeOutput) globalRoomCodeOutput.textContent = status?.roomCode ?? "------";
   setHidden(globalInviteRoomButton, !isWaiting);
@@ -1540,17 +1541,26 @@ function visualCardButton(card, onPlayableCard) {
   button.className = card.playable ? "card-button playable" : "card-button";
   button.setAttribute("aria-label", card.ariaLabel);
   button.dataset.cardId = card.id;
+  button.dataset.suit = card.suit;
   button.append(
     visualCardText("card-rank", card.rank),
-    visualCardText("card-suit", card.suit),
+    visualCardText("card-suit", suitGlyph(card.suit)),
     visualCardText("card-id", card.id),
-    visualCardText("card-state", card.stateLabel)
+    visualCardText("card-state", card.playable ? card.stateLabel : "")
   );
   button.disabled = !card.playable || !onPlayableCard;
   button.addEventListener("click", () => {
     if (onPlayableCard) onPlayableCard(card);
   });
   return button;
+}
+
+function suitGlyph(suit) {
+  if (suit === "spades") return "♠";
+  if (suit === "hearts") return "♥";
+  if (suit === "diamonds") return "♦";
+  if (suit === "clubs") return "♣";
+  return suit;
 }
 
 function visualCardText(className, text) {
