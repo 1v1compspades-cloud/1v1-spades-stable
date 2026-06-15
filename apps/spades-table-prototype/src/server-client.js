@@ -79,6 +79,7 @@ export function createSpadesServerClient({
     async joinRoom(options = {}) {
       const response = await postJson(`/api/rooms/${encodeURIComponent(options.roomCode)}/join`, {
         displayName: options.displayName,
+        spectator: options.spectator === true,
         identity: requestIdentity(options)
       });
       await adoptSessionFromResponse(response);
@@ -206,6 +207,7 @@ export function createSpadesServerClient({
       activeSession = { ...response.session };
       activeRoomCode = response.session.roomCode;
     } else if (response.view?.roomCode) {
+      if (response.view.viewerSeat === "spectator") activeSession = null;
       activeRoomCode = response.view.roomCode;
     }
     if (response.view) {

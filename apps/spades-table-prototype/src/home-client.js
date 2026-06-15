@@ -165,6 +165,11 @@ let titleFlashTimer = null;
 let copyFeedbackTimer = null;
 let coinFlipTimer = null;
 let lastCoinFlipKey = "";
+let readyCountdownTimer = null;
+let readyCountdownInterval = null;
+let readyCountdownKey = null;
+let readyCountdownRemaining = 0;
+let readyCountdownCompletedKey = null;
 let launchInviteRoomCode = "";
 let launchInviteJoinAttempted = false;
 let expoPushToken = String(globalThis.__SPADES_EXPO_PUSH_TOKEN ?? "").trim();
@@ -227,6 +232,18 @@ document.querySelector("#join-room").addEventListener("click", () => {
       seatToken: localIdentity.seatToken
     });
   }, "join room");
+});
+
+document.querySelector("#spectate-room")?.addEventListener("click", () => {
+  runShellAction(() => {
+    saveCurrentDisplayName();
+    return activeShellActions().joinRoom({
+      roomCode: joinCodeInput.value,
+      displayName: localIdentity.displayName,
+      seatToken: null,
+      spectator: true
+    });
+  }, "spectate room");
 });
 
 document.querySelector("#restore-room").addEventListener("click", () => {
@@ -828,6 +845,7 @@ function findMatchStatusText(queue) {
 function renderStatus(status) {
   registerExpoPushToken(status);
   maybeNotifyGameAttention(status);
+  updateReadyCountdown(status);
   updatePlayerScreenForStatus(status);
   updatePlayerActionVisibility(status);
   renderTransportModeStatus();
@@ -875,6 +893,15 @@ function renderPlayerGuide(status) {
 
 function playerGuideForStatus(status) {
   const queue = realServerClient.queueStatus;
+  if (isReadyCountdownActive(status)) {
+    return {
+      title: `Starting in ${readyCountdownRemaining || 5}`,
+      detail: "Both players are ready. The coin flip starts when the countdown ends.",
+      selector: null,
+      urgent: true
+    };
+  }
+
   if (!status?.roomCode) {
     if (queue?.state === "waiting") {
       return {
@@ -1004,6 +1031,9 @@ function updatePlayerScreenForStatus(status) {
 
 function guidedPlayerScreen(status) {
   if (!status?.roomCode) return { screen: "lobby", key: "lobby:none" };
+  if (isReadyCountdownActive(status)) {
+    return { screen: "play", key: `${status.roomCode}:ready-countdown:${readyCountdownKey}` };
+  }
   const bothPlayersPresent = Boolean(status.players?.player1 && status.players?.player2);
   const viewerReady = Boolean(status.playerReady?.[status.viewerSeat]);
   const yourBid = status.phase === "bidding" && status.biddingStatus?.nextBidder === status.viewerSeat;
@@ -1064,6 +1094,10 @@ function updatePlayerChrome(status) {
 function renderCoinFlip(status) {
   if (!coinFlipPanel || !status?.roomCode || status.phase !== "bidding" || !status.coinFlipWinner) return;
   const key = `${status.roomCode}:${status.coinFlipWinner}:${status.dealer}:${status.firstPlayer}`;
+  if (readyCountdownCompletedKey !== key) {
+    hideCoinFlip();
+    return;
+  }
   if (key === lastCoinFlipKey) return;
   lastCoinFlipKey = key;
 
@@ -1087,6 +1121,49 @@ function hideCoinFlip() {
   if (coinFlipPanel) coinFlipPanel.hidden = true;
 }
 
+function coinFlipKeyForStatus(status) {
+  if (!status?.roomCode || status.phase !== "bidding" || !status.coinFlipWinner) return null;
+  return `${status.roomCode}:${status.coinFlipWinner}:${status.dealer}:${status.firstPlayer}`;
+}
+
+function isReadyCountdownActive(status) {
+  const key = coinFlipKeyForStatus(status);
+  return Boolean(key && readyCountdownKey === key && readyCountdownCompletedKey !== key);
+}
+
+function updateReadyCountdown(status) {
+  const key = coinFlipKeyForStatus(status);
+  if (!key) {
+    clearReadyCountdown();
+    return;
+  }
+  if (readyCountdownCompletedKey === key || readyCountdownKey === key) return;
+
+  clearReadyCountdown();
+  readyCountdownKey = key;
+  readyCountdownRemaining = 5;
+  renderPlayerGuide(status);
+  readyCountdownInterval = setInterval(() => {
+    readyCountdownRemaining = Math.max(0, readyCountdownRemaining - 1);
+    renderPlayerGuide(currentShellStatus());
+  }, 1000);
+  readyCountdownTimer = setTimeout(() => {
+    readyCountdownCompletedKey = key;
+    clearReadyCountdown({ keepCompleted: true });
+    renderStatus(currentShellStatus());
+  }, 5000);
+}
+
+function clearReadyCountdown({ keepCompleted = false } = {}) {
+  clearTimeout(readyCountdownTimer);
+  clearInterval(readyCountdownInterval);
+  readyCountdownTimer = null;
+  readyCountdownInterval = null;
+  readyCountdownKey = null;
+  readyCountdownRemaining = 0;
+  if (!keepCompleted) readyCountdownCompletedKey = null;
+}
+
 function seatName(seat) {
   if (seat === "player1") return "Player 1";
   if (seat === "player2") return "Player 2";
@@ -1101,11 +1178,12 @@ function updatePlayerActionVisibility(status) {
   const isWaiting = phase === "waiting";
   const isBidding = phase === "bidding";
   const isYourBid = isBidding && status?.biddingStatus?.nextBidder === status?.viewerSeat;
+  const countdownActive = isReadyCountdownActive(status);
   const isHandComplete = phase === "hand_complete";
   const isMatchComplete = phase === "match_complete";
   const hasRoom = Boolean(status?.roomCode);
 
-  setHidden(bidControls, !isYourBid);
+  setHidden(bidControls, !isYourBid || countdownActive);
   setHidden(globalRoomInviteBar, !hasRoom);
   if (globalRoomCodeOutput) globalRoomCodeOutput.textContent = status?.roomCode ?? "------";
   setHidden(globalInviteRoomButton, !isWaiting);
@@ -1440,12 +1518,12 @@ function renderVisualShellInto(status, targets, onPlayableCard) {
   targets.currentTrick.textContent = model.currentTrick;
   targets.lastTrick.textContent = model.lastTrick;
   targets.scoreSummary.replaceChildren(...model.scoreRows.map((row) => visualSummaryItem(
-    row.seat,
+    seatName(row.seat),
     `Score ${row.score}`,
     `Tricks ${row.tricks}`
   )));
   targets.bidBagSummary.replaceChildren(...model.bidBagRows.map((row) => visualSummaryItem(
-    row.seat,
+    seatName(row.seat),
     `Bid ${row.bid ?? "none"}`,
     `Bags ${row.bags} | Ready ${row.ready ? "yes" : "no"}`
   )));
@@ -1461,11 +1539,9 @@ function renderVisualShellInto(status, targets, onPlayableCard) {
 function renderTableLayout(status, onPlayableCard) {
   const model = buildVisualShellModel(status);
   tableOpponentAreaOutput.textContent = status
-    ? `Opponent: ${model.viewerSeat === "player1" ? "player2" : "player1"} | turn ${model.currentTurn}`
+    ? `Opponent: ${seatName(model.viewerSeat === "player1" ? "player2" : "player1")} | turn ${seatName(model.currentTurn)}`
     : "Opponent: waiting";
-  tableScoreAreaOutput.textContent = model.scoreRows.length
-    ? `${model.scoreRows.map((row) => `${row.seat} ${row.score}`).join(" | ")} | ${model.bidStatus} | ${model.playableStatus}`
-    : "Score/status: waiting";
+  tableScoreAreaOutput.textContent = status ? "Scoreboard is on Play." : "Scoreboard: waiting";
   tableCenterTrickAreaOutput.textContent = `Current trick: ${model.currentTrick}`;
   tableLastTrickAreaOutput.textContent = `Last trick: ${model.lastTrick}`;
   const handLabel = document.createElement("p");

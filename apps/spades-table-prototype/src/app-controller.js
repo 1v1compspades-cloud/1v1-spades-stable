@@ -70,13 +70,15 @@ export function createSpadesAppController({
   function joinLocalRoom({
     roomCode,
     displayName = "Player 2",
-    seatToken
+    seatToken,
+    spectator = false
   } = {}) {
     const currentRoom = repository.require(roomCode);
     const result = joinRoom(currentRoom, {
       seatToken,
       playerId: currentPlayerId(),
-      displayName
+      displayName,
+      spectator
     });
     repository.save(result.room);
 

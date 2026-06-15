@@ -1623,6 +1623,7 @@ body.tester-mode[data-active-screen="lobby"] button {
 
 body.tester-mode[data-active-screen="lobby"] #create-room,
 body.tester-mode[data-active-screen="lobby"] #join-room,
+body.tester-mode[data-active-screen="lobby"] #spectate-room,
 body.tester-mode[data-active-screen="lobby"] #join-quick-match {
   color: #140d03;
   background: linear-gradient(180deg, #fff0a8, #e3a51e 74%, #b9780c);
@@ -1644,8 +1645,12 @@ body.tester-mode[data-active-screen="lobby"] #join-room {
   order: 6;
 }
 
-body.tester-mode[data-active-screen="lobby"] #restore-room {
+body.tester-mode[data-active-screen="lobby"] #spectate-room {
   order: 7;
+}
+
+body.tester-mode[data-active-screen="lobby"] #restore-room {
+  order: 8;
 }
 
 body.tester-mode[data-active-screen="lobby"] #room-code-share-status,
@@ -2444,6 +2449,7 @@ body.tester-mode[data-active-screen="lobby"] .controls {
 
 body.tester-mode[data-active-screen="lobby"] #create-room,
 body.tester-mode[data-active-screen="lobby"] #join-quick-match,
+body.tester-mode[data-active-screen="lobby"] #spectate-room,
 body.tester-mode[data-active-screen="lobby"] #join-room {
   position: relative;
   min-height: 86px;
@@ -2464,6 +2470,7 @@ body.tester-mode[data-active-screen="lobby"] #join-room {
 
 body.tester-mode[data-active-screen="lobby"] #create-room::before,
 body.tester-mode[data-active-screen="lobby"] #join-quick-match::before,
+body.tester-mode[data-active-screen="lobby"] #spectate-room::before,
 body.tester-mode[data-active-screen="lobby"] #join-room::before {
   display: block;
   margin-top: 6px;
@@ -2485,8 +2492,13 @@ body.tester-mode[data-active-screen="lobby"] #join-room::before {
   content: "Enter a room code to join a game";
 }
 
+body.tester-mode[data-active-screen="lobby"] #spectate-room::before {
+  content: "Enter a room code to watch without playing";
+}
+
 body.tester-mode[data-active-screen="lobby"] #create-room::after,
 body.tester-mode[data-active-screen="lobby"] #join-quick-match::after,
+body.tester-mode[data-active-screen="lobby"] #spectate-room::after,
 body.tester-mode[data-active-screen="lobby"] #join-room::after {
   position: absolute;
   top: 50%;
@@ -2517,6 +2529,11 @@ body.tester-mode[data-active-screen="lobby"] #join-room::after {
   content: "\2192";
 }
 
+body.tester-mode[data-active-screen="lobby"] #spectate-room::after {
+  content: "\25CE";
+  color: var(--layout1-muted);
+}
+
 body.tester-mode[data-active-screen="lobby"] #create-room {
   order: 1;
 }
@@ -2535,6 +2552,16 @@ body.tester-mode[data-active-screen="lobby"] label:has(#join-code) {
 
 body.tester-mode[data-active-screen="lobby"] #join-room {
   order: 4;
+}
+
+body.tester-mode[data-active-screen="lobby"] #spectate-room {
+  order: 5;
+}
+
+body.tester-mode[data-active-screen="table"] #visual-score-summary,
+body.tester-mode[data-active-screen="table"] #visual-bid-bag-summary,
+body.tester-mode[data-active-screen="table"] .score-area {
+  display: none !important;
 }
 
 body.tester-mode[data-active-screen="lobby"] input {

@@ -110,7 +110,8 @@ export function createSpadesServerBoundary({
     const result = joinRoom(room, {
       seatToken: identity.seatToken,
       playerId: identity.playerId,
-      displayName: request.displayName
+      displayName: request.displayName,
+      spectator: request.spectator === true
     });
     repository.save(result.room);
 

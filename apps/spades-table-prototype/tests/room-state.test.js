@@ -50,6 +50,20 @@ test("joins player2, restores already-seated viewers, and assigns spectators whe
   assert.equal(spectator.seat, "spectator");
 });
 
+test("can explicitly watch as spectator while player2 seat is open", () => {
+  const room = createRoom({ seatToken: PLAYER1_TOKEN, playerId: "device-1" });
+  const spectator = joinRoom(room, {
+    seatToken: PLAYER2_TOKEN,
+    playerId: "device-2",
+    displayName: "South",
+    spectator: true
+  });
+
+  assert.equal(spectator.seat, "spectator");
+  assert.equal(spectator.seatToken, null);
+  assert.equal(spectator.room.players.player2, null);
+});
+
 test("blocks seat stealing when a token and player id belong to different seats", () => {
   let room = createRoom({ seatToken: PLAYER1_TOKEN, playerId: "device-1" });
   room = joinRoom(room, {

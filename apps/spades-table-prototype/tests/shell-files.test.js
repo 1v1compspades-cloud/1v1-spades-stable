@@ -62,6 +62,7 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /value="real-server"/);
   assert.match(html, /id="join-code"/);
   assert.match(html, /id="join-room"/);
+  assert.match(html, /id="spectate-room"/);
   assert.match(html, /id="restore-room"/);
   assert.match(html, /id="reconnect-live-sync"/);
   assert.match(html, /id="copy-room-code"/);

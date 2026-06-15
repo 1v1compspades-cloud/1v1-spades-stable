@@ -169,6 +169,7 @@ export function createSpadesLiveSyncClient({
       matchSettings: options.matchSettings,
       coinFlipWinner: options.coinFlipWinner,
       deck: options.deck,
+      spectator: options.spectator === true,
       bid: options.bid,
       cardId: options.cardId,
       actionId: options.actionId,
@@ -195,6 +196,7 @@ export function createSpadesLiveSyncClient({
       activeRoomCode = response.session.roomCode;
       socket.reconnect(activeSession);
     } else if (response.view?.roomCode) {
+      if (response.view.viewerSeat === "spectator") activeSession = null;
       activeRoomCode = response.view.roomCode;
     }
 

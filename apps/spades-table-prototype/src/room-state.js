@@ -60,8 +60,17 @@ export function createRoom({
 export function joinRoom(room, {
   seatToken,
   playerId,
-  displayName = "Player 2"
+  displayName = "Player 2",
+  spectator = false
 } = {}) {
+  if (spectator) {
+    return {
+      room,
+      seat: "spectator",
+      seatToken: null,
+      alreadySeated: false
+    };
+  }
   return roomLifecycle.joinRoomShell(room, { seatToken, playerId, displayName });
 }
 
