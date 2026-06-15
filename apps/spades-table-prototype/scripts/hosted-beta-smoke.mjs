@@ -7,6 +7,7 @@ import {
 } from "../src/hosted-beta-smoke.js";
 
 const config = validateSmokeConfig(resolveSmokeConfig());
+const clients = [];
 
 try {
   console.log(`Smoke target API: ${config.baseUrl}`);
@@ -24,6 +25,8 @@ try {
         playerId,
         seatToken
       });
+      clients.push(client);
+      return client;
     }
   });
 
@@ -34,6 +37,11 @@ try {
   console.error("Spades hosted beta smoke test failed");
   console.error(error?.message ?? error);
   process.exitCode = 1;
+} finally {
+  for (const client of clients) {
+    client.disconnect();
+  }
+  process.exit(process.exitCode ?? 0);
 }
 
 function resolveSmokeConfig() {

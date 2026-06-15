@@ -1827,3 +1827,85 @@ body.tester-mode[data-active-screen="lobby"][data-has-room="true"] .global-room-
   font-size: 19px;
   font-weight: 950;
 }
+
+
+/* Emergency phone lobby order and safe-area pass */
+body.tester-mode .bug-report-fab {
+  top: calc(max(8px, env(safe-area-inset-top)) + 6px);
+  right: max(10px, env(safe-area-inset-right));
+  bottom: auto;
+  z-index: 42;
+  min-height: 28px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.92;
+}
+
+body.tester-mode[data-active-screen="lobby"] .home-panel,
+body.tester-mode[data-active-screen="table"] .status-panel,
+body.tester-mode[data-active-screen="play"] .status-panel {
+  padding-bottom: calc(156px + env(safe-area-inset-bottom));
+}
+
+body.tester-mode[data-active-screen="lobby"] .controls {
+  gap: 12px;
+  padding-bottom: 22px;
+}
+
+body.tester-mode[data-active-screen="lobby"] .connection-help-panel,
+body.tester-mode[data-active-screen="lobby"] label:has(#display-name),
+body.tester-mode[data-active-screen="lobby"] #room-code-share-status,
+body.tester-mode[data-active-screen="lobby"] #quick-match-status,
+body.tester-mode[data-active-screen="lobby"] #restore-room {
+  display: none !important;
+}
+
+body.tester-mode[data-active-screen="lobby"] #join-quick-match {
+  order: 1;
+}
+
+body.tester-mode[data-active-screen="lobby"] #create-room {
+  order: 2;
+}
+
+body.tester-mode[data-active-screen="lobby"] label:has(#join-code) {
+  order: 3;
+}
+
+body.tester-mode[data-active-screen="lobby"] #join-room {
+  order: 4;
+}
+
+body.tester-mode[data-active-screen="lobby"] #copy-invite-link,
+body.tester-mode[data-active-screen="lobby"] #copy-room-code,
+body.tester-mode[data-active-screen="lobby"] #leave-quick-match,
+body.tester-mode[data-active-screen="lobby"] #clear-room {
+  order: 8;
+}
+
+body.tester-mode[data-active-screen="lobby"][data-find-match="waiting"] #quick-match-status {
+  display: block !important;
+  order: 2;
+}
+
+body.tester-mode[data-active-screen="lobby"][data-find-match="waiting"] #leave-quick-match {
+  display: block !important;
+  order: 3;
+}
+
+body.tester-mode[data-active-screen="lobby"] #join-quick-match,
+body.tester-mode[data-active-screen="lobby"] #create-room,
+body.tester-mode[data-active-screen="lobby"] #join-room {
+  min-height: 62px;
+}
+
+body.tester-mode[data-active-screen="lobby"] .player-screen-tabs,
+body.tester-mode .player-screen-tabs {
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 2px);
+}
+
+body.tester-mode[data-active-screen="lobby"][data-has-room="true"] .player-guide {
+  margin-bottom: 10px;
+}

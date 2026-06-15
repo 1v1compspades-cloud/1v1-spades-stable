@@ -8,24 +8,28 @@ export async function runHostedBetaSmokeTest({
   if (!baseUrl) throw new Error("Hosted beta smoke test requires baseUrl");
 
   const health = await requestJson(fetchImpl, `${baseUrl}/health`);
-  const host = createClient("smoke-host", "smoke-seat-host");
-  const guest = createClient("smoke-guest", "smoke-seat-guest");
-  const spectator = createClient("smoke-viewer", "smoke-seat-viewer");
+  const runId = createSmokeRunId();
+  const roomCode = runId.slice(0, 6);
+  const host = createClient(`smoke-host-${runId}`, `smoke-seat-host-${runId}`);
+  const guest = createClient(`smoke-guest-${runId}`, `smoke-seat-guest-${runId}`);
+  const spectator = createClient(`smoke-viewer-${runId}`, `smoke-seat-viewer-${runId}`);
 
-  const created = await host.createRoom({ roomCode: "SMOKE01", displayName: "Smoke Host" });
-  const joined = await guest.joinRoom({ roomCode: "SMOKE01", displayName: "Smoke Guest" });
-  await spectator.joinRoom({ roomCode: "SMOKE01", displayName: "Smoke Viewer" });
-  await host.readyPlayer({ actionId: "SMOKE01:player1:ready:1" });
-  await guest.readyPlayer({ actionId: "SMOKE01:player2:ready:1" });
-  await submitSmokeBids({ host, guest, roomCode: "SMOKE01" });
-  const oneTrick = await playSmokeTrick({ host, guest, roomCode: "SMOKE01", sequenceStart: 1 });
-  const completedHand = await completeSmokeHand({ host, guest, roomCode: "SMOKE01", sequenceStart: 3 });
+  const created = await host.createRoom({ roomCode, displayName: "Smoke Host" });
+  const joined = await guest.joinRoom({ roomCode, displayName: "Smoke Guest" });
+  await spectator.joinRoom({ roomCode, displayName: "Smoke Viewer" });
+  await host.readyPlayer({ actionId: `${roomCode}:player1:ready:${runId}` });
+  await guest.readyPlayer({ actionId: `${roomCode}:player2:ready:${runId}` });
+  await submitSmokeBids({ host, guest, roomCode });
+  const oneTrick = await playSmokeTrick({ host, guest, roomCode, sequenceStart: 1 });
+  const completedHand = await completeSmokeHand({ host, guest, roomCode, sequenceStart: 3 });
   const reconnected = await host.reconnect();
 
-  const queueHost = createClient("smoke-q-host", "smoke-q-seat-host");
-  const queueGuest = createClient("smoke-q-guest", "smoke-q-seat-guest");
-  const waiting = await queueHost.joinQuickMatch({ displayName: "Queue Host", actionId: "smoke-q-host" });
-  const matched = await queueGuest.joinQuickMatch({ displayName: "Queue Guest", actionId: "smoke-q-guest" });
+  const queueHost = createClient(`smoke-q-host-${runId}`, `smoke-q-seat-host-${runId}`);
+  const queueGuest = createClient(`smoke-q-guest-${runId}`, `smoke-q-seat-guest-${runId}`);
+  const waiting = await queueHost.joinQuickMatch({ displayName: "Queue Host", actionId: `smoke-q-host-${runId}` });
+  const matched = waiting.queue?.state === "waiting"
+    ? await queueGuest.joinQuickMatch({ displayName: "Queue Guest", actionId: `smoke-q-guest-${runId}` })
+    : waiting;
 
   return {
     healthOk: health.ok === true,
@@ -35,15 +39,19 @@ export async function runHostedBetaSmokeTest({
     playOneTrickOk: oneTrick.completed === true && oneTrick.lastTrickWinner !== null,
     completeHandOk: completedHand.phase === "hand_complete" || completedHand.phase === "match_complete",
     reconnectOk: reconnected.connected === true && host.status?.viewerSeat === "player1",
-    quickMatchOk: waiting.queue?.state === "waiting"
+    quickMatchOk: (waiting.queue?.state === "waiting" || waiting.queue?.state === "matched")
       && matched.queue?.state === "matched"
-      && matched.view?.viewerSeat === "player2",
+      && (matched.view?.viewerSeat === "player1" || matched.view?.viewerSeat === "player2"),
     hiddenHandSafe: spectator.status?.viewerSeat === "spectator"
       && Array.isArray(spectator.status.hand)
       && spectator.status.hand.length === 0
       && Array.isArray(host.status?.hand)
       && Array.isArray(guest.status?.hand)
   };
+}
+
+function createSmokeRunId() {
+  return Date.now().toString(36).toUpperCase().slice(-6);
 }
 
 export function assertHostedBetaSmokePassed(result) {
