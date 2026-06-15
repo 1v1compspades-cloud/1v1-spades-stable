@@ -2192,3 +2192,343 @@ body.tester-mode #global-back-lobby {
     font-size: 15px;
   }
 }
+
+
+/* Layout 1 experiment: modern dark player shell */
+:root {
+  --layout1-bg: #050807;
+  --layout1-panel: rgba(13, 18, 16, 0.94);
+  --layout1-card: rgba(18, 24, 21, 0.9);
+  --layout1-line: rgba(255, 255, 255, 0.13);
+  --layout1-green: #24c06f;
+  --layout1-green-dark: #0f7f48;
+  --layout1-gold: #f1c65a;
+  --layout1-copy: #f8fbf7;
+  --layout1-muted: rgba(248, 251, 247, 0.68);
+  --layout1-script: "Snell Roundhand", "Apple Chancery", "Bradley Hand", "Segoe Script", cursive;
+}
+
+body.tester-mode {
+  color: var(--layout1-copy);
+  background:
+    radial-gradient(circle at 50% -12%, rgba(36, 192, 111, 0.14), transparent 22rem),
+    radial-gradient(circle at 20% 12%, rgba(241, 198, 90, 0.08), transparent 18rem),
+    linear-gradient(180deg, #08100e, var(--layout1-bg) 58%, #030504);
+}
+
+body.tester-mode .app-shell {
+  width: min(100%, 430px);
+  padding: max(10px, env(safe-area-inset-top)) 14px 0;
+}
+
+body.tester-mode .player-app-chrome {
+  min-height: 66px;
+  padding: 10px 0 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+body.tester-mode .player-app-chrome .eyebrow,
+body.tester-mode .guide-kicker,
+body.tester-mode .global-room-label,
+body.tester-mode .room-invite-copy .eyebrow {
+  color: var(--layout1-gold);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+body.tester-mode .player-app-chrome h1,
+body.tester-mode .player-guide h2,
+body.tester-mode #coin-flip-title {
+  color: var(--layout1-copy);
+  font-family: var(--layout1-script);
+  font-weight: 700;
+  text-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+}
+
+body.tester-mode .player-app-chrome h1 {
+  font-size: 30px;
+  line-height: 0.95;
+}
+
+body.tester-mode .suit-strip {
+  gap: 15px;
+  margin-top: 12px;
+  font-size: 25px;
+}
+
+body.tester-mode .player-screen-status {
+  max-width: 128px;
+  border-color: var(--layout1-line);
+  color: var(--layout1-copy);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+body.tester-mode .bug-report-fab {
+  min-height: 34px;
+  padding: 0 11px;
+  border-color: var(--layout1-line);
+  color: var(--layout1-copy);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+body.tester-mode .player-guide {
+  min-height: 132px;
+  align-content: center;
+  margin-bottom: 12px;
+  padding: 20px 18px;
+  border: 1px solid rgba(36, 192, 111, 0.54);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 92% 18%, rgba(36, 192, 111, 0.34), transparent 7rem),
+    linear-gradient(145deg, rgba(9, 68, 45, 0.88), rgba(8, 18, 15, 0.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 20px 50px -34px rgba(36, 192, 111, 0.92);
+}
+
+body.tester-mode .player-guide h2 {
+  font-size: 28px;
+}
+
+body.tester-mode .player-guide p:last-child {
+  max-width: 18rem;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 15px;
+  font-weight: 750;
+}
+
+body.tester-mode[data-active-screen="lobby"] .controls {
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.tester-mode[data-active-screen="lobby"] #create-room,
+body.tester-mode[data-active-screen="lobby"] #join-quick-match,
+body.tester-mode[data-active-screen="lobby"] #join-room {
+  position: relative;
+  min-height: 86px;
+  padding: 16px 74px 16px 18px;
+  border: 1px solid var(--layout1-line);
+  border-radius: 14px;
+  color: var(--layout1-copy);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02)),
+    var(--layout1-card);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 18px 42px -34px rgba(0, 0, 0, 0.9);
+  font-size: 18px;
+  font-weight: 850;
+  text-align: left;
+}
+
+body.tester-mode[data-active-screen="lobby"] #create-room::before,
+body.tester-mode[data-active-screen="lobby"] #join-quick-match::before,
+body.tester-mode[data-active-screen="lobby"] #join-room::before {
+  display: block;
+  margin-top: 6px;
+  color: var(--layout1-muted);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+body.tester-mode[data-active-screen="lobby"] #create-room::before {
+  content: "Create a room and invite your opponent";
+}
+
+body.tester-mode[data-active-screen="lobby"] #join-quick-match::before {
+  content: "We will match you with a player";
+}
+
+body.tester-mode[data-active-screen="lobby"] #join-room::before {
+  content: "Enter a room code to join a game";
+}
+
+body.tester-mode[data-active-screen="lobby"] #create-room::after,
+body.tester-mode[data-active-screen="lobby"] #join-quick-match::after,
+body.tester-mode[data-active-screen="lobby"] #join-room::after {
+  position: absolute;
+  top: 50%;
+  right: 18px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(36, 192, 111, 0.13);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: var(--layout1-green);
+  font-size: 26px;
+  transform: translateY(-50%);
+}
+
+body.tester-mode[data-active-screen="lobby"] #create-room::after {
+  content: "+";
+}
+
+body.tester-mode[data-active-screen="lobby"] #join-quick-match::after {
+  content: "\2315";
+  color: var(--layout1-gold);
+}
+
+body.tester-mode[data-active-screen="lobby"] #join-room::after {
+  content: "\2192";
+}
+
+body.tester-mode[data-active-screen="lobby"] #create-room {
+  order: 1;
+}
+
+body.tester-mode[data-active-screen="lobby"] #join-quick-match {
+  order: 2;
+}
+
+body.tester-mode[data-active-screen="lobby"] label:has(#join-code) {
+  order: 3;
+  padding: 12px 14px;
+  border: 1px solid var(--layout1-line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+body.tester-mode[data-active-screen="lobby"] #join-room {
+  order: 4;
+}
+
+body.tester-mode[data-active-screen="lobby"] input {
+  min-height: 52px;
+  border-color: rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  color: var(--layout1-copy);
+  background: rgba(0, 0, 0, 0.32);
+  font-size: 18px;
+}
+
+body.tester-mode[data-active-screen="table"] .room-invite-panel,
+body.tester-mode[data-active-screen="lobby"][data-has-room="true"] .global-room-invite-bar,
+body.tester-mode .table-layout-shell,
+body.tester-mode .visual-shell {
+  border-color: var(--layout1-line);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015)),
+    var(--layout1-panel);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 20px 52px -40px rgba(0, 0, 0, 0.95);
+}
+
+body.tester-mode .primary-invite-button,
+body.tester-mode[data-active-screen="lobby"][data-has-room="true"] .global-room-actions .primary-invite-button,
+body.tester-mode[data-active-screen="table"] .room-invite-actions .primary-invite-button,
+body.tester-mode #ready-player,
+body.tester-mode #submit-bid,
+body.tester-mode #submit-play-card {
+  color: #f9fffb;
+  border-color: rgba(75, 235, 143, 0.46);
+  background: linear-gradient(180deg, var(--layout1-green), var(--layout1-green-dark));
+}
+
+body.tester-mode .player-screen-tabs {
+  max-width: 402px;
+  padding: 7px;
+  border-color: var(--layout1-line);
+  border-radius: 18px;
+  background: rgba(5, 8, 7, 0.92);
+}
+
+body.tester-mode .screen-tab-button {
+  min-height: 48px;
+  border-radius: 14px;
+  color: var(--layout1-muted);
+}
+
+body.tester-mode .screen-tab-button.active {
+  color: #08100c;
+  background: var(--layout1-green);
+}
+
+body.tester-mode[data-active-screen="play"] #visual-hand,
+body.tester-mode[data-active-screen="play"] .card-button-grid,
+body.tester-mode .table-hand-grid {
+  position: relative;
+  margin-inline: -4px;
+  padding: 10px 6px 15px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 18px;
+  background:
+    linear-gradient(90deg, rgba(36, 192, 111, 0.09), transparent 16%, transparent 84%, rgba(36, 192, 111, 0.09)),
+    rgba(255, 255, 255, 0.035);
+  scrollbar-width: thin;
+  scrollbar-color: var(--layout1-green) rgba(255, 255, 255, 0.08);
+  mask-image: linear-gradient(90deg, transparent 0, black 18px, black calc(100% - 18px), transparent 100%);
+}
+
+body.tester-mode[data-active-screen="play"] #visual-hand::-webkit-scrollbar,
+body.tester-mode[data-active-screen="play"] .card-button-grid::-webkit-scrollbar,
+body.tester-mode .table-hand-grid::-webkit-scrollbar {
+  height: 7px;
+}
+
+body.tester-mode[data-active-screen="play"] #visual-hand::-webkit-scrollbar-track,
+body.tester-mode[data-active-screen="play"] .card-button-grid::-webkit-scrollbar-track,
+body.tester-mode .table-hand-grid::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+body.tester-mode[data-active-screen="play"] #visual-hand::-webkit-scrollbar-thumb,
+body.tester-mode[data-active-screen="play"] .card-button-grid::-webkit-scrollbar-thumb,
+body.tester-mode .table-hand-grid::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--layout1-green);
+}
+
+body.tester-mode[data-active-screen="play"] .card-button,
+body.tester-mode .table-hand-grid .card-button {
+  flex-basis: 82px;
+  min-height: 118px;
+  border-radius: 14px;
+}
+
+body.tester-mode[data-active-screen="play"] .card-button.playable,
+body.tester-mode .table-hand-grid .card-button.playable {
+  border-color: rgba(75, 235, 143, 0.82);
+  box-shadow:
+    0 0 0 2px rgba(36, 192, 111, 0.28),
+    0 18px 34px -22px rgba(36, 192, 111, 0.82),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+@media (max-width: 430px) {
+  body.tester-mode .app-shell {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  body.tester-mode .player-app-chrome h1 {
+    font-size: 28px;
+  }
+
+  body.tester-mode .player-guide h2 {
+    font-size: 26px;
+  }
+
+  body.tester-mode[data-active-screen="lobby"] #create-room,
+  body.tester-mode[data-active-screen="lobby"] #join-quick-match,
+  body.tester-mode[data-active-screen="lobby"] #join-room {
+    min-height: 82px;
+    font-size: 17px;
+  }
+
+  body.tester-mode[data-active-screen="play"] .card-button,
+  body.tester-mode .table-hand-grid .card-button {
+    flex-basis: 78px;
+    min-height: 114px;
+  }
+}
