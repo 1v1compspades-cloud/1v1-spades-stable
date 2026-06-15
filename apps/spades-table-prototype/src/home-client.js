@@ -260,7 +260,7 @@ copyRoomCodeButton?.addEventListener("click", () => {
 document.querySelector("#jump-to-bug-report").addEventListener("click", () => {
   document.body.dataset.reportOpen = "true";
   if (testerMode) {
-    setActivePlayerScreen("play", { manual: true });
+    setActivePlayerScreen(currentShellStatus()?.roomCode ? "play" : "lobby", { manual: true });
   }
   renderBetaFeedbackPanel(currentShellStatus());
   betaFeedbackPanel.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -517,7 +517,14 @@ transportModeSelect.addEventListener("change", () => {
 
 for (const tabButton of playerScreenTabs) {
   tabButton.addEventListener("click", () => {
-    setActivePlayerScreen(tabButton.dataset.screenTarget, { manual: true });
+    const targetScreen = tabButton.dataset.screenTarget;
+    const status = currentShellStatus();
+    if (targetScreen !== "lobby" && !status?.roomCode) {
+      playerChoseScreen = false;
+      setActivePlayerScreen("lobby", { status });
+      return;
+    }
+    setActivePlayerScreen(targetScreen, { manual: true, status });
   });
 }
 
@@ -967,8 +974,12 @@ function setRecommendedAction(selector) {
   }
 }
 
-function setActivePlayerScreen(screen, { manual = false } = {}) {
+function setActivePlayerScreen(screen, { manual = false, status = currentShellStatus() } = {}) {
   if (!["lobby", "table", "play"].includes(screen)) return;
+  if (screen !== "lobby" && !status?.roomCode) {
+    screen = "lobby";
+    manual = false;
+  }
   activePlayerScreen = screen;
   if (manual) {
     playerChoseScreen = true;
@@ -986,7 +997,7 @@ function updatePlayerScreenForStatus(status) {
   const guidance = guidedPlayerScreen(status);
   const preferredScreen = guidance.screen;
   if (!status || !playerChoseScreen || shouldAutoGuideScreen(guidance)) {
-    setActivePlayerScreen(preferredScreen);
+    setActivePlayerScreen(preferredScreen, { status });
     return;
   }
 }
@@ -1112,6 +1123,16 @@ function updatePlayerActionVisibility(status) {
   if (roomInviteCodeOutput) roomInviteCodeOutput.textContent = status?.roomCode ?? "------";
   setHidden(tableStartNextHandButton, !isHandComplete);
   setHidden(tableStartNewMatchButton, !(isHandComplete || isMatchComplete));
+  updatePlayerScreenTabAvailability(hasRoom);
+}
+
+function updatePlayerScreenTabAvailability(hasRoom) {
+  for (const tabButton of playerScreenTabs) {
+    const requiresRoom = tabButton.dataset.screenTarget !== "lobby";
+    const locked = requiresRoom && !hasRoom;
+    tabButton.disabled = locked;
+    tabButton.setAttribute("aria-disabled", locked ? "true" : "false");
+  }
 }
 
 function setHidden(element, hidden) {

@@ -1966,6 +1966,20 @@ body.tester-mode .player-screen-tabs {
   bottom: calc(max(12px, env(safe-area-inset-bottom)) + 2px);
 }
 
+body.tester-mode[data-has-room="false"] .player-screen-tabs {
+  grid-template-columns: 1fr;
+}
+
+body.tester-mode[data-has-room="false"] .screen-tab-button[data-screen-target="table"],
+body.tester-mode[data-has-room="false"] .screen-tab-button[data-screen-target="play"] {
+  display: none;
+}
+
+body.tester-mode .screen-tab-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 body.tester-mode[data-active-screen="lobby"][data-has-room="true"] .player-guide {
   margin-bottom: 10px;
 }
