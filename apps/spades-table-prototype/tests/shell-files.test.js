@@ -371,6 +371,9 @@ test("visual QA and table layout styling is present", () => {
   assert.match(css, /data-card-back="true"/);
   assert.match(css, /content:\s*"1v1"/);
   assert.match(css, /Mobile lobby room-card no-overlap pass/);
+  assert.match(css, /Extra diamond accents across every Spades screen/);
+  assert.match(css, /--lux-diamond-sparkle/);
+  assert.match(css, /--lux-gem-border/);
   assert.match(css, /body\.tester-mode\[data-active-screen="lobby"\] \.global-room-invite-bar/);
   assert.match(css, /flex-direction:\s*column !important/);
   assert.match(css, /body\.tester-mode\[data-active-screen="lobby"\]\[data-has-room="true"\] \.controls/);
