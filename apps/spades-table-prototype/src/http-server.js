@@ -1,6 +1,7 @@
 import express from "express";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createLocalAccountStatsStore } from "./local-account-stats.js";
 import { createQuickMatchQueue } from "./quick-match.js";
 import { createSpadesServerBoundary } from "./server-boundary.js";
 import { createSpadesPushNotifier } from "./push-notifications.js";
@@ -17,10 +18,16 @@ export function createSpadesHttpServer({
   quickMatchQueue = createQuickMatchQueue({ boundary }),
   onQueueResponse = null,
   config = null,
-  pushNotifier = createSpadesPushNotifier()
+  pushNotifier = createSpadesPushNotifier(),
+  accountStatsStore = createLocalAccountStatsStore({ storage: null, namespace: "spadesServer" })
 } = {}) {
   const app = express();
   app.use(express.json({ limit: "128kb" }));
+
+  const handleBoundaryResponse = (payload) => {
+    recordCompletedMatchPreview({ payload, boundary, accountStatsStore });
+    onBoundaryResponse?.(payload);
+  };
 
   app.get("/health", (request, response) => {
     const publicConfig = publicHealthConfig(config, request);
@@ -39,39 +46,58 @@ export function createSpadesHttpServer({
       ...request.body,
       deck: request.body?.deck ?? createShuffledDeck(),
       type: "createRoom"
-    }), onBoundaryResponse);
+    }), handleBoundaryResponse);
   });
 
   app.post("/api/rooms/:roomCode/join", (request, response) => {
-    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "joinRoom")), onBoundaryResponse);
+    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "joinRoom")), handleBoundaryResponse);
   });
 
   app.post("/api/rooms/:roomCode/ready", (request, response) => {
-    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "ready")), onBoundaryResponse);
+    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "ready")), handleBoundaryResponse);
   });
 
   app.post("/api/rooms/:roomCode/bid", (request, response) => {
-    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "bid")), onBoundaryResponse);
+    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "bid")), handleBoundaryResponse);
   });
 
   app.post("/api/rooms/:roomCode/play-card", (request, response) => {
-    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "playCard")), onBoundaryResponse);
+    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "playCard")), handleBoundaryResponse);
   });
 
   app.post("/api/rooms/:roomCode/leave", (request, response) => {
-    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "leaveRoom")), onBoundaryResponse);
+    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "leaveRoom")), handleBoundaryResponse);
   });
 
   app.post("/api/rooms/:roomCode/next-hand", (request, response) => {
-    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "nextHand")), onBoundaryResponse);
+    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "nextHand")), handleBoundaryResponse);
   });
 
   app.post("/api/rooms/:roomCode/new-match", (request, response) => {
-    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "newMatch")), onBoundaryResponse);
+    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "newMatch")), handleBoundaryResponse);
   });
 
   app.post("/api/rooms/:roomCode/rematch", (request, response) => {
-    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "rematch")), onBoundaryResponse);
+    sendBoundaryResponse(response, boundary.handle(roomRequest(request, "rematch")), handleBoundaryResponse);
+  });
+
+  app.get("/api/accounts/:playerId/stats", (request, response) => {
+    response.json({
+      ok: true,
+      playerId: String(request.params.playerId ?? ""),
+      stats: accountStatsStore.getPlayerStats(request.params.playerId),
+      freePlayOnly: true
+    });
+  });
+
+  app.get("/api/leaderboards/local", (request, response) => {
+    const limit = normalizeLimit(request.query.limit);
+    response.json({
+      ok: true,
+      leaderboard: accountStatsStore.getLeaderboard({ limit }),
+      scope: "server-preview",
+      freePlayOnly: true
+    });
   });
 
   app.post("/api/push/register", (request, response) => {
@@ -124,8 +150,47 @@ export function createSpadesHttpServer({
     boundary,
     quickMatchQueue,
     pushNotifier,
+    accountStatsStore,
     repository: boundary.repository
   };
+}
+
+function recordCompletedMatchPreview({ payload, boundary, accountStatsStore }) {
+  if (!payload?.ok || payload.view?.phase !== "match_complete") return;
+  const room = boundary.repository.get(payload.view.roomCode);
+  if (!room?.players?.player1?.playerId || !room?.players?.player2?.playerId) return;
+
+  const summary = payload.view.handSummary;
+  accountStatsStore.recordMatch({
+    id: `${room.roomCode}-${room.handNumber}-${room.game.winner}-${room.updatedAt}`,
+    roomCode: room.roomCode,
+    timestamp: room.updatedAt,
+    winner: room.game.winner,
+    players: {
+      player1: publicPlayer(room.players.player1, "Player 1"),
+      player2: publicPlayer(room.players.player2, "Player 2")
+    },
+    finalScore: { ...room.game.score },
+    bids: { ...room.game.bids },
+    bags: { ...room.game.bags },
+    nilResults: {
+      player1: summary?.players?.player1?.nilResult ?? null,
+      player2: summary?.players?.player2?.nilResult ?? null
+    }
+  });
+}
+
+function publicPlayer(player, fallbackDisplayName) {
+  return {
+    playerId: player.playerId,
+    displayName: player.displayName ?? fallbackDisplayName
+  };
+}
+
+function normalizeLimit(value) {
+  const limit = Number.parseInt(String(value ?? "10"), 10);
+  if (!Number.isFinite(limit)) return 10;
+  return Math.max(1, Math.min(50, limit));
 }
 
 function publicHealthConfig(config, request) {

@@ -258,8 +258,47 @@ test("HTTP Quick Match pairs players and handles duplicate and leave queue", asy
   }
 });
 
+test("HTTP account and leaderboard preview endpoints record completed free-play matches once", async () => {
+  const fixture = await startHttpFixture();
+
+  try {
+    await playingRoom(fixture, "HTTP06", {
+      deck: player1WinsEveryTrickDeck(),
+      matchSettings: { targetScore: 40 }
+    });
+    const finalAction = await completeHandThroughHttp(fixture, "HTTP06");
+    assert.equal(fixture.repository.get("HTTP06").phase, "match_complete");
+
+    const hostStats = await fixture.get("/api/accounts/host/stats");
+    const guestStats = await fixture.get("/api/accounts/guest/stats");
+    const leaderboard = await fixture.get("/api/leaderboards/local?limit=5");
+
+    assert.equal(hostStats.ok, true);
+    assert.equal(hostStats.freePlayOnly, true);
+    assert.equal(hostStats.stats.playerId, "host");
+    assert.equal(hostStats.stats.gamesPlayed, 1);
+    assert.equal(hostStats.stats.wins, 1);
+    assert.equal(guestStats.stats.losses, 1);
+    assert.equal(leaderboard.ok, true);
+    assert.equal(leaderboard.scope, "server-preview");
+    assert.deepEqual(leaderboard.leaderboard.map((row) => row.playerId), ["host", "guest"]);
+    assertNoPrivateStatsLeak(hostStats);
+    assertNoPrivateStatsLeak(leaderboard);
+
+    await fixture.post("/api/rooms/HTTP06/play-card", {
+      identity: identityForSeat(finalAction.seat),
+      cardId: finalAction.cardId,
+      actionId: finalAction.actionId
+    });
+    const afterDuplicate = await fixture.get("/api/accounts/host/stats");
+    assert.equal(afterDuplicate.stats.gamesPlayed, 1);
+  } finally {
+    await fixture.close();
+  }
+});
+
 async function startHttpFixture() {
-  const { app, repository } = createSpadesHttpServer();
+  const { app, repository, accountStatsStore } = createSpadesHttpServer();
   const server = await new Promise((resolve) => {
     const listening = app.listen(0, "127.0.0.1", () => resolve(listening));
   });
@@ -267,6 +306,7 @@ async function startHttpFixture() {
 
   return {
     repository,
+    accountStatsStore,
     get(path, options) {
       return requestJson(`${baseUrl}${path}`, undefined, options);
     },
@@ -339,16 +379,20 @@ async function playingRoom(fixture, roomCode, options = {}) {
 
 async function completeHandThroughHttp(fixture, roomCode) {
   let sequence = 1;
+  let lastAction = null;
   while (fixture.repository.get(roomCode).phase === "playing") {
     const seat = fixture.repository.get(roomCode).currentTurn;
     const cardId = sanitizedView(fixture, roomCode, seat).playableCardStatus.cardIds[0];
+    const actionId = `${roomCode}:${seat}:playCard:${sequence}`;
     await fixture.post(`/api/rooms/${roomCode}/play-card`, {
       identity: identityForSeat(seat),
       cardId,
-      actionId: `${roomCode}:${seat}:playCard:${sequence}`
+      actionId
     });
+    lastAction = { seat, cardId, actionId };
     sequence += 1;
   }
+  return lastAction;
 }
 
 function sanitizedView(fixture, roomCode, seat) {
@@ -381,6 +425,11 @@ function assertNoOpponentLeak(view) {
   const opponent = view.viewerSeat === "player1" ? "player2" : "player1";
   assert.equal(view.hand.length, viewerCount);
   assert.notEqual(view.hiddenHandCounts[opponent], undefined);
+}
+
+function assertNoPrivateStatsLeak(payload) {
+  const serialized = JSON.stringify(payload);
+  assert.doesNotMatch(serialized, /seat-host|seat-guest|seatToken|hand|cardIds|currentTrick/);
 }
 
 function player1WinsEveryTrickDeck() {
