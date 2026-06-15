@@ -10,12 +10,14 @@ export function createSpadesHostedServer({
 } = {}) {
   const config = resolveServerEnvConfig(env);
   let websocketServer = null;
-  const { app, boundary, repository } = createSpadesHttpServer({
+  const { app, boundary, repository, pushNotifier } = createSpadesHttpServer({
     config,
     onBoundaryResponse: (payload) => {
       const roomCode = payload.view?.roomCode ?? payload.spectatorView?.roomCode;
       if (roomCode) {
         websocketServer?.broadcastRoom(roomCode, safeBroadcastMeta(payload, "http"));
+        const room = repository.get(roomCode);
+        pushNotifier.notifyForBoundaryResponse({ payload, room, source: "http" });
       }
     },
     onQueueResponse: (payload) => {
@@ -23,11 +25,13 @@ export function createSpadesHostedServer({
       const roomCode = payload.match?.roomCode;
       if (roomCode) {
         websocketServer?.broadcastRoom(roomCode, safeBroadcastMeta(payload, "quick-match"));
+        const room = repository.get(roomCode);
+        pushNotifier.notifyForBoundaryResponse({ payload: { ...payload, type: "joinRoom" }, room, source: "quick-match" });
       }
     }
   });
   const httpServer = createServer(app);
-  websocketServer = attachSpadesWebSocketServer({ httpServer, boundary });
+  websocketServer = attachSpadesWebSocketServer({ httpServer, boundary, pushNotifier });
 
   function start() {
     return new Promise((resolve, reject) => {

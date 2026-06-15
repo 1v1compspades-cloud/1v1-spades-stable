@@ -8,7 +8,8 @@ const CLOSED_SOCKET = 3;
 export function attachSpadesWebSocketServer({
   httpServer,
   boundary,
-  path = "/ws"
+  path = "/ws",
+  pushNotifier = null
 } = {}) {
   if (!httpServer) {
     throw new Error("HTTP server is required for Spades WebSocket support");
@@ -118,6 +119,8 @@ export function attachSpadesWebSocketServer({
           actionId: response.actionId,
           duplicate: response.duplicate
         });
+        const room = boundary.repository.get(roomCode);
+        pushNotifier?.notifyForBoundaryResponse?.({ payload: response, room, source: "websocket" });
       }
       return;
     }

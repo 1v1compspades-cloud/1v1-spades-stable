@@ -152,6 +152,8 @@ let playerChoseScreen = false;
 let lastNotificationStatusKey = "";
 let lastNotificationAt = 0;
 let titleFlashTimer = null;
+let expoPushToken = String(globalThis.__SPADES_EXPO_PUSH_TOKEN ?? "").trim();
+let lastRegisteredPushKey = "";
 const baseDocumentTitle = document.title || "1v1 Spades";
 const actionLog = createLocalActionLog();
 const accountStats = createLocalAccountStatsStore();
@@ -510,6 +512,11 @@ document.addEventListener("visibilitychange", () => {
   if (!document.hidden) clearGameAttentionSignal();
 });
 
+globalThis.addEventListener?.("spades:expo-push-token", (event) => {
+  expoPushToken = String(event?.detail?.token ?? "").trim();
+  registerExpoPushToken(currentShellStatus());
+});
+
 renderInitialStatus();
 
 function readLaunchParams() {
@@ -758,6 +765,7 @@ function renderQuickMatchStatus() {
 }
 
 function renderStatus(status) {
+  registerExpoPushToken(status);
   maybeNotifyGameAttention(status);
   updatePlayerScreenForStatus(status);
   updatePlayerActionVisibility(status);
@@ -863,6 +871,26 @@ function setHidden(element, hidden) {
   if (!element) return;
   element.hidden = hidden;
 }
+function registerExpoPushToken(status) {
+  if (!expoPushToken || !status?.roomCode || !["player1", "player2"].includes(status.viewerSeat)) return;
+  const key = [localIdentity.playerId, expoPushToken, status.roomCode, status.viewerSeat].join(":");
+  if (key === lastRegisteredPushKey) return;
+  lastRegisteredPushKey = key;
+  fetch("/api/push/register", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      playerId: localIdentity.playerId,
+      token: expoPushToken,
+      displayName: localIdentity.displayName,
+      roomCode: status.roomCode,
+      seat: status.viewerSeat
+    })
+  }).catch(() => {
+    lastRegisteredPushKey = "";
+  });
+}
+
 function isPageAway() {
   return document.hidden || document.visibilityState === "hidden";
 }

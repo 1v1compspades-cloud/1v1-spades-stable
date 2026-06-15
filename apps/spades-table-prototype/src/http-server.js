@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createQuickMatchQueue } from "./quick-match.js";
 import { createSpadesServerBoundary } from "./server-boundary.js";
+import { createSpadesPushNotifier } from "./push-notifications.js";
 
 const sourceDir = dirname(fileURLToPath(import.meta.url));
 const appDir = resolve(sourceDir, "..");
@@ -14,7 +15,8 @@ export function createSpadesHttpServer({
   onBoundaryResponse = null,
   quickMatchQueue = createQuickMatchQueue({ boundary }),
   onQueueResponse = null,
-  config = null
+  config = null,
+  pushNotifier = createSpadesPushNotifier()
 } = {}) {
   const app = express();
   app.use(express.json({ limit: "128kb" }));
@@ -65,6 +67,11 @@ export function createSpadesHttpServer({
     sendBoundaryResponse(response, boundary.handle(roomRequest(request, "newMatch")), onBoundaryResponse);
   });
 
+  app.post("/api/push/register", (request, response) => {
+    const result = pushNotifier.registerToken(request.body ?? {});
+    response.status(result.ok ? 200 : 400).json(result);
+  });
+
   app.post("/api/quick-match/join", (request, response) => {
     sendQueueResponse(response, safeQueueAction(() => quickMatchQueue.joinQueue({
       ...request.body,
@@ -109,6 +116,7 @@ export function createSpadesHttpServer({
     app,
     boundary,
     quickMatchQueue,
+    pushNotifier,
     repository: boundary.repository
   };
 }
