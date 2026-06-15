@@ -20,6 +20,7 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /id="player-guide-detail"/);
   assert.match(html, /id="player-screen-tabs"/);
   assert.match(html, /data-screen-target="lobby"/);
+  assert.match(html, />Home<\/button>/);
   assert.match(html, /data-screen-target="table"/);
   assert.match(html, /data-screen-target="play"/);
   assert.match(html, /id="create-room"/);
@@ -57,7 +58,7 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /id="connection-status"/);
   assert.match(html, /id="reconnect-help"/);
   assert.match(html, /id="afk-disconnect-warning"/);
-  assert.match(html, /Restore Active Room/);
+  assert.match(html, /Reconnect to Current Game/);
   assert.match(html, /AFK\/disconnect warning/);
   assert.match(html, /value="real-server"/);
   assert.match(html, /id="join-code"/);
@@ -225,6 +226,8 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /updatePlayerActionVisibility/);
   assert.match(client, /dataset\.gamePhase/);
   assert.match(client, /dataset\.hasRoom/);
+  assert.match(client, /dataset\.hasSavedRoom/);
+  assert.match(client, /shouldAutoPageAfterAction/);
   assert.match(client, /setHidden/);
   assert.match(client, /preferredPlayerScreen/);
   assert.match(client, /playerChoseScreen/);
@@ -428,7 +431,7 @@ test("hosted deploy checklist and server startup are present", () => {
   assert.match(checklist, /Join a room by code/);
   assert.match(checklist, /Find Match/);
   assert.match(checklist, /Ready both players, bid, and play at least one hand/);
-  assert.match(checklist, /Restore Active Room/);
+  assert.match(checklist, /Reconnect to Current Game/);
   assert.match(checklist, /Beta Feedback Report/);
   assert.match(checklist, /Remind testers this is free play only/i);
   assert.match(checklist, /External Tester Hardening Checks/);
@@ -522,7 +525,7 @@ test("hosted deploy checklist and server startup are present", () => {
   assert.match(testerInvite, /Join a room by code/);
   assert.match(testerInvite, /Find Match/);
   assert.match(testerInvite, /bid, and play at least one hand/i);
-  assert.match(testerInvite, /Restore Active Room/);
+  assert.match(testerInvite, /Reconnect to Current Game/);
   assert.match(testerInvite, /Report Bug/);
   assert.match(testerInvite, /diagnostics bundle/);
   assert.match(releaseNotes, /Spades Hosted Beta Release Notes/);

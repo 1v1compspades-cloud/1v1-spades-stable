@@ -77,6 +77,7 @@ const roomInviteLinkButton = document.querySelector("#room-invite-link");
 const roomCopyCodeButton = document.querySelector("#room-copy-code");
 const copyInviteLinkButton = document.querySelector("#copy-invite-link");
 const copyRoomCodeButton = document.querySelector("#copy-room-code");
+const restoreRoomButton = document.querySelector("#restore-room");
 const quickMatchStatusOutput = document.querySelector("#quick-match-status");
 const phaseStatusOutput = document.querySelector("#phase-status");
 const seatStatusOutput = document.querySelector("#seat-status");
@@ -661,6 +662,9 @@ async function runShellAction(action, successLabel = "completed action") {
     rememberSessionFromStatus(status);
     lastSuccessfulAction = successLabel;
     actionLog.record(successLabel, status);
+    if (shouldAutoPageAfterAction(successLabel, status)) {
+      playerChoseScreen = false;
+    }
     renderStatus(status);
   } catch (error) {
     const message = error?.message ?? "Action failed";
@@ -676,6 +680,19 @@ async function runShellAction(action, successLabel = "completed action") {
     renderBetaSafetyPanel(status);
     renderBetaFeedbackPanel(status);
   }
+}
+
+function shouldAutoPageAfterAction(successLabel, status) {
+  if (!status?.roomCode) return false;
+  return [
+    "create room",
+    "join room",
+    "spectate room",
+    "restore active room",
+    "join quick match",
+    "ready",
+    "ask rematch"
+  ].includes(successLabel);
 }
 
 function activeShellActions() {
@@ -1100,7 +1117,7 @@ function shouldAutoGuideScreen(guidance) {
 
 function updatePlayerChrome(status) {
   if (!playerScreenStatusOutput) return;
-  const roomLabel = status?.roomCode ? `Room ${status.roomCode}` : "Lobby";
+  const roomLabel = status?.roomCode ? `Room ${status.roomCode}` : "Home";
   const phaseLabel = status?.phase ? status.phase.replace("_", " ") : "ready";
   playerScreenStatusOutput.textContent = `${roomLabel} · ${phaseLabel}`;
 }
@@ -1189,6 +1206,7 @@ function updatePlayerActionVisibility(status) {
   const phase = status?.phase ?? "none";
   document.body.dataset.gamePhase = phase;
   document.body.dataset.hasRoom = status?.roomCode ? "true" : "false";
+  document.body.dataset.hasSavedRoom = localIdentity.lastSession ? "true" : "false";
 
   const isWaiting = phase === "waiting";
   const isBidding = phase === "bidding";
@@ -1205,6 +1223,7 @@ function updatePlayerActionVisibility(status) {
   setHidden(globalInviteRoomButton, !isWaiting);
   setHidden(globalCopyRoomCodeButton, !hasRoom);
   setHidden(globalBackLobbyButton, !isMatchComplete);
+  setHidden(restoreRoomButton, !hasRoom && !localIdentity.lastSession);
   setHidden(readyPlayerButton, !isWaiting);
   setHidden(leaveRoomButton, !hasRoom);
   setHidden(askRematchButton, !isMatchComplete || rematchRequested);
@@ -1377,8 +1396,8 @@ function clearGameAttentionSignal() {
 function renderConnectionHelp(status) {
   connectionStatusOutput.textContent = `Connection: ${connectionStatusLabel(status)}`;
   reconnectHelpOutput.textContent = status?.roomCode
-    ? `Reconnect help: if the page refreshes or disconnects, tap Restore Active Room for ${status.roomCode}.`
-    : "Reconnect help: create or join a room first, then Restore Active Room can recover your seat.";
+    ? `Reconnect help: if the page refreshes or disconnects, tap Reconnect to Current Game for ${status.roomCode}.`
+    : "Reconnect help: create or join a room first, then Reconnect to Current Game can recover your seat.";
   afkDisconnectWarningOutput.textContent = status?.roomCode
     ? "AFK/disconnect warning: timer placeholder only; if you step away, reconnect manually before continuing."
     : "AFK/disconnect warning: timer placeholder only; no active room yet.";

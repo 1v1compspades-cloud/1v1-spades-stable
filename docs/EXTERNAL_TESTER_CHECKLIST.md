@@ -8,7 +8,7 @@ This beta is free play only.
 - Enter a display name.
 - Use Real Local Server mode for hosted multiplayer.
 - Check the connection status panel before starting.
-- If disconnected, use Restore Active Room before taking another action.
+- If disconnected, use Reconnect to Current Game before taking another action.
 
 ## Room Entry
 
@@ -29,7 +29,7 @@ This beta is free play only.
 ## Reconnect And Disconnect
 
 - Refresh during the room.
-- Tap Restore Active Room.
+- Tap Reconnect to Current Game.
 - Confirm the same seat returns.
 - Confirm hidden-hand safety still passes.
 - Note the AFK/disconnect warning placeholder if you step away.

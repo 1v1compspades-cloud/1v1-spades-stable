@@ -11,7 +11,7 @@ Please try:
 - Join a room by code from another device or browser.
 - Try Find Match with another tester.
 - Ready up, bid, and play at least one hand.
-- Refresh during a room and use Restore Active Room.
+- Refresh during a room and use Reconnect to Current Game.
 - Use Report Bug if anything feels confusing or breaks.
 
 Safety note: this is free play only.

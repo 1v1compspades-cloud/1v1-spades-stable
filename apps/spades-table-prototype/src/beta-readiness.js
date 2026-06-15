@@ -17,7 +17,7 @@ export const MANUAL_BETA_FLOWS = Object.freeze([
   {
     id: "reconnect",
     label: "Reconnect",
-    steps: ["Disconnect or refresh", "Restore Active Room", "Confirm same seat and hidden-hand safety"]
+    steps: ["Disconnect or refresh", "Reconnect to Current Game", "Confirm same seat and hidden-hand safety"]
   },
   {
     id: "leave-room",

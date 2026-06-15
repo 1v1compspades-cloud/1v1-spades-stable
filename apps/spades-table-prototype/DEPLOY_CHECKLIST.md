@@ -111,14 +111,14 @@ Use this sequence for each hosted beta invite:
 4. Join a room by code from a second browser or device.
 5. Try Find Match with two testers.
 6. Ready both players, bid, and play at least one hand.
-7. Refresh during a room and use Restore Active Room to test reconnect.
+7. Refresh during a room and use Reconnect to Current Game to test reconnect.
 8. Use the Beta Feedback Report panel to report a bug with diagnostics.
 9. Remind testers this is free play only.
 
 ## External Tester Hardening Checks
 
 1. Confirm the connection status panel is visible before creating a room.
-2. Confirm reconnect help explains Restore Active Room.
+2. Confirm reconnect help explains Reconnect to Current Game.
 3. Confirm the AFK/disconnect warning placeholder is visible.
 4. Confirm Copy Room Code works after creating or joining a room.
 5. Confirm Leave Room / Back to Lobby wording appears in table and text controls.

@@ -1865,11 +1865,6 @@ body.tester-mode[data-game-phase="waiting"] .score-area {
 }
 
 
-/* Active-room lobby cleanup */
-body.tester-mode[data-active-screen="lobby"][data-has-room="true"] .home-panel {
-  display: none !important;
-}
-
 body.tester-mode[data-active-screen="lobby"][data-has-room="true"] .global-room-invite-bar {
   display: grid;
   gap: 14px;
@@ -1936,8 +1931,7 @@ body.tester-mode[data-active-screen="lobby"] .controls {
 body.tester-mode[data-active-screen="lobby"] .connection-help-panel,
 body.tester-mode[data-active-screen="lobby"] label:has(#display-name),
 body.tester-mode[data-active-screen="lobby"] #room-code-share-status,
-body.tester-mode[data-active-screen="lobby"] #quick-match-status,
-body.tester-mode[data-active-screen="lobby"] #restore-room {
+body.tester-mode[data-active-screen="lobby"] #quick-match-status {
   display: none !important;
 }
 
@@ -1960,6 +1954,7 @@ body.tester-mode[data-active-screen="lobby"] #join-room {
 body.tester-mode[data-active-screen="lobby"] #copy-invite-link,
 body.tester-mode[data-active-screen="lobby"] #copy-room-code,
 body.tester-mode[data-active-screen="lobby"] #leave-quick-match,
+body.tester-mode[data-active-screen="lobby"] #restore-room,
 body.tester-mode[data-active-screen="lobby"] #clear-room {
   order: 8;
 }
