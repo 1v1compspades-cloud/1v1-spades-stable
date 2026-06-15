@@ -61,6 +61,7 @@ const globalRoomInviteBar = document.querySelector("#global-room-invite-bar");
 const globalRoomCodeOutput = document.querySelector("#global-room-code");
 const globalInviteRoomButton = document.querySelector("#global-invite-room");
 const globalCopyRoomCodeButton = document.querySelector("#global-copy-room-code");
+const copyFeedbackToast = document.querySelector("#copy-feedback-toast");
 const playerScreenTabs = Array.from(document.querySelectorAll("[data-screen-target]"));
 const roomCodeShareStatusOutput = document.querySelector("#room-code-share-status");
 const roomInvitePanel = document.querySelector("#room-invite-panel");
@@ -68,6 +69,7 @@ const roomInviteCodeOutput = document.querySelector("#room-invite-code");
 const roomInviteLinkButton = document.querySelector("#room-invite-link");
 const roomCopyCodeButton = document.querySelector("#room-copy-code");
 const copyInviteLinkButton = document.querySelector("#copy-invite-link");
+const copyRoomCodeButton = document.querySelector("#copy-room-code");
 const quickMatchStatusOutput = document.querySelector("#quick-match-status");
 const phaseStatusOutput = document.querySelector("#phase-status");
 const seatStatusOutput = document.querySelector("#seat-status");
@@ -152,6 +154,7 @@ let playerChoseScreen = false;
 let lastNotificationStatusKey = "";
 let lastNotificationAt = 0;
 let titleFlashTimer = null;
+let copyFeedbackTimer = null;
 let expoPushToken = String(globalThis.__SPADES_EXPO_PUSH_TOKEN ?? "").trim();
 let lastRegisteredPushKey = "";
 const baseDocumentTitle = document.title || "1v1 Spades";
@@ -234,7 +237,7 @@ tableInviteLinkButton?.addEventListener("click", () => {
   copyInviteLink();
 });
 
-document.querySelector("#copy-room-code").addEventListener("click", () => {
+copyRoomCodeButton?.addEventListener("click", () => {
   copyRoomCode();
 });
 
@@ -1044,6 +1047,69 @@ function buildInviteLink(roomCode) {
   return url.toString();
 }
 
+function allCopyFeedbackButtons() {
+  return [
+    globalInviteRoomButton,
+    copyInviteLinkButton,
+    roomInviteLinkButton,
+    tableInviteLinkButton,
+    globalCopyRoomCodeButton,
+    copyRoomCodeButton,
+    roomCopyCodeButton
+  ].filter(Boolean);
+}
+
+function copyFeedbackButtons(kind) {
+  const inviteButtons = [
+    globalInviteRoomButton,
+    copyInviteLinkButton,
+    roomInviteLinkButton,
+    tableInviteLinkButton
+  ];
+  const roomCodeButtons = [
+    globalCopyRoomCodeButton,
+    copyRoomCodeButton,
+    roomCopyCodeButton
+  ];
+  return (kind === "invite" ? inviteButtons : roomCodeButtons).filter(Boolean);
+}
+
+function restoreCopyFeedbackButtons() {
+  for (const button of allCopyFeedbackButtons()) {
+    if (button.dataset.copyOriginalLabel) {
+      button.textContent = button.dataset.copyOriginalLabel;
+    }
+    button.classList.remove("copied");
+  }
+}
+
+function showCopyFeedback(message, kind = "invite") {
+  roomCodeShareStatusOutput.textContent = message;
+  if (copyFeedbackToast) {
+    copyFeedbackToast.textContent = message;
+    copyFeedbackToast.hidden = false;
+  }
+
+  clearTimeout(copyFeedbackTimer);
+  restoreCopyFeedbackButtons();
+
+  for (const button of copyFeedbackButtons(kind)) {
+    if (!button.dataset.copyOriginalLabel) {
+      button.dataset.copyOriginalLabel = button.textContent;
+    }
+    button.textContent = "Copied";
+    button.classList.add("copied");
+  }
+
+  copyFeedbackTimer = setTimeout(() => {
+    if (copyFeedbackToast) {
+      copyFeedbackToast.hidden = true;
+      copyFeedbackToast.textContent = "";
+    }
+    restoreCopyFeedbackButtons();
+  }, 3600);
+}
+
 async function copyInviteLink() {
   const roomCode = currentShellStatus()?.roomCode;
   if (!roomCode) {
@@ -1054,14 +1120,14 @@ async function copyInviteLink() {
   try {
     if (globalThis.navigator?.clipboard?.writeText) {
       await globalThis.navigator.clipboard.writeText(inviteLink);
-      roomCodeShareStatusOutput.textContent = `Invite link copied for room ${roomCode}.`;
+      showCopyFeedback(`Copied invite link for room ${roomCode}. Send it to your opponent.`, "invite");
       return;
     }
     joinCodeInput.value = inviteLink;
     joinCodeInput.focus();
     joinCodeInput.select();
     document.execCommand?.("copy");
-    roomCodeShareStatusOutput.textContent = `Invite link selected for room ${roomCode}.`;
+    showCopyFeedback(`Copied invite link for room ${roomCode}. Send it to your opponent.`, "invite");
   } catch (error) {
     roomCodeShareStatusOutput.textContent = `Could not copy invite link: ${friendlyTesterError(error?.message ?? "copy failed")}`;
   }
@@ -1487,14 +1553,14 @@ async function copyRoomCode() {
   try {
     if (globalThis.navigator?.clipboard?.writeText) {
       await globalThis.navigator.clipboard.writeText(roomCode);
-      roomCodeShareStatusOutput.textContent = `Room code copied: ${roomCode}`;
+      showCopyFeedback(`Copied room code ${roomCode}. Send it to your opponent.`, "room-code");
       return;
     }
     joinCodeInput.value = roomCode;
     joinCodeInput.focus();
     joinCodeInput.select();
     document.execCommand?.("copy");
-    roomCodeShareStatusOutput.textContent = `Room code selected for sharing: ${roomCode}`;
+    showCopyFeedback(`Copied room code ${roomCode}. Send it to your opponent.`, "room-code");
   } catch (error) {
     roomCodeShareStatusOutput.textContent = `Could not copy room code: ${friendlyTesterError(error?.message ?? "copy failed")}`;
   }
