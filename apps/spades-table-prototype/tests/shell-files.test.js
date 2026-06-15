@@ -578,3 +578,15 @@ test("hosted deploy checklist and server startup are present", () => {
   assert.match(testerRun, /Hidden hands, private seat tokens, admin keys, and host-only data do not appear/);
   assert.match(testerRun, /No gameplay features were added/);
 });
+
+test("quick match waiting screens stay compact for mobile testers", () => {
+  const css = readFileSync(resolve(appDir, "src/styles.css"), "utf8");
+
+  assert.match(css, /Compact quick-match waiting pass/);
+  assert.match(css, /body\.tester-mode\[data-active-screen="table"\] #room-invite-panel\s*\{\s*display: none !important;/);
+  assert.match(css, /body\.tester-mode\[data-active-screen="play"\]\[data-game-phase="waiting"\] \.visual-shell > :not\(#room-invite-panel\)/);
+  assert.match(css, /body\.tester-mode\[data-active-screen="play"\]\[data-game-phase="waiting"\] #room-invite-panel \.room-invite-copy\s*\{\s*display: none !important;/);
+  assert.match(css, /body\.tester-mode\[data-active-screen="play"\]\[data-game-phase="waiting"\] \.status-panel > \.room-actions #ready-player/);
+  assert.match(css, /body\.tester-mode\[data-active-screen="play"\]\[data-game-phase="waiting"\] \.center-trick-area/);
+  assert.match(css, /body\.tester-mode\[data-active-screen="play"\]\[data-game-phase="waiting"\] \.player-hand-area/);
+});
