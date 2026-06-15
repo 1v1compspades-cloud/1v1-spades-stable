@@ -1784,3 +1784,46 @@ body.tester-mode[data-game-phase="waiting"] .score-area {
     font-size: 15px;
   }
 }
+
+
+/* Active-room lobby cleanup */
+body.tester-mode[data-active-screen="lobby"][data-has-room="true"] .home-panel {
+  display: none !important;
+}
+
+body.tester-mode[data-active-screen="lobby"][data-has-room="true"] .global-room-invite-bar {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 16px;
+  border-radius: 18px;
+  border-color: rgba(255, 226, 124, 0.72);
+  background:
+    linear-gradient(160deg, rgba(19, 73, 52, 0.94), rgba(23, 18, 10, 0.96)),
+    rgba(0, 0, 0, 0.48);
+}
+
+body.tester-mode[data-active-screen="lobby"][data-has-room="true"] #global-room-code {
+  width: 100%;
+  max-width: 260px;
+  padding: 12px 14px;
+  font-size: 28px;
+  text-align: center;
+}
+
+body.tester-mode[data-active-screen="lobby"][data-has-room="true"] #global-room-help {
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+body.tester-mode[data-active-screen="lobby"][data-has-room="true"] .global-room-actions {
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+body.tester-mode[data-active-screen="lobby"][data-has-room="true"] .global-room-actions button {
+  min-height: 60px;
+  border-radius: 16px;
+  font-size: 19px;
+  font-weight: 950;
+}
