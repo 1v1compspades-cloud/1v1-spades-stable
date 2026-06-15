@@ -38,7 +38,7 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /Free play only/);
   assert.match(html, /Create a room/);
   assert.match(html, /Join by code/);
-  assert.match(html, /Quick Match/);
+  assert.match(html, /Find Match/);
   assert.match(html, /Bid/);
   assert.match(html, /play each trick/);
   assert.match(html, /Reconnect/);
@@ -415,7 +415,7 @@ test("hosted deploy checklist and server startup are present", () => {
   assert.match(checklist, /visible beta build label/);
   assert.match(checklist, /Create a room/);
   assert.match(checklist, /Join a room by code/);
-  assert.match(checklist, /Quick Match/);
+  assert.match(checklist, /Find Match/);
   assert.match(checklist, /Ready both players, bid, and play at least one hand/);
   assert.match(checklist, /Restore Active Room/);
   assert.match(checklist, /Beta Feedback Report/);
@@ -442,7 +442,7 @@ test("hosted deploy checklist and server startup are present", () => {
   assert.match(launchDoc, /free play only/i);
   assert.match(launchDoc, /Create a room and share the code/);
   assert.match(launchDoc, /Join a room by code/);
-  assert.match(launchDoc, /Quick Match/);
+  assert.match(launchDoc, /Find Match/);
   assert.match(launchDoc, /Play one full trick/);
   assert.match(launchDoc, /Complete one hand/);
   assert.match(testerGuide, /Spades Hosted Beta Tester Guide/);
@@ -450,7 +450,7 @@ test("hosted deploy checklist and server startup are present", () => {
   assert.match(testerGuide, /Quick Checklist/);
   assert.match(testerGuide, /Create room/);
   assert.match(testerGuide, /Join room/);
-  assert.match(testerGuide, /Quick Match/);
+  assert.match(testerGuide, /Find Match/);
   assert.match(testerGuide, /Bid/);
   assert.match(testerGuide, /Play hand/);
   assert.match(testerGuide, /Reconnect/);
@@ -509,7 +509,7 @@ test("hosted deploy checklist and server startup are present", () => {
   assert.match(testerInvite, /free-play Spades beta/i);
   assert.match(testerInvite, /Create a room/);
   assert.match(testerInvite, /Join a room by code/);
-  assert.match(testerInvite, /Quick Match/);
+  assert.match(testerInvite, /Find Match/);
   assert.match(testerInvite, /bid, and play at least one hand/i);
   assert.match(testerInvite, /Restore Active Room/);
   assert.match(testerInvite, /Report Bug/);

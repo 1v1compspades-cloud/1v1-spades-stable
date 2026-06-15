@@ -12,7 +12,7 @@ This run is free play only.
 - `SPADES_PUBLIC_WS_URL` points to the hosted `/ws` endpoint.
 - Create Room returns a room code.
 - Join Room works from a second browser or device.
-- Quick Match pairs two testers into player1 and player2.
+- Find Match pairs two testers into player1 and player2.
 - Ready, bid, and play one full trick.
 - Complete one hand.
 - Refresh one tester and restore the same seat.
@@ -45,7 +45,7 @@ npm run smoke:hosted -- <hosted-url>
 15. Complete one hand if time allows.
 16. Refresh tester A and tap Restore Active Room.
 17. Confirm tester A returns to the same seat.
-18. Run Quick Match with two fresh tester identities.
+18. Run Find Match with two fresh tester identities.
 19. Copy diagnostics from Report Bug.
 20. Record results in the post-test review template below.
 
@@ -58,7 +58,7 @@ npm run smoke:hosted -- <hosted-url>
 5. Bid from both seats.
 6. Play one trick.
 7. Restore Active Room after refresh.
-8. Quick Match with two testers.
+8. Find Match with two testers.
 9. Spectator view in a full room.
 10. Report Bug diagnostics.
 
@@ -66,7 +66,7 @@ npm run smoke:hosted -- <hosted-url>
 
 Hi! The Spades free-play hosted beta is ready for a small first tester run.
 
-Please test room entry, joining by code, Quick Match, bidding, playing a hand, reconnect after refresh, and Report Bug diagnostics.
+Please test room entry, joining by code, Find Match, bidding, playing a hand, reconnect after refresh, and Report Bug diagnostics.
 
 Start here:
 1. Open the beta link.
@@ -103,7 +103,7 @@ Ask testers to send:
 - Phase 40 is a tester-run preparation pass.
 - No gameplay features were added.
 - The app remains local identity plus hosted room flow.
-- Room code join, Quick Match, reconnect, text-backed card controls, report diagnostics, and safety checks are the focus.
+- Room code join, Find Match, reconnect, text-backed card controls, report diagnostics, and safety checks are the focus.
 - Release handoff docs now include tester invite copy, bug report instructions, smoke steps, rollback, known issues, and post-test review.
 
 ## Known Issues
@@ -132,7 +132,7 @@ Create Room result:
 
 Join Room result:
 
-Quick Match result:
+Find Match result:
 
 Reconnect result:
 

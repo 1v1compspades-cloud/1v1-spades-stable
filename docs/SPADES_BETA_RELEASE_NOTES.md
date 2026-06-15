@@ -8,12 +8,12 @@ This beta is free play only.
 
 - Hosted room-code flow for creating and joining 1v1 Spades rooms.
 - Local identity restore for reconnecting to the same seat.
-- Quick Match queue for pairing two testers.
+- Find Match queue for pairing two testers.
 - HTTP and WebSocket local server boundary with sanitized responses.
 - Simple mobile-first table layout using text-backed card buttons.
 - Bidding, legal play, trick resolution, hand completion, next hand, match completion, and new match reset.
 - Beta safety panel, diagnostics bundle, issue report form, and tester-friendly error messages.
-- Hosted smoke-test script for health, room join, WebSocket, reconnect, Quick Match, and hidden-hand safety.
+- Hosted smoke-test script for health, room join, WebSocket, reconnect, Find Match, and hidden-hand safety.
 
 ## Safety Confirmations
 
@@ -40,7 +40,7 @@ cd apps/spades-table-prototype
 npm run smoke:hosted -- https://spades-beta.example.com
 ```
 
-The smoke test validates health, create room, join room, WebSocket connection, one trick, hand completion, reconnect, Quick Match, and hidden-hand safety.
+The smoke test validates health, create room, join room, WebSocket connection, one trick, hand completion, reconnect, Find Match, and hidden-hand safety.
 
 ## Rollback
 

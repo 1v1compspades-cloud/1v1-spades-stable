@@ -57,4 +57,4 @@ Include:
 - last error
 - hidden-hand safety status
 - connection status
-- whether the issue involved create room, join room, Quick Match, bid, play hand, reconnect, or leave room
+- whether the issue involved create room, join room, Find Match, bid, play hand, reconnect, or leave room

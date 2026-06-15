@@ -9,7 +9,7 @@ Hi! I am opening a small free-play Spades beta and would love your help testing 
 Please try:
 - Create a room and share the room code.
 - Join a room by code from another device or browser.
-- Try Quick Match with another tester.
+- Try Find Match with another tester.
 - Ready up, bid, and play at least one hand.
 - Refresh during a room and use Restore Active Room.
 - Use Report Bug if anything feels confusing or breaks.

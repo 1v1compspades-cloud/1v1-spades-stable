@@ -1,6 +1,6 @@
 # Spades Hosted Beta Tester Guide
 
-Welcome to the Spades hosted beta. This build is for testing room entry, reconnect, Quick Match, bidding, hand play, and issue reporting.
+Welcome to the Spades hosted beta. This build is for testing room entry, reconnect, Find Match, bidding, hand play, and issue reporting.
 
 Safety note: this beta is free play only.
 
@@ -15,7 +15,7 @@ Safety note: this beta is free play only.
 
 - Create room.
 - Join room.
-- Quick Match.
+- Find Match.
 - Bid.
 - Play hand.
 - Reconnect.
@@ -33,9 +33,9 @@ Join room:
 2. Enter the room code.
 3. Tap Join Room.
 
-Quick Match:
+Find Match:
 1. Use two tester identities.
-2. Tap Join Quick Match from both testers.
+2. Tap Find Match from both testers.
 3. Confirm one tester becomes player1 and the other becomes player2.
 
 Bid and play:

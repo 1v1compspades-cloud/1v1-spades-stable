@@ -1,6 +1,6 @@
 # Spades Beta Feedback Reporting
 
-This hosted beta is free play only. Keep issue reports focused on room entry, reconnect, Quick Match, bidding, hand play, and diagnostics.
+This hosted beta is free play only. Keep issue reports focused on room entry, reconnect, Find Match, bidding, hand play, and diagnostics.
 
 ## What Testers Should Send
 

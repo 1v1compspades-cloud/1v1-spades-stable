@@ -257,7 +257,7 @@ document.querySelector("#join-quick-match").addEventListener("click", () => {
   requestGameNotificationPermission();
   runShellAction(async () => {
     if (!isRealServerMode()) {
-      throw new Error("Quick Match requires real local server mode");
+      throw new Error("Find Match requires hosted server mode");
     }
     saveCurrentDisplayName();
     const response = await realServerClient.joinQuickMatch({
@@ -274,7 +274,7 @@ document.querySelector("#join-quick-match").addEventListener("click", () => {
 document.querySelector("#leave-quick-match").addEventListener("click", () => {
   runShellAction(async () => {
     if (!isRealServerMode()) {
-      throw new Error("Quick Match requires real local server mode");
+      throw new Error("Find Match requires hosted server mode");
     }
     const response = await realServerClient.leaveQuickMatch();
     renderQuickMatchStatus();
@@ -785,8 +785,8 @@ function renderTransportModeStatus() {
 function renderQuickMatchStatus() {
   const queue = realServerClient.queueStatus;
   quickMatchStatusOutput.textContent = queue
-    ? `Quick Match: ${queue.state} (${queue.waitingCount ?? 0} waiting)`
-    : "Quick Match: idle";
+    ? `Find Match: ${queue.state} (${queue.waitingCount ?? 0} waiting)`
+    : "Find Match: idle";
 }
 
 function renderStatus(status) {

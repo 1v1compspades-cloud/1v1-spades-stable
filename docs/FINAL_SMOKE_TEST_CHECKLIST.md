@@ -24,7 +24,7 @@ This launch candidate is free play only.
 ## Mobile Layout Check
 
 - The welcome panel fits on a phone screen without horizontal scrolling.
-- Create Room, Join Room, Quick Match, Restore Active Room, Copy Room Code, and Report Bug are easy to tap.
+- Create Room, Join Room, Find Match, Restore Active Room, Copy Room Code, and Report Bug are easy to tap.
 - The Report Bug button remains visible while scrolling.
 - The diagnostics text area is readable and copyable.
 - Advanced diagnostics and local test tools are collapsed by default.
@@ -43,7 +43,7 @@ This launch candidate is free play only.
 10. Refresh one tester and restore the active room.
 11. Confirm the same seat returns.
 12. Confirm hidden-hand safety passes.
-13. Try Quick Match with two testers.
+13. Try Find Match with two testers.
 14. Submit a bug report and copy diagnostics.
 
 ## Data Safety Check

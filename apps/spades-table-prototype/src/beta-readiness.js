@@ -11,8 +11,8 @@ export const MANUAL_BETA_FLOWS = Object.freeze([
   },
   {
     id: "quick-match",
-    label: "Quick Match",
-    steps: ["Switch to Real Local Server", "Join Quick Match", "Wait for second tester", "Confirm matched room"]
+    label: "Find Match",
+    steps: ["Switch to Real Local Server", "Find Match", "Wait for second tester", "Confirm matched room"]
   },
   {
     id: "reconnect",

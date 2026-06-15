@@ -8,7 +8,7 @@ This beta is free play only. It has no production account system. Leaderboard an
 2. Enter a display name for this device.
 3. Create a room and share the room code with a second tester.
 4. Join a room by code from a second browser/device.
-5. Use Quick Match when two testers want the server to pair them automatically.
+5. Use Find Match when two testers want the server to pair them automatically.
 6. Use Restore Active Room after refresh or reconnect.
 7. Use Clear Active Room if a local tester session gets stuck.
 
@@ -19,7 +19,7 @@ Ask testers to try:
 - Join a room by code.
 - Ready both seats, bid both seats, play a full trick, and complete a hand.
 - Refresh during bidding or play and confirm reconnect restores the same seat.
-- Use Quick Match with two testers.
+- Use Find Match with two testers.
 - Join as a third viewer and confirm spectator mode shows no hidden hands.
 - Leave and rejoin safely.
 
@@ -28,7 +28,7 @@ Ask testers to report:
 - Screenshot of the action log around the issue.
 - Room code, selected transport mode, current phase, viewer seat, last action, and last error.
 - The copyable diagnostics bundle from the Beta Feedback Report panel.
-- Whether the issue happened after refresh, reconnect, Quick Match, or manual room-code join.
+- Whether the issue happened after refresh, reconnect, Find Match, or manual room-code join.
 
 Known limitations:
 - No real login or production account database.
@@ -61,7 +61,7 @@ Manual smoke path:
 6. Play one full trick.
 7. Complete one hand.
 8. Reconnect one tester and confirm the same seat returns.
-9. Use Quick Match with two testers.
+9. Use Find Match with two testers.
 10. Confirm player1, player2, and spectator views do not leak hidden hands.
 
 ## Feedback Capture
@@ -74,4 +74,4 @@ Saved beta reports remain local to the tester device until exported or cleared.
 
 Use this language in beta invites:
 
-> This is a free-play Spades beta for testing room flow, reconnect, Quick Match, and gameplay reliability. Local leaderboard and tournament panels are previews only.
+> This is a free-play Spades beta for testing room flow, reconnect, Find Match, and gameplay reliability. Local leaderboard and tournament panels are previews only.

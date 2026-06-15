@@ -52,7 +52,7 @@ Manual fallback:
 4. Ready both players, bid, and play one full trick.
 5. Complete one hand.
 6. Refresh tester A and restore the active room.
-7. Run Quick Match with two testers.
+7. Run Find Match with two testers.
 8. Confirm player1 sees only player1 hand.
 9. Confirm player2 sees only player2 hand.
 10. Confirm spectator sees no hidden hands.

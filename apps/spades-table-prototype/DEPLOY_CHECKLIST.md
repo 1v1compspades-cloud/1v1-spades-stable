@@ -88,7 +88,7 @@ cd apps/spades-table-prototype
 npm run smoke:hosted -- https://spades-beta.example.com
 ```
 
-The script checks health, create room, join room, WebSocket connection, one trick, full hand completion, reconnect, Quick Match, and hidden-hand safety.
+The script checks health, create room, join room, WebSocket connection, one trick, full hand completion, reconnect, Find Match, and hidden-hand safety.
 
 1. Open `/health` and confirm `ok: true`.
 2. Create a room from tester A.
@@ -98,7 +98,7 @@ The script checks health, create room, join room, WebSocket connection, one tric
 6. Submit ready, bids, and play one full trick.
 7. Complete a hand and confirm the summary appears.
 8. Disconnect/reconnect one tester and confirm the same seat restores.
-9. Use Quick Match with two testers and confirm player1/player2 assignment.
+9. Use Find Match with two testers and confirm player1/player2 assignment.
 10. Confirm the beta safety panel shows hidden-hand safe.
 
 ## Tester Entry Steps
@@ -109,7 +109,7 @@ Use this sequence for each hosted beta invite:
 2. Enter a display name.
 3. Create a room and share the room code with another tester.
 4. Join a room by code from a second browser or device.
-5. Try Quick Match with two testers.
+5. Try Find Match with two testers.
 6. Ready both players, bid, and play at least one hand.
 7. Refresh during a room and use Restore Active Room to test reconnect.
 8. Use the Beta Feedback Report panel to report a bug with diagnostics.
