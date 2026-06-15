@@ -1658,3 +1658,129 @@ body.tester-mode .card-button.recommended-action {
     font-size: 18px;
   }
 }
+
+
+/* Waiting-room table cleanup */
+body.tester-mode[data-active-screen="table"] .global-room-invite-bar,
+body.tester-mode[data-active-screen="play"] .global-room-invite-bar {
+  display: none !important;
+}
+
+body.tester-mode .status-panel > h2 {
+  display: none;
+}
+
+body.tester-mode[data-active-screen="table"] .visual-shell {
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.tester-mode[data-active-screen="table"] .room-invite-panel {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 16px;
+  overflow: hidden;
+  border-radius: 18px;
+  border-color: rgba(255, 226, 124, 0.72);
+  background:
+    linear-gradient(160deg, rgba(19, 73, 52, 0.94), rgba(23, 18, 10, 0.96)),
+    rgba(0, 0, 0, 0.48);
+}
+
+body.tester-mode[data-active-screen="table"] .room-invite-panel[hidden] {
+  display: none !important;
+}
+
+body.tester-mode[data-active-screen="table"] .room-invite-copy {
+  display: grid;
+  gap: 8px;
+}
+
+body.tester-mode[data-active-screen="table"] .room-invite-copy .eyebrow {
+  margin: 0;
+  font-size: 12px;
+}
+
+body.tester-mode[data-active-screen="table"] .room-invite-code {
+  width: 100%;
+  max-width: 260px;
+  padding: 12px 14px;
+  font-size: 30px;
+  text-align: center;
+}
+
+body.tester-mode[data-active-screen="table"] .room-invite-instructions {
+  font-size: 16px;
+  line-height: 1.32;
+}
+
+body.tester-mode[data-active-screen="table"] .room-invite-actions {
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+body.tester-mode[data-active-screen="table"] .room-invite-actions button {
+  min-height: 60px;
+  border-radius: 16px;
+  font-size: 19px;
+  font-weight: 950;
+}
+
+body.tester-mode[data-active-screen="table"] .table-layout-shell {
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+}
+
+body.tester-mode[data-active-screen="table"] .table-controls #table-copy-invite-link,
+body.tester-mode[data-active-screen="table"] .table-controls #table-record-history,
+body.tester-mode[data-active-screen="table"] .table-controls #table-start-next-hand,
+body.tester-mode[data-active-screen="table"] .table-controls #table-start-new-match {
+  display: none !important;
+}
+
+body.tester-mode[data-active-screen="table"] .table-controls {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.tester-mode[data-active-screen="table"] .table-controls button {
+  min-height: 54px;
+  border-radius: 14px;
+}
+
+body.tester-mode[data-game-phase="waiting"] .center-trick-area,
+body.tester-mode[data-game-phase="waiting"] .last-trick-area,
+body.tester-mode[data-game-phase="waiting"] .player-hand-area {
+  display: none !important;
+}
+
+body.tester-mode[data-game-phase="waiting"] .table-area {
+  min-height: 58px;
+  padding: 14px;
+  font-size: 16px;
+}
+
+body.tester-mode[data-game-phase="waiting"] .score-area {
+  color: #fff8e7;
+}
+
+@media (max-width: 430px) {
+  body.tester-mode[data-active-screen="table"] .room-invite-panel {
+    padding: 14px;
+  }
+
+  body.tester-mode[data-active-screen="table"] .room-invite-code {
+    font-size: 26px;
+  }
+
+  body.tester-mode[data-active-screen="table"] .room-invite-instructions {
+    font-size: 15px;
+  }
+}
