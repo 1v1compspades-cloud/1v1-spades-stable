@@ -57,6 +57,10 @@ const connectionStatusOutput = document.querySelector("#connection-status");
 const reconnectHelpOutput = document.querySelector("#reconnect-help");
 const afkDisconnectWarningOutput = document.querySelector("#afk-disconnect-warning");
 const playerScreenStatusOutput = document.querySelector("#player-screen-status");
+const globalRoomInviteBar = document.querySelector("#global-room-invite-bar");
+const globalRoomCodeOutput = document.querySelector("#global-room-code");
+const globalInviteRoomButton = document.querySelector("#global-invite-room");
+const globalCopyRoomCodeButton = document.querySelector("#global-copy-room-code");
 const playerScreenTabs = Array.from(document.querySelectorAll("[data-screen-target]"));
 const roomCodeShareStatusOutput = document.querySelector("#room-code-share-status");
 const roomInvitePanel = document.querySelector("#room-invite-panel");
@@ -168,6 +172,14 @@ for (const scriptName of listVisualQaScripts()) {
   option.textContent = scriptName;
   visualQaScriptSelect.append(option);
 }
+
+globalInviteRoomButton?.addEventListener("click", () => {
+  copyInviteLink();
+});
+
+globalCopyRoomCodeButton?.addEventListener("click", () => {
+  copyRoomCode();
+});
 
 document.querySelector("#create-room").addEventListener("click", () => {
   runShellAction(() => {
@@ -816,6 +828,10 @@ function updatePlayerActionVisibility(status) {
   const hasRoom = Boolean(status?.roomCode);
 
   setHidden(bidControls, !isBidding);
+  setHidden(globalRoomInviteBar, !hasRoom);
+  if (globalRoomCodeOutput) globalRoomCodeOutput.textContent = status?.roomCode ?? "------";
+  setHidden(globalInviteRoomButton, !isWaiting);
+  setHidden(globalCopyRoomCodeButton, !hasRoom);
   setHidden(readyPlayerButton, !isWaiting);
   setHidden(leaveRoomButton, !hasRoom);
   setHidden(leaveRoomHelp, !hasRoom);

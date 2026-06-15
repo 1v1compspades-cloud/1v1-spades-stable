@@ -1304,3 +1304,91 @@ body.tester-mode .bug-report-fab {
     font-size: 21px;
   }
 }
+
+
+/* Persistent TestFlight room sharing bar */
+.global-room-invite-bar {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(247, 209, 90, 0.5);
+  border-radius: 14px;
+  background:
+    linear-gradient(160deg, rgba(247, 209, 90, 0.18), rgba(255, 255, 255, 0.05)),
+    rgba(0, 0, 0, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 14px 34px -28px rgba(247, 209, 90, 0.8);
+}
+
+.global-room-invite-bar[hidden] {
+  display: none !important;
+}
+
+.global-room-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.global-room-label {
+  color: #f7d15a;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+#global-room-code {
+  width: fit-content;
+  padding: 7px 11px;
+  border: 1px solid rgba(255, 235, 166, 0.58);
+  border-radius: 10px;
+  color: #fff0a8;
+  background: rgba(0, 0, 0, 0.45);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 22px;
+  letter-spacing: 0.12em;
+}
+
+#global-room-help {
+  color: #f8f4eb;
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.32;
+}
+
+.global-room-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+body.tester-mode .app-shell {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+body.tester-mode .global-room-invite-bar {
+  position: relative;
+  z-index: 32;
+  margin: 0 0 8px;
+}
+
+body.tester-mode[data-has-room="true"] .home-panel,
+body.tester-mode[data-has-room="true"] .status-panel {
+  padding-bottom: 142px;
+}
+
+body.tester-mode .bug-report-fab {
+  right: max(10px, env(safe-area-inset-right));
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 94px);
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 11px;
+}
+
+@media (max-width: 430px) {
+  .global-room-actions {
+    grid-template-columns: 1fr;
+  }
+
+  #global-room-code {
+    font-size: 20px;
+  }
+}
