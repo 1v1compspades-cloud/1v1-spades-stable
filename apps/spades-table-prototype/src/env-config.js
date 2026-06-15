@@ -3,7 +3,9 @@ const DEFAULT_LOCAL_HOST = "127.0.0.1";
 
 export function resolveServerEnvConfig(env = globalThis.process?.env ?? {}) {
   const port = parsePort(env.PORT ?? env.SPADES_SERVER_PORT ?? DEFAULT_PORT);
+  const renderApiUrl = renderPublicApiUrl(env);
   const publicApiUrl = normalizeUrl(env.SPADES_PUBLIC_API_URL ?? env.PUBLIC_API_URL)
+    ?? renderApiUrl
     ?? `http://${DEFAULT_LOCAL_HOST}:${port}`;
   const publicWebSocketUrl = normalizeUrl(env.SPADES_PUBLIC_WS_URL ?? env.PUBLIC_WS_URL)
     ?? httpToWebSocketUrl(publicApiUrl);
@@ -75,6 +77,13 @@ function normalizeUrl(value) {
   const text = String(value ?? "").trim();
   if (!text) return null;
   return text.replace(/\/$/, "");
+}
+
+function renderPublicApiUrl(env) {
+  const renderExternalUrl = normalizeUrl(env.RENDER_EXTERNAL_URL);
+  if (renderExternalUrl) return renderExternalUrl;
+  const renderHostname = String(env.RENDER_EXTERNAL_HOSTNAME ?? "").trim();
+  return renderHostname ? `https://${renderHostname}` : null;
 }
 
 function httpToWebSocketUrl(apiUrl) {

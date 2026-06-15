@@ -22,14 +22,15 @@ export function createSpadesHttpServer({
   const app = express();
   app.use(express.json({ limit: "128kb" }));
 
-  app.get("/health", (_request, response) => {
+  app.get("/health", (request, response) => {
+    const publicConfig = publicHealthConfig(config, request);
     response.json({
       ok: true,
       service: "spades-table-prototype",
       transport: "http-local",
       websocket: "enabled",
-      publicApiUrl: config?.publicApiUrl ?? null,
-      publicWebSocketUrl: config?.publicWebSocketUrl ?? null
+      publicApiUrl: publicConfig.publicApiUrl,
+      publicWebSocketUrl: publicConfig.publicWebSocketUrl
     });
   });
 
@@ -125,6 +126,56 @@ export function createSpadesHttpServer({
     pushNotifier,
     repository: boundary.repository
   };
+}
+
+function publicHealthConfig(config, request) {
+  const requestOrigin = publicOriginFromRequest(request);
+  const publicApiUrl = shouldUseRequestOrigin(config?.publicApiUrl) && requestOrigin
+    ? requestOrigin
+    : config?.publicApiUrl ?? requestOrigin ?? null;
+  const publicWebSocketUrl = shouldUseRequestOrigin(config?.publicWebSocketUrl) && requestOrigin
+    ? publicOriginToWebSocketUrl(requestOrigin)
+    : config?.publicWebSocketUrl ?? (requestOrigin ? publicOriginToWebSocketUrl(requestOrigin) : null);
+
+  return { publicApiUrl, publicWebSocketUrl };
+}
+
+function publicOriginFromRequest(request) {
+  const forwardedHost = firstForwardedHeader(request.get("x-forwarded-host"));
+  const host = forwardedHost ?? request.get("host");
+  if (!host) return null;
+  const hostname = host.split(":")[0];
+  if (isLocalHostname(hostname)) return null;
+  const forwardedProto = firstForwardedHeader(request.get("x-forwarded-proto"));
+  const protocol = forwardedProto ?? request.protocol ?? "https";
+  return `${protocol}://${host}`.replace(/\/$/, "");
+}
+
+function publicOriginToWebSocketUrl(origin) {
+  const url = new URL(origin);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.pathname = "/ws";
+  url.search = "";
+  url.hash = "";
+  return url.toString().replace(/\/$/, "");
+}
+
+function shouldUseRequestOrigin(value) {
+  if (!value) return true;
+  try {
+    const url = new URL(value);
+    return isLocalHostname(url.hostname);
+  } catch {
+    return true;
+  }
+}
+
+function isLocalHostname(hostname) {
+  return ["127.0.0.1", "localhost", "0.0.0.0", "::1", "[::1]"].includes(hostname);
+}
+
+function firstForwardedHeader(value) {
+  return String(value ?? "").split(",")[0]?.trim() || null;
 }
 
 function roomRequest(request, type) {

@@ -11,6 +11,7 @@ export function buildVisualShellModel(status) {
       handCards: [],
       currentTrick: "none",
       lastTrick: "none",
+      hiddenHandCounts: {},
       scoreRows: [],
       bidBagRows: []
     };
@@ -46,6 +47,7 @@ export function buildVisualShellModel(status) {
     lastTrick: status.lastTrick
       ? `${formatTrick(status.lastTrick.plays)} | winner ${status.lastTrick.winner}`
       : "none",
+    hiddenHandCounts: status.hiddenHandCounts ?? {},
     scoreRows: ["player1", "player2"].map((seat) => ({
       seat,
       score: status.score[seat],

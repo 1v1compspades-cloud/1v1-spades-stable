@@ -287,12 +287,34 @@
         </details>
         <p id="shell-error" class="error-line" role="status"></p>
         <div class="bid-controls" aria-label="Bidding controls">
-          <label>
+          <div class="bid-panel-copy">
+            <p class="bid-panel-title">Place your bid</p>
+            <p class="bid-panel-subtitle">Choose once. Bid Nil for 0 tricks.</p>
+          </div>
+          <label class="bid-input-label">
             Bid
             <input id="bid-input" type="number" min="0" max="13" inputmode="numeric" value="4">
           </label>
-          <button id="submit-bid" type="button">Submit Bid</button>
-          <button id="submit-nil" type="button">Submit Nil Bid</button>
+          <div class="bid-choice-grid" aria-label="Bid choices">
+            <button class="bid-choice" type="button" data-bid-value="0">Nil</button>
+            <button class="bid-choice" type="button" data-bid-value="1">1</button>
+            <button class="bid-choice" type="button" data-bid-value="2">2</button>
+            <button class="bid-choice" type="button" data-bid-value="3">3</button>
+            <button class="bid-choice" type="button" data-bid-value="4">4</button>
+            <button class="bid-choice" type="button" data-bid-value="5">5</button>
+            <button class="bid-choice" type="button" data-bid-value="6">6</button>
+            <button class="bid-choice" type="button" data-bid-value="7">7</button>
+            <button class="bid-choice" type="button" data-bid-value="8">8</button>
+            <button class="bid-choice" type="button" data-bid-value="9">9</button>
+            <button class="bid-choice" type="button" data-bid-value="10">10</button>
+            <button class="bid-choice" type="button" data-bid-value="11">11</button>
+            <button class="bid-choice" type="button" data-bid-value="12">12</button>
+            <button class="bid-choice" type="button" data-bid-value="13">13</button>
+          </div>
+          <div class="bid-submit-row">
+            <button id="submit-bid" type="button">Submit Bid</button>
+            <button id="submit-nil" type="button">Nil</button>
+          </div>
         </div>
         <div class="room-actions">
           <button id="ready-player" type="button">Ready</button>

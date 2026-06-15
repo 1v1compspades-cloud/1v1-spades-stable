@@ -143,6 +143,7 @@ const tournamentPlacementsOutput = document.querySelector("#tournament-placement
 const tournamentHistoryOutput = document.querySelector("#tournament-history");
 const errorOutput = document.querySelector("#shell-error");
 const bidInput = document.querySelector("#bid-input");
+const bidChoiceButtons = [...document.querySelectorAll("[data-bid-value]")];
 const playCardIdInput = document.querySelector("#play-card-id");
 const bidControls = document.querySelector(".bid-controls");
 const readyPlayerButton = document.querySelector("#ready-player");
@@ -350,6 +351,13 @@ document.querySelector("#submit-bid").addEventListener("click", () => {
   runShellAction(() => activeShellActions().submitBid({
     bid: Number(bidInput.value)
   }), "bid");
+});
+
+bidChoiceButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    bidInput.value = button.dataset.bidValue;
+    syncBidChoiceSelection();
+  });
 });
 
 document.querySelector("#submit-nil").addEventListener("click", () => {
@@ -1533,6 +1541,7 @@ function renderVisualShell(status) {
     currentTrick: visualCurrentTrickOutput,
     lastTrick: visualLastTrickOutput
   }, playCard);
+  syncBidChoiceSelection();
   renderTableLayout(status, playCard);
   renderQaReport(status, errorOutput.textContent, {
     checks: qaCheckListOutput,
@@ -1572,7 +1581,10 @@ function renderVisualShellInto(status, targets, onPlayableCard) {
     tricks: row.tricks,
     bid: bidRowsBySeat.get(row.seat)?.bid,
     bags: bidRowsBySeat.get(row.seat)?.bags,
-    ready: bidRowsBySeat.get(row.seat)?.ready
+    ready: bidRowsBySeat.get(row.seat)?.ready,
+    cards: row.seat === model.viewerSeat
+      ? model.handCards.length
+      : model.hiddenHandCounts?.[row.seat]
   })));
   targets.bidBagSummary.replaceChildren(...model.bidBagRows.map((row) => visualSummaryItem(
     seatName(row.seat),
@@ -1677,7 +1689,7 @@ function visualSummaryItem(label, primary, secondary) {
   return item;
 }
 
-function playerRailSummaryItem({ seat, viewerSeat, score, tricks, bid, bags, ready }) {
+function playerRailSummaryItem({ seat, viewerSeat, score, tricks, bid, bags, ready, cards }) {
   const item = document.createElement("div");
   item.className = seat === viewerSeat ? "summary-item scoreboard-rail viewer-rail" : "summary-item scoreboard-rail opponent-rail";
   item.dataset.seat = seat;
@@ -1686,11 +1698,20 @@ function playerRailSummaryItem({ seat, viewerSeat, score, tricks, bid, bags, rea
     railText("rail-name", currentShellStatus()?.players?.[seat]?.displayName ?? seatName(seat)),
     railMetric("pts", `${score} pts`),
     railMetric("bags", `${bags ?? 0} bags`),
+    railMetric("cards", `${cards ?? 0} cards`),
     railMetric("bid", bid ?? "–"),
     railMetric("tricks", tricks ?? 0),
     railText("rail-ready", ready ? "Online" : "Online")
   );
   return item;
+}
+
+
+function syncBidChoiceSelection() {
+  const selectedBid = String(bidInput.value ?? "");
+  bidChoiceButtons.forEach((button) => {
+    button.classList.toggle("selected", button.dataset.bidValue === selectedBid);
+  });
 }
 
 function railMetric(label, value) {

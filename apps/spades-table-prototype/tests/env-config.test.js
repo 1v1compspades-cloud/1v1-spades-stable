@@ -40,6 +40,17 @@ test("client env config uses same-origin hosted urls when browser location exist
   assert.deepEqual(config.missing, []);
 });
 
+test("server env config uses Render public hostname when explicit URLs are missing", () => {
+  const config = resolveServerEnvConfig({
+    PORT: "10000",
+    RENDER_EXTERNAL_HOSTNAME: "1v1spades.com"
+  });
+
+  assert.equal(config.publicApiUrl, "https://1v1spades.com");
+  assert.equal(config.publicWebSocketUrl, "wss://1v1spades.com/ws");
+  assert.equal(config.localApiUrl, "http://127.0.0.1:10000");
+});
+
 test("client env config reports missing hosted urls without location fallback", () => {
   const config = resolveClientEnvConfig({
     env: { PORT: "5175" },

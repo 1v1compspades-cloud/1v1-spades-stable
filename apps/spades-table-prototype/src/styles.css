@@ -2,6 +2,340 @@
   box-sizing: border-box;
 }
 
+/* Luxury onyx + diamond theme pass. Visual-only overrides shared by all Spades screens. */
+:root {
+  --lux-onyx: #030303;
+  --lux-onyx-soft: #080706;
+  --lux-marble: #12100d;
+  --lux-gold: #f8c95c;
+  --lux-gold-deep: #9f6b14;
+  --lux-gold-hot: #ffd976;
+  --lux-diamond: #f8fbff;
+  --lux-diamond-blue: #b7d7ff;
+  --lux-emerald-felt: #061b14;
+  --lux-panel: rgba(5, 5, 4, 0.88);
+  --lux-marble-texture:
+    radial-gradient(circle at 14% 18%, rgba(255, 255, 255, 0.06) 0 1px, transparent 2px 100%),
+    radial-gradient(circle at 86% 22%, rgba(248, 201, 92, 0.16) 0 1px, transparent 2px 100%),
+    linear-gradient(128deg, transparent 0 31%, rgba(255, 255, 255, 0.05) 31.2%, transparent 32.2% 100%),
+    linear-gradient(42deg, transparent 0 58%, rgba(248, 201, 92, 0.09) 58.2%, transparent 59.1% 100%),
+    radial-gradient(ellipse at 50% 0%, rgba(248, 201, 92, 0.12), transparent 52%),
+    linear-gradient(180deg, #15110d, #030303 54%, #090806);
+  --lux-quilt:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.055) 25%, transparent 25% 75%, rgba(255, 255, 255, 0.055) 75%),
+    linear-gradient(-45deg, rgba(248, 201, 92, 0.1) 25%, transparent 25% 75%, rgba(248, 201, 92, 0.1) 75%),
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.22) 0 1px, transparent 2px 100%),
+    linear-gradient(180deg, #14110d, #030303);
+}
+
+body.tester-mode {
+  color: #fff8e7;
+  background:
+    var(--lux-marble-texture),
+    #030303;
+}
+
+body.tester-mode::before {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(248, 201, 92, 0.18), transparent 34%),
+    linear-gradient(90deg, transparent 0 8%, rgba(255, 255, 255, 0.05) 8.2%, transparent 9% 100%);
+  opacity: 0.72;
+}
+
+body.tester-mode .app-shell,
+body.tester-mode .home-panel,
+body.tester-mode .status-panel,
+body.tester-mode .tester-entry-panel,
+body.tester-mode .global-room-invite-bar,
+body.tester-mode .room-invite-panel,
+body.tester-mode .table-layout-shell,
+body.tester-mode .visual-shell,
+body.tester-mode .beta-feedback-panel,
+body.tester-mode .bid-controls {
+  border-color: rgba(248, 201, 92, 0.52);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.05), transparent 28% 72%, rgba(248, 201, 92, 0.08)),
+    var(--lux-marble-texture);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 0 0 2px rgba(248, 201, 92, 0.16),
+    0 22px 54px rgba(0, 0, 0, 0.5);
+}
+
+body.tester-mode .player-app-chrome,
+body.tester-mode .scoreboard-rail,
+body.tester-mode .table-area,
+body.tester-mode .visual-zone,
+body.tester-mode .center-trick-area,
+body.tester-mode .player-hand-area,
+body.tester-mode .room-invite-copy,
+body.tester-mode .summary-item,
+body.tester-mode .player-screen-tabs {
+  border-color: rgba(248, 201, 92, 0.46);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.045), transparent 35% 70%, rgba(248, 201, 92, 0.08)),
+    var(--lux-marble-texture);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 14px 34px rgba(0, 0, 0, 0.42);
+}
+
+body.tester-mode .visual-shell {
+  position: relative;
+  background:
+    radial-gradient(circle at 50% 49%, rgba(248, 201, 92, 0.15) 0 30%, transparent 30.4% 100%),
+    radial-gradient(circle at 50% 49%, transparent 0 34%, rgba(255, 255, 255, 0.16) 34.2% 34.8%, rgba(248, 201, 92, 0.82) 35% 35.5%, transparent 36.2% 100%),
+    var(--lux-marble-texture);
+}
+
+body.tester-mode .visual-shell::before {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  z-index: 0;
+  border: 2px solid rgba(248, 201, 92, 0.42);
+  border-radius: 28px;
+  pointer-events: none;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.12),
+    inset 0 0 26px rgba(248, 201, 92, 0.12);
+}
+
+body.tester-mode .visual-shell::after,
+body.tester-mode .scoreboard-rail::after,
+body.tester-mode .room-invite-panel::after,
+body.tester-mode .home-panel::after {
+  content: "";
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  border: 1px solid rgba(248, 201, 92, 0.92);
+  background:
+    radial-gradient(circle, var(--lux-diamond) 0 27%, var(--lux-diamond-blue) 28% 42%, rgba(248, 201, 92, 0.88) 43% 58%, transparent 60%),
+    #111;
+  transform: rotate(45deg);
+  pointer-events: none;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.45));
+}
+
+body.tester-mode .visual-shell::after {
+  right: 15px;
+  bottom: 15px;
+}
+
+body.tester-mode .scoreboard-rail,
+body.tester-mode .room-invite-panel,
+body.tester-mode .home-panel {
+  position: relative;
+}
+
+body.tester-mode .scoreboard-rail::after,
+body.tester-mode .room-invite-panel::after,
+body.tester-mode .home-panel::after {
+  top: 10px;
+  right: 10px;
+}
+
+body.tester-mode .visual-shell > *,
+body.tester-mode .scoreboard-rail > *,
+body.tester-mode .room-invite-panel > *,
+body.tester-mode .home-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+body.tester-mode .player-app-chrome h1,
+body.tester-mode .home-panel > h1,
+body.tester-mode .player-guide h2,
+body.tester-mode .room-invite-code,
+body.tester-mode .rail-seat,
+body.tester-mode #visual-current-trick-title,
+body.tester-mode .bid-panel-title {
+  color: var(--lux-gold-hot);
+  text-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.95),
+    0 0 14px rgba(248, 201, 92, 0.28);
+}
+
+body.tester-mode button,
+body.tester-mode .primary-invite-button,
+body.tester-mode .screen-tab-button.active,
+body.tester-mode .bid-choice.selected,
+body.tester-mode #submit-bid {
+  border-color: rgba(255, 226, 142, 0.9);
+  background:
+    linear-gradient(180deg, rgba(255, 241, 183, 0.96), rgba(232, 166, 26, 0.98) 48%, rgba(142, 86, 9, 0.98));
+  color: #100a02;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -2px 0 rgba(85, 48, 4, 0.5),
+    0 12px 28px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+body.tester-mode button::before,
+body.tester-mode .screen-tab-button::before {
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.4));
+}
+
+body.tester-mode button:hover,
+body.tester-mode button:focus-visible {
+  border-color: #fff2bd;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.7),
+    0 0 0 3px rgba(248, 201, 92, 0.28),
+    0 16px 34px rgba(0, 0, 0, 0.46);
+}
+
+body.tester-mode input,
+body.tester-mode select,
+body.tester-mode textarea,
+body.tester-mode .rail-metric-value,
+body.tester-mode .room-pill,
+body.tester-mode #room-status-pill {
+  border-color: rgba(248, 201, 92, 0.64);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 60%),
+    rgba(0, 0, 0, 0.72);
+  color: #fff8e7;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 0 18px rgba(248, 201, 92, 0.08);
+}
+
+body.tester-mode .card-button,
+body.tester-mode .table-hand-grid .card-button,
+body.tester-mode[data-active-screen="play"] #visual-hand .card-button {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  color: #15100a;
+  border: 2px solid rgba(248, 201, 92, 0.92);
+  background:
+    radial-gradient(circle at 16% 14%, rgba(255, 255, 255, 0.9) 0 1px, transparent 2px 100%),
+    radial-gradient(circle at 88% 12%, rgba(255, 255, 255, 0.75) 0 1px, transparent 2px 100%),
+    radial-gradient(circle at 16% 86%, rgba(255, 255, 255, 0.7) 0 1px, transparent 2px 100%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(249, 244, 230, 0.98));
+  box-shadow:
+    inset 0 0 0 2px rgba(133, 83, 14, 0.48),
+    inset 0 0 0 4px rgba(255, 255, 255, 0.5),
+    0 12px 24px rgba(0, 0, 0, 0.42),
+    0 0 0 1px rgba(255, 255, 255, 0.24);
+}
+
+body.tester-mode .card-button::before,
+body.tester-mode .table-hand-grid .card-button::before,
+body.tester-mode[data-active-screen="play"] #visual-hand .card-button::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  z-index: -1;
+  border: 1px solid rgba(248, 201, 92, 0.64);
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 0 0, rgba(255, 255, 255, 0.55) 0 2px, transparent 3px),
+    radial-gradient(circle at 100% 0, rgba(255, 255, 255, 0.55) 0 2px, transparent 3px),
+    radial-gradient(circle at 0 100%, rgba(255, 255, 255, 0.5) 0 2px, transparent 3px),
+    radial-gradient(circle at 100% 100%, rgba(255, 255, 255, 0.5) 0 2px, transparent 3px);
+}
+
+body.tester-mode .card-button[data-suit="hearts"] .card-rank,
+body.tester-mode .card-button[data-suit="hearts"] .card-suit,
+body.tester-mode .card-button[data-suit="diamonds"] .card-rank,
+body.tester-mode .card-button[data-suit="diamonds"] .card-suit {
+  color: #b60915;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+body.tester-mode .card-button[data-suit="spades"] .card-rank,
+body.tester-mode .card-button[data-suit="spades"] .card-suit {
+  color: #111;
+}
+
+body.tester-mode .card-button[data-suit="clubs"] .card-rank,
+body.tester-mode .card-button[data-suit="clubs"] .card-suit {
+  color: #09673f;
+}
+
+body.tester-mode .card-button:disabled .card-state {
+  color: rgba(255, 248, 231, 0.88);
+  background: rgba(4, 4, 4, 0.42);
+}
+
+body.tester-mode .card-back,
+body.tester-mode .hidden-card,
+body.tester-mode .opponent-card-back,
+body.tester-mode [data-card-back="true"],
+body.tester-mode .card-button.card-back,
+body.tester-mode .card-button[data-card-visibility="hidden"] {
+  position: relative;
+  overflow: hidden;
+  border: 2px solid rgba(248, 201, 92, 0.92);
+  background-size: 24px 24px, 24px 24px, 100% 100%, 100% 100%;
+  background-color: #030303;
+  background-image: var(--lux-quilt);
+  color: var(--lux-gold-hot);
+  box-shadow:
+    inset 0 0 0 3px rgba(0, 0, 0, 0.76),
+    inset 0 0 0 5px rgba(248, 201, 92, 0.5),
+    0 12px 28px rgba(0, 0, 0, 0.52);
+}
+
+body.tester-mode .card-back::after,
+body.tester-mode .hidden-card::after,
+body.tester-mode .opponent-card-back::after,
+body.tester-mode [data-card-back="true"]::after,
+body.tester-mode .card-button.card-back::after,
+body.tester-mode .card-button[data-card-visibility="hidden"]::after {
+  content: "1v1";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  min-width: 42px;
+  padding: 6px 7px;
+  border: 1px solid rgba(248, 201, 92, 0.92);
+  color: var(--lux-gold-hot);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 18px;
+  font-weight: 900;
+  text-align: center;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.45), 0 1px 0 #000;
+  background:
+    radial-gradient(circle at 50% 0, rgba(255, 255, 255, 0.55), transparent 34%),
+    rgba(0, 0, 0, 0.58);
+  transform: translate(-50%, -50%) rotate(-36deg);
+  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.38), 0 0 18px rgba(248, 201, 92, 0.38);
+}
+
+body.tester-mode #visual-hand,
+body.tester-mode .card-button-grid,
+body.tester-mode .table-hand-grid {
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.48), rgba(0, 0, 0, 0.84)),
+    var(--lux-marble-texture);
+}
+
+body.tester-mode .visual-zone[aria-labelledby="visual-current-trick-title"] {
+  background:
+    radial-gradient(circle at 50% 44%, rgba(248, 201, 92, 0.15), transparent 38%),
+    var(--lux-marble-texture);
+}
+
+body.tester-mode .bid-choice {
+  border-color: rgba(248, 201, 92, 0.46);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent),
+    rgba(0, 0, 0, 0.76);
+  color: #fff8e7;
+}
+
+body.tester-mode .bug-report-fab {
+  border-color: rgba(248, 201, 92, 0.72);
+  background:
+    linear-gradient(180deg, rgba(255, 241, 183, 0.95), rgba(207, 139, 18, 0.96));
+  color: #100a02;
+}
+
 [hidden] {
   display: none !important;
 }
@@ -2993,4 +3327,558 @@ body.tester-mode[data-active-screen="play"] #visual-hand .card-suit {
     flex-basis: 84px;
     min-height: 118px;
   }
+}
+
+/* iPhone 15 hard-fit beta pass. */
+body.tester-mode[data-active-screen="play"] .scoreboard-rail {
+  grid-template-columns: minmax(0, 1.28fr) auto auto auto auto auto;
+  grid-template-areas:
+    "identity pts bags cards bid tricks"
+    "name pts bags cards bid tricks";
+}
+
+body.tester-mode[data-active-screen="play"] .rail-cards {
+  grid-area: cards;
+}
+
+body.tester-mode .bid-panel-copy {
+  display: grid;
+  gap: 6px;
+  text-align: center;
+}
+
+body.tester-mode .bid-panel-title,
+body.tester-mode .bid-panel-subtitle {
+  margin: 0;
+}
+
+body.tester-mode .bid-panel-title {
+  color: #f6a020;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(26px, 8vw, 42px);
+  font-weight: 900;
+  line-height: 1;
+}
+
+body.tester-mode .bid-panel-subtitle {
+  color: rgba(220, 235, 226, 0.72);
+  font-size: 16px;
+  font-weight: 850;
+}
+
+body.tester-mode .bid-input-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+body.tester-mode .bid-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+body.tester-mode .bid-choice {
+  min-height: 52px;
+  padding: 0;
+  border: 2px solid rgba(111, 151, 132, 0.42);
+  border-radius: 10px;
+  background: rgba(1, 21, 14, 0.92);
+  color: #fff8e7;
+  font-size: 22px;
+  font-weight: 950;
+  box-shadow: none;
+}
+
+body.tester-mode .bid-choice.selected {
+  border-color: rgba(247, 176, 31, 0.96);
+  background: linear-gradient(180deg, #ffb133, #e69113);
+  color: #100b02;
+}
+
+body.tester-mode .bid-submit-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+
+body.tester-mode .bid-submit-row #submit-bid,
+body.tester-mode .bid-submit-row #submit-nil {
+  min-height: 48px;
+}
+
+@media (max-width: 430px) {
+  html {
+    background: #020706;
+  }
+
+  body.tester-mode {
+    max-width: 393px;
+    min-height: 100dvh;
+    margin: 0 auto;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 96px);
+    overflow-x: hidden;
+  }
+
+  body.tester-mode .app-shell {
+    width: min(100%, 393px);
+    max-width: 393px;
+    min-height: calc(100dvh - env(safe-area-inset-top));
+    padding: 8px 10px calc(env(safe-area-inset-bottom) + 96px);
+    gap: 8px;
+  }
+
+  body.tester-mode .player-app-chrome {
+    min-height: 48px;
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  body.tester-mode .player-app-chrome h1 {
+    font-size: 24px;
+    line-height: 1;
+  }
+
+  body.tester-mode .player-app-chrome .app-subtitle,
+  body.tester-mode .beta-build-label {
+    font-size: 11px;
+  }
+
+  body.tester-mode .room-pill,
+  body.tester-mode #room-status-pill {
+    min-height: 30px;
+    padding: 4px 9px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  body.tester-mode .player-guide {
+    padding: 12px 14px;
+    border-radius: 16px;
+  }
+
+  body.tester-mode .player-guide h2 {
+    font-size: 24px;
+    line-height: 1.05;
+  }
+
+  body.tester-mode .player-guide p {
+    font-size: 14px;
+    line-height: 1.25;
+  }
+
+  body.tester-mode .bug-report-fab {
+    position: fixed;
+    top: calc(env(safe-area-inset-top) + 8px);
+    right: max(10px, calc((100vw - 393px) / 2 + 10px));
+    bottom: auto;
+    z-index: 45;
+    min-height: 30px;
+    padding: 0 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    line-height: 1;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
+  }
+
+  body.tester-mode .player-screen-tabs {
+    position: fixed;
+    right: max(10px, calc((100vw - 393px) / 2 + 10px));
+    bottom: calc(env(safe-area-inset-bottom) + 10px);
+    left: max(10px, calc((100vw - 393px) / 2 + 10px));
+    z-index: 40;
+    min-height: 58px;
+    padding: 7px;
+    border-radius: 22px;
+  }
+
+  body.tester-mode .screen-tab-button {
+    min-height: 44px;
+    padding: 0 10px;
+    border-radius: 16px;
+    font-size: 15px;
+  }
+
+  body.tester-mode .developer-details,
+  body.tester-mode #local-preview-tools,
+  body.tester-mode #advanced-diagnostics,
+  body.tester-mode .transport-selector,
+  body.tester-mode .qa-report-panel,
+  body.tester-mode .action-log-panel,
+  body.tester-mode .beta-safety-panel {
+    display: none !important;
+  }
+
+  body.tester-mode[data-active-screen="lobby"] .home-panel,
+  body.tester-mode[data-active-screen="table"] .status-panel,
+  body.tester-mode[data-active-screen="play"] .status-panel {
+    max-width: 393px;
+    margin: 0 auto;
+  }
+
+  body.tester-mode[data-active-screen="lobby"] .home-panel {
+    min-height: 0;
+    padding: 12px;
+    gap: 10px;
+    border-radius: 16px;
+  }
+
+  body.tester-mode[data-active-screen="lobby"] .controls {
+    gap: 9px;
+  }
+
+  body.tester-mode[data-active-screen="lobby"] label:has(#display-name),
+  body.tester-mode[data-active-screen="lobby"] .connection-help-panel,
+  body.tester-mode[data-active-screen="lobby"] #connection-status,
+  body.tester-mode[data-active-screen="lobby"] #room-code-share-status,
+  body.tester-mode[data-active-screen="lobby"] #quick-match-status {
+    display: none !important;
+  }
+
+  body.tester-mode[data-active-screen="lobby"] label:has(#join-code) {
+    gap: 5px;
+    font-size: 14px;
+  }
+
+  body.tester-mode[data-active-screen="lobby"] input {
+    min-height: 46px;
+    padding: 0 14px;
+    font-size: 18px;
+  }
+
+  body.tester-mode[data-active-screen="lobby"] #join-quick-match,
+  body.tester-mode[data-active-screen="lobby"] #create-room,
+  body.tester-mode[data-active-screen="lobby"] #join-room,
+  body.tester-mode[data-active-screen="lobby"] #spectate-room,
+  body.tester-mode[data-active-screen="lobby"] #restore-room,
+  body.tester-mode[data-active-screen="lobby"] #copy-invite-link,
+  body.tester-mode[data-active-screen="lobby"] #copy-room-code,
+  body.tester-mode[data-active-screen="lobby"] #leave-quick-match,
+  body.tester-mode[data-active-screen="lobby"] #clear-room {
+    min-height: 52px;
+    padding: 0 14px;
+    border-radius: 14px;
+    font-size: 16px;
+  }
+
+  body.tester-mode[data-active-screen="lobby"] .global-room-invite-bar,
+  body.tester-mode[data-active-screen="table"] .room-invite-panel {
+    padding: 12px;
+    gap: 8px;
+    border-radius: 16px;
+  }
+
+  body.tester-mode[data-active-screen="lobby"] .global-room-actions,
+  body.tester-mode[data-active-screen="table"] .room-invite-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  body.tester-mode[data-active-screen="play"] .visual-shell {
+    height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 116px);
+    min-height: 0;
+    max-height: 642px;
+    grid-template-rows: 104px minmax(176px, 1fr) 104px 126px;
+    margin-inline: -10px;
+  }
+
+  body.tester-mode[data-active-screen="play"] .scoreboard-rail {
+    min-height: 104px;
+    padding: 11px 10px 10px;
+    column-gap: 6px;
+    grid-template-columns: minmax(0, 1.08fr) auto auto auto auto;
+    grid-template-areas:
+      "identity pts bags cards tricks"
+      "name pts bags cards tricks";
+  }
+
+  body.tester-mode[data-active-screen="play"] .rail-seat {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+  }
+
+  body.tester-mode[data-active-screen="play"] .rail-name {
+    max-width: 118px;
+    font-size: 22px;
+  }
+
+  body.tester-mode[data-active-screen="play"] .rail-metric {
+    min-width: 42px;
+    gap: 3px;
+  }
+
+  body.tester-mode[data-active-screen="play"] .rail-metric-value {
+    min-width: 38px;
+    padding: 4px 5px;
+    font-size: 14px;
+    border-width: 2px;
+    border-radius: 8px;
+  }
+
+  body.tester-mode[data-active-screen="play"] .rail-metric-label {
+    font-size: 9px;
+    letter-spacing: 0.08em;
+  }
+
+  body.tester-mode[data-active-screen="play"] .rail-bid {
+    display: none;
+  }
+
+  body.tester-mode[data-active-screen="play"] .rail-tricks .rail-metric-value {
+    color: #f1c40f;
+    font-size: 24px;
+  }
+
+  body.tester-mode[data-active-screen="play"] .rail-ready {
+    top: 7px;
+    right: 9px;
+    font-size: 9px;
+  }
+
+  body.tester-mode[data-active-screen="play"] .visual-zone[aria-labelledby="visual-current-trick-title"] {
+    padding: 14px 12px;
+  }
+
+  body.tester-mode[data-active-screen="play"] #visual-current-trick-title {
+    font-size: 14px;
+    letter-spacing: 0.22em;
+  }
+
+  body.tester-mode[data-active-screen="play"] #visual-current-trick {
+    margin-top: 8px;
+    font-size: 16px;
+  }
+
+  body.tester-mode[data-active-screen="play"] #visual-hand {
+    height: 126px;
+    padding: 8px 10px 10px;
+  }
+
+  body.tester-mode[data-active-screen="play"] #visual-hand .card-button {
+    flex-basis: 76px;
+    min-height: 108px;
+    border-radius: 9px;
+  }
+
+  body.tester-mode[data-active-screen="play"] #visual-hand .card-rank {
+    font-size: 30px;
+  }
+
+  body.tester-mode[data-active-screen="play"] #visual-hand .card-suit {
+    font-size: 34px;
+  }
+
+  body.tester-mode[data-active-screen="play"] .room-actions {
+    padding: 0 10px;
+  }
+
+  body.tester-mode[data-active-screen="play"] .room-actions button {
+    min-height: 46px;
+    font-size: 15px;
+  }
+
+  body.tester-mode[data-active-screen="play"][data-game-phase="bidding"] .bid-controls {
+    position: fixed;
+    top: calc(env(safe-area-inset-top) + 158px);
+    right: max(14px, calc((100vw - 393px) / 2 + 14px));
+    bottom: auto;
+    left: max(14px, calc((100vw - 393px) / 2 + 14px));
+    z-index: 35;
+    display: grid;
+    max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 236px);
+    padding: 18px 16px 14px;
+    gap: 12px;
+    overflow-y: auto;
+    border: 1px solid rgba(111, 151, 132, 0.62);
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(9, 42, 31, 0.98), rgba(3, 20, 15, 0.98));
+    box-shadow: 0 26px 58px rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  body.tester-mode[data-active-screen="play"][data-game-phase="bidding"] .bid-panel-title {
+    font-size: 30px;
+  }
+
+  body.tester-mode[data-active-screen="play"][data-game-phase="bidding"] .bid-panel-subtitle {
+    font-size: 13px;
+  }
+
+  body.tester-mode[data-active-screen="play"][data-game-phase="bidding"] .bid-choice-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  body.tester-mode[data-active-screen="play"][data-game-phase="bidding"] .bid-choice {
+    min-height: 46px;
+    font-size: 20px;
+  }
+
+  body.tester-mode[data-active-screen="play"][data-game-phase="bidding"] .bid-submit-row {
+    grid-template-columns: 1fr;
+  }
+
+  body.tester-mode[data-active-screen="play"][data-game-phase="bidding"] #submit-bid {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  body.tester-mode[data-active-screen="play"][data-game-phase="bidding"] #submit-nil {
+    display: none;
+  }
+}
+
+/* Final cascade reinforcement for the onyx + diamond casino theme. */
+body.tester-mode,
+body.tester-mode[data-active-screen="lobby"],
+body.tester-mode[data-active-screen="table"],
+body.tester-mode[data-active-screen="play"] {
+  background:
+    var(--lux-marble-texture),
+    var(--lux-onyx) !important;
+}
+
+body.tester-mode .app-shell,
+body.tester-mode .home-panel,
+body.tester-mode .status-panel,
+body.tester-mode .tester-entry-panel,
+body.tester-mode .global-room-invite-bar,
+body.tester-mode .room-invite-panel,
+body.tester-mode .table-layout-shell,
+body.tester-mode .visual-shell,
+body.tester-mode .player-app-chrome,
+body.tester-mode .player-screen-tabs,
+body.tester-mode .scoreboard-rail,
+body.tester-mode .visual-zone,
+body.tester-mode .center-trick-area,
+body.tester-mode .player-hand-area,
+body.tester-mode .bid-controls,
+body.tester-mode .beta-feedback-panel {
+  border-color: rgba(248, 201, 92, 0.58) !important;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.05), transparent 31% 68%, rgba(248, 201, 92, 0.09)),
+    var(--lux-marble-texture) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+    inset 0 0 0 2px rgba(248, 201, 92, 0.18),
+    0 20px 48px rgba(0, 0, 0, 0.5) !important;
+}
+
+body.tester-mode[data-active-screen="play"] .visual-shell {
+  background:
+    radial-gradient(circle at 50% 49%, transparent 0 28%, rgba(248, 201, 92, 0.82) 29.2% 29.8%, rgba(255, 255, 255, 0.7) 30% 30.4%, transparent 31.2% 100%),
+    radial-gradient(circle at 50% 49%, rgba(248, 201, 92, 0.13), transparent 44%),
+    var(--lux-marble-texture) !important;
+}
+
+body.tester-mode .scoreboard-rail,
+body.tester-mode[data-active-screen="play"] .scoreboard-rail {
+  border-color: rgba(248, 201, 92, 0.68) !important;
+  background:
+    linear-gradient(90deg, rgba(248, 201, 92, 0.08), transparent 14% 86%, rgba(248, 201, 92, 0.08)),
+    var(--lux-marble-texture) !important;
+}
+
+body.tester-mode .rail-seat,
+body.tester-mode .rail-metric-label,
+body.tester-mode #visual-current-trick-title,
+body.tester-mode .room-invite-copy .eyebrow,
+body.tester-mode .home-panel > .eyebrow {
+  color: var(--lux-gold-hot) !important;
+}
+
+body.tester-mode .rail-name,
+body.tester-mode .rail-metric-value,
+body.tester-mode .room-invite-code,
+body.tester-mode .player-app-chrome h1 {
+  color: #fff8e7;
+  text-shadow: 0 1px 0 #000, 0 0 16px rgba(248, 201, 92, 0.22);
+}
+
+body.tester-mode button,
+body.tester-mode .primary-invite-button,
+body.tester-mode .screen-tab-button.active,
+body.tester-mode #submit-bid,
+body.tester-mode .bid-choice.selected,
+body.tester-mode .bug-report-fab {
+  border-color: rgba(255, 226, 142, 0.92) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 245, 198, 0.98), rgba(239, 178, 43, 0.98) 48%, rgba(148, 91, 11, 0.98)) !important;
+  color: #120b02 !important;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -2px 0 rgba(67, 38, 4, 0.5),
+    0 12px 30px rgba(0, 0, 0, 0.42),
+    0 0 0 1px rgba(255, 255, 255, 0.12) !important;
+}
+
+body.tester-mode .screen-tab-button:not(.active),
+body.tester-mode .bid-choice:not(.selected) {
+  border-color: rgba(248, 201, 92, 0.48) !important;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.04), transparent),
+    rgba(0, 0, 0, 0.72) !important;
+  color: #fff8e7 !important;
+}
+
+body.tester-mode input,
+body.tester-mode select,
+body.tester-mode textarea,
+body.tester-mode .rail-metric-value,
+body.tester-mode .room-pill,
+body.tester-mode #room-status-pill {
+  border-color: rgba(248, 201, 92, 0.72) !important;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 65%),
+    rgba(0, 0, 0, 0.74) !important;
+}
+
+body.tester-mode .card-button,
+body.tester-mode .table-hand-grid .card-button,
+body.tester-mode[data-active-screen="play"] #visual-hand .card-button {
+  border-color: rgba(248, 201, 92, 0.95) !important;
+  background:
+    radial-gradient(circle at 12% 11%, rgba(255, 255, 255, 0.9) 0 1px, transparent 2px 100%),
+    radial-gradient(circle at 88% 11%, rgba(255, 255, 255, 0.75) 0 1px, transparent 2px 100%),
+    radial-gradient(circle at 12% 88%, rgba(255, 255, 255, 0.7) 0 1px, transparent 2px 100%),
+    radial-gradient(circle at 88% 88%, rgba(255, 255, 255, 0.7) 0 1px, transparent 2px 100%),
+    linear-gradient(135deg, #fffdf5, #f4ead4 54%, #fffaf0) !important;
+  box-shadow:
+    inset 0 0 0 2px rgba(119, 73, 8, 0.55),
+    inset 0 0 0 4px rgba(255, 255, 255, 0.52),
+    0 12px 28px rgba(0, 0, 0, 0.5) !important;
+}
+
+body.tester-mode .card-back,
+body.tester-mode .hidden-card,
+body.tester-mode .opponent-card-back,
+body.tester-mode [data-card-back="true"],
+body.tester-mode .card-button.card-back,
+body.tester-mode .card-button[data-card-visibility="hidden"] {
+  background-image: var(--lux-quilt) !important;
+  background-size: 24px 24px, 24px 24px, 100% 100%, 100% 100% !important;
+  background-color: #030303 !important;
+  border-color: rgba(248, 201, 92, 0.95) !important;
+}
+
+body.tester-mode .card-back::after,
+body.tester-mode .hidden-card::after,
+body.tester-mode .opponent-card-back::after,
+body.tester-mode [data-card-back="true"]::after,
+body.tester-mode .card-button.card-back::after,
+body.tester-mode .card-button[data-card-visibility="hidden"]::after {
+  content: "1v1";
+}
+
+body.tester-mode #visual-hand,
+body.tester-mode .card-button-grid,
+body.tester-mode .table-hand-grid {
+  border-color: rgba(248, 201, 92, 0.34) !important;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.54), rgba(0, 0, 0, 0.88)),
+    var(--lux-marble-texture) !important;
 }
