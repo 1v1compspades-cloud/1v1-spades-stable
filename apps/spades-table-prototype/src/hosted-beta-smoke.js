@@ -51,9 +51,7 @@ export async function runHostedBetaSmokeTest({
 }
 
 function createSmokeRunId() {
-  const timePart = Date.now().toString(36).toUpperCase().slice(-4);
-  const randomPart = Math.random().toString(36).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(2, 6).padEnd(4, "X");
-  return `${timePart}${randomPart}`;
+  return Date.now().toString(36).toUpperCase().slice(-6);
 }
 
 export function assertHostedBetaSmokePassed(result) {
