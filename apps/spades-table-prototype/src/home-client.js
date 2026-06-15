@@ -155,6 +155,8 @@ let lastNotificationStatusKey = "";
 let lastNotificationAt = 0;
 let titleFlashTimer = null;
 let copyFeedbackTimer = null;
+let launchInviteRoomCode = "";
+let launchInviteJoinAttempted = false;
 let expoPushToken = String(globalThis.__SPADES_EXPO_PUSH_TOKEN ?? "").trim();
 let lastRegisteredPushKey = "";
 const baseDocumentTitle = document.title || "1v1 Spades";
@@ -550,7 +552,9 @@ function shouldUseTesterMode(params) {
 function applyLaunchMode() {
   const invitedRoomCode = String(launchParams.get("room") ?? launchParams.get("code") ?? "").trim().toUpperCase();
   if (invitedRoomCode) {
+    launchInviteRoomCode = invitedRoomCode;
     joinCodeInput.value = invitedRoomCode;
+    roomCodeShareStatusOutput.textContent = `Joining room ${invitedRoomCode} from invite link...`;
   }
 
   const requestedTransport = launchParams.get("transport");
@@ -571,7 +575,8 @@ function applyLaunchMode() {
 function renderInitialStatus() {
   if (isRealServerMode()) {
     realServerClient.connect()
-      .then(() => renderStatus(realServerClient.status))
+      .then(() => joinLaunchInviteRoom())
+      .then((status) => renderStatus(status ?? realServerClient.status))
       .catch((error) => {
         showError(error?.message ?? "Hosted server unavailable");
         renderStatus(realServerClient.status);
@@ -580,6 +585,23 @@ function renderInitialStatus() {
   }
 
   renderStatus(controller.restoreActiveRoom().status);
+}
+
+async function joinLaunchInviteRoom() {
+  if (!launchInviteRoomCode || launchInviteJoinAttempted) return realServerClient.status;
+  launchInviteJoinAttempted = true;
+  saveCurrentDisplayName();
+  const status = serverStatusFromResponse(await realServerClient.joinRoom({
+    roomCode: launchInviteRoomCode,
+    displayName: localIdentity.displayName,
+    seatToken: localIdentity.seatToken
+  }));
+  rememberSessionFromStatus(status);
+  lastSuccessfulAction = `joined invite room ${launchInviteRoomCode}`;
+  actionLog.record(lastSuccessfulAction, status);
+  roomCodeShareStatusOutput.textContent = `Joined room ${launchInviteRoomCode}. Both players press Ready on Play.`;
+  window.history?.replaceState?.({}, document.title, window.location.pathname);
+  return status;
 }
 
 async function runShellAction(action, successLabel = "completed action") {

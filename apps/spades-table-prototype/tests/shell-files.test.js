@@ -190,6 +190,10 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /params\.get\("dev"\)/);
   assert.match(client, /transportMode = "real-server"/);
   assert.match(client, /realServerClient\.connect/);
+  assert.match(client, /launchInviteRoomCode/);
+  assert.match(client, /joinLaunchInviteRoom/);
+  assert.match(client, /realServerClient\.joinRoom\(\{/);
+  assert.match(client, /Joined room \$/);
   assert.match(client, /document\.body\.classList\.add\("tester-mode"\)/);
   assert.match(client, /createLocalActionLog/);
   assert.match(client, /createSpadesLiveSyncClient/);
