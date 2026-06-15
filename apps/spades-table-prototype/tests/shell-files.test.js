@@ -581,8 +581,13 @@ test("hosted deploy checklist and server startup are present", () => {
 
 test("quick match waiting screens stay compact for mobile testers", () => {
   const css = readFileSync(resolve(appDir, "src/styles.css"), "utf8");
+  const js = readFileSync(resolve(appDir, "src/home-client.js"), "utf8");
 
   assert.match(css, /Compact quick-match waiting pass/);
+  assert.match(js, /return \{ screen: "play", key: `\$\{status\.roomCode\}:waiting:invite` \}/);
+  assert.match(js, /return \{ screen: "play", key: `\$\{status\.roomCode\}:waiting:opponent-ready:\$\{status\.viewerSeat\}` \}/);
+  assert.match(css, /body\.tester-mode\[data-active-screen="table"\]\[data-game-phase="waiting"\] \.visual-shell/);
+  assert.match(css, /body\.tester-mode\[data-active-screen="table"\]\[data-game-phase="waiting"\] \.table-layout-shell/);
   assert.match(css, /body\.tester-mode\[data-active-screen="table"\] #room-invite-panel\s*\{\s*display: none !important;/);
   assert.match(css, /body\.tester-mode\[data-active-screen="play"\]\[data-game-phase="waiting"\] \.visual-shell > :not\(#room-invite-panel\)/);
   assert.match(css, /body\.tester-mode\[data-active-screen="play"\]\[data-game-phase="waiting"\] #room-invite-panel \.room-invite-copy\s*\{\s*display: none !important;/);

@@ -1083,9 +1083,9 @@ function guidedPlayerScreen(status) {
       return { screen: "play", key: `${status.roomCode}:waiting:ready:${status.viewerSeat}` };
     }
     if (bothPlayersPresent && viewerReady) {
-      return { screen: "table", key: `${status.roomCode}:waiting:opponent-ready:${status.viewerSeat}` };
+      return { screen: "play", key: `${status.roomCode}:waiting:opponent-ready:${status.viewerSeat}` };
     }
-    return { screen: "table", key: `${status.roomCode}:waiting:invite` };
+    return { screen: "play", key: `${status.roomCode}:waiting:invite` };
   }
 
   if (status.phase === "bidding") {

@@ -4249,6 +4249,26 @@ body.tester-mode .table-hand-grid {
 
 
 /* Compact quick-match waiting pass. */
+body.tester-mode[data-active-screen="table"][data-game-phase="waiting"] .visual-shell,
+body.tester-mode[data-active-screen="table"][data-game-phase="waiting"] .table-layout-shell,
+body.tester-mode[data-active-screen="table"][data-game-phase="waiting"] .status-panel > h2,
+body.tester-mode[data-active-screen="table"][data-game-phase="waiting"] .visual-zone,
+body.tester-mode[data-active-screen="table"][data-game-phase="waiting"] .summary-grid,
+body.tester-mode[data-active-screen="table"][data-game-phase="waiting"] .visual-status-band,
+body.tester-mode[data-active-screen="table"][data-game-phase="waiting"] .center-trick-area,
+body.tester-mode[data-active-screen="table"][data-game-phase="waiting"] .last-trick-area,
+body.tester-mode[data-active-screen="table"][data-game-phase="waiting"] .player-hand-area {
+  display: none !important;
+}
+
+body.tester-mode[data-active-screen="table"][data-game-phase="waiting"] .status-panel {
+  min-height: 0 !important;
+  padding: 0 0 calc(env(safe-area-inset-bottom) + 96px) !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
 body.tester-mode[data-active-screen="table"] #room-invite-panel {
   display: none !important;
 }
