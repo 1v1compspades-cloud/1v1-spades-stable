@@ -15,6 +15,9 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /Report Bug/);
   assert.match(html, /id="player-app-chrome"/);
   assert.match(html, /id="player-screen-status"/);
+  assert.match(html, /id="player-guide"/);
+  assert.match(html, /id="player-guide-title"/);
+  assert.match(html, /id="player-guide-detail"/);
   assert.match(html, /id="player-screen-tabs"/);
   assert.match(html, /data-screen-target="lobby"/);
   assert.match(html, /data-screen-target="table"/);
@@ -245,6 +248,9 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /joinQuickMatch/);
   assert.match(client, /leaveQuickMatch/);
   assert.match(client, /renderQuickMatchStatus/);
+  assert.match(client, /renderPlayerGuide/);
+  assert.match(client, /setRecommendedAction/);
+  assert.match(client, /recommended-action/);
   assert.match(client, /createLocalAccountStatsStore/);
   assert.match(client, /createLocalTournamentHistoryStore/);
   assert.match(client, /recordLocalCompletedMatch/);

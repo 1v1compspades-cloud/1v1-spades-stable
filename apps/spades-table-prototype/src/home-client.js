@@ -57,6 +57,9 @@ const connectionStatusOutput = document.querySelector("#connection-status");
 const reconnectHelpOutput = document.querySelector("#reconnect-help");
 const afkDisconnectWarningOutput = document.querySelector("#afk-disconnect-warning");
 const playerScreenStatusOutput = document.querySelector("#player-screen-status");
+const playerGuideTitleOutput = document.querySelector("#player-guide-title");
+const playerGuideDetailOutput = document.querySelector("#player-guide-detail");
+const playerGuidePanel = document.querySelector("#player-guide");
 const globalRoomInviteBar = document.querySelector("#global-room-invite-bar");
 const globalRoomCodeOutput = document.querySelector("#global-room-code");
 const globalInviteRoomButton = document.querySelector("#global-invite-room");
@@ -784,9 +787,17 @@ function renderTransportModeStatus() {
 
 function renderQuickMatchStatus() {
   const queue = realServerClient.queueStatus;
+  document.body.dataset.findMatch = queue?.state ?? "idle";
   quickMatchStatusOutput.textContent = queue
-    ? `Find Match: ${queue.state} (${queue.waitingCount ?? 0} waiting)`
-    : "Find Match: idle";
+    ? findMatchStatusText(queue)
+    : "Find Match: ready";
+}
+
+function findMatchStatusText(queue) {
+  if (queue.state === "waiting") return "Finding opponent... keep this screen open.";
+  if (queue.state === "matched") return "Match found. Opening your table.";
+  if (queue.state === "left") return "Find Match canceled.";
+  return `Find Match: ${queue.state} (${queue.waitingCount ?? 0} waiting)`;
 }
 
 function renderStatus(status) {
@@ -824,6 +835,99 @@ function renderStatus(status) {
   renderTournamentHistoryPanel();
   renderActionLog();
   renderBetaFeedbackPanel(status);
+  renderPlayerGuide(status);
+}
+
+function renderPlayerGuide(status) {
+  if (!playerGuideTitleOutput || !playerGuideDetailOutput) return;
+  const guide = playerGuideForStatus(status);
+  playerGuideTitleOutput.textContent = guide.title;
+  playerGuideDetailOutput.textContent = guide.detail;
+  playerGuidePanel?.classList.toggle("urgent", Boolean(guide.urgent));
+  setRecommendedAction(guide.selector);
+}
+
+function playerGuideForStatus(status) {
+  const queue = realServerClient.queueStatus;
+  if (!status?.roomCode) {
+    if (queue?.state === "waiting") {
+      return {
+        title: "Finding an opponent",
+        detail: "Keep this screen open. We will move you to the table when someone joins.",
+        selector: "#leave-quick-match",
+        urgent: true
+      };
+    }
+    return {
+      title: "Choose how to play",
+      detail: "Tap Find Match for a fast game, or Create Room to invite a friend.",
+      selector: "#join-quick-match"
+    };
+  }
+
+  if (status.phase === "waiting") {
+    return {
+      title: "Ready up",
+      detail: "Share the room if needed, then press Ready on Play when both players are here.",
+      selector: "#ready-player",
+      urgent: true
+    };
+  }
+
+  if (status.phase === "bidding") {
+    const isYourBid = status.biddingStatus?.nextBidder === status.viewerSeat;
+    return {
+      title: isYourBid ? "Your bid" : "Opponent is bidding",
+      detail: isYourBid ? "Choose how many tricks you think you can take, then submit your bid." : "Watch the table. Your turn is coming next.",
+      selector: isYourBid ? "#submit-bid" : null,
+      urgent: isYourBid
+    };
+  }
+
+  if (status.phase === "playing") {
+    const canPlay = status.currentPlayerStatus?.canAct;
+    return {
+      title: canPlay ? "Your play" : "Opponent turn",
+      detail: canPlay ? "Tap a highlighted card to play it." : "Watch the trick. You will play after your opponent.",
+      selector: canPlay ? ".card-button:not(:disabled)" : null,
+      urgent: canPlay
+    };
+  }
+
+  if (status.phase === "hand_complete") {
+    return {
+      title: "Hand complete",
+      detail: "Review the score, then start the next hand when you are ready.",
+      selector: "#table-start-next-hand",
+      urgent: true
+    };
+  }
+
+  if (status.phase === "match_complete") {
+    return {
+      title: "Match complete",
+      detail: "Start a new match or head back to the lobby.",
+      selector: "#table-start-new-match",
+      urgent: true
+    };
+  }
+
+  return {
+    title: "You are at the table",
+    detail: "Use Table for room status and Play when it is your turn.",
+    selector: null
+  };
+}
+
+function setRecommendedAction(selector) {
+  document.querySelectorAll(".recommended-action").forEach((element) => {
+    element.classList.remove("recommended-action");
+  });
+  if (!selector) return;
+  const target = document.querySelector(selector);
+  if (target && !target.hidden && !target.disabled) {
+    target.classList.add("recommended-action");
+  }
 }
 
 function setActivePlayerScreen(screen, { manual = false } = {}) {
@@ -883,6 +987,7 @@ function updatePlayerActionVisibility(status) {
   setHidden(leaveRoomHelp, !hasRoom);
   setHidden(tableLeaveRoomButton, !hasRoom);
   setHidden(copyInviteLinkButton, !hasRoom);
+  setHidden(copyRoomCodeButton, !hasRoom);
   setHidden(tableInviteLinkButton, !isWaiting);
   setHidden(roomInvitePanel, !hasRoom);
   setHidden(roomInviteLinkButton, !isWaiting);
