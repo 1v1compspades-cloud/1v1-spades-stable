@@ -154,6 +154,7 @@ let activeFixturePreset = "none";
 let transportMode = "direct";
 let activePlayerScreen = "lobby";
 let playerChoseScreen = false;
+let lastGuidedScreenKey = "";
 let lastNotificationStatusKey = "";
 let lastNotificationAt = 0;
 let titleFlashTimer = null;
@@ -296,6 +297,7 @@ document.querySelector("#clear-room").addEventListener("click", () => {
   localIdentity = identityStore.clearSession();
   lastSuccessfulAction = "clear active room";
   playerChoseScreen = false;
+  lastGuidedScreenKey = "";
   actionLog.record("clear active room", null);
   renderStatus(null);
 });
@@ -866,10 +868,28 @@ function playerGuideForStatus(status) {
   }
 
   if (status.phase === "waiting") {
+    const bothPlayersPresent = Boolean(status.players?.player1 && status.players?.player2);
+    const isReady = Boolean(status.playerReady?.[status.viewerSeat]);
+    if (bothPlayersPresent && !isReady) {
+      return {
+        title: "Opponent joined",
+        detail: "You are at the table. Press Ready on Play to start the hand.",
+        selector: "#ready-player",
+        urgent: true
+      };
+    }
+    if (bothPlayersPresent && isReady) {
+      return {
+        title: "Waiting on opponent",
+        detail: "You are ready. The hand starts as soon as your opponent presses Ready.",
+        selector: null,
+        urgent: false
+      };
+    }
     return {
-      title: "Ready up",
-      detail: "Share the room if needed, then press Ready on Play when both players are here.",
-      selector: "#ready-player",
+      title: "Invite your opponent",
+      detail: "Share the room code or invite link. We will move you to Play when they join.",
+      selector: "#global-invite-room",
       urgent: true
     };
   }
@@ -946,17 +966,64 @@ function setActivePlayerScreen(screen, { manual = false } = {}) {
 
 function updatePlayerScreenForStatus(status) {
   updatePlayerChrome(status);
-  const preferredScreen = preferredPlayerScreen(status);
-  if (!status || !playerChoseScreen) {
+  const guidance = guidedPlayerScreen(status);
+  const preferredScreen = guidance.screen;
+  if (!status || !playerChoseScreen || shouldAutoGuideScreen(guidance)) {
     setActivePlayerScreen(preferredScreen);
     return;
   }
 }
 
+function guidedPlayerScreen(status) {
+  if (!status?.roomCode) return { screen: "lobby", key: "lobby:none" };
+  const bothPlayersPresent = Boolean(status.players?.player1 && status.players?.player2);
+  const viewerReady = Boolean(status.playerReady?.[status.viewerSeat]);
+  const yourBid = status.phase === "bidding" && status.biddingStatus?.nextBidder === status.viewerSeat;
+  const yourPlay = status.phase === "playing" && status.currentPlayerStatus?.canAct;
+
+  if (status.phase === "waiting") {
+    if (bothPlayersPresent && !viewerReady) {
+      return { screen: "play", key: `${status.roomCode}:waiting:ready:${status.viewerSeat}` };
+    }
+    if (bothPlayersPresent && viewerReady) {
+      return { screen: "table", key: `${status.roomCode}:waiting:opponent-ready:${status.viewerSeat}` };
+    }
+    return { screen: "table", key: `${status.roomCode}:waiting:invite` };
+  }
+
+  if (status.phase === "bidding") {
+    return {
+      screen: "play",
+      key: `${status.roomCode}:bidding:${yourBid ? "your-bid" : "opponent-bid"}:${status.biddingStatus?.nextBidder ?? "none"}`
+    };
+  }
+
+  if (status.phase === "playing") {
+    return {
+      screen: "play",
+      key: `${status.roomCode}:playing:${yourPlay ? "your-play" : "opponent-play"}:${status.currentTurn ?? "none"}:${status.hand?.length ?? 0}`
+    };
+  }
+
+  if (status.phase === "hand_complete") {
+    return { screen: "play", key: `${status.roomCode}:hand-complete` };
+  }
+
+  if (status.phase === "match_complete") {
+    return { screen: "play", key: `${status.roomCode}:match-complete` };
+  }
+
+  return { screen: "table", key: `${status.roomCode}:${status.phase ?? "unknown"}` };
+}
+
 function preferredPlayerScreen(status) {
-  if (!status?.roomCode) return "lobby";
-  if (["bidding", "playing"].includes(status.phase)) return "play";
-  return "table";
+  return guidedPlayerScreen(status).screen;
+}
+
+function shouldAutoGuideScreen(guidance) {
+  if (guidance.key === lastGuidedScreenKey) return false;
+  lastGuidedScreenKey = guidance.key;
+  return activePlayerScreen !== guidance.screen;
 }
 
 function updatePlayerChrome(status) {
