@@ -15,14 +15,15 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /Report Bug/);
   assert.match(html, /id="player-app-chrome"/);
   assert.match(html, /id="player-screen-status"/);
+  assert.match(html, /id="universal-home"/);
+  assert.match(html, /class="universal-home-button"/);
   assert.match(html, /id="player-guide"/);
   assert.match(html, /id="player-guide-title"/);
   assert.match(html, /id="player-guide-detail"/);
-  assert.match(html, /id="player-screen-tabs"/);
-  assert.match(html, /data-screen-target="lobby"/);
-  assert.match(html, />Home<\/button>/);
-  assert.match(html, /data-screen-target="table"/);
-  assert.match(html, /data-screen-target="play"/);
+  assert.doesNotMatch(html, /id="player-screen-tabs"/);
+  assert.doesNotMatch(html, /data-screen-target="lobby"/);
+  assert.doesNotMatch(html, /data-screen-target="table"/);
+  assert.doesNotMatch(html, /data-screen-target="play"/);
   assert.match(html, /id="create-room"/);
   assert.match(html, /id="tester-entry-panel"/);
   assert.match(html, /id="beta-build-label"/);
@@ -341,8 +342,8 @@ test("visual QA and table layout styling is present", () => {
   assert.match(css, /\.tester-entry-panel/);
   assert.match(css, /\[hidden\]/);
   assert.match(css, /\.player-app-chrome/);
-  assert.match(css, /\.player-screen-tabs/);
-  assert.match(css, /\.screen-tab-button\.active/);
+  assert.match(css, /\.universal-home-button/);
+  assert.match(css, /body\.tester-mode \.player-screen-tabs\s*\{\s*display: none !important;/);
   assert.match(css, /\.bug-report-fab/);
   assert.match(css, /position:\s*fixed/);
   assert.match(css, /\.beta-build-label/);
@@ -596,16 +597,18 @@ test("quick match waiting screens stay compact for mobile testers", () => {
   assert.match(css, /body\.tester-mode\[data-active-screen="play"\]\[data-game-phase="waiting"\] \.player-hand-area/);
 });
 
-test("manual Home from a waiting room shows a clean menu with resume", () => {
+test("universal Home from an active room shows a clean menu with reconnect", () => {
   const css = readFileSync(resolve(appDir, "src/styles.css"), "utf8");
   const js = readFileSync(resolve(appDir, "src/home-client.js"), "utf8");
 
   assert.match(js, /let cleanHomeRoomCode = null/);
-  assert.match(js, /targetScreen === "lobby" && status\?\.roomCode && status\.phase === "waiting"/);
+  assert.match(js, /universalHomeButton\?\.addEventListener\("click"/);
+  assert.match(js, /function showCleanHome\(status\)/);
   assert.match(js, /document\.body\.dataset\.cleanHome = cleanHome \? "true" : "false"/);
+  assert.match(js, /setHidden\(universalHomeButton, !hasRoom \|\| cleanHome\)/);
   assert.match(js, /setHidden\(globalRoomInviteBar, !hasRoom \|\| cleanHome\)/);
-  assert.match(js, /restoreRoomButton\.textContent = cleanHome \? "Resume Room" : "Reconnect to Current Game"/);
+  assert.match(js, /restoreRoomButton\.textContent = "Reconnect to Current Game"/);
   assert.match(js, /function isCleanHomeMode\(status\)/);
-  assert.match(css, /body\.tester-mode\[data-active-screen="lobby"\]\[data-clean-home="true"\] \.global-room-invite-bar/);
+  assert.match(css, /body\.tester-mode\[data-clean-home="true"\] #global-room-invite-bar/);
   assert.match(css, /body\.tester-mode\[data-active-screen="lobby"\]\[data-clean-home="true"\] #restore-room/);
 });

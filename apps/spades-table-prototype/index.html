@@ -16,6 +16,7 @@
           <p class="suit-strip" aria-label="Card suits"><span>♠</span><span>♥</span><span>♦</span><span>♣</span></p>
         </div>
         <div class="player-chrome-actions">
+          <button id="universal-home" class="universal-home-button" type="button" hidden>Home</button>
           <p id="player-screen-status" class="player-screen-status">Home</p>
           <button id="jump-to-bug-report" class="bug-report-fab" type="button">Report Bug</button>
         </div>
@@ -400,11 +401,6 @@
         <pre id="visual-qa-status">Visual QA idle.</pre>
         <pre id="manual-status">Manual harness idle.</pre>
       </details>
-      <nav id="player-screen-tabs" class="player-screen-tabs" aria-label="Game screens">
-        <button class="screen-tab-button" type="button" data-screen-target="lobby" aria-pressed="true">Home</button>
-        <button class="screen-tab-button" type="button" data-screen-target="table" aria-pressed="false">Table</button>
-        <button class="screen-tab-button" type="button" data-screen-target="play" aria-pressed="false">Play</button>
-      </nav>
     </main>
 
     <script type="module" src="./src/home-client.js"></script>

@@ -57,6 +57,7 @@ const connectionStatusOutput = document.querySelector("#connection-status");
 const reconnectHelpOutput = document.querySelector("#reconnect-help");
 const afkDisconnectWarningOutput = document.querySelector("#afk-disconnect-warning");
 const playerScreenStatusOutput = document.querySelector("#player-screen-status");
+const universalHomeButton = document.querySelector("#universal-home");
 const playerGuideTitleOutput = document.querySelector("#player-guide-title");
 const playerGuideDetailOutput = document.querySelector("#player-guide-detail");
 const playerGuidePanel = document.querySelector("#player-guide");
@@ -254,6 +255,10 @@ document.querySelector("#restore-room").addEventListener("click", () => {
   cleanHomeRoomCode = null;
   playerChoseScreen = false;
   runShellAction(() => activeShellActions().restoreRoom(), "restore active room");
+});
+
+universalHomeButton?.addEventListener("click", () => {
+  showCleanHome(currentShellStatus());
 });
 
 document.querySelector("#reconnect-live-sync").addEventListener("click", () => {
@@ -549,24 +554,10 @@ transportModeSelect.addEventListener("change", () => {
   renderStatus(currentShellStatus());
 });
 
-for (const tabButton of playerScreenTabs) {
-  tabButton.addEventListener("click", () => {
-    const targetScreen = tabButton.dataset.screenTarget;
-    const status = currentShellStatus();
-    if (targetScreen === "lobby" && status?.roomCode && status.phase === "waiting") {
-      cleanHomeRoomCode = status.roomCode;
-      setActivePlayerScreen("lobby", { manual: true, status });
-      renderStatus(status);
-      return;
-    }
-    cleanHomeRoomCode = null;
-    if (targetScreen !== "lobby" && !status?.roomCode) {
-      playerChoseScreen = false;
-      setActivePlayerScreen("lobby", { status });
-      return;
-    }
-    setActivePlayerScreen(targetScreen, { manual: true, status });
-  });
+function showCleanHome(status) {
+  cleanHomeRoomCode = status?.roomCode ?? null;
+  setActivePlayerScreen("lobby", { manual: true, status });
+  renderStatus(status);
 }
 
 liveSyncClient.onStatus((update) => {
@@ -883,7 +874,7 @@ function findMatchStatusText(queue) {
 }
 
 function renderStatus(status) {
-  if (!status?.roomCode || status.roomCode !== cleanHomeRoomCode || status.phase !== "waiting") {
+  if (!status?.roomCode || status.roomCode !== cleanHomeRoomCode) {
     cleanHomeRoomCode = null;
   }
   registerExpoPushToken(status);
@@ -939,7 +930,7 @@ function playerGuideForStatus(status) {
   if (isCleanHomeMode(status)) {
     return {
       title: "Choose how to play",
-      detail: `Room ${status.roomCode} is still waiting. Tap Resume Room to invite or ready up.`,
+      detail: `Room ${status.roomCode} is saved. Tap Reconnect to Current Game to return.`,
       selector: "#restore-room"
     };
   }
@@ -1045,7 +1036,7 @@ function playerGuideForStatus(status) {
 
   return {
     title: "You are at the table",
-    detail: "Use Table for room status and Play when it is your turn.",
+    detail: "Use the game screen for room status and actions.",
     selector: null
   };
 }
@@ -1256,6 +1247,7 @@ function updatePlayerActionVisibility(status) {
   const hasRoom = Boolean(status?.roomCode);
   const rematchRequested = Boolean(status?.rematchRequests?.[status.viewerSeat]);
 
+  setHidden(universalHomeButton, !hasRoom || cleanHome);
   setHidden(bidControls, !isYourBid || countdownActive);
   setHidden(globalRoomInviteBar, !hasRoom || cleanHome);
   if (globalRoomCodeOutput) globalRoomCodeOutput.textContent = status?.roomCode ?? "------";
@@ -1263,7 +1255,7 @@ function updatePlayerActionVisibility(status) {
   setHidden(globalCopyRoomCodeButton, !hasRoom);
   setHidden(globalBackLobbyButton, !isMatchComplete);
   setHidden(restoreRoomButton, cleanHome ? false : (!hasRoom && !localIdentity.lastSession));
-  if (restoreRoomButton) restoreRoomButton.textContent = cleanHome ? "Resume Room" : "Reconnect to Current Game";
+  if (restoreRoomButton) restoreRoomButton.textContent = "Reconnect to Current Game";
   setHidden(readyPlayerButton, !isWaiting);
   setHidden(leaveRoomButton, !hasRoom);
   setHidden(askRematchButton, !isMatchComplete || rematchRequested);
@@ -1286,8 +1278,7 @@ function updatePlayerActionVisibility(status) {
 function isCleanHomeMode(status) {
   return activePlayerScreen === "lobby"
     && Boolean(cleanHomeRoomCode)
-    && status?.roomCode === cleanHomeRoomCode
-    && status.phase === "waiting";
+    && status?.roomCode === cleanHomeRoomCode;
 }
 
 function updatePlayerScreenTabAvailability(status) {

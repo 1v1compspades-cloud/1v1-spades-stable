@@ -4383,3 +4383,62 @@ body.tester-mode[data-active-screen="play"][data-game-phase="waiting"] .player-h
     font-size: 16px !important;
   }
 }
+
+/* Universal Home replaces the old bottom Home/Table/Play tab bar. */
+.universal-home-button {
+  display: none;
+}
+
+body.tester-mode .player-screen-tabs {
+  display: none !important;
+}
+
+body.tester-mode .player-chrome-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+body.tester-mode .universal-home-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid rgba(249, 214, 118, 0.78);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 232, 150, 0.98), rgba(205, 139, 10, 0.96));
+  color: #080604;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.24) inset, 0 6px 16px rgba(0, 0, 0, 0.38);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+body.tester-mode .universal-home-button[hidden],
+body.tester-mode[data-clean-home="true"] .universal-home-button {
+  display: none !important;
+}
+
+body.tester-mode[data-active-screen="lobby"][data-clean-home="true"] #restore-room {
+  display: inline-flex !important;
+}
+
+body.tester-mode[data-clean-home="true"] #global-room-invite-bar,
+body.tester-mode[data-clean-home="true"] #room-invite-panel,
+body.tester-mode[data-clean-home="true"] .visual-zone,
+body.tester-mode[data-clean-home="true"] .center-trick-area,
+body.tester-mode[data-clean-home="true"] .last-trick-area,
+body.tester-mode[data-clean-home="true"] .player-hand-area {
+  display: none !important;
+}
+
+body.tester-mode .app-shell,
+body.tester-mode .home-panel,
+body.tester-mode .status-panel {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px) !important;
+}
