@@ -195,7 +195,7 @@ Known gaps:
 
 ## Immediate Next Best Work
 
-1. Verify the live `/privacy`, `/terms`, and `/support` routes after deploy.
+1. Complete the manual iPhone/TestFlight checklist in `docs/SPADES_RELEASE_GATE_MATRIX.md`.
 2. Add an automated UI-state smoke for the clean Home/Reconnect flow if a browser test harness is introduced.
 3. Keep production claims narrow: free-play rooms, Find Match, reconnect, spectator safety, and core gameplay.
 4. Do not start KOTT or tournament implementation until the beta release gate is stable and documented.

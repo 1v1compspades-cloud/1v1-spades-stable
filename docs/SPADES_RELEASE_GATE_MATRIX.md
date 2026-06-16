@@ -46,7 +46,7 @@ corepack pnpm --filter @workspace/spades-freeplay exec eas build:list --platform
 | --- | --- | --- | --- | --- |
 | Production URL is correct | PASS | `/health` returns `publicApiUrl: https://1v1spades.com` and `publicWebSocketUrl: wss://1v1spades.com/ws`. | `curl -fsSL https://1v1spades.com/health` | Recheck after every deploy. |
 | WebSocket and hosted smoke path work | PASS | Hosted smoke covers health, create room, join room, WebSocket, one trick, complete hand, reconnect, quick match, and hidden-hand safety. | `npm run smoke:hosted -- https://1v1spades.com` | Re-run after every code or Render env change. |
-| Public legal/support URLs resolve | PASS after deploy | Server now serves `/privacy`, `/terms`, and `/support` with free-play-only wording. | `curl -I https://1v1spades.com/privacy`, `/terms`, `/support` should return 200. | Verify live after Render deploy completes. |
+| Public legal/support URLs resolve | PASS | Live `/privacy`, `/terms`, and `/support` return HTTP 200 with free-play-only wording. | `curl -I https://1v1spades.com/privacy`, `/terms`, `/support`. | Recheck before App Store metadata review. |
 | Root web app loads | PASS | `/` serves the Spades app shell and current client assets. | `curl -fsSL https://1v1spades.com/` and manual browser load. | Recheck after deploy. |
 | Free-play wording | PASS | Home, policy pages, terms, and launch docs say free play only. | Read root shell plus public pages. | Keep payments/prizes/gambling language out of product UI. |
 | Hidden hands stay private | PASS | Core, room-state, HTTP, WebSocket, visual shell, hosted smoke, and spectator tests cover hidden-hand safety. | `npm test`; hosted smoke. | Add browser visual checks later. |
@@ -67,7 +67,7 @@ corepack pnpm --filter @workspace/spades-freeplay exec eas build:list --platform
 | iPhone install and launch | MANUAL | Requires real TestFlight device. | Install latest build, open on iPhone, confirm no crash and hosted app loads. | Must be repeated after every hosted UI change because the wrapper loads the live site. |
 | iPhone clean Home/Reconnect | MANUAL plus automated shell coverage | Universal Home/Reconnect shell test passes; real iPhone must confirm visual flow. | Create room, tap Home, confirm clean Home, tap Reconnect, confirm room returns. | Required before external tester invite. |
 | iPhone gameplay fit | MANUAL | Automated unit tests do not prove visual fit on iPhone 15 Safari/TestFlight. | Play create/join/ready/bid/play/full hand on iPhone. | Screenshot each major phase. |
-| App Store public URLs | BLOCKER until live 200 verified | Wrapper docs and constants point to `/privacy`, `/terms`, `/support`; routes now exist in server code. | `curl -I` for all three after deploy. | Do not submit metadata review until all return 200. |
+| App Store public URLs | PASS | `/privacy`, `/terms`, and `/support` are live HTTP 200 routes. | `curl -I` for all three before each submission. | Keep wording current as privacy/support behavior changes. |
 
 ## Gameplay Gates
 
@@ -124,4 +124,4 @@ Run this on iPhone 15 or newer and capture screenshots:
 
 ## Release Decision
 
-Current decision: limited free-play beta can continue after the public URL routes deploy and real-device checks pass. Full production readiness is not complete because accounts, production leaderboards, tournaments, KOTT, host/admin tools, durable room lifecycle, and iPhone visual regression coverage remain unfinished.
+Current decision: limited free-play beta can continue after real-device checks pass. Full production readiness is not complete because accounts, production leaderboards, tournaments, KOTT, host/admin tools, durable room lifecycle, and iPhone visual regression coverage remain unfinished.
