@@ -372,6 +372,9 @@ test("visual QA and table layout styling is present", () => {
   assert.match(css, /body\.tester-mode\[data-active-screen="play"\]:not\(\[data-game-phase="waiting"\]\) \.rail-bid/);
   assert.match(css, /body\.tester-mode\[data-active-screen="play"\]:not\(\[data-game-phase="waiting"\]\) \.visual-zone\[aria-labelledby="visual-current-trick-title"\]::before/);
   assert.match(css, /LAST HAND PLAYED/);
+  assert.match(css, /Mobile table spacing pass/);
+  assert.match(css, /height:\s*min\(646px, calc\(100dvh - env\(safe-area-inset-top\) - env\(safe-area-inset-bottom\) - 78px\)\)/);
+  assert.match(css, /grid-template-rows:\s*74px minmax\(394px, 1fr\) 74px 104px/);
   assert.match(css, /@media \(max-width: 430px\)/);
   assert.match(css, /max-width:\s*393px/);
   assert.match(css, /env\(safe-area-inset-top\)/);
