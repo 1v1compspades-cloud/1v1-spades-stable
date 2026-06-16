@@ -68,6 +68,8 @@ const playerGuideDetailOutput = document.querySelector("#player-guide-detail");
 const playerGuidePanel = document.querySelector("#player-guide");
 const globalRoomInviteBar = document.querySelector("#global-room-invite-bar");
 const globalRoomCodeOutput = document.querySelector("#global-room-code");
+const globalRoomHelpOutput = document.querySelector("#global-room-help");
+const globalRoomPlayersOutput = document.querySelector("#global-room-players");
 const globalInviteRoomButton = document.querySelector("#global-invite-room");
 const globalCopyRoomCodeButton = document.querySelector("#global-copy-room-code");
 const globalBackLobbyButton = document.querySelector("#global-back-lobby");
@@ -78,6 +80,8 @@ const coinFlipDetailOutput = document.querySelector("#coin-flip-detail");
 const roomCodeShareStatusOutput = document.querySelector("#room-code-share-status");
 const roomInvitePanel = document.querySelector("#room-invite-panel");
 const roomInviteCodeOutput = document.querySelector("#room-invite-code");
+const roomInviteInstructionsOutput = document.querySelector("#room-invite-instructions");
+const roomInvitePlayersOutput = document.querySelector("#room-invite-players");
 const roomInviteLinkButton = document.querySelector("#room-invite-link");
 const roomCopyCodeButton = document.querySelector("#room-copy-code");
 const copyInviteLinkButton = document.querySelector("#copy-invite-link");
@@ -1451,6 +1455,57 @@ function renderRoomCodeShare(status) {
   roomCodeShareStatusOutput.textContent = status?.roomCode
     ? `Room ${status.roomCode} is ready. Share this code with your opponent, then both players press Ready on Play.`
     : "Room code: create or join a room to share.";
+  renderRoomPresence(status);
+}
+
+function renderRoomPresence(status) {
+  const presence = roomPresenceText(status);
+  const help = roomInviteHelpText(status);
+
+  if (globalRoomPlayersOutput) globalRoomPlayersOutput.textContent = presence;
+  if (roomInvitePlayersOutput) roomInvitePlayersOutput.textContent = presence;
+  if (globalRoomHelpOutput) globalRoomHelpOutput.textContent = help;
+  if (roomInviteInstructionsOutput) roomInviteInstructionsOutput.textContent = help;
+}
+
+function roomInviteHelpText(status) {
+  if (!status?.roomCode) return "Create or join a room first.";
+  const bothPlayersPresent = Boolean(status.players?.player1 && status.players?.player2);
+  if (status.phase === "waiting" && bothPlayersPresent) {
+    return "Opponent joined. Both players press Ready to start.";
+  }
+  if (status.phase === "waiting") {
+    return "Share this code with your opponent, then both players press Ready on Play.";
+  }
+  if (status.phase === "bidding") return "Bidding is live. Watch your hand and submit when it is your turn.";
+  if (status.phase === "playing") return "Game is live. Play from this screen when it is your turn.";
+  if (status.phase === "hand_complete") return "Hand complete. Review the score and continue when ready.";
+  if (status.phase === "match_complete") return "Match complete. Return to lobby or ask for a rematch.";
+  return "Room is active.";
+}
+
+function roomPresenceText(status) {
+  if (!status?.roomCode) return "Players: waiting for room.";
+  const player1 = status.players?.player1;
+  const player2 = status.players?.player2;
+  if (!player1 && !player2) return "Players: waiting for seats.";
+  if (!player1 || !player2) {
+    const seated = player1 ?? player2;
+    const label = player1 ? "Player 1" : "Player 2";
+    return `Players: ${label} ${seated?.displayName ?? "Player"} is here. Opponent waiting.`;
+  }
+
+  if (status.viewerSeat === "spectator") {
+    return `Players: ${player1.displayName ?? "Player 1"} vs ${player2.displayName ?? "Player 2"}.`;
+  }
+
+  const opponentSeat = status.viewerSeat === "player1" ? "player2" : "player1";
+  const you = status.players?.[status.viewerSeat]?.displayName ?? seatName(status.viewerSeat);
+  const opponent = status.players?.[opponentSeat]?.displayName ?? seatName(opponentSeat);
+  const ready = status.phase === "waiting"
+    ? ` Ready: you ${status.playerReady?.[status.viewerSeat] ? "yes" : "no"}, opponent ${status.playerReady?.[opponentSeat] ? "yes" : "no"}.`
+    : "";
+  return `Players: you ${you} · opponent ${opponent}.${ready}`;
 }
 
 function buildInviteLink(roomCode) {

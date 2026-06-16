@@ -1925,6 +1925,13 @@ body.tester-mode .bug-report-fab {
   line-height: 1.32;
 }
 
+.room-player-status {
+  color: rgba(255, 248, 231, 0.86);
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.25;
+}
+
 .global-room-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3444,6 +3451,7 @@ body.tester-mode[data-active-screen="play"] .rail-cards {
 body.tester-mode .bid-panel-copy {
   display: grid;
   gap: 6px;
+  justify-items: center;
   text-align: center;
 }
 
@@ -3458,12 +3466,14 @@ body.tester-mode .bid-panel-title {
   font-size: clamp(26px, 8vw, 42px);
   font-weight: 900;
   line-height: 1;
+  text-align: center;
 }
 
 body.tester-mode .bid-panel-subtitle {
   color: rgba(220, 235, 226, 0.72);
   font-size: 16px;
   font-weight: 850;
+  line-height: 1.2;
 }
 
 body.tester-mode .bid-input-label {
@@ -3477,7 +3487,7 @@ body.tester-mode .bid-input-label {
 
 body.tester-mode .bid-choice-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -3501,13 +3511,18 @@ body.tester-mode .bid-choice.selected {
 
 body.tester-mode .bid-submit-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.78fr);
+  align-items: center;
   gap: 10px;
 }
 
 body.tester-mode .bid-submit-row #submit-bid,
 body.tester-mode .bid-submit-row #submit-nil {
   min-height: 48px;
+}
+
+body.tester-mode .bid-submit-row #submit-nil {
+  display: none;
 }
 
 @media (max-width: 430px) {
@@ -4692,6 +4707,86 @@ body.tester-mode .status-panel {
   }
 
   body.tester-mode[data-active-screen="play"]:not([data-game-phase="waiting"]) #leave-room-help {
+    display: none !important;
+  }
+
+  body.tester-mode[data-active-screen="play"][data-game-phase="bidding"] .visual-shell {
+    grid-template-rows: 74px minmax(332px, 1fr) 70px 124px !important;
+  }
+
+  body.tester-mode[data-active-screen="play"][data-game-phase="bidding"] #visual-hand {
+    height: 124px !important;
+    opacity: 1 !important;
+  }
+
+  body.tester-mode[data-active-screen="play"][data-game-phase="bidding"] #visual-hand .card-button {
+    flex-basis: 72px !important;
+    min-height: 104px !important;
+  }
+
+  body.tester-mode[data-active-screen="play"][data-game-phase="bidding"] .bid-controls {
+    position: fixed !important;
+    top: calc(env(safe-area-inset-top) + 124px) !important;
+    right: max(12px, calc((100vw - 393px) / 2 + 12px)) !important;
+    bottom: auto !important;
+    left: max(12px, calc((100vw - 393px) / 2 + 12px)) !important;
+    z-index: 36 !important;
+    max-width: 369px !important;
+    max-height: min(322px, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 374px)) !important;
+    padding: 10px 11px 12px !important;
+    gap: 8px !important;
+    overflow-y: auto !important;
+    border-radius: 15px !important;
+    background:
+      var(--lux-diamond-sparkle),
+      linear-gradient(135deg, rgba(84, 63, 16, 0.82), rgba(3, 4, 3, 0.98) 52%, rgba(92, 72, 22, 0.74)) !important;
+    box-shadow:
+      0 18px 38px rgba(0, 0, 0, 0.52),
+      inset 0 0 0 1px rgba(255, 244, 190, 0.18) !important;
+  }
+
+  body.tester-mode[data-active-screen="play"][data-game-phase="bidding"] .bid-panel-copy {
+    justify-items: center !important;
+    text-align: center !important;
+  }
+
+  body.tester-mode[data-active-screen="play"][data-game-phase="bidding"] .bid-panel-title {
+    width: 100% !important;
+    font-size: 24px !important;
+    line-height: 1 !important;
+    text-align: center !important;
+  }
+
+  body.tester-mode[data-active-screen="play"][data-game-phase="bidding"] .bid-choice-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    gap: 7px !important;
+  }
+
+  body.tester-mode[data-active-screen="play"][data-game-phase="bidding"] .bid-choice {
+    min-height: 48px !important;
+    border-radius: 11px !important;
+    font-size: 19px !important;
+  }
+
+  body.tester-mode[data-active-screen="play"][data-game-phase="bidding"] .bid-submit-row {
+    grid-template-columns: 1fr !important;
+    gap: 7px !important;
+  }
+
+  body.tester-mode[data-active-screen="play"][data-game-phase="bidding"] .bid-panel-subtitle {
+    color: rgba(255, 248, 231, 0.78) !important;
+    font-size: 12px !important;
+    line-height: 1.18 !important;
+    text-align: center !important;
+  }
+
+  body.tester-mode[data-active-screen="play"][data-game-phase="bidding"] #submit-bid {
+    min-height: 50px !important;
+    border-radius: 13px !important;
+    font-size: 17px !important;
+  }
+
+  body.tester-mode[data-active-screen="play"][data-game-phase="bidding"] #submit-nil {
     display: none !important;
   }
 }

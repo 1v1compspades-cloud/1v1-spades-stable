@@ -31,6 +31,30 @@ test("server client creates and joins through HTTP and subscribes through WebSoc
   }
 });
 
+test("invite link join updates the waiting host with opponent name", async () => {
+  const fixture = await startServerClientFixture();
+
+  try {
+    const host = fixture.client("host-invite", "seat-host-invite");
+    const guest = fixture.client("guest-invite", "seat-guest-invite");
+    const hostUpdates = [];
+    host.onStatus((update) => hostUpdates.push(update));
+
+    await host.createRoom({ roomCode: "INVITE1", displayName: "Shaw" });
+    await guest.joinRoom({ roomCode: "INVITE1", displayName: "Jason" });
+
+    assert.equal(host.status.phase, "waiting");
+    assert.equal(host.status.players.player1.displayName, "Shaw");
+    assert.equal(host.status.players.player2.displayName, "Jason");
+    assert.equal(host.status.viewerSeat, "player1");
+    assert.equal(guest.status.players.player1.displayName, "Shaw");
+    assert.equal(guest.status.players.player2.displayName, "Jason");
+    assert.equal(hostUpdates.some((update) => update.view?.players?.player2?.displayName === "Jason"), true);
+  } finally {
+    await fixture.close();
+  }
+});
+
 test("server client receives sanitized broadcasts for player and spectator views", async () => {
   const fixture = await startServerClientFixture();
 

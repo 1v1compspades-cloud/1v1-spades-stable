@@ -70,6 +70,8 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /id="reconnect-live-sync"/);
   assert.match(html, /id="copy-room-code"/);
   assert.match(html, /id="room-code-share-status"/);
+  assert.match(html, /id="global-room-players"/);
+  assert.match(html, /id="room-invite-players"/);
   assert.match(html, /Copy Room Code/);
   assert.match(html, /id="join-quick-match"/);
   assert.match(html, /id="leave-quick-match"/);
@@ -375,11 +377,15 @@ test("visual QA and table layout styling is present", () => {
   assert.match(css, /Mobile table spacing pass/);
   assert.match(css, /height:\s*min\(646px, calc\(100dvh - env\(safe-area-inset-top\) - env\(safe-area-inset-bottom\) - 78px\)\)/);
   assert.match(css, /grid-template-rows:\s*74px minmax\(394px, 1fr\) 74px 104px/);
+  assert.match(css, /grid-template-rows:\s*74px minmax\(332px, 1fr\) 70px 124px/);
   assert.match(css, /@media \(max-width: 430px\)/);
   assert.match(css, /max-width:\s*393px/);
   assert.match(css, /env\(safe-area-inset-top\)/);
   assert.match(css, /env\(safe-area-inset-bottom\)/);
+  assert.match(css, /\.room-player-status/);
   assert.match(css, /grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(css, /grid-template-columns:\s*repeat\(5, minmax\(0, 1fr\)\)/);
+  assert.match(css, /max-height:\s*min\(322px, calc\(100dvh - env\(safe-area-inset-top\) - env\(safe-area-inset-bottom\) - 374px\)\)/);
   assert.match(css, /max-height:\s*calc\(100dvh - env\(safe-area-inset-top\) - env\(safe-area-inset-bottom\) - 236px\)/);
   assert.match(css, /\.rail-cards/);
   assert.match(css, /--lux-marble-texture/);

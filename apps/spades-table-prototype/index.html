@@ -31,6 +31,7 @@
           <span class="global-room-label">Room</span>
           <strong id="global-room-code">------</strong>
           <span id="global-room-help">Share this code with your opponent, then both players press Ready on Play.</span>
+          <span id="global-room-players" class="room-player-status">Players: waiting for opponent.</span>
         </div>
         <div class="global-room-actions">
           <button id="global-invite-room" class="primary-invite-button" type="button">Invite / Share Room</button>
@@ -164,6 +165,7 @@
               <p class="eyebrow">Room</p>
               <p id="room-invite-code" class="room-invite-code">------</p>
               <p id="room-invite-instructions" class="room-invite-instructions">Share this code with your opponent, then both players press Ready on Play.</p>
+              <p id="room-invite-players" class="room-player-status">Players: waiting for opponent.</p>
             </div>
             <div class="room-invite-actions">
               <button id="room-invite-link" class="primary-invite-button" type="button">Invite / Share Room</button>
@@ -290,7 +292,6 @@
         <div class="bid-controls" aria-label="Bidding controls">
           <div class="bid-panel-copy">
             <p class="bid-panel-title">Place your bid</p>
-            <p class="bid-panel-subtitle">Choose once. Bid Nil for 0 tricks.</p>
           </div>
           <label class="bid-input-label">
             Bid
@@ -313,6 +314,7 @@
             <button class="bid-choice" type="button" data-bid-value="13">13</button>
           </div>
           <div class="bid-submit-row">
+            <p class="bid-panel-subtitle">Choose once. Bid Nil for 0 tricks.</p>
             <button id="submit-bid" type="button">Submit Bid</button>
             <button id="submit-nil" type="button">Nil</button>
           </div>
