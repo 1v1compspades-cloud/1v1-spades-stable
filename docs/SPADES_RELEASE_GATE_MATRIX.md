@@ -51,7 +51,7 @@ corepack pnpm --filter @workspace/spades-freeplay exec eas build:list --platform
 | Free-play wording | PASS | Home, policy pages, terms, and launch docs say free play only. | Read root shell plus public pages. | Keep payments/prizes/gambling language out of product UI. |
 | Hidden hands stay private | PASS | Core, room-state, HTTP, WebSocket, visual shell, hosted smoke, and spectator tests cover hidden-hand safety. | `npm test`; hosted smoke. | Add browser visual checks later. |
 | Report Bug remains available | PASS with manual confirmation | `#jump-to-bug-report` and beta feedback diagnostics exist and are tested as shell targets. | `npm test`; manual phone check. | Confirm it never covers key gameplay buttons on iPhone. |
-| Developer panels hidden from testers | RISK | CSS/tester mode hides advanced diagnostics/local preview/manual tools; markup still ships. | `npm test`; manual phone check. | Prefer build-time removal or a production shell split before broad launch. |
+| Developer panels hidden from testers | PASS for visibility, RISK for shipped markup | The HTML shell defaults to `class="tester-mode"` so advanced diagnostics/local preview/manual tools are hidden before client JavaScript runs; `?dev=1` unlocks them for development. Markup still ships. | `npm test`; manual phone check. | Prefer build-time removal or a production shell split before broad launch. |
 | Logs do not leak secrets | MANUAL | Code tests cover diagnostics/API payloads, not Render log review. | Inspect Render logs during create/join/bid/play smoke. | Confirm no hands, seat tokens, request bodies, admin keys, or secrets appear. |
 | Rollback path exists | MANUAL | Docs describe rollback; actual proof lives in provider dashboard. | Confirm previous Render deploy is available and can be redeployed. | Keep tester pause/update message ready. |
 
@@ -101,6 +101,20 @@ corepack pnpm --filter @workspace/spades-freeplay exec eas build:list --platform
 | Tournaments | BLOCKER for tournament launch | Only local tournament history preview exists. No bracket/admin engine. | Do not market tournaments as live. |
 | King of the Table | BLOCKER for KOTT launch | No KOTT queue/current king/streak/host controls implemented. | Do not market KOTT as live. |
 | Admin roles/tools | BLOCKER for admin launch | No production admin auth/role system. | Keep admin claims out of public copy. |
+
+## Accounts Prep After 8.5 Beta Gate
+
+Do not implement production auth until the mobile/TestFlight beta remains stable on real devices. The next account pass should preserve guest mode and add only the minimum shared platform layer needed for:
+
+- username/display name ownership
+- login/signup with guest upgrade
+- profile page
+- wins/losses and match history
+- leaderboard-ready match result records
+- tournament and King of the Table history fields
+- admin roles separated from player accounts
+
+Acceptance bar before account code starts: real iPhone create/join/find match/reconnect smoke passes, no hidden-hand leaks, no TestFlight crash, and public copy remains free-play only.
 
 ## Manual iPhone/TestFlight Checklist
 

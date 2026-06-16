@@ -87,11 +87,11 @@ Completed or covered:
 - Hosted health endpoint reports production public API/WebSocket URLs.
 - Hosted smoke covers create, join, WebSocket, one trick, full hand, reconnect, quick match, and hidden-hand safety.
 - Bottom Home/Table/Play tabs were removed; universal Home now returns to a clean Home screen with Reconnect to Current Game.
-- Tester mode hides developer transport/debug panels by CSS in the current shell.
+- Tester mode is the default HTML shell class, so developer transport/debug panels are hidden before client JavaScript runs. `?dev=1` explicitly unlocks the dev shell.
 
 Known gaps:
 
-- Developer/manual/local preview markup still exists in the shipped HTML and relies on hiding rather than separate build-time removal.
+- Developer/manual/local preview markup still exists in the shipped HTML, but public testers receive the no-JS-safe tester shell by default. A later production shell split would reduce shipped markup further.
 - There is no production visual regression suite for iPhone Safari/TestFlight layout.
 - `apps/spades-table-prototype/node_modules/` is present as an untracked local directory and should not be committed.
 

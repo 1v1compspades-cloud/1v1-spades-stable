@@ -75,7 +75,6 @@ const copyFeedbackToast = document.querySelector("#copy-feedback-toast");
 const coinFlipPanel = document.querySelector("#coin-flip-panel");
 const coinFlipTitleOutput = document.querySelector("#coin-flip-title");
 const coinFlipDetailOutput = document.querySelector("#coin-flip-detail");
-const playerScreenTabs = Array.from(document.querySelectorAll("[data-screen-target]"));
 const roomCodeShareStatusOutput = document.querySelector("#room-code-share-status");
 const roomInvitePanel = document.querySelector("#room-invite-panel");
 const roomInviteCodeOutput = document.querySelector("#room-invite-code");
@@ -632,6 +631,8 @@ function applyLaunchMode() {
     document.body.classList.add("tester-mode");
     transportMode = "real-server";
     transportModeSelect.value = "real-server";
+  } else {
+    document.body.classList.remove("tester-mode");
   }
 
   setActivePlayerScreen("lobby");
@@ -1071,11 +1072,6 @@ function setActivePlayerScreen(screen, { manual = false, status = currentShellSt
     playerChoseScreen = true;
   }
   document.body.dataset.activeScreen = screen;
-  for (const tabButton of playerScreenTabs) {
-    const selected = tabButton.dataset.screenTarget === screen;
-    tabButton.classList.toggle("active", selected);
-    tabButton.setAttribute("aria-pressed", selected ? "true" : "false");
-  }
 }
 
 function updatePlayerScreenForStatus(status) {
@@ -1283,23 +1279,10 @@ function updatePlayerActionVisibility(status) {
   setHidden(tableStartRematchButton, !isMatchComplete || rematchRequested);
   if (leaveRoomButton) leaveRoomButton.textContent = isMatchComplete ? "Return to Lobby" : "Leave Game";
   if (tableLeaveRoomButton) tableLeaveRoomButton.textContent = isMatchComplete ? "Return to Lobby" : "Leave Game";
-  updatePlayerScreenTabAvailability(status);
 }
 
 function isCleanHomeMode(status) {
   return isCleanHomeNavigationMode({ activePlayerScreen, cleanHomeRoomCode, status });
-}
-
-function updatePlayerScreenTabAvailability(status) {
-  const hasRoom = Boolean(status?.roomCode);
-  const tableLocked = hasRoom && !["waiting"].includes(status?.phase);
-  for (const tabButton of playerScreenTabs) {
-    const target = tabButton.dataset.screenTarget;
-    const requiresRoom = target !== "lobby";
-    const locked = (requiresRoom && !hasRoom) || (target === "table" && tableLocked);
-    tabButton.disabled = locked;
-    tabButton.setAttribute("aria-disabled", locked ? "true" : "false");
-  }
 }
 
 function setHidden(element, hidden) {

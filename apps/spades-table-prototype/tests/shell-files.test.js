@@ -14,6 +14,7 @@ test("basic shell exposes create join ready leave and status targets", () => {
   assert.match(html, /id="jump-to-bug-report"/);
   assert.match(html, /Report Bug/);
   assert.match(html, /id="player-app-chrome"/);
+  assert.match(html, /<body class="tester-mode"/);
   assert.match(html, /id="player-screen-status"/);
   assert.match(html, /id="universal-home"/);
   assert.match(html, /class="universal-home-button"/);
@@ -205,6 +206,7 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /realServerClient\.joinRoom\(\{/);
   assert.match(client, /Joined room \$/);
   assert.match(client, /document\.body\.classList\.add\("tester-mode"\)/);
+  assert.match(client, /document\.body\.classList\.remove\("tester-mode"\)/);
   assert.match(client, /createLocalActionLog/);
   assert.match(client, /createSpadesLiveSyncClient/);
   assert.match(client, /createMockSpadesSocketTransport/);
@@ -230,6 +232,8 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /ready-countdown/);
   assert.match(client, /updatePlayerScreenForStatus/);
   assert.match(client, /updatePlayerActionVisibility/);
+  assert.doesNotMatch(client, /querySelectorAll\("\[data-screen-target\]"\)/);
+  assert.doesNotMatch(client, /updatePlayerScreenTabAvailability/);
   assert.match(client, /dataset\.gamePhase/);
   assert.match(client, /dataset\.hasRoom/);
   assert.match(client, /dataset\.hasSavedRoom/);
@@ -345,7 +349,7 @@ test("visual QA and table layout styling is present", () => {
   assert.match(css, /\[hidden\]/);
   assert.match(css, /\.player-app-chrome/);
   assert.match(css, /\.universal-home-button/);
-  assert.match(css, /body\.tester-mode \.player-screen-tabs\s*\{\s*display: none !important;/);
+  assert.doesNotMatch(css, /player-screen-tabs|screen-tab-button/);
   assert.match(css, /\.bug-report-fab/);
   assert.match(css, /position:\s*fixed/);
   assert.match(css, /\.beta-build-label/);
@@ -360,6 +364,14 @@ test("visual QA and table layout styling is present", () => {
   assert.match(css, /body\.tester-mode\[data-active-screen="lobby"\] \.home-panel/);
   assert.match(css, /body\.tester-mode\[data-active-screen="table"\] \.status-panel/);
   assert.match(css, /body\.tester-mode\[data-active-screen="play"\] \.status-panel/);
+  assert.match(css, /body\.tester-mode\[data-active-screen="lobby"\]\[data-has-room="false"\] #create-room::before/);
+  assert.match(css, /body\.tester-mode\[data-active-screen="play"\]\[data-game-phase="playing"\] #room-invite-panel/);
+  assert.match(css, /body\.tester-mode\[data-active-screen="lobby"\]\[data-clean-home="true"\] #restore-room/);
+  assert.match(css, /body\.tester-mode\[data-active-screen="play"\]:not\(\[data-game-phase="waiting"\]\) \.table-layout-shell/);
+  assert.match(css, /body\.tester-mode\[data-active-screen="play"\]:not\(\[data-game-phase="waiting"\]\) \.visual-zone\[aria-labelledby="visual-last-trick-title"\]/);
+  assert.match(css, /body\.tester-mode\[data-active-screen="play"\]:not\(\[data-game-phase="waiting"\]\) \.rail-bid/);
+  assert.match(css, /body\.tester-mode\[data-active-screen="play"\]:not\(\[data-game-phase="waiting"\]\) \.visual-zone\[aria-labelledby="visual-current-trick-title"\]::before/);
+  assert.match(css, /LAST HAND PLAYED/);
   assert.match(css, /@media \(max-width: 430px\)/);
   assert.match(css, /max-width:\s*393px/);
   assert.match(css, /env\(safe-area-inset-top\)/);

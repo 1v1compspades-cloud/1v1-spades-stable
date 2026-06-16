@@ -23,7 +23,7 @@ export async function runHostedBetaSmokeTest({
   await guest.readyPlayer({ actionId: `${roomCode}:player2:ready:${runId}` });
   await submitSmokeBids({ host, guest, roomCode });
   const oneTrick = await playSmokeTrick({ host, guest, roomCode, sequenceStart: 1 });
-  const completedHand = await completeSmokeHand({ host, guest, roomCode, sequenceStart: 3 });
+  const completedHand = await completeSmokeHand({ host, guest, roomCode, sequenceStart: 3, startStatus: oneTrick.status });
   const reconnected = await host.reconnect();
 
   const queueHost = createClient(`smoke-q-host-${runId}`, `smoke-q-seat-host-${runId}`);
@@ -155,14 +155,15 @@ async function playSmokeTrick({ host, guest, roomCode, sequenceStart }) {
   }
   return {
     completed: result?.view?.lastTrick?.plays?.length === 2,
-    lastTrickWinner: result?.view?.lastTrick?.winner ?? null
+    lastTrickWinner: result?.view?.lastTrick?.winner ?? null,
+    status: result?.view ?? status
   };
 }
 
-async function completeSmokeHand({ host, guest, roomCode, sequenceStart }) {
+async function completeSmokeHand({ host, guest, roomCode, sequenceStart, startStatus = host.status }) {
   let sequence = sequenceStart;
   let guard = 0;
-  let status = host.status;
+  let status = startStatus;
   while (status?.phase === "playing" && guard < 26) {
     const seat = status.currentTurn;
     const client = clientForSeat({ host, guest, seat });
