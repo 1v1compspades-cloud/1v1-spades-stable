@@ -76,7 +76,7 @@ Evidence gathered:
 Remaining audit work:
 
 - Capture iOS wrapper config and EAS/TestFlight state in the same readiness tracker.
-- Produce a pass/fail matrix for every release checklist item in `docs/FINAL_SMOKE_TEST_CHECKLIST.md` and `docs/PRODUCTION_CONFIG_CHECKLIST.md`.
+- Keep `docs/SPADES_RELEASE_GATE_MATRIX.md` current after every hosted deploy, TestFlight build, and real-device smoke pass.
 
 ### Phase 2 - Broken Basics
 
@@ -195,7 +195,7 @@ Known gaps:
 
 ## Immediate Next Best Work
 
-1. Add a release-gate matrix that maps every beta checklist item to a command, test, manual iPhone step, or explicit unresolved risk.
+1. Verify the live `/privacy`, `/terms`, and `/support` routes after deploy.
 2. Add an automated UI-state smoke for the clean Home/Reconnect flow if a browser test harness is introduced.
 3. Keep production claims narrow: free-play rooms, Find Match, reconnect, spectator safety, and core gameplay.
 4. Do not start KOTT or tournament implementation until the beta release gate is stable and documented.

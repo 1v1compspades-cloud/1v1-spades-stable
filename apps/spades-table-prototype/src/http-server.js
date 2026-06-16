@@ -41,6 +41,104 @@ export function createSpadesHttpServer({
     });
   });
 
+  app.get("/privacy", (_request, response) => {
+    response.type("html").send(renderPublicInfoPage({
+      title: "Privacy Policy",
+      heading: "Spades Free Play Privacy Policy",
+      updated: "June 16, 2026",
+      sections: [
+        {
+          heading: "Free-play beta",
+          paragraphs: [
+            "Spades Free Play is a free-play head-to-head card game beta. It does not offer real-money gambling, wagers, prizes, payments, or tournament entry fees."
+          ]
+        },
+        {
+          heading: "Information used by the beta",
+          paragraphs: [
+            "The app uses a display name, local player identity, room code, and room session data so you can create, join, reconnect to, and play free-play rooms.",
+            "Bug reports can include public room status, current phase, viewer seat, last action, last error, and hidden-hand safety checks. Bug diagnostics are designed not to include hidden hands, private seat tokens, admin keys, or secrets."
+          ]
+        },
+        {
+          heading: "Local storage and notifications",
+          paragraphs: [
+            "The web beta stores local identity and reconnect data on your device. If push notifications are enabled, a push token may be registered for game-attention alerts."
+          ]
+        },
+        {
+          heading: "Contact",
+          paragraphs: [
+            "For privacy or support questions, use Report Bug in the app or email 1v1compspades@gmail.com."
+          ]
+        }
+      ]
+    }));
+  });
+
+  app.get("/terms", (_request, response) => {
+    response.type("html").send(renderPublicInfoPage({
+      title: "Terms of Use",
+      heading: "Spades Free Play Terms of Use",
+      updated: "June 16, 2026",
+      sections: [
+        {
+          heading: "Free-play use only",
+          paragraphs: [
+            "Spades Free Play is provided for free-play entertainment and beta testing. Do not use the app for real-money gambling, wagers, prizes, payments, or paid tournament entry."
+          ]
+        },
+        {
+          heading: "Fair play",
+          paragraphs: [
+            "Do not exploit bugs, harass other players, impersonate other users, or attempt to access hidden hands, private room credentials, server internals, or admin-only data."
+          ]
+        },
+        {
+          heading: "Beta availability",
+          paragraphs: [
+            "Rooms are beta sessions and may reset during deploys, service restarts, or maintenance. In-memory beta rooms are not guaranteed to persist."
+          ]
+        },
+        {
+          heading: "Support",
+          paragraphs: [
+            "Use Report Bug in the app or email 1v1compspades@gmail.com for help."
+          ]
+        }
+      ]
+    }));
+  });
+
+  app.get("/support", (_request, response) => {
+    response.type("html").send(renderPublicInfoPage({
+      title: "Support",
+      heading: "Spades Free Play Support",
+      updated: "June 16, 2026",
+      sections: [
+        {
+          heading: "Get help",
+          paragraphs: [
+            "Use Report Bug inside the app when something feels wrong. Include the room code, current phase, what you tapped, what you expected, and what happened instead.",
+            "You can also email 1v1compspades@gmail.com for support."
+          ]
+        },
+        {
+          heading: "Common beta fixes",
+          paragraphs: [
+            "If a room seems stuck, tap Home, then Reconnect to Current Game. If that does not work, refresh the page and reconnect from the same device."
+          ]
+        },
+        {
+          heading: "Free-play reminder",
+          paragraphs: [
+            "This beta is free play only and does not include payments, prizes, wagers, or real-money gambling."
+          ]
+        }
+      ]
+    }));
+  });
+
   app.post("/api/rooms", (request, response) => {
     sendBoundaryResponse(response, boundary.handle({
       ...request.body,
@@ -231,6 +329,55 @@ function isLocalHostname(hostname) {
 
 function firstForwardedHeader(value) {
   return String(value ?? "").split(",")[0]?.trim() || null;
+}
+
+function renderPublicInfoPage({ title, heading, updated, sections }) {
+  const sectionHtml = sections.map((section) => `
+      <section>
+        <h2>${escapeHtml(section.heading)}</h2>
+        ${section.paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join("\n        ")}
+      </section>`).join("\n");
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>${escapeHtml(title)} - Spades Free Play</title>
+    <style>
+      :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      body { margin: 0; background: #050604; color: #f8f4e7; }
+      main { width: min(760px, calc(100% - 32px)); margin: 0 auto; padding: 48px 0 64px; }
+      a { color: #f5c542; }
+      .eyebrow { color: #f5c542; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+      h1 { margin: 8px 0 12px; font-family: Georgia, serif; font-size: clamp(2rem, 8vw, 4rem); line-height: 0.95; }
+      h2 { margin: 28px 0 8px; color: #f5d36b; font-size: 1.05rem; letter-spacing: 0.04em; text-transform: uppercase; }
+      p { color: #e6dfcf; font-size: 1rem; line-height: 1.65; }
+      .panel { border: 1px solid rgba(245, 197, 66, 0.42); border-radius: 18px; background: linear-gradient(145deg, rgba(19, 38, 28, 0.95), rgba(6, 7, 5, 0.96)); padding: 24px; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45); }
+      .back { display: inline-flex; margin-top: 28px; color: #0a0804; background: linear-gradient(180deg, #ffe88d, #d99b12); border-radius: 999px; padding: 10px 16px; font-weight: 900; text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">Spades Free Play</p>
+      <div class="panel">
+        <h1>${escapeHtml(heading)}</h1>
+        <p>Last updated: ${escapeHtml(updated)}</p>
+${sectionHtml}
+        <a class="back" href="/">Back to Spades</a>
+      </div>
+    </main>
+  </body>
+</html>`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function roomRequest(request, type) {

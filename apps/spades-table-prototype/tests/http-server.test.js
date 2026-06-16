@@ -40,6 +40,32 @@ test("HTTP server serves hosted UI shell and keeps API routes separate", async (
   }
 });
 
+test("HTTP server serves App Store public policy and support pages", async () => {
+  const fixture = await startHttpFixture();
+
+  try {
+    const privacy = await fixture.getText("/privacy");
+    const terms = await fixture.getText("/terms");
+    const support = await fixture.getText("/support");
+
+    for (const page of [privacy, terms, support]) {
+      assert.match(page.contentType, /text\/html/);
+      assert.match(page.body, /Spades Free Play/);
+      assert.match(page.body, /free-play|free play/i);
+      assert.doesNotMatch(page.body, /seatToken|seat-host|seat-guest|sk_live|secret_/);
+    }
+
+    assert.match(privacy.body, /Privacy Policy/);
+    assert.match(privacy.body, /does not offer real-money gambling, wagers, prizes, payments, or tournament entry fees/);
+    assert.match(terms.body, /Terms of Use/);
+    assert.match(terms.body, /Do not use the app for real-money gambling, wagers, prizes, payments, or paid tournament entry/);
+    assert.match(support.body, /Support/);
+    assert.match(support.body, /1v1compspades@gmail\.com/);
+  } finally {
+    await fixture.close();
+  }
+});
+
 test("HTTP server exposes health and sanitized create join ready bid responses", async () => {
   const fixture = await startHttpFixture();
 
