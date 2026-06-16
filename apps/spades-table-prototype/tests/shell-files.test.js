@@ -209,6 +209,8 @@ test("home client wires the shell through the local app controller", () => {
   assert.match(client, /createSpadesLiveSyncClient/);
   assert.match(client, /createMockSpadesSocketTransport/);
   assert.match(client, /createSpadesServerClient/);
+  assert.match(client, /buildPlayerNavigationVisibility/);
+  assert.match(client, /cleanHomeRoomCodeForStatus/);
   assert.match(client, /buildVisualShellModel/);
   assert.match(client, /buildVisualQaReport/);
   assert.match(client, /buildBetaSafetyChecklist/);
@@ -604,9 +606,11 @@ test("universal Home from an active room shows a clean menu with reconnect", () 
   assert.match(js, /let cleanHomeRoomCode = null/);
   assert.match(js, /universalHomeButton\?\.addEventListener\("click"/);
   assert.match(js, /function showCleanHome\(status\)/);
+  assert.match(js, /cleanHomeRoomCode = cleanHomeRoomCodeForStatus\(status\)/);
   assert.match(js, /document\.body\.dataset\.cleanHome = cleanHome \? "true" : "false"/);
-  assert.match(js, /setHidden\(universalHomeButton, !hasRoom \|\| cleanHome\)/);
-  assert.match(js, /setHidden\(globalRoomInviteBar, !hasRoom \|\| cleanHome\)/);
+  assert.match(js, /const navigation = buildPlayerNavigationVisibility\(\{/);
+  assert.match(js, /setHidden\(universalHomeButton, !navigation\.showUniversalHome\)/);
+  assert.match(js, /setHidden\(globalRoomInviteBar, !navigation\.showGlobalRoomInvite\)/);
   assert.match(js, /restoreRoomButton\.textContent = "Reconnect to Current Game"/);
   assert.match(js, /function isCleanHomeMode\(status\)/);
   assert.match(css, /body\.tester-mode\[data-clean-home="true"\] #global-room-invite-bar/);

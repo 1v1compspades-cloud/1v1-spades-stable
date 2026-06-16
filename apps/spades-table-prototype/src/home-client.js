@@ -24,6 +24,11 @@ import { createMockSpadesSocketTransport } from "./mock-socket-transport.js";
 import { renderRoomShellText } from "./room-shell.js";
 import { createSpadesServerClient } from "./server-client.js";
 import {
+  buildPlayerNavigationVisibility,
+  cleanHomeRoomCodeForStatus,
+  isCleanHomeMode as isCleanHomeNavigationMode
+} from "./player-ui-navigation.js";
+import {
   buildVisualQaReport,
   buildVisualShellModel
 } from "./visual-shell.js";
@@ -555,7 +560,7 @@ transportModeSelect.addEventListener("change", () => {
 });
 
 function showCleanHome(status) {
-  cleanHomeRoomCode = status?.roomCode ?? null;
+  cleanHomeRoomCode = cleanHomeRoomCodeForStatus(status);
   setActivePlayerScreen("lobby", { manual: true, status });
   renderStatus(status);
 }
@@ -1232,9 +1237,15 @@ function seatName(seat) {
 
 function updatePlayerActionVisibility(status) {
   const phase = status?.phase ?? "none";
-  const cleanHome = isCleanHomeMode(status);
+  const navigation = buildPlayerNavigationVisibility({
+    status,
+    activePlayerScreen,
+    cleanHomeRoomCode,
+    hasSavedRoom: Boolean(localIdentity.lastSession)
+  });
+  const cleanHome = navigation.cleanHome;
   document.body.dataset.gamePhase = phase;
-  document.body.dataset.hasRoom = status?.roomCode && !cleanHome ? "true" : "false";
+  document.body.dataset.hasRoom = navigation.bodyHasRoom ? "true" : "false";
   document.body.dataset.cleanHome = cleanHome ? "true" : "false";
   document.body.dataset.hasSavedRoom = localIdentity.lastSession ? "true" : "false";
 
@@ -1247,14 +1258,14 @@ function updatePlayerActionVisibility(status) {
   const hasRoom = Boolean(status?.roomCode);
   const rematchRequested = Boolean(status?.rematchRequests?.[status.viewerSeat]);
 
-  setHidden(universalHomeButton, !hasRoom || cleanHome);
+  setHidden(universalHomeButton, !navigation.showUniversalHome);
   setHidden(bidControls, !isYourBid || countdownActive);
-  setHidden(globalRoomInviteBar, !hasRoom || cleanHome);
+  setHidden(globalRoomInviteBar, !navigation.showGlobalRoomInvite);
   if (globalRoomCodeOutput) globalRoomCodeOutput.textContent = status?.roomCode ?? "------";
   setHidden(globalInviteRoomButton, !isWaiting);
   setHidden(globalCopyRoomCodeButton, !hasRoom);
   setHidden(globalBackLobbyButton, !isMatchComplete);
-  setHidden(restoreRoomButton, cleanHome ? false : (!hasRoom && !localIdentity.lastSession));
+  setHidden(restoreRoomButton, !navigation.showReconnect);
   if (restoreRoomButton) restoreRoomButton.textContent = "Reconnect to Current Game";
   setHidden(readyPlayerButton, !isWaiting);
   setHidden(leaveRoomButton, !hasRoom);
@@ -1276,9 +1287,7 @@ function updatePlayerActionVisibility(status) {
 }
 
 function isCleanHomeMode(status) {
-  return activePlayerScreen === "lobby"
-    && Boolean(cleanHomeRoomCode)
-    && status?.roomCode === cleanHomeRoomCode;
+  return isCleanHomeNavigationMode({ activePlayerScreen, cleanHomeRoomCode, status });
 }
 
 function updatePlayerScreenTabAvailability(status) {
