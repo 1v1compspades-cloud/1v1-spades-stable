@@ -595,3 +595,17 @@ test("quick match waiting screens stay compact for mobile testers", () => {
   assert.match(css, /body\.tester-mode\[data-active-screen="play"\]\[data-game-phase="waiting"\] \.center-trick-area/);
   assert.match(css, /body\.tester-mode\[data-active-screen="play"\]\[data-game-phase="waiting"\] \.player-hand-area/);
 });
+
+test("manual Home from a waiting room shows a clean menu with resume", () => {
+  const css = readFileSync(resolve(appDir, "src/styles.css"), "utf8");
+  const js = readFileSync(resolve(appDir, "src/home-client.js"), "utf8");
+
+  assert.match(js, /let cleanHomeRoomCode = null/);
+  assert.match(js, /targetScreen === "lobby" && status\?\.roomCode && status\.phase === "waiting"/);
+  assert.match(js, /document\.body\.dataset\.cleanHome = cleanHome \? "true" : "false"/);
+  assert.match(js, /setHidden\(globalRoomInviteBar, !hasRoom \|\| cleanHome\)/);
+  assert.match(js, /restoreRoomButton\.textContent = cleanHome \? "Resume Room" : "Reconnect to Current Game"/);
+  assert.match(js, /function isCleanHomeMode\(status\)/);
+  assert.match(css, /body\.tester-mode\[data-active-screen="lobby"\]\[data-clean-home="true"\] \.global-room-invite-bar/);
+  assert.match(css, /body\.tester-mode\[data-active-screen="lobby"\]\[data-clean-home="true"\] #restore-room/);
+});

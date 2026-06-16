@@ -161,6 +161,7 @@ let activeFixturePreset = "none";
 let transportMode = "direct";
 let activePlayerScreen = "lobby";
 let playerChoseScreen = false;
+let cleanHomeRoomCode = null;
 let lastGuidedScreenKey = "";
 let lastNotificationStatusKey = "";
 let lastNotificationAt = 0;
@@ -250,6 +251,8 @@ document.querySelector("#spectate-room")?.addEventListener("click", () => {
 });
 
 document.querySelector("#restore-room").addEventListener("click", () => {
+  cleanHomeRoomCode = null;
+  playerChoseScreen = false;
   runShellAction(() => activeShellActions().restoreRoom(), "restore active room");
 });
 
@@ -550,6 +553,13 @@ for (const tabButton of playerScreenTabs) {
   tabButton.addEventListener("click", () => {
     const targetScreen = tabButton.dataset.screenTarget;
     const status = currentShellStatus();
+    if (targetScreen === "lobby" && status?.roomCode && status.phase === "waiting") {
+      cleanHomeRoomCode = status.roomCode;
+      setActivePlayerScreen("lobby", { manual: true, status });
+      renderStatus(status);
+      return;
+    }
+    cleanHomeRoomCode = null;
     if (targetScreen !== "lobby" && !status?.roomCode) {
       playerChoseScreen = false;
       setActivePlayerScreen("lobby", { status });
@@ -873,6 +883,9 @@ function findMatchStatusText(queue) {
 }
 
 function renderStatus(status) {
+  if (!status?.roomCode || status.roomCode !== cleanHomeRoomCode || status.phase !== "waiting") {
+    cleanHomeRoomCode = null;
+  }
   registerExpoPushToken(status);
   maybeNotifyGameAttention(status);
   updateReadyCountdown(status);
@@ -923,6 +936,14 @@ function renderPlayerGuide(status) {
 
 function playerGuideForStatus(status) {
   const queue = realServerClient.queueStatus;
+  if (isCleanHomeMode(status)) {
+    return {
+      title: "Choose how to play",
+      detail: `Room ${status.roomCode} is still waiting. Tap Resume Room to invite or ready up.`,
+      selector: "#restore-room"
+    };
+  }
+
   if (isReadyCountdownActive(status)) {
     return {
       title: `Starting in ${readyCountdownRemaining || 5}`,
@@ -1047,6 +1068,9 @@ function setActivePlayerScreen(screen, { manual = false, status = currentShellSt
     manual = false;
   }
   activePlayerScreen = screen;
+  if (screen !== "lobby") {
+    cleanHomeRoomCode = null;
+  }
   if (manual) {
     playerChoseScreen = true;
   }
@@ -1060,6 +1084,7 @@ function setActivePlayerScreen(screen, { manual = false, status = currentShellSt
 
 function updatePlayerScreenForStatus(status) {
   updatePlayerChrome(status);
+  if (isCleanHomeMode(status)) return;
   const guidance = guidedPlayerScreen(status);
   const preferredScreen = guidance.screen;
   if (!status || !playerChoseScreen || shouldAutoGuideScreen(guidance)) {
@@ -1125,6 +1150,10 @@ function shouldAutoGuideScreen(guidance) {
 
 function updatePlayerChrome(status) {
   if (!playerScreenStatusOutput) return;
+  if (isCleanHomeMode(status)) {
+    playerScreenStatusOutput.textContent = "Home";
+    return;
+  }
   const roomLabel = status?.roomCode ? `Room ${status.roomCode}` : "Home";
   const phaseLabel = status?.phase ? status.phase.replace("_", " ") : "ready";
   playerScreenStatusOutput.textContent = `${roomLabel} · ${phaseLabel}`;
@@ -1212,8 +1241,10 @@ function seatName(seat) {
 
 function updatePlayerActionVisibility(status) {
   const phase = status?.phase ?? "none";
+  const cleanHome = isCleanHomeMode(status);
   document.body.dataset.gamePhase = phase;
-  document.body.dataset.hasRoom = status?.roomCode ? "true" : "false";
+  document.body.dataset.hasRoom = status?.roomCode && !cleanHome ? "true" : "false";
+  document.body.dataset.cleanHome = cleanHome ? "true" : "false";
   document.body.dataset.hasSavedRoom = localIdentity.lastSession ? "true" : "false";
 
   const isWaiting = phase === "waiting";
@@ -1226,12 +1257,13 @@ function updatePlayerActionVisibility(status) {
   const rematchRequested = Boolean(status?.rematchRequests?.[status.viewerSeat]);
 
   setHidden(bidControls, !isYourBid || countdownActive);
-  setHidden(globalRoomInviteBar, !hasRoom);
+  setHidden(globalRoomInviteBar, !hasRoom || cleanHome);
   if (globalRoomCodeOutput) globalRoomCodeOutput.textContent = status?.roomCode ?? "------";
   setHidden(globalInviteRoomButton, !isWaiting);
   setHidden(globalCopyRoomCodeButton, !hasRoom);
   setHidden(globalBackLobbyButton, !isMatchComplete);
-  setHidden(restoreRoomButton, !hasRoom && !localIdentity.lastSession);
+  setHidden(restoreRoomButton, cleanHome ? false : (!hasRoom && !localIdentity.lastSession));
+  if (restoreRoomButton) restoreRoomButton.textContent = cleanHome ? "Resume Room" : "Reconnect to Current Game";
   setHidden(readyPlayerButton, !isWaiting);
   setHidden(leaveRoomButton, !hasRoom);
   setHidden(askRematchButton, !isMatchComplete || rematchRequested);
@@ -1249,6 +1281,13 @@ function updatePlayerActionVisibility(status) {
   if (leaveRoomButton) leaveRoomButton.textContent = isMatchComplete ? "Return to Lobby" : "Leave Game";
   if (tableLeaveRoomButton) tableLeaveRoomButton.textContent = isMatchComplete ? "Return to Lobby" : "Leave Game";
   updatePlayerScreenTabAvailability(status);
+}
+
+function isCleanHomeMode(status) {
+  return activePlayerScreen === "lobby"
+    && Boolean(cleanHomeRoomCode)
+    && status?.roomCode === cleanHomeRoomCode
+    && status.phase === "waiting";
 }
 
 function updatePlayerScreenTabAvailability(status) {

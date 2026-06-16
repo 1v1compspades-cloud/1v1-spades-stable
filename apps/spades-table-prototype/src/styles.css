@@ -4100,6 +4100,10 @@ body.tester-mode .table-hand-grid {
     display: none !important;
   }
 
+  body.tester-mode[data-active-screen="lobby"][data-clean-home="true"] .global-room-invite-bar {
+    display: none !important;
+  }
+
   body.tester-mode[data-active-screen="lobby"] .global-room-invite-bar::before,
   body.tester-mode[data-active-screen="lobby"] .global-room-invite-bar::after {
     pointer-events: none;
@@ -4234,6 +4238,11 @@ body.tester-mode .table-hand-grid {
   body.tester-mode[data-active-screen="lobby"][data-has-room="false"] #room-code-share-status,
   body.tester-mode[data-active-screen="lobby"][data-has-room="false"] #quick-match-status {
     display: none !important;
+  }
+
+  body.tester-mode[data-active-screen="lobby"][data-clean-home="true"] #restore-room {
+    display: block !important;
+    order: 5 !important;
   }
 
   body.tester-mode[data-active-screen="lobby"] .controls button,
