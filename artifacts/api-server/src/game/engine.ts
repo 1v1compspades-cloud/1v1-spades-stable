@@ -183,6 +183,10 @@ function makeRoomCode(): string {
   return code;
 }
 
+function normalizePlayerName(name: string): string {
+  return name.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 export function createGame(
   roomCode: string,
   matchTarget = 250,
@@ -805,6 +809,10 @@ export function joinRoom(
   if (!state) throw new Error("Room not found");
   if (state.phase !== "waiting") throw new Error("Game already started");
   if (state.players[1] !== null) throw new Error("Room is full");
+  const normalizedJoinName = normalizePlayerName(playerName);
+  if (state.players.some((p) => p && normalizePlayerName(p.name) === normalizedJoinName)) {
+    throw new Error("That player is already seated");
+  }
 
   const joiner: Player = {
     id: socketId,

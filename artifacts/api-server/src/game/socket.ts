@@ -265,15 +265,18 @@ function sweepStaleEntities(): void {
 }
 let sweepHandle: NodeJS.Timeout | null = null;
 
-function sanitizeStateForPlayer(
+export function sanitizeStateForPlayer(
   state: GameState,
   playerIndex: 0 | 1
 ): Record<string, unknown> {
   const opponentIndex = playerIndex === 0 ? 1 : 0;
+  const publicPlayers = state.players.map((p) =>
+    p ? { name: p.name, index: p.index } : null,
+  );
   return {
     roomCode: state.roomCode,
     phase: state.phase,
-    players: state.players,
+    players: publicPlayers,
     hand: state.hands[playerIndex],
     opponentHandSize: state.hands[opponentIndex].length,
     handSizes: [state.hands[0].length, state.hands[1].length],
@@ -312,11 +315,14 @@ function sanitizeStateForPlayer(
   };
 }
 
-function sanitizeStateForSpectator(state: GameState): Record<string, unknown> {
+export function sanitizeStateForSpectator(state: GameState): Record<string, unknown> {
+  const publicPlayers = state.players.map((p) =>
+    p ? { name: p.name, index: p.index } : null,
+  );
   return {
     roomCode: state.roomCode,
     phase: state.phase,
-    players: state.players,
+    players: publicPlayers,
     hand: [],
     opponentHandSize: 0,
     handSizes: [state.hands[0].length, state.hands[1].length],
@@ -353,6 +359,56 @@ function sanitizeStateForSpectator(state: GameState): Record<string, unknown> {
     isPaused: state.isPaused ?? false,
     gameOverReason: state.gameOverReason ?? null,
   };
+}
+
+function handPayloadRedactionSummary(view: Record<string, unknown>): Record<string, unknown> {
+  const hand = Array.isArray(view.hand) ? view.hand : [];
+  const handSizes = Array.isArray(view.handSizes) ? view.handSizes : [];
+  return {
+    isSpectator: view.isSpectator === true,
+    handCount: hand.length,
+    opponentHandSize: typeof view.opponentHandSize === "number" ? view.opponentHandSize : null,
+    handSizes,
+    hasPrivateHandsField: Object.prototype.hasOwnProperty.call(view, "hands"),
+  };
+}
+
+function assertNoHiddenHandLeak(view: Record<string, unknown>, role: "player" | "spectator"): void {
+  if (Object.prototype.hasOwnProperty.call(view, "hands")) {
+    throw new Error(`${role} payload contains private hands field`);
+  }
+  if (role === "spectator" && Array.isArray(view.hand) && view.hand.length > 0) {
+    throw new Error("spectator payload contains hidden hand cards");
+  }
+}
+
+function emitSanitizedGameState(
+  io: SocketIOServer,
+  socketId: string,
+  view: Record<string, unknown>,
+  role: "player" | "spectator",
+  meta: Record<string, unknown>,
+): void {
+  assertNoHiddenHandLeak(view, role);
+  logger.debug(
+    {
+      event: "game_state_emit",
+      socketId,
+      role,
+      ...meta,
+      handPayload: handPayloadRedactionSummary(view),
+    },
+    "Emitting sanitized game_state payload",
+  );
+  io.to(socketId).emit("game_state", view);
+}
+
+export function shouldRejectDuplicateReconnect(
+  currentSocketId: string | null | undefined,
+  incomingSocketId: string,
+  currentSocketConnected: boolean,
+): boolean {
+  return Boolean(currentSocketId && currentSocketId !== incomingSocketId && currentSocketConnected);
 }
 
 // ── Turn timers (tournament rooms only) ─────────────────────────────────────
@@ -1327,12 +1383,24 @@ function broadcastState(
   for (let i = 0; i < 2; i++) {
     const p = state.players[i];
     if (p) {
-      io.to(p.socketId).emit("game_state", sanitizeStateForPlayer(state, i as 0 | 1));
+      emitSanitizedGameState(
+        io,
+        p.socketId,
+        sanitizeStateForPlayer(state, i as 0 | 1),
+        "player",
+        { roomCode: state.roomCode, seat: i, phase: state.phase },
+      );
     }
   }
   const specView = sanitizeStateForSpectator(state);
   for (const spec of state.spectators) {
-    io.to(spec.socketId).emit("game_state", specView);
+    emitSanitizedGameState(
+      io,
+      spec.socketId,
+      specView,
+      "spectator",
+      { roomCode: state.roomCode, seat: null, phase: state.phase },
+    );
   }
 }
 
@@ -1751,7 +1819,40 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           //                  engine name match (preserves existing UX for
           //                  rooms created before tokens shipped).
           const existing = getRoom(code);
+          const currentSeat = existing?.players?.[data.playerIndex] ?? null;
+          const currentSocketId = currentSeat?.socketId ?? null;
+          const currentSocketConnected =
+            typeof currentSocketId === "string" &&
+            currentSocketId.length > 0 &&
+            io.sockets.sockets.get(currentSocketId)?.connected === true;
           const seatTokenized = existing?.tokenizedSeats?.[data.playerIndex] === true;
+          logger.info(
+            {
+              event: "reconnect_attempt",
+              roomCode: code,
+              requestedSeat: data.playerIndex,
+              socketId: socket.id,
+              claimedPlayerName: data.playerName,
+              hasToken: Boolean(data.token),
+              seatTokenized,
+              currentSeatSocketId: currentSocketId,
+              currentSeatConnected: Boolean(currentSocketConnected),
+            },
+            "Reconnect attempt",
+          );
+          if (shouldRejectDuplicateReconnect(currentSocketId, socket.id, Boolean(currentSocketConnected))) {
+            logger.warn(
+              {
+                event: "reconnect_duplicate_tab_rejected",
+                roomCode: code,
+                requestedSeat: data.playerIndex,
+                socketId: socket.id,
+                currentSeatSocketId: currentSocketId,
+              },
+              "Rejected reconnect because the seat is active on another socket",
+            );
+            throw new Error("Seat already active in another tab");
+          }
           if (seatTokenized) {
             if (!data.token) {
               throw new Error("Reconnect token required for this seat");
@@ -1788,9 +1889,17 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           const s: GameState = state!;
           socket.join(code);
           socket.data.playerName = data.playerName;
+          const reconnectedView = sanitizeStateForPlayer(s, data.playerIndex);
           logger.info(
-            { roomCode: code, playerIndex: data.playerIndex, playerName: data.playerName },
-            "Player reconnected"
+            {
+              event: "reconnect_success",
+              roomCode: code,
+              playerIndex: data.playerIndex,
+              playerName: data.playerName,
+              socketId: socket.id,
+              handPayload: handPayloadRedactionSummary(reconnectedView),
+            },
+            "Player reconnected",
           );
           cancelAutoForfeit(code, data.playerIndex);
 
@@ -1804,7 +1913,17 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           broadcastState(io, s);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
-          logger.warn({ err, data }, "Reconnect failed");
+          logger.warn(
+            {
+              err,
+              roomCode: data?.roomCode,
+              playerIndex: data?.playerIndex,
+              playerName: data?.playerName,
+              socketId: socket.id,
+              hasToken: Boolean(data?.token),
+            },
+            "Reconnect failed",
+          );
           callback({ ok: false, error: msg });
         }
       }
@@ -1891,7 +2010,13 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           logger.info({ roomCode: code, playerName: name }, "Spectator joined");
 
           callback({ ok: true });
-          socket.emit("game_state", sanitizeStateForSpectator(s));
+          emitSanitizedGameState(
+            io,
+            socket.id,
+            sanitizeStateForSpectator(s),
+            "spectator",
+            { roomCode: code, seat: null, phase: s.phase, direct: true },
+          );
           broadcastState(io, s);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
@@ -1932,7 +2057,13 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           logger.info({ roomCode: code, playerName: name }, "Spectator reconnected");
 
           callback({ ok: true });
-          socket.emit("game_state", sanitizeStateForSpectator(s));
+          emitSanitizedGameState(
+            io,
+            socket.id,
+            sanitizeStateForSpectator(s),
+            "spectator",
+            { roomCode: code, seat: null, phase: s.phase, direct: true },
+          );
           broadcastState(io, s);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
