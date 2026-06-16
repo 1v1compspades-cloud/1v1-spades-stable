@@ -17,7 +17,7 @@ try {
     baseUrl: config.baseUrl,
     fetchImpl: fetch,
     createClient(playerId, seatToken) {
-      return createSpadesServerClient({
+      const client = createSpadesServerClient({
         baseUrl: config.baseUrl,
         wsUrl: config.wsUrl,
         fetchImpl: fetch,

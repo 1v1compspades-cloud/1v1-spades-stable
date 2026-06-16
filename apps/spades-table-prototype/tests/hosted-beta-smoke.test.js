@@ -120,6 +120,11 @@ test("hosted beta smoke flow covers health create join websocket quick match rec
 
     assert.deepEqual(result, {
       healthOk: true,
+      publicUrlConfigOk: true,
+      appShellOk: true,
+      cleanHomeShellOk: true,
+      publicPagesOk: true,
+      freePlayOnlyCopyOk: true,
       createRoomOk: true,
       joinRoomOk: true,
       webSocketConnected: true,

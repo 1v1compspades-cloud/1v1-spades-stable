@@ -8,6 +8,8 @@ export async function runHostedBetaSmokeTest({
   if (!baseUrl) throw new Error("Hosted beta smoke test requires baseUrl");
 
   const health = await requestJson(fetchImpl, `${baseUrl}/health`);
+  const appShell = await requestText(fetchImpl, `${baseUrl}/`);
+  const publicPages = await requestPublicPages(fetchImpl, baseUrl);
   const runId = createSmokeRunId();
   const roomCode = runId.slice(0, 6);
   const host = createClient(`smoke-host-${runId}`, `smoke-seat-host-${runId}`);
@@ -33,6 +35,12 @@ export async function runHostedBetaSmokeTest({
 
   return {
     healthOk: health.ok === true,
+    publicUrlConfigOk: publicUrlConfigMatchesTarget({ health, baseUrl }),
+    appShellOk: appShell.ok === true,
+    cleanHomeShellOk: shellHasCleanHomeFlow(appShell.text),
+    publicPagesOk: publicPages.every((page) => page.ok && page.hasExpectedContent),
+    freePlayOnlyCopyOk: appShell.text.includes("Free Play")
+      && publicPages.every((page) => /free-play/i.test(page.text)),
     createRoomOk: created.ok === true && created.view?.viewerSeat === "player1",
     joinRoomOk: joined.ok === true && joined.view?.viewerSeat === "player2",
     webSocketConnected: host.connectionStatus === "connected" && guest.connectionStatus === "connected",
@@ -67,6 +75,55 @@ export function assertHostedBetaSmokePassed(result) {
 async function requestJson(fetchImpl, url) {
   const response = await fetchImpl(url);
   return response.json();
+}
+
+async function requestText(fetchImpl, url) {
+  const response = await fetchImpl(url);
+  return {
+    ok: response.ok,
+    status: response.status,
+    text: await response.text()
+  };
+}
+
+async function requestPublicPages(fetchImpl, baseUrl) {
+  const pages = [
+    { path: "/privacy", pattern: /Privacy Policy/i },
+    { path: "/terms", pattern: /Terms of Use/i },
+    { path: "/support", pattern: /Support/i }
+  ];
+
+  return Promise.all(pages.map(async (page) => {
+    const response = await requestText(fetchImpl, `${baseUrl}${page.path}`);
+    return {
+      ...page,
+      ...response,
+      hasExpectedContent: page.pattern.test(response.text)
+    };
+  }));
+}
+
+function publicUrlConfigMatchesTarget({ health, baseUrl }) {
+  if (!health?.ok) return false;
+  const target = new URL(baseUrl);
+  if (isLocalHostname(target.hostname)) {
+    return true;
+  }
+  return health.publicApiUrl === trimTrailingSlash(target.toString())
+    && health.publicWebSocketUrl === httpToWebSocketUrl(target.toString());
+}
+
+function shellHasCleanHomeFlow(html) {
+  return [
+    /id="universal-home"/,
+    /Reconnect to Current Game/,
+    /id="restore-room"/,
+    /id="create-room"/,
+    /id="join-room"/,
+    /id="join-quick-match"/,
+    /id="jump-to-bug-report"/
+  ].every((pattern) => pattern.test(html))
+    && !/id="player-screen-tabs"|data-screen-target="(?:lobby|table|play)"/.test(html);
 }
 
 async function submitSmokeBids({ host, guest, roomCode }) {
@@ -128,4 +185,21 @@ function clientForSeat({ host, guest, seat }) {
   if (seat === "player1") return host;
   if (seat === "player2") return guest;
   throw new Error(`Smoke test expected player turn, got ${seat}`);
+}
+
+function httpToWebSocketUrl(value) {
+  const url = new URL(value);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.pathname = "/ws";
+  url.search = "";
+  url.hash = "";
+  return trimTrailingSlash(url.toString());
+}
+
+function trimTrailingSlash(value) {
+  return String(value ?? "").replace(/\/$/, "");
+}
+
+function isLocalHostname(hostname) {
+  return ["127.0.0.1", "localhost", "0.0.0.0", "::1", "[::1]"].includes(hostname);
 }

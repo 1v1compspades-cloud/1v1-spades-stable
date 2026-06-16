@@ -204,7 +204,7 @@ Known gaps:
 
 Most recent verified commands before this audit:
 
-- `npm test` in `apps/spades-table-prototype`: 153 passing tests.
-- Hosted smoke against `https://1v1spades.com`: passed health, create room, join room, WebSocket, one trick, complete hand, reconnect, quick match, and hidden-hand safety.
+- `npm test` in `apps/spades-table-prototype`: 158 passing tests.
+- Hosted smoke against `https://1v1spades.com`: passed health, public URL config, app shell, clean Home/Reconnect shell, public pages, free-play copy, create room, join room, WebSocket, one trick, complete hand, reconnect, quick match, and hidden-hand safety.
 
 This audit is documentation-only and does not change gameplay, scoring, bidding, trick logic, server rules, or Euchre files.
