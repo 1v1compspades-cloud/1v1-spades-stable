@@ -3,15 +3,14 @@ import { Link } from "wouter";
 
 const NAV = [
   { href: "/rules", label: "Rules" },
-  { href: "/tournaments", label: "Tournaments" },
-  { href: "/king-of-the-table", label: "King of the Table" },
   { href: "/fair-play", label: "Fair Play" },
-  { href: "/discord", label: "Community" },
+  { href: "/privacy", label: "Privacy" },
+  { href: "/terms", label: "Terms" },
+  { href: "/support", label: "Support" },
 ];
 
 /**
- * Lightweight shared chrome for the public, indexable info pages (rules,
- * tournaments, king-of-the-table, community). Pure presentational layout —
+ * Lightweight shared chrome for the public, indexable info pages. Pure presentational layout —
  * no sockets, no game state. Uses semantic HTML so the text is readable to
  * crawlers, and interlinks the pages + homepage for SEO discovery.
  */
@@ -34,7 +33,7 @@ export function InfoPageLayout({
             data-testid="link-home-brand"
           >
             <span aria-hidden className="mr-2 text-base">♠</span>
-            1v1 Competitive Spades
+            Spades Free Play
           </Link>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <nav aria-label="Info pages" className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
@@ -85,7 +84,7 @@ export function InfoPageLayout({
               data-testid="link-play-now"
               className="mt-4 inline-flex items-center justify-center rounded-md bg-primary px-6 py-3 text-base font-bold text-primary-foreground hover:bg-primary/90 transition-colors"
             >
-              Play 1v1 Spades
+              Play Spades
             </Link>
           </div>
         </article>

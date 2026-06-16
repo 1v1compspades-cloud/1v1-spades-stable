@@ -33,8 +33,8 @@ export default function Lobby() {
   const [tournamentName, setTournamentName] = useState<string>("");
   const ALL_MATCH_MODES = [
     { id: "quick",     label: "Quick Match",          blurb: "Single head-to-head match" },
-    { id: "king",      label: "King of the Table",    blurb: "Winner stays, queue challengers" },
-    { id: "custom",    label: "Custom Tournament",    blurb: "Single-elimination bracket" },
+    { id: "king",      label: "Table Streak",         blurb: "Winner stays, next player joins" },
+    { id: "custom",    label: "Private Event",        blurb: "Host-managed invite bracket" },
   ] as const;
   type MatchMode = typeof ALL_MATCH_MODES[number]["id"];
   // Tournaments are admin-only: the Custom Tournament tile is hidden from
@@ -201,24 +201,19 @@ export default function Lobby() {
   };
 
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
+    <div className="spades-screen min-h-[100dvh] flex items-center justify-center p-3 sm:p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
       <ConnectionPill />
       <InfoMenu />
-      <Card className="w-full max-w-md border-primary/30 shadow-2xl shadow-primary/10 bg-card/80 backdrop-blur-sm">
+      <Card className="spades-panel w-full max-w-md border-primary/30 bg-card/80 backdrop-blur-sm">
         <CardHeader className="text-center space-y-3 pb-4">
           <div className="flex items-center justify-center gap-2 text-primary text-lg" aria-hidden>
             <span>♠</span><span className="text-red-500">♥</span><span className="text-blue-500">♦</span><span className="text-emerald-500">♣</span>
           </div>
-          <CardTitle className="text-3xl font-serif text-primary tracking-wider drop-shadow-[0_2px_8px_rgba(234,179,8,0.25)]">
-            1v1 COMPETITIVE SPADES
+          <CardTitle className="text-[2rem] sm:text-4xl leading-tight font-serif text-primary tracking-wider drop-shadow-[0_2px_10px_rgba(234,179,8,0.34)]">
+            SPADES FREE PLAY
           </CardTitle>
-          <div className="flex items-center justify-center">
-            <span className="inline-block px-2 py-0.5 rounded-full border border-primary/40 bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-widest">
-              Season 0 Beta
-            </span>
-          </div>
           <CardDescription className="text-sm font-medium text-foreground/80">
-            No partner. No excuses. Head-to-head spades.
+            Free head-to-head Spades for two players.
           </CardDescription>
           <p className="text-xs text-muted-foreground px-2 leading-relaxed">
             Create a room, send the code to your opponent, and play a live 1v1 match.
@@ -277,9 +272,9 @@ export default function Lobby() {
             </div>
             <p className="text-xs text-muted-foreground">
               {matchMode === "king"
-                ? "King of the Table: winner stays, queue replaces the loser."
+                ? "Table Streak: winner stays, and the next player can join the table."
                 : matchMode === "custom"
-                ? "Custom Tournament: single-elimination bracket of 4, 8, 16, or 32 players."
+                ? "Private Event: host-managed invite bracket for organized groups."
                 : "Quick Match: one head-to-head game, first to the target wins."}
             </p>
           </div>
@@ -345,17 +340,17 @@ export default function Lobby() {
               <Button
                 onClick={handleCreate}
                 disabled={isCreating || isJoining || isSpectating}
-                className="w-full py-6 text-lg font-bold shadow-lg shadow-primary/20 active:scale-[0.98] transition-transform"
+                className="spades-gold-button w-full py-6 text-lg font-bold active:scale-[0.98] transition-transform"
                 data-testid="button-create"
               >
-                {isCreating ? "Creating..." : matchMode === "custom" ? "Create Tournament" : "Create Room"}
+                {isCreating ? "Creating..." : matchMode === "custom" ? "Create Event" : "Create Room"}
               </Button>
             </div>
 
             <div className="space-y-4">
               <div className="flex gap-2">
                 <Input
-                  placeholder={matchMode === "custom" ? "Tournament code" : "Enter room code"}
+                  placeholder={matchMode === "custom" ? "Event code" : "Enter room code"}
                   value={joinCodeInput}
                   onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
                   className="text-center uppercase font-mono py-6 placeholder:normal-case placeholder:font-sans placeholder:tracking-normal"
@@ -369,7 +364,7 @@ export default function Lobby() {
                 className="w-full py-6 text-lg font-bold active:scale-[0.98] transition-transform"
                 data-testid="button-join"
               >
-                {isJoining ? "Joining..." : matchMode === "custom" ? "Join Tournament" : "Join Match"}
+                {isJoining ? "Joining..." : matchMode === "custom" ? "Join Event" : "Join Match"}
               </Button>
             </div>
           </div>

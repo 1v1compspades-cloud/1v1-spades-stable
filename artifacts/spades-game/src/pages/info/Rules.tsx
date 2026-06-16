@@ -5,19 +5,19 @@ export default function Rules() {
   return (
     <>
       <Seo
-        title="1V1 Spades Rules | No Partner. No Excuses."
-        description="Learn the rules of 1V1 Competitive Spades, including bidding, nil, bags, spades breaking, renege penalties, scoring, and tournament race formats."
+        title="Spades Free Play Rules"
+        description="Learn the rules of Spades Free Play, including bidding, nil, bags, spades breaking, scoring, and head-to-head match flow."
         path="/rules"
       />
       <InfoPageLayout
-        title="How to Play 1V1 Competitive Spades"
-        intro="1V1 Competitive Spades is head-to-head Spades with no partner. Just two players, hidden hands, and a full bidding-and-tricks match decided entirely by your own skill. Here is how a match plays out."
+        title="How to Play Spades Free Play"
+        intro="Spades Free Play is head-to-head Spades with no partner. Just two players, hidden hands, and a full bidding-and-tricks match. Here is how a match plays out."
       >
         <section>
           <h2>Head-to-head, no partner</h2>
           <p>
             Unlike traditional 4-player Spades, this is a pure 1-versus-1 duel.
-            There are no teammates to cover for you — every bid, every book, and
+            There are no teammates to cover for you. Every bid, every book, and
             every bag is yours alone. You only ever see your own cards; your
             opponent's hand stays hidden until each card is played.
           </p>

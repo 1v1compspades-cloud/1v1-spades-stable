@@ -14,7 +14,7 @@ export function PreGameChecklist({
 }) {
   const items = [
     "Open in Safari or Chrome (not an app's built-in browser)",
-    "No Discord / Instagram / TikTok in-app browser",
+    "Avoid social app built-in browsers",
     "No private / incognito mode",
     "Close old game tabs",
     "One player, one device, one tab",

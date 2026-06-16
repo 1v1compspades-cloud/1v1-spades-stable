@@ -11,10 +11,7 @@ import Room from "@/pages/Room";
 import Tournament from "@/pages/Tournament";
 import HostDashboard from "@/pages/HostDashboard";
 import Rules from "@/pages/info/Rules";
-import TournamentsInfo from "@/pages/info/Tournaments";
-import KingOfTheTable from "@/pages/info/KingOfTheTable";
 import FairPlay from "@/pages/info/FairPlay";
-import DiscordInfo from "@/pages/info/Discord";
 import Privacy from "@/pages/info/Privacy";
 import Terms from "@/pages/info/Terms";
 import Support from "@/pages/info/Support";
@@ -26,10 +23,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Lobby} />
       <Route path="/rules" component={Rules} />
-      <Route path="/tournaments" component={TournamentsInfo} />
-      <Route path="/king-of-the-table" component={KingOfTheTable} />
       <Route path="/fair-play" component={FairPlay} />
-      <Route path="/discord" component={DiscordInfo} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
       <Route path="/support" component={Support} />

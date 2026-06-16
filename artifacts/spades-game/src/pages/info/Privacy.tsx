@@ -8,7 +8,7 @@ export default function Privacy() {
     <>
       <Seo
         title="Privacy Policy | Spades Free Play"
-        description="Privacy Policy for the Spades Free Play app. A free-play card game with no accounts required, no real-money play, and no sale of personal data."
+        description="Privacy Policy for the Spades Free Play app. A free card game with no accounts required, no payment features, and no sale of personal data."
         path="/privacy"
       />
       <InfoPageLayout
@@ -18,10 +18,10 @@ export default function Privacy() {
         <section>
           <h2>Free play only</h2>
           <p>
-            Spades Free Play is a free, for-entertainment card game. There are no
-            cash games, deposits, paid entries, wallets, withdrawals, real-money
-            gambling, or in-app prizes. We do not collect or process any payment
-            or financial account information through the app.
+            Spades Free Play is a free, for-entertainment card game. The app
+            does not include payment features, paid entry, redeemable rewards, or
+            financial accounts. We do not collect or process payment or financial
+            account information through the app.
           </p>
         </section>
 
@@ -89,7 +89,7 @@ export default function Privacy() {
           <p>
             The app is suitable for general audiences and does not knowingly
             collect personal information from children. Because no account is
-            required and no real-money features exist, the app does not request
+            required and no payment features exist, the app does not request
             personal details from any user.
           </p>
         </section>
@@ -116,17 +116,7 @@ export default function Privacy() {
         <section>
           <h2>Contact</h2>
           <p>
-            Questions about this policy? Reach us through our community on{" "}
-            <a
-              href="https://discord.gg/bT2G3uNX5"
-              target="_blank"
-              rel="noopener noreferrer"
-              data-testid="link-privacy-discord"
-              className="text-primary hover:underline"
-            >
-              Discord
-            </a>{" "}
-            or by email at{" "}
+            Questions about this policy? Reach us by email at{" "}
             <a
               href="mailto:support@1v1spades.com"
               className="text-primary hover:underline"

@@ -8,7 +8,7 @@
     "scheme": "spades-freeplay",
     "userInterfaceStyle": "dark",
     "primaryColor": "#d4af37",
-    "description": "Free, head-to-head 1v1 Spades. Just you and one opponent — no stakes, no catches.",
+    "description": "Free, head-to-head Spades for two players. Create a room, invite an opponent, and play for fun.",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/icon.png",
@@ -18,9 +18,14 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.oneononespades.freeplay",
-      "buildNumber": "1",
+      "buildNumber": "21",
       "config": {
         "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       }
     },
     "android": {
@@ -31,18 +36,25 @@
       "favicon": "./assets/images/icon.png"
     },
     "plugins": [
+      "expo-dev-client",
       [
         "expo-router",
         {
-          "origin": "https://replit.com/"
+          "origin": "https://1v1spades.com/"
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "9b64353d-700c-4be9-ac70-3101400335b8"
+      }
     }
   }
 }

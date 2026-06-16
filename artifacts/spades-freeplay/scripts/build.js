@@ -22,6 +22,11 @@ function findWorkspaceRoot(startDir) {
 const workspaceRoot = findWorkspaceRoot(projectRoot);
 const basePath = (process.env.BASE_PATH || "/").replace(/\/+$/, "");
 
+function packageManagerCommand() {
+  const command = process.env.PNPM_BIN || "pnpm";
+  return command.trim().split(/\s+/).filter(Boolean);
+}
+
 function exitWithError(message) {
   console.error(message);
   if (metroProcess) {
@@ -146,9 +151,12 @@ async function startMetro(expoPublicDomain, expoPublicReplId) {
     console.log(`Setting EXPO_PUBLIC_REPL_ID=${expoPublicReplId}`);
   }
 
+  const [packageManager, ...packageManagerArgs] = packageManagerCommand();
+
   metroProcess = spawn(
-    "pnpm",
+    packageManager,
     [
+      ...packageManagerArgs,
       "exec",
       "expo",
       "start",

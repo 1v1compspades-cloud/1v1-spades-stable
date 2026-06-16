@@ -1,389 +1,304 @@
-import { Feather } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
+  Linking,
   Pressable,
-  ScrollView,
+  SafeAreaView,
+  StatusBar,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { WebView, type WebViewMessageEvent, type WebViewNavigation } from "react-native-webview";
+import * as Haptics from "expo-haptics";
 
-import { GoldButton } from "@/components/GoldButton";
-import { PlayingCard } from "@/components/PlayingCard";
-import { useColors } from "@/hooks/useColors";
-import { LINKS } from "@/constants/links";
-import { loadOnboarded } from "@/lib/session";
-import type { Card } from "@workspace/spades-core";
+const LIVE_URL = "https://1v1spades.com/";
+const LIVE_ORIGIN = "https://1v1spades.com";
+const CONNECTION_ERROR = "Connection unavailable. Check internet or try again.";
+const SERVER_UNAVAILABLE_ERROR = "Server unavailable. Tap Retry in a moment.";
+const LOAD_TIMEOUT_MS = 10000;
+const LOADING_HTML = `
+<!doctype html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      html, body { margin: 0; height: 100%; background: #050505; color: #f8f4eb; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+      body { display: grid; place-items: center; }
+      main { text-align: center; padding: 24px; }
+      strong { color: #efb72a; }
+    </style>
+  </head>
+  <body><main><strong>Spades Free Play</strong><p>Loading...</p></main></body>
+</html>
+`;
 
-const HERO_FAN: Card[] = [
-  { suit: "spades", rank: "A" },
-  { suit: "hearts", rank: "K" },
-  { suit: "clubs", rank: "Q" },
-  { suit: "diamonds", rank: "J" },
-];
+const TESTER_MODE_SCRIPT = `
+  (function () {
+    function hide(element) {
+      if (element) element.style.display = "none";
+    }
 
-export default function Home() {
-  const colors = useColors();
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const [ready, setReady] = useState(false);
+    function applyTesterMode() {
+      document.body.classList.add("tester-mode");
 
-  // First-launch gate: send brand-new users to onboarding before the home screen.
-  useEffect(() => {
-    let active = true;
-    loadOnboarded().then((seen) => {
-      if (!active) return;
-      if (seen) {
-        setReady(true);
-      } else {
-        router.replace("/onboarding");
+      var transport = document.getElementById("transport-mode");
+      if (transport) {
+        transport.value = "real-server";
+        transport.dispatchEvent(new Event("change", { bubbles: true }));
+        hide(transport.closest("label"));
       }
-    });
+
+      hide(document.getElementById("reconnect-live-sync"));
+      hide(document.getElementById("advanced-diagnostics"));
+      hide(document.getElementById("local-preview-tools"));
+      hide(document.getElementById("manual-test-tools"));
+    }
+
+    applyTesterMode();
+    setTimeout(applyTesterMode, 250);
+    setTimeout(applyTesterMode, 1000);
+  })();
+  true;
+`;
+
+function hostedUrl() {
+  const url = new URL(LIVE_URL);
+  url.searchParams.set("transport", "real-server");
+  url.searchParams.set("tester", "ios-testflight");
+  url.searchParams.set("cacheBust", String(Date.now()));
+  return url.toString();
+}
+
+export default function HostedSpadesFreePlay() {
+  const webViewRef = useRef<WebView>(null);
+  const loadingFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const healthAbortRef = useRef<AbortController | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [sourceUrl, setSourceUrl] = useState<string | null>(null);
+
+  const stopLoading = useCallback(() => {
+    if (loadingFallbackRef.current) {
+      clearTimeout(loadingFallbackRef.current);
+      loadingFallbackRef.current = null;
+    }
+    setIsLoading(false);
+  }, []);
+
+  const startLoadingTimer = useCallback(() => {
+    if (loadingFallbackRef.current) {
+      clearTimeout(loadingFallbackRef.current);
+    }
+    loadingFallbackRef.current = setTimeout(() => {
+      setIsLoading(false);
+      setLoadError(CONNECTION_ERROR);
+    }, LOAD_TIMEOUT_MS);
+  }, []);
+
+  const loadHostedBeta = useCallback(async () => {
+    healthAbortRef.current?.abort();
+    const controller = new AbortController();
+    healthAbortRef.current = controller;
+
+    setLoadError(null);
+    setIsLoading(true);
+    startLoadingTimer();
+
+    try {
+      const response = await fetch(LIVE_URL, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
+
+      if (response.status >= 500) {
+        throw new Error(`Server error ${response.status}`);
+      }
+
+      setSourceUrl(hostedUrl());
+    } catch (error) {
+      if (controller.signal.aborted) return;
+
+      stopLoading();
+      setSourceUrl(null);
+      setLoadError(error instanceof Error ? error.message : SERVER_UNAVAILABLE_ERROR);
+    }
+  }, [startLoadingTimer, stopLoading]);
+
+  useEffect(() => {
+    loadHostedBeta();
+
     return () => {
-      active = false;
+      healthAbortRef.current?.abort();
+      if (loadingFallbackRef.current) {
+        clearTimeout(loadingFallbackRef.current);
+      }
     };
-  }, [router]);
+  }, [loadHostedBeta]);
 
-  const openLink = (url: string) => {
-    WebBrowser.openBrowserAsync(url).catch(() => {});
-  };
+  const retryConnection = useCallback(() => {
+    loadHostedBeta();
+  }, [loadHostedBeta]);
 
-  if (!ready) {
-    return <View style={[styles.root, { backgroundColor: colors.background }]} />;
-  }
+  const handleShouldStartLoad = useCallback((request: WebViewNavigation) => {
+    const nextUrl = request?.url ?? "";
+    return isAllowedUrl(nextUrl);
+  }, []);
+
+  const handleWebMessage = useCallback((event: WebViewMessageEvent) => {
+    try {
+      const payload = JSON.parse(event.nativeEvent.data) as { type?: string; title?: string; body?: string };
+      if (payload.type !== "spades:game-attention") return;
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+      Alert.alert(payload.title || "Spades needs you", payload.body || "Open the game to continue.");
+    } catch {
+      // Ignore non-JSON messages from the hosted web app.
+    }
+  }, []);
+
+  const webViewSource = sourceUrl
+    ? { uri: sourceUrl }
+    : { html: LOADING_HTML, baseUrl: LIVE_ORIGIN };
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <LinearGradient
-        colors={[colors.felt, colors.background, colors.background]}
-        locations={[0, 0.55, 1]}
-        style={StyleSheet.absoluteFill}
-      />
-      <View pointerEvents="none" style={styles.glowWrap}>
-        <LinearGradient
-          colors={[colors.glowStrong, colors.glowFade]}
-          style={styles.glow}
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" />
+      <View style={styles.container}>
+        <WebView
+          ref={webViewRef}
+          source={webViewSource}
+          style={styles.webView}
+          containerStyle={styles.webViewContainer}
+          originWhitelist={["*"]}
+          allowsBackForwardNavigationGestures
+          allowsInlineMediaPlayback
+          javaScriptEnabled
+          domStorageEnabled
+          sharedCookiesEnabled
+          pullToRefreshEnabled
+          startInLoadingState={false}
+          mixedContentMode="never"
+          injectedJavaScript={TESTER_MODE_SCRIPT}
+          onLoadStart={() => {
+            setLoadError(null);
+            setIsLoading(true);
+          }}
+          onLoadProgress={(event) => {
+            if (event.nativeEvent.progress > 0.35) {
+              stopLoading();
+            }
+          }}
+          onLoadEnd={stopLoading}
+          onError={(event) => {
+            stopLoading();
+            setLoadError(event.nativeEvent?.description ?? CONNECTION_ERROR);
+          }}
+          onHttpError={(event) => {
+            if (event.nativeEvent?.statusCode >= 500) {
+              stopLoading();
+              setLoadError(`Server error ${event.nativeEvent.statusCode}`);
+            }
+          }}
+          onContentProcessDidTerminate={() => {
+            stopLoading();
+            setSourceUrl(null);
+            setLoadError("The game view restarted.");
+          }}
+          onShouldStartLoadWithRequest={handleShouldStartLoad}
+          onMessage={handleWebMessage}
         />
+
+        {loadError ? (
+          <View style={styles.errorPanel}>
+            <Text style={styles.errorTitle}>Spades Free Play</Text>
+            <Text style={styles.errorText}>{CONNECTION_ERROR}</Text>
+            <Text style={styles.errorDetail}>Last load error: {loadError}</Text>
+            <Pressable accessibilityRole="button" onPress={retryConnection} style={styles.retryButton}>
+              <Text style={styles.retryText}>Retry</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {isLoading && !loadError ? (
+          <View style={styles.loadingOverlay} pointerEvents="none">
+            <ActivityIndicator color="#efb72a" size="large" />
+          </View>
+        ) : null}
       </View>
-
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingTop: insets.top + 28, paddingBottom: insets.bottom + 32 },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Hero */}
-        <View style={styles.hero}>
-          <View style={styles.fan}>
-            {HERO_FAN.map((card, i) => {
-              const mid = (HERO_FAN.length - 1) / 2;
-              const angle = (i - mid) * 11;
-              return (
-                <PlayingCard
-                  key={`${card.suit}-${card.rank}`}
-                  card={card}
-                  width={70}
-                  style={{
-                    marginHorizontal: -14,
-                    transform: [
-                      { rotate: `${angle}deg` },
-                      { translateY: Math.abs(i - mid) * 8 },
-                    ],
-                  }}
-                />
-              );
-            })}
-          </View>
-
-          <View style={styles.titleRow}>
-            <Feather name="award" size={22} color={colors.gold} />
-            <Text style={[styles.brand, { color: colors.foreground }]}>SPADES</Text>
-          </View>
-          <Text style={[styles.subtitle, { color: colors.gold }]}>
-            FREE PLAY
-          </Text>
-          <Text style={[styles.tagline, { color: colors.mutedForeground }]}>
-            Head-to-head 1v1 Spades. Just you and the table.
-          </Text>
-        </View>
-
-        {/* Primary actions */}
-        <View style={styles.actions}>
-          <GoldButton
-            label="Quick Match"
-            icon="zap"
-            onPress={() => router.push("/play")}
-          />
-          <GoldButton
-            label="Play a Friend"
-            icon="users"
-            variant="outline"
-            onPress={() => router.push("/friend")}
-          />
-        </View>
-
-        {/* Info tiles */}
-        <View style={styles.tiles}>
-          <InfoTile
-            icon="book-open"
-            label="How to Play"
-            onPress={() => router.push("/rules")}
-          />
-          <InfoTile
-            icon="shield"
-            label="Fair Play"
-            onPress={() => router.push("/fairplay")}
-          />
-        </View>
-
-        {/* Community / web */}
-        <View style={styles.community}>
-          <CommunityLink
-            icon="award"
-            label="Tournaments on 1v1spades.com"
-            onPress={() => openLink(LINKS.websiteTournaments)}
-          />
-          <CommunityLink
-            icon="message-circle"
-            label="Join the Discord"
-            onPress={() => openLink(LINKS.discord)}
-          />
-          <CommunityLink
-            icon="globe"
-            label="Visit 1v1spades.com"
-            onPress={() => openLink(LINKS.website)}
-          />
-        </View>
-
-        {/* Replay onboarding */}
-        <Pressable
-          onPress={() => router.push("/onboarding")}
-          style={({ pressed }) => [styles.tourRow, { opacity: pressed ? 0.6 : 1 }]}
-        >
-          <Feather name="help-circle" size={14} color={colors.mutedForeground} />
-          <Text style={[styles.tourLabel, { color: colors.mutedForeground }]}>
-            New here? Take the tour
-          </Text>
-        </Pressable>
-
-        <Text style={[styles.footnote, { color: colors.mutedForeground }]}>
-          Free play only — competitive tournaments are hosted on the website.
-        </Text>
-
-        {/* Legal / support */}
-        <View style={styles.legalRow}>
-          <Pressable
-            onPress={() => openLink(LINKS.privacy)}
-            hitSlop={8}
-            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-          >
-            <Text style={[styles.legalLink, { color: colors.mutedForeground }]}>
-              Privacy
-            </Text>
-          </Pressable>
-          <Text style={[styles.legalDot, { color: colors.border }]}>•</Text>
-          <Pressable
-            onPress={() => openLink(LINKS.terms)}
-            hitSlop={8}
-            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-          >
-            <Text style={[styles.legalLink, { color: colors.mutedForeground }]}>
-              Terms
-            </Text>
-          </Pressable>
-          <Text style={[styles.legalDot, { color: colors.border }]}>•</Text>
-          <Pressable
-            onPress={() => openLink(LINKS.support)}
-            hitSlop={8}
-            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-          >
-            <Text style={[styles.legalLink, { color: colors.mutedForeground }]}>
-              Support
-            </Text>
-          </Pressable>
-        </View>
-      </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
-function InfoTile({
-  icon,
-  label,
-  onPress,
-}: {
-  icon: keyof typeof Feather.glyphMap;
-  label: string;
-  onPress: () => void;
-}) {
-  const colors = useColors();
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.tile,
-        {
-          backgroundColor: colors.card,
-          borderColor: colors.border,
-          borderRadius: colors.radius,
-          opacity: pressed ? 0.85 : 1,
-        },
-      ]}
-    >
-      <Feather name={icon} size={20} color={colors.primary} />
-      <Text style={[styles.tileLabel, { color: colors.foreground }]}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-function CommunityLink({
-  icon,
-  label,
-  onPress,
-}: {
-  icon: keyof typeof Feather.glyphMap;
-  label: string;
-  onPress: () => void;
-}) {
-  const colors = useColors();
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.communityLink, { opacity: pressed ? 0.7 : 1 }]}
-    >
-      <Feather name={icon} size={16} color={colors.gold} />
-      <Text style={[styles.communityLabel, { color: colors.foreground }]}>
-        {label}
-      </Text>
-      <Feather name="external-link" size={14} color={colors.mutedForeground} />
-    </Pressable>
-  );
+function isAllowedUrl(value: string) {
+  if (value === "about:blank") return true;
+  if (value === LIVE_ORIGIN || value.startsWith(`${LIVE_ORIGIN}/`)) return true;
+  if (/^(mailto:|tel:|https?:\/\/)/i.test(value)) {
+    Linking.openURL(value).catch(() => undefined);
+  }
+  return false;
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
-  glowWrap: {
-    position: "absolute",
-    top: -120,
-    left: 0,
-    right: 0,
-    alignItems: "center",
-  },
-  glow: {
-    width: 460,
-    height: 460,
-    borderRadius: 230,
-  },
-  content: {
-    paddingHorizontal: 22,
-    gap: 26,
-  },
-  hero: {
-    alignItems: "center",
-    gap: 6,
-  },
-  fan: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginBottom: 22,
-    height: 120,
-    alignItems: "center",
-  },
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  brand: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 40,
-    letterSpacing: 6,
-  },
-  subtitle: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-    letterSpacing: 8,
-  },
-  tagline: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    textAlign: "center",
-    marginTop: 8,
-    maxWidth: 280,
-    lineHeight: 20,
-  },
-  actions: {
-    gap: 12,
-  },
-  tiles: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  tile: {
+  safeArea: {
     flex: 1,
+    backgroundColor: "#050505",
+  },
+  container: {
+    flex: 1,
+    backgroundColor: "#050505",
+  },
+  webView: {
+    flex: 1,
+    backgroundColor: "#050505",
+  },
+  webViewContainer: {
+    flex: 1,
+    backgroundColor: "#050505",
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(5, 5, 5, 0.72)",
+  },
+  errorPanel: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 2,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+    backgroundColor: "#050505",
+  },
+  errorTitle: {
+    color: "#efb72a",
+    fontSize: 24,
+    fontWeight: "800",
+    marginBottom: 12,
+  },
+  errorText: {
+    color: "#f5efe2",
+    fontSize: 16,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  errorDetail: {
+    color: "#aaa297",
+    fontSize: 12,
+    marginTop: 10,
+    textAlign: "center",
+  },
+  retryButton: {
+    marginTop: 18,
+    borderRadius: 6,
     borderWidth: 1,
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-    gap: 10,
+    borderColor: "#efb72a",
+    paddingHorizontal: 18,
+    paddingVertical: 10,
   },
-  tileLabel: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-  },
-  community: {
-    gap: 4,
-    marginTop: 2,
-  },
-  communityLink: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 12,
-  },
-  communityLabel: {
-    flex: 1,
-    fontFamily: "Inter_500Medium",
-    fontSize: 14.5,
-  },
-  tourRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    paddingVertical: 4,
-    marginTop: -10,
-  },
-  tourLabel: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 13,
-  },
-  footnote: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    textAlign: "center",
-    lineHeight: 18,
-    marginTop: -8,
-    paddingHorizontal: 24,
-  },
-  legalRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    marginTop: -12,
-  },
-  legalLink: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 12.5,
-  },
-  legalDot: {
-    fontSize: 12,
+  retryText: {
+    color: "#efb72a",
+    fontSize: 14,
+    fontWeight: "800",
   },
 });

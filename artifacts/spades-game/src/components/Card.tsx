@@ -26,8 +26,8 @@ export function CardComponent({ card, hidden, className, onClick, disabled, sele
     return (
       <div
         className={cn(
-          "relative flex-shrink-0 w-16 h-24 sm:w-24 sm:h-36 rounded-lg border-2 border-slate-700 bg-slate-800 shadow-md flex items-center justify-center overflow-hidden",
-          "bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cmVjdCB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjMWUyOTNiIj48L3JlY3Q+CjxwYXRoIGQ9Ik0wIDBMOCA4Wk04IDBMMCA4WiIgc3Ryb2tlPSIjMzMzNDNiIiBzdHJva2Utd2lkdGg9IjEiPjwvcGF0aD4KPC9zdmc+')] bg-repeat",
+          "spades-card-back relative flex-shrink-0 w-[4.35rem] h-[6.25rem] sm:w-24 sm:h-36 rounded-xl border-2 shadow-md flex items-center justify-center overflow-hidden",
+          "after:absolute after:inset-2 after:rounded-lg after:border after:border-primary/25",
           className
         )}
       />
@@ -47,9 +47,9 @@ export function CardComponent({ card, hidden, className, onClick, disabled, sele
       className={cn(
         // Compact mobile card so a horizontal hand strip fits on one row.
         // 64×88 mobile is still a solid tap target; sm: bumps back to 96×144.
-        "relative flex-shrink-0 w-16 h-24 sm:w-24 sm:h-36 rounded-lg border border-slate-300 bg-white shadow-md flex flex-col items-center justify-center p-1.5 select-none transition-transform duration-150",
+        "spades-card-face relative flex-shrink-0 w-[4.35rem] h-[6.25rem] sm:w-24 sm:h-36 rounded-xl border border-amber-200/70 shadow-md flex flex-col items-center justify-center p-1.5 select-none transition-transform duration-150",
         // Suit-tinted left edge bar for fast scanning even when fanned
-        "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1.5 before:rounded-l-lg",
+        "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1.5 before:rounded-l-xl",
         card.suit === "spades"   && "before:bg-slate-900",
         card.suit === "hearts"   && "before:bg-red-600",
         card.suit === "clubs"    && "before:bg-emerald-700",
@@ -75,8 +75,8 @@ export function CardComponent({ card, hidden, className, onClick, disabled, sele
 
       {/* Center: large stacked value over suit — the dominant face */}
       <div className="flex flex-col items-center justify-center leading-none pointer-events-none">
-        <span className="text-2xl sm:text-3xl font-bold font-serif tabular-nums">{card.rank}</span>
-        <span className="text-2xl sm:text-3xl mt-0.5">{symbol}</span>
+        <span className="text-3xl sm:text-4xl font-bold font-serif tabular-nums drop-shadow-sm">{card.rank}</span>
+        <span className="text-3xl sm:text-4xl mt-0.5 drop-shadow-sm">{symbol}</span>
       </div>
 
       {/* Bottom-right corner index (rotated) */}

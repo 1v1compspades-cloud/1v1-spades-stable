@@ -868,19 +868,19 @@ export default function Room() {
           // relative + z-[110] keeps the score row above the bidding modal
           // backdrop (z-[100]) so the bottom-player score stays visible while
           // bidding. The modal itself stays centered between the two rows.
-          "relative z-[110] flex items-center justify-between px-4 py-3 bg-black/40 border-y backdrop-blur-sm transition-shadow",
+          "spades-seat-bar relative z-[110] flex w-full max-w-full min-w-0 items-center justify-between gap-2 px-2.5 sm:px-4 py-2.5 sm:py-3 border-y backdrop-blur-sm transition-shadow overflow-hidden",
           isActive
             ? "border-primary/60 shadow-[inset_0_0_0_1px_hsla(35,90%,55%,0.5),0_0_12px_-2px_hsla(35,90%,55%,0.35)]"
             : "border-border",
           opts?.isTopSeat && "pt-[calc(env(safe-area-inset-top)+1.75rem)]",
         )}
       >
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex flex-col leading-tight">
+        <div className="flex flex-1 items-center gap-2 sm:gap-3 min-w-0">
+          <div className="flex min-w-0 shrink flex-col leading-tight">
             <span className="text-xs text-muted-foreground uppercase tracking-wider">
               {seatLabel}{isMe ? " · You" : ""}
             </span>
-            <span className="font-bold font-serif truncate max-w-[120px]">
+            <span className="font-bold font-serif truncate max-w-[6.5rem] sm:max-w-[10rem]">
               {showCrown && (
                 <span
                   data-testid={`king-crown-seat-${idx + 1}`}
@@ -894,19 +894,19 @@ export default function Room() {
               {isActive && <span className="text-primary ml-2 animate-pulse">●</span>}
             </span>
           </div>
-          <div className="flex gap-2 flex-wrap">
-            <Badge variant="outline" className="text-xs tabular-nums">{score} pts</Badge>
-            <Badge variant="outline" className={`text-xs tabular-nums ${bags >= 8 ? "border-yellow-500 text-yellow-400" : "text-muted-foreground"}`}>
+          <div className="flex min-w-0 flex-1 gap-1.5 sm:gap-2 overflow-hidden">
+            <Badge variant="outline" className="shrink-0 px-1.5 text-[10px] sm:text-xs tabular-nums">{score} pts</Badge>
+            <Badge variant="outline" className={`shrink-0 px-1.5 text-[10px] sm:text-xs tabular-nums ${bags >= 8 ? "border-yellow-500 text-yellow-400" : "text-muted-foreground"}`}>
               {bags} bag{bags !== 1 ? "s" : ""}
             </Badge>
-            <Badge variant="outline" className="text-xs tabular-nums text-muted-foreground">
+            <Badge variant="outline" className="shrink-0 px-1.5 text-[10px] sm:text-xs tabular-nums text-muted-foreground">
               {gameState.handSizes?.[idx] ?? 0} cards
             </Badge>
             {afk === "may" && !isMe && (
               <Badge
                 data-testid={`afk-badge-seat-${idx + 1}`}
                 variant="outline"
-                className="text-xs border-yellow-500/60 text-yellow-300"
+                className="hidden sm:inline-flex text-xs border-yellow-500/60 text-yellow-300"
               >
                 ⏳ May be AFK
               </Badge>
@@ -915,7 +915,7 @@ export default function Room() {
               <Badge
                 data-testid={`afk-badge-seat-${idx + 1}`}
                 variant="outline"
-                className="text-xs border-red-500/60 text-red-300"
+                className="hidden sm:inline-flex text-xs border-red-500/60 text-red-300"
               >
                 ⚠ AFK
               </Badge>
@@ -924,14 +924,14 @@ export default function Room() {
         </div>
 
         {gameState.phase !== "waiting" && (
-          <div className="flex gap-5 text-right shrink-0">
+          <div className="flex shrink-0 gap-2 sm:gap-5 text-right">
             <div className="flex flex-col items-center">
               <span className="text-muted-foreground text-[10px] uppercase tracking-wider">Bid</span>
-              <span className="text-xl font-bold font-mono">{bid !== null ? bid : "—"}</span>
+              <span className="text-lg sm:text-xl font-bold font-mono">{bid !== null ? bid : "—"}</span>
             </div>
             <div className="flex flex-col items-center">
               <span className="text-muted-foreground text-[10px] uppercase tracking-wider">Tricks</span>
-              <span className={`text-xl font-bold font-mono ${bid !== null && tricks > bid ? "text-yellow-400" : tricks === bid && bid !== null ? "text-green-400" : ""}`}>
+              <span className={`text-lg sm:text-xl font-bold font-mono ${bid !== null && tricks > bid ? "text-yellow-400" : tricks === bid && bid !== null ? "text-green-400" : ""}`}>
                 {tricks}
               </span>
             </div>
@@ -1059,7 +1059,7 @@ export default function Room() {
     return (
       <div className="flex-1 overflow-y-auto px-4 py-6 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
         <div className="mx-auto w-full max-w-2xl">
-          <div className="rounded-2xl border-2 border-primary/40 bg-gradient-to-b from-card/80 via-card/50 to-black/70 shadow-[0_10px_60px_-10px_rgba(234,179,8,0.25)] backdrop-blur-sm overflow-hidden">
+          <div className="spades-panel rounded-2xl border-2 border-primary/40 backdrop-blur-sm overflow-hidden">
             {/* Header */}
             <div className="px-5 pt-6 pb-4 text-center border-b border-primary/20">
               <div className="flex items-center justify-center gap-2 text-base mb-2" aria-hidden>
@@ -1069,7 +1069,7 @@ export default function Room() {
                 <span className="text-emerald-500">♣</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-serif font-bold text-primary tracking-wider drop-shadow-[0_2px_8px_rgba(234,179,8,0.25)]">
-                {isKingMode ? "👑 King of the Table" : "1v1 Competitive Spades"}
+                {isKingMode ? "Table Streak" : "Spades Free Play"}
               </h1>
               <p className="text-[11px] uppercase tracking-widest text-muted-foreground mt-1">
                 {isKingMode ? (kottLobbyState || "Pre-match lobby") : "Pre-match lobby"}
@@ -1220,13 +1220,13 @@ export default function Room() {
   const renderSpectatorWaiting = () => (
     <div className="flex-1 overflow-y-auto px-4 py-6 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
       <div className="mx-auto w-full max-w-2xl">
-        <div className="rounded-2xl border-2 border-primary/40 bg-gradient-to-b from-card/80 via-card/50 to-black/70 shadow-[0_10px_60px_-10px_rgba(234,179,8,0.25)] backdrop-blur-sm overflow-hidden">
+        <div className="spades-panel rounded-2xl border-2 border-primary/40 backdrop-blur-sm overflow-hidden">
           <div className="px-5 pt-6 pb-4 text-center border-b border-primary/20">
             <Badge variant="outline" className="border-primary/40 text-primary uppercase tracking-widest text-[10px] mb-2">
               Spectator
             </Badge>
             <h1 className="text-2xl sm:text-3xl font-serif font-bold text-primary tracking-wider">
-              1v1 Competitive Spades
+              Spades Free Play
             </h1>
             <p className="text-[11px] uppercase tracking-widest text-muted-foreground mt-1">
               Watching room
@@ -1301,9 +1301,9 @@ export default function Room() {
       : "You";
 
     return (
-      <div className="flex-1 flex flex-col items-center justify-center relative overflow-hidden">
+      <div className="spades-table-surface flex-1 flex flex-col items-center justify-center relative overflow-hidden px-2">
         {/* Top seat hidden hand (always hidden — even players don't see opponent's cards) */}
-        <div className="absolute top-4 flex justify-center w-full pointer-events-none">
+        <div className="absolute top-3 sm:top-4 flex justify-center w-full pointer-events-none">
           <div className="flex items-center gap-2">
             <div className="flex -space-x-10">
               {Array.from({ length: topHandSize }).map((_, i) => (
@@ -1337,15 +1337,15 @@ export default function Room() {
         )}
 
         {/* Center trick area */}
-        <div className="w-64 h-64 rounded-full border border-white/5 bg-white/5 flex items-center justify-center relative">
+        <div className="spades-table-pocket rounded-full flex items-center justify-center relative">
           {gameState.spadesBroken && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 text-[10px] text-muted-foreground uppercase tracking-widest opacity-60 whitespace-nowrap">
               ♠ Spades Broken
             </div>
           )}
           <div className="flex flex-col items-center justify-center gap-2 relative z-10">
-            <div className="flex gap-8">
-              <div className="w-24 h-36 border-2 border-dashed border-white/10 rounded-lg flex items-center justify-center relative">
+            <div className="flex gap-5 sm:gap-10">
+              <div className="w-[5rem] h-[7.1rem] sm:w-24 sm:h-36 border-2 border-dashed border-primary/24 rounded-xl flex items-center justify-center relative bg-black/14">
                 {topCard ? (
                   <div className="absolute inset-0 z-10 -translate-y-2">
                     <CardComponent card={topCard} />
@@ -1353,7 +1353,7 @@ export default function Room() {
                 ) : null}
                 <span className="text-white/20 text-xs font-serif">{topLabel}</span>
               </div>
-              <div className="w-24 h-36 border-2 border-dashed border-white/10 rounded-lg flex items-center justify-center relative">
+              <div className="w-[5rem] h-[7.1rem] sm:w-24 sm:h-36 border-2 border-dashed border-primary/24 rounded-xl flex items-center justify-center relative bg-black/14">
                 {bottomCard ? (
                   <div className="absolute inset-0 z-20 translate-y-2">
                     <CardComponent card={bottomCard} />
@@ -1698,10 +1698,10 @@ export default function Room() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => copyToClipboard(discord, "Discord report")}
-                        data-testid="button-copy-discord"
+                        onClick={() => copyToClipboard(discord, "Shareable report")}
+                        data-testid="button-copy-shareable-report"
                       >
-                        💬 Copy for Discord
+                        Copy shareable report
                       </Button>
                     </div>
                   </div>
@@ -1790,7 +1790,7 @@ export default function Room() {
                             className="w-full h-11"
                             data-testid="button-kott-back-to-lobby"
                           >
-                            Back to King of the Table Lobby
+                            Back to Table Streak Lobby
                           </Button>
                         </div>
                       );
@@ -1883,7 +1883,7 @@ export default function Room() {
     return (
       <div
         data-testid="my-hand"
-        className="flex-shrink-0 overflow-x-auto overflow-y-hidden snap-x pt-2 pb-hand-safe bg-black/30 border-t border-primary/20 shadow-[0_-2px_12px_-6px_hsla(35,90%,55%,0.25)]"
+        className="spades-hand-tray flex-shrink-0 overflow-x-auto overflow-y-hidden snap-x pt-2 pb-hand-safe border-t shadow-[0_-10px_34px_-24px_hsla(35,90%,55%,0.5)]"
       >
         <div className="flex flex-nowrap items-end gap-1 px-2 sm:gap-2 sm:px-3 sm:justify-center min-w-min">
           {groups.map((group, gi) => (
@@ -1934,7 +1934,7 @@ export default function Room() {
             variant="outline"
             className="border-yellow-500/50 text-yellow-300 uppercase tracking-widest"
           >
-            👑 King of the Table
+            Table Streak
           </Badge>
           {/* Clear session/lobby state for the stream. */}
           {kottLobbyState && (
@@ -2245,7 +2245,7 @@ export default function Room() {
 
   if (spectator && gameState.phase === "waiting") {
     return (
-      <div className="h-[100dvh] flex flex-col bg-background overflow-hidden relative">
+      <div className="spades-screen h-[100dvh] flex flex-col bg-background overflow-hidden relative">
         {renderStatusPill()}
         {renderOpponentOffline()}
         {renderQueuePanel()}
@@ -2256,7 +2256,7 @@ export default function Room() {
   }
 
   return (
-    <div className="h-[100dvh] flex flex-col bg-background overflow-hidden relative">
+    <div className="spades-screen h-[100dvh] flex flex-col bg-background overflow-hidden relative">
       {renderStatusPill()}
       {renderOpponentOffline()}
       {!spectator && gameState.phase === "waiting" ? (

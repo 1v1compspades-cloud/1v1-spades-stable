@@ -8,7 +8,7 @@ export default function Terms() {
     <>
       <Seo
         title="Terms of Use | Spades Free Play"
-        description="Terms of Use for the Spades Free Play app. A free, for-entertainment card game with no real-money gambling, deposits, or prizes."
+        description="Terms of Use for the Spades Free Play app. A free, for-entertainment card game with no payment features or redeemable rewards."
         path="/terms"
       />
       <InfoPageLayout
@@ -24,20 +24,18 @@ export default function Terms() {
         </section>
 
         <section>
-          <h2>Free play only — no real-money gambling</h2>
+          <h2>Free play only</h2>
           <p>
-            The app is provided solely for entertainment. It is free to play and
-            contains:
+            The app is provided solely for entertainment. It is free to play.
           </p>
           <ul>
-            <li>No cash games and no real-money wagering of any kind.</li>
-            <li>No deposits, paid entries, or buy-ins.</li>
-            <li>No wallets, balances, or withdrawals.</li>
-            <li>No prizes, payouts, or items of monetary value.</li>
+            <li>No payment features or paid entry.</li>
+            <li>No financial accounts or balances.</li>
+            <li>No redeemable rewards or items of monetary value.</li>
           </ul>
           <p>
-            Any in-game scores or standings are for fun only and have no monetary
-            value and cannot be redeemed for anything of value.
+            Any in-game scores or standings are for fun only and cannot be
+            redeemed for anything of value.
           </p>
         </section>
 
@@ -129,17 +127,7 @@ export default function Terms() {
         <section>
           <h2>Contact</h2>
           <p>
-            Questions about these terms? Reach us through our community on{" "}
-            <a
-              href="https://discord.gg/bT2G3uNX5"
-              target="_blank"
-              rel="noopener noreferrer"
-              data-testid="link-terms-discord"
-              className="text-primary hover:underline"
-            >
-              Discord
-            </a>{" "}
-            or by email at{" "}
+            Questions about these terms? Reach us by email at{" "}
             <a
               href="mailto:support@1v1spades.com"
               className="text-primary hover:underline"

@@ -9,7 +9,7 @@ export interface Card {
 export interface GameState {
   roomCode: string;
   phase: "waiting" | "coin_toss" | "shuffling" | "bidding" | "playing" | "round_over" | "game_over";
-  players: ({ id: string; name: string; index: 0 | 1 } | null)[];
+  players: ({ name: string; index: 0 | 1 } | null)[];
   hand: Card[];
   opponentHandSize: number;
   bids: (number | null)[];

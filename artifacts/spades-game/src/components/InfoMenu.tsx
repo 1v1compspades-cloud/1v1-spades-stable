@@ -11,20 +11,16 @@ import {
 
 const LINKS = [
   { href: "/rules", label: "Rules", testid: "info-link-rules" },
-  { href: "/tournaments", label: "Tournaments", testid: "info-link-tournaments" },
-  {
-    href: "/king-of-the-table",
-    label: "King of the Table",
-    testid: "info-link-king-of-the-table",
-  },
   { href: "/fair-play", label: "Fair Play & Anti-Cheat", testid: "info-link-fair-play" },
-  { href: "/discord", label: "Community / Discord", testid: "info-link-discord" },
+  { href: "/privacy", label: "Privacy Policy", testid: "info-link-privacy" },
+  { href: "/terms", label: "Terms of Use", testid: "info-link-terms" },
+  { href: "/support", label: "Support", testid: "info-link-support" },
 ];
 
 /**
  * Small "Info" menu shown ONLY on the setup/start screen (Lobby). It links to
- * the public info pages and never appears during active matches, tournament /
- * KotT rooms, spectator views, or admin tools (those are rendered by other
+ * the public info pages and never appears during active matches, private-event
+ * rooms, spectator views, or admin tools (those are rendered by other
  * pages). Purely navigational — no game state, sockets, or gameplay logic.
  * Fixed top-left so it never overlaps the ConnectionPill (top-right) or the
  * lobby's name input / create / join controls.

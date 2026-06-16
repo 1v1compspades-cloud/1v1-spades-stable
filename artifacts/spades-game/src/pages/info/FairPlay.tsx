@@ -3,23 +3,22 @@ import { InfoPageLayout } from "@/components/InfoPageLayout";
 
 const RISK_ROWS: { context: string; range: string }[] = [
   { context: "Open public casual lobbies", range: "10%–25%" },
-  { context: "Current private hosted tournaments", range: "3%–8%" },
-  { context: "Controlled events with host oversight", range: "2%–5%" },
+  { context: "Private invite lobbies", range: "3%–8%" },
+  { context: "Host-managed events", range: "2%–5%" },
   { context: "Future accounts + logs + replay review", range: "1%–3%" },
-  { context: "Future cash-event version with KYC/review", range: "0.5%–2%" },
 ];
 
 export default function FairPlay() {
   return (
     <>
       <Seo
-        title="Fair Play & Anti-Cheat | 1V1 Competitive Spades"
-        description="Learn how 1V1 Competitive Spades uses private lobbies, hidden spectator hands, locked admin tools, host oversight, and fair-play policies to reduce cheating risk."
+        title="Fair Play & Anti-Cheat | Spades Free Play"
+        description="Learn how Spades Free Play uses private lobbies, hidden spectator hands, server rules, and fair-play policies to reduce cheating risk."
         path="/fair-play"
       />
       <InfoPageLayout
         title="Fair Play & Anti-Cheat"
-        intro="Competitive integrity is the foundation of 1V1 Competitive Spades. We combine private events, server-enforced rules, and active host oversight to make cheating hard to attempt, easy to detect, and costly to risk."
+        intro="Fair play is the foundation of Spades Free Play. We combine private rooms, server-enforced rules, and clear session controls to make cheating hard to attempt and easier to detect."
       >
         <section>
           <h2>How we protect competitive integrity</h2>
@@ -30,8 +29,8 @@ export default function FairPlay() {
           </p>
           <ul>
             <li>
-              <strong>Private, invite-only tournaments:</strong> events run in
-              closed lobbies with a known field rather than anonymous public
+              <strong>Private, invite-only rooms:</strong> matches run in
+              closed lobbies with a known opponent rather than anonymous public
               rooms.
             </li>
             <li>
