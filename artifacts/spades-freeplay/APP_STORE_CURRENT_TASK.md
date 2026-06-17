@@ -13,18 +13,18 @@ workspace root, to print the automated dashboard.
 | --- | --- |
 | App | Spades Free Play |
 | Version | 1.0.0 |
-| iOS build | 21 |
+| iOS build | 22 |
 | Bundle ID | com.oneononespades.freeplay |
-| EAS build ID | cb3da640-16d5-44c7-813f-908f00485a4e |
-| EAS submission ID | dde15017-24a9-4995-a793-b73a48861885 |
+| EAS build ID | 40ad8e0a-f866-470d-93cd-61a90eb087a4 |
+| EAS submission ID | 945fc363-18e0-4f66-8df6-f8e2149fc401 |
 | App Store Connect app ID | 6776721716 |
 | TestFlight URL | https://appstoreconnect.apple.com/apps/6776721716/testflight/ios |
 | Release mode default | Manual release after approval |
 
 ## Manual launch checklist
 
-- [x] Apple processing complete for build 21
-- [x] Build 21 added to internal TestFlight testing
+- [ ] Apple processing complete for build 22
+- [ ] Build 22 added to internal TestFlight testing
 - [ ] TestFlight smoke test checklist complete
 - [ ] Hosted web mobile layout fix deployed to 1v1spades.com
 - [ ] App Store screenshots uploaded
@@ -39,19 +39,20 @@ workspace root, to print the automated dashboard.
 
 ## Ordered next actions
 
-1. Add build 21 to internal TestFlight testing.
-2. Smoke test on a real iPhone: launch, create room, join from second device or browser, play bidding/trick flow, background/reopen reconnect, leave/return, and open Privacy/Terms/Support.
-3. Confirm the hosted web mobile layout fix is live on `https://1v1spades.com`.
-4. Upload App Store screenshots.
-5. Complete App Privacy, metadata, and App Review notes.
-6. Mark ready, then submit the App Store version for review.
-7. Track App Review status: Waiting for Review, In Review, Rejected, or Approved.
-8. If approved, manually release by default.
-9. Verify the public App Store listing, install path, live URLs, and first-launch flow.
+1. Wait for Apple processing to finish for build 22.
+2. Add build 22 to internal TestFlight testing.
+3. Smoke test on a real iPhone: launch, create room, join from second device or browser, play bidding/trick flow, background/reopen reconnect, leave/return, and open Privacy/Terms/Support.
+4. Confirm the hosted web mobile layout fix is live on `https://1v1spades.com`.
+5. Upload App Store screenshots.
+6. Complete App Privacy, metadata, and App Review notes.
+7. Mark ready, then submit the App Store version for review.
+8. Track App Review status: Waiting for Review, In Review, Rejected, or Approved.
+9. If approved, manually release by default.
+10. Verify the public App Store listing, install path, live URLs, and first-launch flow.
 
 ## Current blockers
 
-- [ ] Smoke test visual layout failure on build 21: iPhone bidding/game screen clips horizontally, score counters overflow past the right edge, bid modal is too wide/tall for the viewport, bottom hand is partially cut off, and the Report Bug button truncates. A local web fix is implemented; do not mark smoke test complete until it is deployed to `1v1spades.com` and verified on device.
+- [ ] Smoke test visual layout failure seen on build 21: iPhone bidding/game screen clipped horizontally, score counters overflowed past the right edge, bid modal was too wide/tall for the viewport, bottom hand was partially cut off, and the Report Bug button truncated. Build 22 includes the mobile layout fix; do not mark smoke test complete until build 22 is processed, installed, and verified on device.
 
 ## App Review notes draft
 
@@ -66,7 +67,7 @@ room code. Privacy, Terms, and Support pages are available at 1v1spades.com.
   gambling.
 - Codex does not submit final App Review or release the app unless explicitly
   asked by the user at that step.
-- Build 21 remains the release candidate unless smoke testing finds a blocker.
+- Build 22 remains the release candidate unless smoke testing finds a blocker.
 - If Apple rejects the app, record the reason here before changing build or
   metadata.
 - Do not commit Apple credentials or local EAS settings.
