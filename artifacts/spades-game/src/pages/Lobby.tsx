@@ -416,6 +416,12 @@ export default function Lobby() {
                   placeholder={matchMode === "custom" ? "Event code" : "Enter room code"}
                   value={joinCodeInput}
                   onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter") return;
+                    if (isCreating || isJoining || isSpectating || !joinCodeInput.trim()) return;
+                    e.preventDefault();
+                    void handleJoin();
+                  }}
                   className="text-center uppercase font-mono py-6 placeholder:normal-case placeholder:font-sans placeholder:tracking-normal"
                   maxLength={6}
                 />
