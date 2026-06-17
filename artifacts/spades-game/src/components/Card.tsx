@@ -62,7 +62,7 @@ export function CardComponent({ card, hidden, className, onClick, disabled, sele
       className={cn(
         // Compact mobile card so a horizontal hand strip fits on one row.
         // Compact mobile card keeps the 13-card hand usable in a WebView.
-        "spades-card-face relative flex-shrink-0 w-[4.05rem] h-[5.8rem] sm:w-24 sm:h-36 rounded-xl border-2 shadow-md flex flex-col items-center justify-center p-1.5 select-none transition-transform duration-150 disabled:opacity-100",
+        "spades-card-face relative flex-shrink-0 w-[3.95rem] h-[5.65rem] sm:w-24 sm:h-36 rounded-xl border-2 shadow-md flex flex-col items-center justify-center p-1.5 select-none transition-transform duration-150 disabled:opacity-100",
         // Suit-tinted left edge bar for fast scanning even when fanned
         "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1.5 before:rounded-l-xl",
         SUIT_EDGE_COLORS[card.suit],
@@ -80,21 +80,21 @@ export function CardComponent({ card, hidden, className, onClick, disabled, sele
       )}
     >
       {/* Top-left corner index: rank stacked over suit */}
-      <div className={cn("absolute top-1 left-2 flex flex-col items-center leading-[0.85]", markClass)}>
-        <span className="text-base sm:text-lg font-bold font-serif tabular-nums">{card.rank}</span>
-        <span className="text-base sm:text-lg font-bold">{symbol}</span>
+      <div className={cn("absolute top-1.5 left-2 flex flex-col items-center leading-none", markClass)}>
+        <span className="text-sm sm:text-lg font-bold font-serif tabular-nums">{card.rank}</span>
+        <span className="text-[0.95rem] sm:text-lg font-bold leading-none">{symbol}</span>
       </div>
 
       {/* Center: large stacked value over suit — the dominant face */}
-      <div className={cn("flex flex-col items-center justify-center leading-none pointer-events-none", markClass)}>
-        <span className="text-[1.75rem] sm:text-4xl font-black font-serif tabular-nums drop-shadow-sm">{card.rank}</span>
-        <span className="text-[2rem] sm:text-5xl mt-0.5 font-black drop-shadow-sm">{symbol}</span>
+      <div className={cn("flex flex-col items-center justify-center leading-[0.98] pointer-events-none", markClass)}>
+        <span className="text-[1.55rem] sm:text-4xl font-extrabold font-serif tabular-nums drop-shadow-sm">{card.rank}</span>
+        <span className="text-[1.7rem] sm:text-[2.65rem] mt-1 font-extrabold leading-none drop-shadow-sm">{symbol}</span>
       </div>
 
       {/* Bottom-right corner index (rotated) */}
-      <div className={cn("absolute bottom-1 right-2 flex flex-col items-center leading-[0.85] rotate-180", markClass)}>
-        <span className="text-base sm:text-lg font-bold font-serif tabular-nums">{card.rank}</span>
-        <span className="text-base sm:text-lg font-bold">{symbol}</span>
+      <div className={cn("absolute bottom-1.5 right-2 flex flex-col items-center leading-none rotate-180", markClass)}>
+        <span className="text-sm sm:text-lg font-bold font-serif tabular-nums">{card.rank}</span>
+        <span className="text-[0.95rem] sm:text-lg font-bold leading-none">{symbol}</span>
       </div>
     </button>
   );
