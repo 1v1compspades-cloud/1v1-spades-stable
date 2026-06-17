@@ -1067,6 +1067,32 @@ export default function Room() {
       : !bothReady
         ? "text-yellow-300"
         : "text-emerald-300";
+    const presenceTitle = !opponent
+      ? (isKingMode ? "Waiting for challenger" : "Invite your opponent")
+      : bothReady
+        ? "Both players ready"
+        : (isKingMode ? "Challenger joined" : "Opponent joined");
+    const presenceCopy = !opponent
+      ? "Share the room code or invite link. The lobby updates as soon as another player joins."
+      : bothReady
+        ? "Start the match when you are ready."
+        : oppReady && !myReady
+          ? "Opponent is ready. Press Ready Up to continue."
+          : myReady && !oppReady
+            ? "You are ready. Waiting for opponent to press Ready."
+            : "Both players are here. Each player needs to press Ready.";
+    const readyBadge = (ready: boolean, label: string) => (
+      <span
+        className={cn(
+          "inline-flex items-center justify-center rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest",
+          ready
+            ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300"
+            : "border-yellow-500/50 bg-yellow-500/10 text-yellow-300",
+        )}
+      >
+        {label}: {ready ? "Ready" : "Waiting"}
+      </span>
+    );
 
     return (
       <div className="flex-1 overflow-y-auto px-4 py-6 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
@@ -1086,6 +1112,37 @@ export default function Room() {
               <p className="text-[11px] uppercase tracking-widest text-muted-foreground mt-1">
                 {isKingMode ? (kottLobbyState || "Pre-match lobby") : "Pre-match lobby"}
               </p>
+            </div>
+
+            {/* Lobby presence */}
+            <div
+              data-testid="lobby-presence-card"
+              className={cn(
+                "mx-4 mt-4 rounded-xl border-2 p-4 shadow-[inset_0_0_24px_rgba(234,179,8,0.12)]",
+                opponent
+                  ? "border-emerald-400/55 bg-emerald-950/30"
+                  : "border-primary/40 bg-primary/10",
+              )}
+            >
+              <p className="text-[10px] font-bold uppercase tracking-widest text-primary">
+                Free Play Lobby
+              </p>
+              <h2 className="mt-1 font-serif text-3xl leading-tight text-foreground">
+                {presenceTitle}
+              </h2>
+              <p className="mt-2 text-sm font-semibold leading-snug text-foreground/85">
+                {presenceCopy}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {readyBadge(myReady, "You")}
+                {opponent ? (
+                  readyBadge(oppReady, "Opponent")
+                ) : (
+                  <span className="inline-flex items-center justify-center rounded-full border border-muted-foreground/30 bg-black/30 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                    Opponent: Not joined
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Room code + invite */}
