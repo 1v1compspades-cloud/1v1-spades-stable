@@ -165,7 +165,7 @@ export default function Lobby() {
         if (savedSession && code === savedRoomCode) {
           saveRoomCode(code);
           savePlayerIndex(savedSession.seat);
-          setLocation(`/room/${code}`);
+          setLocation(`/room/${code}?reconnect=1&seat=${savedSession.seat}`);
           return;
         }
         const res = await joinRoom(code, nameInput);
@@ -239,7 +239,7 @@ export default function Lobby() {
     saveRoomCode(savedRoomCode);
     savePlayerIndex(savedPlayerSession.seat);
     saveIsSpectator(false);
-    setLocation(`/room/${savedRoomCode}`);
+    setLocation(`/room/${savedRoomCode}?reconnect=1&seat=${savedPlayerSession.seat}`);
   };
 
   return (

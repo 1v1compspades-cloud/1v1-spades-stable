@@ -83,6 +83,13 @@ export default function Room() {
     if (typeof window === "undefined") return false;
     return new URLSearchParams(window.location.search).get("spectator") === "1";
   })();
+  const reconnectSeatFromUrl = (() => {
+    if (typeof window === "undefined") return null;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("reconnect") !== "1") return null;
+    const seat = params.get("seat");
+    return seat === "0" || seat === "1" ? (Number(seat) as 0 | 1) : null;
+  })();
 
   const {
     socket,
@@ -289,6 +296,32 @@ export default function Room() {
     if (!connected) connect();
   }, [roomCode, connected, connect, setLocation]);
 
+  useEffect(() => {
+    if (!roomCode || reconnectSeatFromUrl === null || wantsSpectate) return;
+    const token = getPlayerToken(roomCode, reconnectSeatFromUrl);
+    if (!token) {
+      toast({ description: "Reconnect token missing. Please rejoin.", variant: "destructive" });
+      setLocation("/");
+      return;
+    }
+    if (storedRoomCode !== roomCode) saveRoomCode(roomCode);
+    if (playerIndex !== reconnectSeatFromUrl) savePlayerIndex(reconnectSeatFromUrl);
+    if (isSpectator) saveIsSpectator(false);
+  }, [
+    roomCode,
+    reconnectSeatFromUrl,
+    wantsSpectate,
+    storedRoomCode,
+    playerIndex,
+    isSpectator,
+    getPlayerToken,
+    saveRoomCode,
+    savePlayerIndex,
+    saveIsSpectator,
+    setLocation,
+    toast,
+  ]);
+
   // Pre-June-1 fix: declare which room URL we're viewing so useSocket can
   // drop foreign-room game_state broadcasts. Without this, a completed
   // tournament match room (whose socket.io membership we never tore down)
@@ -351,6 +384,7 @@ export default function Room() {
     // any join/reconnect — otherwise we might fire with a stale playerIndex
     // from a previous room.
     if (storedRoomCode !== roomCode) return;
+    if (reconnectSeatFromUrl !== null && playerIndex !== reconnectSeatFromUrl) return;
     if (isSpectator) {
       // Fresh spectate via `?spectator=1` has no prior session, so the
       // `reconnect_spectator` handler would reject. Use `join_as_spectator`
@@ -402,7 +436,7 @@ export default function Room() {
         setLocation("/");
       });
     }
-  }, [connected, roomCode, storedRoomCode, playerName, gameState, playerIndex, isSpectator, wantsSpectate, tabSuperseded, reconnect, reconnectAsSpectator, joinAsSpectator, joinRoom, setLocation, savePlayerIndex, saveIsSpectator, toast, getPlayerToken, savePlayerToken, clearPlayerToken]);
+  }, [connected, roomCode, storedRoomCode, playerName, gameState, playerIndex, isSpectator, wantsSpectate, reconnectSeatFromUrl, tabSuperseded, reconnect, reconnectAsSpectator, joinAsSpectator, joinRoom, setLocation, savePlayerIndex, saveIsSpectator, toast, getPlayerToken, savePlayerToken, clearPlayerToken]);
 
   // Old-tab guard: a newer tab opened this same room → pause this stale tab.
   if (tabSuperseded) {
