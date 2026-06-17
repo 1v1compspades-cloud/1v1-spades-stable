@@ -14,7 +14,19 @@ import { PreGameChecklist } from "@/components/PreGameChecklist";
 export default function Lobby() {
   const [, setLocation] = useLocation();
   const { connect, connected, socket, createRoom, joinRoom, joinAsSpectator, createTournament, joinTournament, isAdmin, unlockAdmin } = useSocket();
-  const { playerName, savePlayerName, saveRoomCode, savePlayerIndex, saveIsSpectator, saveTournamentToken, getTournamentToken, savePlayerToken } = useGameStorage();
+  const {
+    playerName,
+    roomCode: storedRoomCode,
+    playerIndex: storedPlayerIndex,
+    savePlayerName,
+    saveRoomCode,
+    savePlayerIndex,
+    saveIsSpectator,
+    saveTournamentToken,
+    getTournamentToken,
+    savePlayerToken,
+    getPlayerToken,
+  } = useGameStorage();
   const { toast } = useToast();
 
   // Parse ?room=XXX&mode=spectator from the URL (once on mount)
@@ -50,6 +62,12 @@ export default function Lobby() {
   const [adminDialogOpen, setAdminDialogOpen] = useState(false);
   const [adminKeyInput, setAdminKeyInput] = useState("");
   const [adminUnlocking, setAdminUnlocking] = useState(false);
+  const savedRoomCode = storedRoomCode.toUpperCase().trim();
+  const savedPlayerToken =
+    savedRoomCode && storedPlayerIndex !== null
+      ? getPlayerToken(savedRoomCode, storedPlayerIndex)
+      : null;
+  const canReconnectToCurrentGame = !!savedRoomCode && storedPlayerIndex !== null && !!savedPlayerToken;
 
   useEffect(() => {
     connect();
@@ -200,6 +218,11 @@ export default function Lobby() {
     }
   };
 
+  const handleReconnectToCurrentGame = (): void => {
+    if (!canReconnectToCurrentGame) return;
+    setLocation(`/room/${savedRoomCode}`);
+  };
+
   return (
     <div className="spades-screen min-h-[100dvh] flex items-center justify-center p-3 sm:p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
       <ConnectionPill />
@@ -234,6 +257,17 @@ export default function Lobby() {
                 : <>You've been invited to room <span className="font-mono">{initialParams.code}</span>. Enter your name and join.</>
               }
             </div>
+          )}
+          {canReconnectToCurrentGame && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleReconnectToCurrentGame}
+              className="w-full h-12 border-emerald-500/50 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/15 hover:text-emerald-100"
+              data-testid="button-reconnect-current-game"
+            >
+              Reconnect to Current Game
+            </Button>
           )}
           <div className="space-y-2">
             <Label htmlFor="name">Your Name</Label>
