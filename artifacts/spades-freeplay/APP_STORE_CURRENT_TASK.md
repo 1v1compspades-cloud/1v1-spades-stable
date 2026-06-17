@@ -16,7 +16,7 @@ workspace root, to print the automated dashboard.
 | iOS build | 24 |
 | Bundle ID | com.oneononespades.freeplay |
 | EAS build ID | 10d3806c-f568-4536-bbf4-6c824675ebdb |
-| EAS submission ID | pending |
+| EAS submission ID | 866d46c9-07ef-4dad-baa9-a7bd99ac99d7 |
 | App Store Connect app ID | 6776721716 |
 | TestFlight URL | https://appstoreconnect.apple.com/apps/6776721716/testflight/ios |
 | Release mode default | Manual release after approval |
@@ -39,17 +39,16 @@ workspace root, to print the automated dashboard.
 
 ## Ordered next actions
 
-1. Build and submit iOS build 24.
-2. Wait for Apple processing to finish for build 24.
-3. Add build 24 to internal TestFlight testing.
-4. Smoke test on a real iPhone: launch, create room, join from second device or browser, play bidding/trick flow, background/reopen reconnect, leave/return, and open Privacy/Terms/Support.
-5. Confirm the hosted web mobile layout fix is live on `https://1v1spades.com`.
-6. Upload App Store screenshots.
-7. Complete App Privacy, metadata, and App Review notes.
-8. Mark ready, then submit the App Store version for review.
-9. Track App Review status: Waiting for Review, In Review, Rejected, or Approved.
-10. If approved, manually release by default.
-11. Verify the public App Store listing, install path, live URLs, and first-launch flow.
+1. Wait for Apple processing to finish for build 24.
+2. Add build 24 to internal TestFlight testing.
+3. Smoke test on a real iPhone: launch, create room, join from second device or browser, play bidding/trick flow, background/reopen reconnect, leave/return, and open Privacy/Terms/Support.
+4. Confirm the hosted web mobile layout fix is live on `https://1v1spades.com`.
+5. Upload App Store screenshots.
+6. Complete App Privacy, metadata, and App Review notes.
+7. Mark ready, then submit the App Store version for review.
+8. Track App Review status: Waiting for Review, In Review, Rejected, or Approved.
+9. If approved, manually release by default.
+10. Verify the public App Store listing, install path, live URLs, and first-launch flow.
 
 ## Current blockers
 
