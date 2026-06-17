@@ -134,6 +134,8 @@ export default function Room() {
   const readyAutoStartKeyRef = useRef<string | null>(null);
   const [roundNextCountdown, setRoundNextCountdown] = useState<number | null>(null);
   const roundAutoNextKeyRef = useRef<string | null>(null);
+  const [reconnectRetryTick, setReconnectRetryTick] = useState(0);
+  const reconnectRetryCountRef = useRef(0);
 
   // Tick every 15s so AFK indicators re-render without depending on socket events.
   const [now, setNow] = useState<number>(() => Date.now());
@@ -406,6 +408,18 @@ export default function Room() {
           typeof window !== "undefined"
             ? window.localStorage.getItem(`spades_room_tournament_${roomCode}`)
             : null;
+        if (/seat already active in another tab/i.test(msg)) {
+          if (reconnectRetryCountRef.current < 20) {
+            reconnectRetryCountRef.current += 1;
+            window.setTimeout(() => setReconnectRetryTick(tick => tick + 1), 1500);
+            return;
+          }
+          toast({
+            description: "That seat is still active in another tab. Close the old tab, then try Reconnect again.",
+            variant: "destructive",
+          });
+          return;
+        }
         // Self-heal: "Room not found" means our cached room code is from a
         // finished round that's already been cleaned up. Instead of dumping the
         // player at the public lobby, route back through the tournament page —
@@ -436,7 +450,7 @@ export default function Room() {
         setLocation("/");
       });
     }
-  }, [connected, roomCode, storedRoomCode, playerName, gameState, playerIndex, isSpectator, wantsSpectate, reconnectSeatFromUrl, tabSuperseded, reconnect, reconnectAsSpectator, joinAsSpectator, joinRoom, setLocation, savePlayerIndex, saveIsSpectator, toast, getPlayerToken, savePlayerToken, clearPlayerToken]);
+  }, [connected, roomCode, storedRoomCode, playerName, gameState, playerIndex, isSpectator, wantsSpectate, reconnectSeatFromUrl, reconnectRetryTick, tabSuperseded, reconnect, reconnectAsSpectator, joinAsSpectator, joinRoom, setLocation, savePlayerIndex, saveIsSpectator, toast, getPlayerToken, savePlayerToken, clearPlayerToken]);
 
   // Old-tab guard: a newer tab opened this same room → pause this stale tab.
   if (tabSuperseded) {
