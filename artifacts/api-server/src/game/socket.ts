@@ -836,6 +836,73 @@ function endMatchForTesting(
 }
 
 /**
+ * Player-initiated quick/KotT/tournament forfeit. The forfeiting socket must
+ * currently occupy a seated player slot. We end the match by giving the other
+ * player a decisive non-tied score, then reuse the normal game_over follow-ups.
+ */
+function forfeitActiveMatch(
+  io: SocketIOServer,
+  roomCode: string,
+  forfeitSeat: 0 | 1,
+  actorSocketId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  return withRoomLock(roomCode, async () => {
+    const state = getRoom(roomCode);
+    if (!state) return { ok: false, error: "Room not found" };
+    if (state.phase === "game_over") return { ok: false, error: "Match is already over" };
+    if (state.phase === "waiting") return { ok: false, error: "Match has not started yet" };
+    if (!state.players[0] || !state.players[1]) {
+      return { ok: false, error: "Both seats must be filled to forfeit" };
+    }
+    if (state.players[forfeitSeat]?.socketId !== actorSocketId) {
+      return { ok: false, error: "Forfeiting player is not seated" };
+    }
+
+    const winnerSeat: 0 | 1 = forfeitSeat === 0 ? 1 : 0;
+    const finalScores: [number, number] = [state.scores[0], state.scores[1]];
+    finalScores[winnerSeat] = Math.max(finalScores[winnerSeat], state.matchTarget);
+    if (finalScores[winnerSeat] <= finalScores[forfeitSeat]) {
+      finalScores[winnerSeat] = finalScores[forfeitSeat] + 1;
+    }
+
+    const forfeitedName = state.players[forfeitSeat]?.name ?? null;
+    const winnerName = state.players[winnerSeat]?.name ?? null;
+    clearTurnTimer(roomCode);
+    const finalState: GameState = {
+      ...state,
+      phase: "game_over",
+      scores: finalScores,
+      currentBidder: null,
+      currentTurnIndex: null,
+      turnDeadline: null,
+      gameOverReason: `${forfeitedName ?? `Seat ${forfeitSeat + 1}`} forfeited.`,
+    };
+    await commit(finalState, {
+      action: "player_forfeit",
+      actorSeat: forfeitSeat,
+      payload: { forfeitedName, winnerName, winnerSeat, finalScores },
+    });
+    io.to(roomCode).emit("match_forfeit", {
+      roomCode,
+      forfeitSeat,
+      forfeitedName,
+      winnerSeat,
+      winnerName,
+      reason: "player_forfeit",
+    });
+    broadcastState(io, finalState);
+
+    if (finalState.tournamentRef) {
+      await advanceTournamentOnGameOver(io, finalState);
+    }
+    if (finalState.mode === "king" && finalState.challengerQueue.length > 0) {
+      scheduleKingNextMatch(io, roomCode);
+    }
+    return { ok: true };
+  });
+}
+
+/**
  * Shared body for `admin_force_forfeit` (canonical) and
  * `tournament_force_forfeit` (legacy alias). Validates host token,
  * delegates to `forfeitTournamentMatch`, and appends an audit row.
@@ -1780,6 +1847,33 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
             callback({ ok: false, error: msg });
           }
         });
+      }
+    );
+
+    socket.on(
+      "forfeit_match",
+      (
+        data: { roomCode: string },
+        callback: (res: { ok: boolean; error?: string }) => void
+      ) => {
+        if (!checkRate(socket.id, "forfeit_match", 5, 30_000)) {
+          return callback({ ok: false, error: "Slow down." });
+        }
+        void (async () => {
+          try {
+            const state = getRoom(data.roomCode);
+            if (!state) throw new Error("Room not found");
+            const playerIndex = state.players.findIndex(
+              (p) => p?.socketId === socket.id
+            ) as 0 | 1;
+            if (playerIndex < 0) throw new Error("Player not found");
+            const result = await forfeitActiveMatch(io, data.roomCode, playerIndex, socket.id);
+            callback(result);
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "Unknown error";
+            callback({ ok: false, error: msg });
+          }
+        })();
       }
     );
 

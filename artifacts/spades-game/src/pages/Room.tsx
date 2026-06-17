@@ -100,6 +100,7 @@ export default function Room() {
     joinAsSpectator,
     reconnectAsSpectator,
     joinQueue, leaveQueue, kottStepDown,
+    forfeitMatch,
     fastFinishMatch,
     setActiveRoom,
     isAdmin,
@@ -598,13 +599,21 @@ export default function Room() {
     playerIndex !== null &&
     activeForfeitPhase;
 
-  const handleConfirmForfeit = () => {
+  const handleConfirmForfeit = async () => {
     if (!roomCode || playerIndex === null) return;
-    clearPlayerToken(roomCode, playerIndex);
-    clearStorage();
-    toast({ description: "You forfeited this game. Your active session was cleared." });
-    setForfeitConfirmOpen(false);
-    setLocation("/");
+    try {
+      await forfeitMatch(roomCode);
+      clearPlayerToken(roomCode, playerIndex);
+      clearStorage();
+      toast({ description: "You forfeited this game. Your opponent was awarded the win." });
+      setForfeitConfirmOpen(false);
+      setLocation("/");
+    } catch (err) {
+      toast({
+        description: typeof err === "string" ? err : "Could not forfeit this game.",
+        variant: "destructive",
+      });
+    }
   };
 
   // KotT queue actions (spectators only).

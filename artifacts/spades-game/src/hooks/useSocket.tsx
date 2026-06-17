@@ -39,6 +39,7 @@ interface SocketContextType {
   joinQueue: (code: string, name: string) => Promise<void>;
   leaveQueue: (code: string) => Promise<void>;
   kottStepDown: (code: string, rejoin: boolean) => Promise<void>;
+  forfeitMatch: (code: string) => Promise<void>;
   // Dev/host test tool: end the live match with a chosen winner. Server is the
   // real gate (dev/preview OR unlocked admin); rejects normal players in prod.
   fastFinishMatch: (code: string, winnerSeat: 0 | 1) => Promise<void>;
@@ -267,6 +268,16 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       socket.emit("kott_step_down", { roomCode, rejoin }, (res: { ok: boolean; error?: string }) => {
         if (res.ok) resolve();
         else reject(res.error || "Could not leave the table");
+      });
+    });
+  };
+
+  const forfeitMatch = (roomCode: string) => {
+    return new Promise<void>((resolve, reject) => {
+      if (!socket) return reject("No socket");
+      socket.emit("forfeit_match", { roomCode }, (res: { ok: boolean; error?: string }) => {
+        if (res.ok) resolve();
+        else reject(res.error || "Forfeit failed");
       });
     });
   };
@@ -548,6 +559,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       joinQueue,
       leaveQueue,
       kottStepDown,
+      forfeitMatch,
       fastFinishMatch,
       tournament,
       matchAssignment,
