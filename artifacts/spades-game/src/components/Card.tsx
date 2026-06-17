@@ -21,6 +21,20 @@ const SUIT_FACE_COLORS: Record<CardType["suit"], string> = {
   diamonds: "text-blue-700",
 };
 
+const SUIT_EDGE_COLORS: Record<CardType["suit"], string> = {
+  spades:   "before:bg-slate-900",
+  hearts:   "before:bg-red-600",
+  clubs:    "before:bg-emerald-700",
+  diamonds: "before:bg-blue-700",
+};
+
+const SUIT_BORDER_COLORS: Record<CardType["suit"], string> = {
+  spades:   "border-slate-800/70",
+  hearts:   "border-red-500/70",
+  clubs:    "border-emerald-600/70",
+  diamonds: "border-blue-600/70",
+};
+
 export function CardComponent({ card, hidden, className, onClick, disabled, selected, dimmed }: CardProps) {
   if (hidden || !card) {
     return (
@@ -36,6 +50,7 @@ export function CardComponent({ card, hidden, className, onClick, disabled, sele
 
   const colorClass = SUIT_FACE_COLORS[card.suit];
   const symbol = SUIT_SYMBOLS[card.suit];
+  const markClass = cn(colorClass, "disabled:opacity-100");
 
   return (
     <button
@@ -47,14 +62,11 @@ export function CardComponent({ card, hidden, className, onClick, disabled, sele
       className={cn(
         // Compact mobile card so a horizontal hand strip fits on one row.
         // Compact mobile card keeps the 13-card hand usable in a WebView.
-        "spades-card-face relative flex-shrink-0 w-[3.85rem] h-[5.55rem] sm:w-24 sm:h-36 rounded-xl border border-amber-200/70 shadow-md flex flex-col items-center justify-center p-1.5 select-none transition-transform duration-150",
+        "spades-card-face relative flex-shrink-0 w-[3.85rem] h-[5.55rem] sm:w-24 sm:h-36 rounded-xl border-2 shadow-md flex flex-col items-center justify-center p-1.5 select-none transition-transform duration-150 disabled:opacity-100",
         // Suit-tinted left edge bar for fast scanning even when fanned
         "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1.5 before:rounded-l-xl",
-        card.suit === "spades"   && "before:bg-slate-900",
-        card.suit === "hearts"   && "before:bg-red-600",
-        card.suit === "clubs"    && "before:bg-emerald-700",
-        card.suit === "diamonds" && "before:bg-blue-700",
-        colorClass,
+        SUIT_EDGE_COLORS[card.suit],
+        SUIT_BORDER_COLORS[card.suit],
         // Disabled but NOT dimmed (e.g. during bidding, opponent's turn) →
         // fully readable, just non-clickable.
         disabled && "cursor-default",
@@ -68,19 +80,19 @@ export function CardComponent({ card, hidden, className, onClick, disabled, sele
       )}
     >
       {/* Top-left corner index: rank stacked over suit */}
-      <div className="absolute top-1 left-2 flex flex-col items-center leading-[0.85]">
+      <div className={cn("absolute top-1 left-2 flex flex-col items-center leading-[0.85]", markClass)}>
         <span className="text-sm sm:text-lg font-bold font-serif tabular-nums">{card.rank}</span>
         <span className="text-sm sm:text-base">{symbol}</span>
       </div>
 
       {/* Center: large stacked value over suit — the dominant face */}
-      <div className="flex flex-col items-center justify-center leading-none pointer-events-none">
+      <div className={cn("flex flex-col items-center justify-center leading-none pointer-events-none", markClass)}>
         <span className="text-2xl sm:text-4xl font-bold font-serif tabular-nums drop-shadow-sm">{card.rank}</span>
         <span className="text-2xl sm:text-4xl mt-0.5 drop-shadow-sm">{symbol}</span>
       </div>
 
       {/* Bottom-right corner index (rotated) */}
-      <div className="absolute bottom-1 right-2 flex flex-col items-center leading-[0.85] rotate-180">
+      <div className={cn("absolute bottom-1 right-2 flex flex-col items-center leading-[0.85] rotate-180", markClass)}>
         <span className="text-sm sm:text-lg font-bold font-serif tabular-nums">{card.rank}</span>
         <span className="text-sm sm:text-base">{symbol}</span>
       </div>

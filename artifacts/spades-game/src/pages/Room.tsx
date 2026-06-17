@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useSocket } from "@/hooks/useSocket";
 import { useGameStorage } from "@/hooks/useGameStorage";
@@ -31,6 +31,9 @@ import { Badge } from "@/components/ui/badge";
 import { PreGameChecklist } from "@/components/PreGameChecklist";
 import { TabConflictOverlay } from "@/components/TabConflictOverlay";
 import { useTabGuard } from "@/hooks/useTabGuard";
+
+const READY_START_COUNTDOWN_SECONDS = 5;
+const ROUND_OVER_NEXT_COUNTDOWN_SECONDS = 10;
 
 /**
  * Live countdown bar for tournament-room turn timers. Re-renders every 250ms
@@ -120,6 +123,10 @@ export default function Room() {
   useEffect(() => {
     if (gameState?.phase === "shuffling") setDealSkipped(false);
   }, [gameState?.phase]);
+  const [readyStartCountdown, setReadyStartCountdown] = useState<number | null>(null);
+  const readyAutoStartKeyRef = useRef<string | null>(null);
+  const [roundNextCountdown, setRoundNextCountdown] = useState<number | null>(null);
+  const roundAutoNextKeyRef = useRef<string | null>(null);
 
   // Tick every 15s so AFK indicators re-render without depending on socket events.
   const [now, setNow] = useState<number>(() => Date.now());
@@ -129,6 +136,116 @@ export default function Room() {
   }, []);
 
   const isHost = !isSpectator && playerIndex === 0;
+
+  useEffect(() => {
+    if (!roomCode || !gameState || gameState.phase !== "waiting") {
+      setReadyStartCountdown(null);
+      readyAutoStartKeyRef.current = null;
+      return;
+    }
+
+    const bothPresent = !!gameState.players[0] && !!gameState.players[1];
+    const bothReady = bothPresent && !!gameState.ready?.[0] && !!gameState.ready?.[1];
+
+    if (!bothReady) {
+      setReadyStartCountdown(null);
+      readyAutoStartKeyRef.current = null;
+      return;
+    }
+
+    setReadyStartCountdown((current) => current ?? READY_START_COUNTDOWN_SECONDS);
+  }, [
+    roomCode,
+    gameState?.phase,
+    gameState?.players[0]?.name,
+    gameState?.players[1]?.name,
+    gameState?.ready?.[0],
+    gameState?.ready?.[1],
+  ]);
+
+  useEffect(() => {
+    if (readyStartCountdown === null || readyStartCountdown <= 0) return;
+    const id = window.setTimeout(() => {
+      setReadyStartCountdown((current) => (
+        current === null ? null : Math.max(0, current - 1)
+      ));
+    }, 1000);
+    return () => window.clearTimeout(id);
+  }, [readyStartCountdown]);
+
+  useEffect(() => {
+    if (!roomCode || !gameState || gameState.phase !== "waiting") return;
+    if (readyStartCountdown !== 0) return;
+
+    const bothPresent = !!gameState.players[0] && !!gameState.players[1];
+    const bothReady = bothPresent && !!gameState.ready?.[0] && !!gameState.ready?.[1];
+    if (!bothReady) return;
+
+    const isTournamentMatch = !!gameState.tournamentRef;
+    const canAutoStart = isTournamentMatch ? playerIndex === 0 : isHost;
+    if (!canAutoStart) return;
+
+    const startKey = `${roomCode}:${gameState.roundNumber}:waiting`;
+    if (readyAutoStartKeyRef.current === startKey) return;
+    readyAutoStartKeyRef.current = startKey;
+    startGame(roomCode);
+  }, [
+    readyStartCountdown,
+    roomCode,
+    gameState?.phase,
+    gameState?.roundNumber,
+    gameState?.players[0]?.name,
+    gameState?.players[1]?.name,
+    gameState?.ready?.[0],
+    gameState?.ready?.[1],
+    gameState?.tournamentRef,
+    isHost,
+    playerIndex,
+    startGame,
+  ]);
+
+  useEffect(() => {
+    if (!roomCode || !gameState || gameState.phase !== "round_over") {
+      setRoundNextCountdown(null);
+      roundAutoNextKeyRef.current = null;
+      return;
+    }
+
+    setRoundNextCountdown((current) => current ?? ROUND_OVER_NEXT_COUNTDOWN_SECONDS);
+  }, [
+    roomCode,
+    gameState?.phase,
+    gameState?.roundNumber,
+  ]);
+
+  useEffect(() => {
+    if (roundNextCountdown === null || roundNextCountdown <= 0) return;
+    const id = window.setTimeout(() => {
+      setRoundNextCountdown((current) => (
+        current === null ? null : Math.max(0, current - 1)
+      ));
+    }, 1000);
+    return () => window.clearTimeout(id);
+  }, [roundNextCountdown]);
+
+  useEffect(() => {
+    if (!roomCode || !gameState || gameState.phase !== "round_over") return;
+    if (roundNextCountdown !== 0) return;
+    if (isSpectator || playerIndex !== 0) return;
+
+    const nextKey = `${roomCode}:${gameState.roundNumber}:round_over`;
+    if (roundAutoNextKeyRef.current === nextKey) return;
+    roundAutoNextKeyRef.current = nextKey;
+    nextRound(roomCode);
+  }, [
+    roundNextCountdown,
+    roomCode,
+    gameState?.phase,
+    gameState?.roundNumber,
+    isSpectator,
+    playerIndex,
+    nextRound,
+  ]);
 
   // Old-tab protection: if this same browser opens the same room in another
   // tab, the newer tab wins and this (older) tab is flagged superseded so we
@@ -1143,6 +1260,19 @@ export default function Room() {
                   </span>
                 )}
               </div>
+              {bothReady && readyStartCountdown !== null && (
+                <div
+                  data-testid="ready-start-countdown"
+                  className="mt-4 rounded-lg border border-emerald-400/50 bg-black/35 px-4 py-3 text-center shadow-[inset_0_0_20px_rgba(16,185,129,0.12)]"
+                >
+                  <div className="text-[10px] font-bold uppercase tracking-[0.28em] text-emerald-300">
+                    Both players ready
+                  </div>
+                  <div className="mt-1 font-serif text-3xl font-bold text-primary">
+                    Starting in {readyStartCountdown}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Room code + invite */}
@@ -1493,7 +1623,7 @@ export default function Room() {
               }}
               data-testid="bidding-overlay"
             >
-              <div className="bg-card/96 border border-border p-2.5 sm:p-5 rounded-xl shadow-2xl space-y-2 sm:space-y-3 w-full max-w-[min(34rem,calc(100vw-1rem))] text-center max-h-[48dvh] sm:max-h-[80vh] overflow-y-auto pointer-events-auto backdrop-blur-md">
+              <div className="bg-card/96 border border-border p-3 sm:p-5 rounded-xl shadow-2xl space-y-3 w-full max-w-[min(34rem,calc(100vw-1rem))] text-center max-h-[min(70dvh,32rem)] sm:max-h-[80dvh] overflow-y-auto pointer-events-auto backdrop-blur-md">
                 <h3 className="text-sm sm:text-lg font-serif text-primary">Place your bid</h3>
                 {gameState.bids[0] === null && gameState.bids[1] === null && (
                   <p className="text-[10px] sm:text-[11px] uppercase tracking-widest text-primary/80">
@@ -1510,7 +1640,7 @@ export default function Room() {
                 </p>
                 <div
                   data-testid="bid-buttons"
-                  className="grid grid-cols-7 gap-1 w-full sm:gap-1.5"
+                  className="grid grid-cols-7 gap-1.5 w-full sm:gap-2"
                 >
                   {Array.from({ length: 14 }).map((_, i) => {
                     const val = i.toString();
@@ -1522,7 +1652,7 @@ export default function Room() {
                         data-testid={`bid-btn-${i}`}
                         onClick={() => setBidAmount(val)}
                         className={cn(
-                          "min-h-[32px] sm:min-h-[44px] rounded-lg border text-xs sm:text-sm font-bold tabular-nums transition-colors",
+                          "min-h-[36px] sm:min-h-[44px] rounded-lg border text-xs sm:text-sm font-bold tabular-nums transition-colors",
                           selected
                             ? "bg-primary text-primary-foreground border-primary shadow-md"
                             : "bg-white/[0.04] text-foreground border-white/20 hover:bg-white/[0.08] active:bg-white/10"
@@ -1533,11 +1663,11 @@ export default function Room() {
                     );
                   })}
                 </div>
-                <div className="sticky bottom-0 -mx-2.5 -mb-2.5 px-2.5 pt-1.5 pb-2.5 sm:-mx-5 sm:-mb-5 sm:px-5 sm:pb-4 bg-card/96">
+                <div className="-mx-3 -mb-3 px-3 pt-2 pb-3 sm:-mx-5 sm:-mb-5 sm:px-5 sm:pb-5 bg-card/96">
                   <Button
                     onClick={handleBid}
                     disabled={!bidAmount || isSubmitting}
-                    className="mx-auto block h-auto min-h-[38px] sm:min-h-[44px] w-full max-w-[220px] px-5 py-2 text-sm sm:text-base"
+                    className="mx-auto flex h-auto min-h-[44px] w-full max-w-[240px] items-center justify-center px-5 py-2 text-sm sm:text-base"
                     data-testid="button-confirm-bid"
                   >
                     {bidAmount ? `Bid ${bidAmount === "0" ? "Nil" : bidAmount}` : "Select a bid first"}
@@ -1550,13 +1680,13 @@ export default function Room() {
 
         {/* Round over overlay (shown to everyone, including spectators) */}
         {gameState.phase === "round_over" && lastRound && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
-            <div className="bg-card border border-border p-6 rounded-xl shadow-2xl max-w-sm w-full mx-4 space-y-5">
-              <h3 className="text-xl font-serif text-center text-primary border-b border-border pb-3">
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
+            <div className="bg-card border border-border p-5 sm:p-7 lg:p-8 rounded-xl shadow-2xl w-full max-w-[min(46rem,calc(100vw-2rem))] mx-4 space-y-6">
+              <h3 className="text-2xl sm:text-3xl font-serif text-center text-primary border-b border-border pb-4">
                 Round {lastRound.round} Summary
               </h3>
 
-              <div className="grid grid-cols-2 gap-4 text-center">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 text-center">
                 {([0, 1] as (0 | 1)[]).map((idx) => {
                   const isMyCol  = !spectator && idx === playerIndex;
                   const pName    = gameState.players[idx]?.name ?? `Seat ${idx + 1}`;
@@ -1576,10 +1706,10 @@ export default function Room() {
                   const bagPenalty = Math.floor(freshBags / bagThreshold) * bagPenaltyAmt;
 
                   return (
-                    <div key={idx} className={`space-y-2 p-3 rounded-lg ${isMyCol ? "bg-primary/10 border border-primary/20" : "bg-white/5"}`}>
-                      <div className="text-xs text-muted-foreground uppercase tracking-wider truncate">{pName}</div>
+                    <div key={idx} className={`space-y-3 p-4 sm:p-5 rounded-lg ${isMyCol ? "bg-primary/10 border border-primary/20" : "bg-white/5"}`}>
+                      <div className="text-sm text-muted-foreground uppercase tracking-wider truncate">{pName}</div>
 
-                      <div className="text-xs space-y-1 text-left">
+                      <div className="text-sm sm:text-base space-y-2 text-left">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Bid</span>
                           <span className="font-mono">{bid === 0 ? "Nil" : bid}</span>
@@ -1614,28 +1744,41 @@ export default function Room() {
                         )}
                       </div>
 
-                      {nilMade   && <div className="text-[11px] text-green-400 font-semibold">✓ Nil made</div>}
-                      {nilBroken && <div className="text-[11px] text-red-400 font-semibold">✗ Nil broken</div>}
+                      {nilMade   && <div className="text-xs sm:text-sm text-green-400 font-semibold">✓ Nil made</div>}
+                      {nilBroken && <div className="text-xs sm:text-sm text-red-400 font-semibold">✗ Nil broken</div>}
                       {!isNil && made && tricks > bid && (
-                        <div className="text-[11px] text-yellow-400">+{tricks - bid} bag{tricks - bid !== 1 ? "s" : ""}</div>
+                        <div className="text-xs sm:text-sm text-yellow-400">+{tricks - bid} bag{tricks - bid !== 1 ? "s" : ""}</div>
                       )}
                       {!isNil && !made && (
-                        <div className="text-[11px] text-red-400">Set — missed by {bid - tricks}</div>
+                        <div className="text-xs sm:text-sm text-red-400">Set — missed by {bid - tricks}</div>
                       )}
                     </div>
                   );
                 })}
               </div>
 
-              <div className="pt-1">
+              <div className="pt-1 space-y-3">
+                {roundNextCountdown !== null && (
+                  <div
+                    data-testid="next-round-countdown"
+                    className="rounded-lg border border-primary/35 bg-black/35 px-4 py-3 text-center"
+                  >
+                    <div className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.28em] text-primary/80">
+                      Next round
+                    </div>
+                    <div className="mt-1 font-serif text-2xl sm:text-3xl font-bold text-primary">
+                      Starting in {roundNextCountdown}
+                    </div>
+                  </div>
+                )}
                 {spectator ? (
-                  <p className="text-center text-muted-foreground italic text-sm">Waiting for host to start next round…</p>
+                  <p className="text-center text-muted-foreground italic text-sm">Waiting for the next round…</p>
                 ) : playerIndex === 0 ? (
                   <Button onClick={handleNextRound} className="w-full h-11 text-base">
-                    Start Next Round →
+                    Start Next Round Now →
                   </Button>
                 ) : (
-                  <p className="text-center text-muted-foreground italic text-sm">Waiting for host to start next round…</p>
+                  <p className="text-center text-muted-foreground italic text-sm">Waiting for the next round…</p>
                 )}
               </div>
             </div>
