@@ -1,6 +1,8 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
@@ -35,5 +37,17 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
+
+const webPublicDir = path.resolve(process.cwd(), "artifacts/spades-game/dist/public");
+const webIndex = path.join(webPublicDir, "index.html");
+
+if (existsSync(webIndex)) {
+  app.use(express.static(webPublicDir));
+  app.use((req, res, next) => {
+    if (req.method !== "GET" && req.method !== "HEAD") return next();
+    if (req.path.startsWith("/api") || req.path.startsWith("/socket.io")) return next();
+    res.sendFile(webIndex);
+  });
+}
 
 export default app;
