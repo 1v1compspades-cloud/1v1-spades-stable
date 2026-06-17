@@ -417,10 +417,10 @@ export default function Room() {
           return;
         }
         toast({ description: err || "Session expired. Please rejoin.", variant: "destructive" });
-        // Only a genuine seat/token rejection is terminal for this browser —
-        // drop the stale token so the next visit to this code starts clean.
-        // Retryable (db) and stale-room errors keep the token intact.
-        if (/seat|token/i.test(msg)) {
+        // Only a genuine token mismatch is terminal for this browser. Safari
+        // can briefly report the old socket as active after a disconnect; keep
+        // the token so Home can still offer Reconnect once the socket settles.
+        if (/held by another player|token invalid/i.test(msg)) {
           clearPlayerToken(roomCode, playerIndex);
         }
         setLocation(tournamentCode ? `/tournament/${tournamentCode}` : "/");
