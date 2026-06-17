@@ -9,7 +9,7 @@ export interface Card {
 export interface GameState {
   roomCode: string;
   phase: "waiting" | "coin_toss" | "shuffling" | "bidding" | "playing" | "round_over" | "game_over";
-  players: ({ name: string; index: 0 | 1 } | null)[];
+  players: ({ name: string; index: 0 | 1; username?: string | null } | null)[];
   hand: Card[];
   opponentHandSize: number;
   bids: (number | null)[];
@@ -69,12 +69,13 @@ export interface GameState {
   turnDeadline?: number | null;
   /** Host has paused this tournament match — bidding/playing rejected until resumed. */
   isPaused?: boolean;
-  /**
-   * Set only when the match ended via the bust-out floor rule (a total reached
-   * -250 or below), e.g. "Alice loses by reaching -250." Null/undefined for
-   * normal target or tiebreaker wins. Shown on the game-over overlay.
-   */
+  /** Human-readable game-over reason, including bust-out and auto-victory labels. */
   gameOverReason?: string | null;
+  /**
+   * Explicit winner for auto-victory endings. When set, UI/progression should
+   * use this as the winner while still displaying the actual scores.
+   */
+  winnerSeat?: 0 | 1 | null;
 }
 
 // ── Host admin tools (tournament) ────────────────────────────────────────────

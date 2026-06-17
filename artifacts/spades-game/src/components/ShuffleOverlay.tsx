@@ -27,8 +27,8 @@ function CardBack({ className = "", style }: CardBackProps) {
 }
 
 // ── Timeline (must finish inside the server's SHUFFLE_ANIMATION_MS = 3100ms) ──
-//   0ms     shuffle  — two half-stacks fly in + riffle together
-//   1000ms  cut      — opponent cuts the deck
+//   0ms     shuffle  — regular table riffle: split deck, riffle together, square
+//   1000ms  cut      — clean deck cut
 //   1560ms  deal     — 16 cards fly clockwise into 4 piles (You · West · Opp · East)
 //   2200ms  discard  — the two SIDE hands sweep into the graveyard, kept hands glow
 //   2980ms  done     — final teaching frame: only You + Opponent remain in play
@@ -37,7 +37,7 @@ const DEAL_START_MS = 1560;
 const DISCARD_START_MS = 2200;
 const DONE_MS = 2980;
 const DEAL_STAGGER_MS = 30;
-const STACK_SIZE = 7;
+const STACK_SIZE = 5;
 const ROUNDS = 4; // 4 cards dealt to each of the 4 piles → 16 flying cards
 
 type Stage = "shuffle" | "cut" | "deal" | "discard" | "done";
@@ -214,49 +214,60 @@ export function ShuffleOverlay({ onSkip }: ShuffleOverlayProps) {
           className="absolute inset-0 flex items-center justify-center"
           style={{ opacity: showIntro ? 1 : 0, transition: "opacity 220ms ease" }}
         >
-          {/* LEFT half-stack: flies in, then riffles toward center */}
+          {/* LEFT half-stack: split deck, then riffles toward center */}
           <div
             className="absolute"
             style={{
               animation:
-                "shuffle-stack-in-left 380ms cubic-bezier(0.2, 0.7, 0.2, 1) both, " +
-                "shuffle-riffle-left 600ms cubic-bezier(0.5, 0, 0.5, 1) 400ms both",
+                "shuffle-stack-in-left 260ms ease-out both, " +
+                "shuffle-riffle-left 520ms cubic-bezier(0.5, 0, 0.5, 1) 300ms both",
             }}
           >
             {Array.from({ length: STACK_SIZE }).map((_, i) => (
               <CardBack
                 key={`l-${i}`}
                 className="absolute"
-                style={{ top: `${-i * 2}px`, left: `${-i * 1}px`, zIndex: STACK_SIZE - i }}
+                style={{
+                  top: `${-i * 1.1}px`,
+                  left: `${-i * 0.35}px`,
+                  zIndex: STACK_SIZE - i,
+                  animation: `shuffle-riffle-card-left 520ms ease-in-out ${300 + i * 34}ms both`,
+                }}
               />
             ))}
           </div>
 
-          {/* RIGHT half-stack: mirror */}
+          {/* RIGHT half-stack: mirror half of the riffle */}
           <div
             className="absolute"
             style={{
               animation:
-                "shuffle-stack-in-right 380ms cubic-bezier(0.2, 0.7, 0.2, 1) both, " +
-                "shuffle-riffle-right 600ms cubic-bezier(0.5, 0, 0.5, 1) 400ms both",
+                "shuffle-stack-in-right 260ms ease-out both, " +
+                "shuffle-riffle-right 520ms cubic-bezier(0.5, 0, 0.5, 1) 300ms both",
             }}
           >
             {Array.from({ length: STACK_SIZE }).map((_, i) => (
               <CardBack
                 key={`r-${i}`}
                 className="absolute"
-                style={{ top: `${-i * 2}px`, right: `${-i * 1}px`, zIndex: STACK_SIZE - i }}
+                style={{
+                  top: `${-i * 1.1}px`,
+                  right: `${-i * 0.35}px`,
+                  zIndex: STACK_SIZE - i,
+                  animation: `shuffle-riffle-card-right 520ms ease-in-out ${318 + i * 34}ms both`,
+                }}
               />
             ))}
           </div>
 
-          {/* CUT pile — appears after the riffle and performs the cut motion */}
+          {/* Squared deck + cut — appears after the riffle and performs a clean cut */}
           <div
             className="absolute"
             style={{
               animation:
-                `shuffle-fade-in 120ms ease-out ${CUT_MS}ms both, ` +
-                `shuffle-cut 540ms cubic-bezier(0.5, 0, 0.5, 1) ${CUT_MS}ms both`,
+                `shuffle-fade-in 120ms ease-out 820ms both, ` +
+                `shuffle-square 180ms ease-out 820ms both, ` +
+                `shuffle-cut 500ms cubic-bezier(0.5, 0, 0.5, 1) ${CUT_MS}ms both`,
               opacity: 0,
             }}
           >

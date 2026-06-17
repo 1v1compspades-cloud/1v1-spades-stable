@@ -36,9 +36,9 @@ const READY_START_COUNTDOWN_SECONDS = 5;
 const ROUND_OVER_NEXT_COUNTDOWN_SECONDS = 10;
 
 /**
- * Live countdown bar for tournament-room turn timers. Re-renders every 250ms
- * while a deadline is in the future. No-op for non-tournament rooms (no
- * turnTimeoutMs) or when there's no active actor (deadline is null).
+ * Live active-turn AFK countdown. Warnings appear after 60s and 90s of
+ * inactivity; the server auto-forfeits the actor at 120s if the turn has not
+ * changed.
  */
 function TurnTimerBar({ deadline, total, label }: { deadline: number; total: number; label: string }) {
   const [now, setNow] = useState(() => Date.now());
@@ -47,9 +47,17 @@ function TurnTimerBar({ deadline, total, label }: { deadline: number; total: num
     return () => clearInterval(h);
   }, []);
   const remaining = Math.max(0, deadline - now);
+  const elapsed = Math.max(0, total - remaining);
   const pct = Math.max(0, Math.min(100, (remaining / total) * 100));
   const seconds = Math.ceil(remaining / 1000);
-  const urgent = remaining < 10_000;
+  const finalWarning = elapsed >= 90_000;
+  const firstWarning = elapsed >= 60_000;
+  const urgent = finalWarning || remaining < 10_000;
+  const warningText = finalWarning
+    ? "Final AFK warning — auto-forfeit at 120 seconds"
+    : firstWarning
+      ? "AFK warning — make your move"
+      : null;
   return (
     <div className="px-4 py-1 bg-black/30" data-testid="turn-timer-bar">
       <div className="flex items-center justify-between text-[10px] uppercase tracking-wider mb-0.5">
@@ -64,6 +72,14 @@ function TurnTimerBar({ deadline, total, label }: { deadline: number; total: num
           style={{ width: `${pct}%` }}
         />
       </div>
+      {warningText && (
+        <div
+          className={`mt-1 text-center text-[11px] font-semibold uppercase tracking-wider ${finalWarning ? "text-destructive" : "text-yellow-300"}`}
+          data-testid={finalWarning ? "afk-final-warning" : "afk-first-warning"}
+        >
+          {warningText}
+        </div>
+      )}
     </div>
   );
 }
@@ -732,11 +748,13 @@ export default function Room() {
   // challenger. So when a match ends (especially with no one in line) the
   // streak is stale: a fresh winner still reads as streak 0, and a dethroned
   // King still reads as streak>0. Derive the King from the match RESULT here:
-  // higher score wins, or the sole remaining seat if the loser already stepped
-  // down. Keeps the crown correct for both "King wins again" and "challenger
+  // explicit auto-victory winner, higher score wins, or the sole remaining
+  // seat if the loser already stepped down. Keeps the crown correct for both
+  // "King wins again" and "challenger
   // takes the crown", queue or no queue.
   const gameOverKingSeat: 0 | 1 | null = (() => {
     if (!isKingMode || gameState?.phase !== "game_over") return null;
+    if (gameState.winnerSeat === 0 || gameState.winnerSeat === 1) return gameState.winnerSeat;
     const p0 = gameState?.players?.[0];
     const p1 = gameState?.players?.[1];
     if (p0 && !p1) return 0;
@@ -855,20 +873,17 @@ export default function Room() {
     }
   };
 
-  // Soft AFK detection — never auto-forfeits. Returns null / "may" / "afk".
+  // Soft AFK display for the current active turn. Server owns auto-forfeit.
   const afkLevelFor = (idx: 0 | 1): null | "may" | "afk" => {
     const ts = gameState.lastActiveAt?.[idx];
     if (!ts) return null;
-    // Only flag during phases where it's their turn to act
     const isTheirTurnish =
       (gameState.phase === "bidding" && gameState.currentBidder === idx) ||
-      (gameState.phase === "playing"  && gameState.currentTurnIndex === idx) ||
-      (gameState.phase === "round_over" && idx === 0) ||
-      (gameState.phase === "waiting"    && idx === 0);
+      (gameState.phase === "playing"  && gameState.currentTurnIndex === idx);
     if (!isTheirTurnish) return null;
     const elapsed = now - ts;
-    if (elapsed >= 5 * 60_000) return "afk";
-    if (elapsed >= 2 * 60_000) return "may";
+    if (elapsed >= 90_000) return "afk";
+    if (elapsed >= 60_000) return "may";
     return null;
   };
 
@@ -1025,7 +1040,7 @@ export default function Room() {
       null;
     const showTurnTimer = !!turnDeadline && !!turnBudget && actorIdx !== null;
     const timerLabel = !spectator && actorIdx === playerIndex
-      ? "Your turn — auto-play when timer expires"
+      ? "Your turn — move before AFK forfeit"
       : `${actorIdx !== null ? gameState.players[actorIdx]?.name ?? `Seat ${actorIdx + 1}` : "Opponent"} thinking…`;
 
     return (
@@ -1652,19 +1667,42 @@ export default function Room() {
           const loserIdx: 0 | 1 = gameState.coinFlipWinner === 0 ? 1 : 0;
           const loserName = gameState.players[loserIdx]?.name ?? `Seat ${loserIdx + 1}`;
           const youWon = !spectator && playerIndex === gameState.coinFlipWinner;
+          const resultSide = gameState.coinFlipWinner === 0 ? "heads" : "tails";
+          const resultLabel = resultSide === "heads" ? "Heads" : "Tails";
           return (
             <div
               className="absolute inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-lg"
               data-testid="coin-toss-overlay"
             >
-              <div className="bg-card border border-border p-8 rounded-xl shadow-2xl max-w-sm w-full mx-4 text-center space-y-5">
-                <div className="text-6xl animate-spin-slow inline-block" aria-hidden>🪙</div>
+              <div className="bg-card border border-border p-6 rounded-xl shadow-2xl max-w-sm w-full mx-4 text-center space-y-5">
+                <div className="spades-coin-stage" aria-hidden="true">
+                  <div
+                    className={`spades-live-coin spades-live-coin--${resultSide}`}
+                    data-testid="live-coin-toss"
+                  >
+                    <div className="spades-live-coin__face spades-live-coin__face--heads">
+                      <div className="spades-live-coin__rim">1v1 SPADES</div>
+                      <div className="spades-live-coin__spade">♠</div>
+                      <div className="spades-live-coin__mark">1v1</div>
+                      <div className="spades-live-coin__side">HEADS</div>
+                    </div>
+                    <div className="spades-live-coin__face spades-live-coin__face--tails">
+                      <div className="spades-live-coin__rim">1v1 SPADES</div>
+                      <div className="spades-live-coin__dragon">♞</div>
+                      <div className="spades-live-coin__spade spades-live-coin__spade--tails">♠</div>
+                      <div className="spades-live-coin__side">TAILS</div>
+                    </div>
+                  </div>
+                </div>
                 <h3 className="text-2xl font-serif text-primary">Coin Toss</h3>
                 <p className="text-sm text-muted-foreground">
-                  Happens once per match. Winner bids <span className="font-semibold text-foreground">second</span> in Round 1.
+                  Live server toss. <span className="font-semibold text-foreground">Heads = Seat 1</span>,{" "}
+                  <span className="font-semibold text-foreground">Tails = Seat 2</span>.
                 </p>
                 <div className="space-y-1 border-y border-border py-3">
-                  <p className="text-xs text-muted-foreground uppercase tracking-widest">Winner</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-widest">
+                    Result: <span className="text-primary">{resultLabel}</span>
+                  </p>
                   <p data-testid="coin-toss-winner" className="text-2xl font-serif font-bold text-primary">
                     {winnerName}{youWon ? " (you)" : ""}
                   </p>
@@ -1898,15 +1936,23 @@ export default function Room() {
               <div>
                 {(() => {
                   const s0 = gameState.scores[0], s1 = gameState.scores[1];
+                  const explicitWinner = gameState.winnerSeat ?? null;
                   if (spectator) {
-                    if (s0 === s1) return <p className="text-2xl font-bold text-yellow-400">Draw.</p>;
-                    const winnerName = gameState.players[s0 > s1 ? 0 : 1]?.name ?? `Seat ${s0 > s1 ? 1 : 2}`;
+                    if (explicitWinner === null && s0 === s1) return <p className="text-2xl font-bold text-yellow-400">Draw.</p>;
+                    const winnerIdx = explicitWinner ?? (s0 > s1 ? 0 : 1);
+                    const winnerName = gameState.players[winnerIdx]?.name ?? `Seat ${winnerIdx + 1}`;
                     return <p className="text-2xl font-bold text-green-400">{winnerName} wins 🏆</p>;
                   }
-                  const my = gameState.scores[playerIndex as 0 | 1];
+                  const mySeat = playerIndex as 0 | 1;
+                  if (explicitWinner !== null) {
+                    return explicitWinner === mySeat
+                      ? <p className="text-2xl font-bold text-green-400">You Won! 🏆</p>
+                      : <p className="text-2xl font-bold text-red-400">You Lost.</p>;
+                  }
+                  const my = gameState.scores[mySeat];
                   const opp = gameState.scores[playerIndex === 0 ? 1 : 0];
-                  if (my > opp)  return <p className="text-2xl font-bold text-green-400">You Won! 🏆</p>;
-                  if (my < opp)  return <p className="text-2xl font-bold text-red-400">You Lost.</p>;
+                  if (my > opp) return <p className="text-2xl font-bold text-green-400">You Won! 🏆</p>;
+                  if (my < opp) return <p className="text-2xl font-bold text-red-400">You Lost.</p>;
                   return <p className="text-2xl font-bold text-yellow-400">It's a Draw.</p>;
                 })()}
                 <p className="text-xs text-muted-foreground mt-1">
@@ -1927,9 +1973,9 @@ export default function Room() {
                   <span>{gameState.players[1]?.name ?? "Seat 2"}</span>
                 </div>
                 <div className="flex justify-between text-3xl font-mono font-bold">
-                  <span className={gameState.scores[0] > gameState.scores[1] ? "text-green-400" : ""}>{gameState.scores[0]}</span>
+                  <span className={(gameState.winnerSeat ?? (gameState.scores[0] > gameState.scores[1] ? 0 : null)) === 0 ? "text-green-400" : ""}>{gameState.scores[0]}</span>
                   <span className="text-muted-foreground text-lg self-center">vs</span>
-                  <span className={gameState.scores[1] > gameState.scores[0] ? "text-green-400" : ""}>{gameState.scores[1]}</span>
+                  <span className={(gameState.winnerSeat ?? (gameState.scores[1] > gameState.scores[0] ? 1 : null)) === 1 ? "text-green-400" : ""}>{gameState.scores[1]}</span>
                 </div>
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>{gameState.bags[0]} bags</span>
@@ -1945,8 +1991,9 @@ export default function Room() {
                 const s0 = gameState.scores[0], s1 = gameState.scores[1];
                 const n0 = gameState.players[0]?.name ?? "Seat 1";
                 const n1 = gameState.players[1]?.name ?? "Seat 2";
-                const tie = s0 === s1;
-                const winIdx = s0 >= s1 ? 0 : 1;
+                const explicitWinner = gameState.winnerSeat ?? null;
+                const tie = explicitWinner === null && s0 === s1;
+                const winIdx = explicitWinner ?? (s0 >= s1 ? 0 : 1);
                 const loseIdx = winIdx === 0 ? 1 : 0;
                 const winName = [n0, n1][winIdx];
                 const loseName = [n0, n1][loseIdx];

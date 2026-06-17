@@ -168,3 +168,7 @@ overrides:
   # package's typecheck green.
   "@types/react": "^19.2.0"
   "@types/react-dom": "^19.2.0"
+
+allowBuilds:
+  dtrace-provider: true
+  esbuild: true

@@ -1,4 +1,7 @@
 import {
+  randomInt,
+} from "node:crypto";
+import {
   Card,
   Suit,
   createDeck,
@@ -21,6 +24,7 @@ export type GamePhase =
 export interface Player {
   id: string;
   name: string;
+  profileUsername?: string | null;
   socketId: string;
   index: 0 | 1;
 }
@@ -153,14 +157,14 @@ export interface GameState {
    * name-match path.
    */
   tokenizedSeats?: [boolean, boolean];
-  /**
-   * Human-readable game-over reason, set ONLY when the match ended via the
-   * bust-out floor rule (a running total reached LOSS_FLOOR or below after a
-   * hand was fully scored), e.g. "Alice loses by reaching -250." Null /
-   * undefined for normal target-reached or tiebreaker wins. Surfaced to the
-   * game-over UI for both players and spectators.
-   */
+  /** Human-readable game-over reason, including bust-out and auto-victory labels. */
   gameOverReason?: string | null;
+  /**
+   * Explicit winner for non-score-derived endings such as forfeits,
+   * disconnect timeouts, or host auto-victory. Natural scoring wins leave this
+   * unset and derive the winner from the displayed score.
+   */
+  winnerSeat?: 0 | 1 | null;
 }
 
 /** Max challengers waiting in the KotT queue. */
@@ -227,6 +231,8 @@ export function createGame(
     turnTimeoutMs: null,
     turnDeadline: null,
     tokenizedSeats: [false, false],
+    gameOverReason: null,
+    winnerSeat: null,
   };
 }
 
@@ -290,7 +296,7 @@ export function performCoinToss(state: GameState): GameState {
     // Coin already tossed for this match — preserve it.
     return { ...state, phase: "coin_toss" };
   }
-  const winner: 0 | 1 = Math.random() < 0.5 ? 0 : 1;
+  const winner: 0 | 1 = randomInt(2) as 0 | 1;
   const loser: 0 | 1 = winner === 0 ? 1 : 0;
   return {
     ...state,
@@ -334,6 +340,7 @@ export function startRound(state: GameState): GameState {
     roundNumber: nextRoundNumber,
     tiebreakerRound: state.tiebreakerActive ? state.tiebreakerRound + 1 : 0,
     gameOverReason: null,
+    winnerSeat: null,
   };
   return newState;
 }
@@ -368,6 +375,7 @@ export function resetMatch(state: GameState): GameState {
     lastActiveAt: [Date.now(), Date.now()],
     ready: [false, false],
     gameOverReason: null,
+    winnerSeat: null,
   };
 }
 
@@ -781,6 +789,7 @@ export function createRoom(
   matchLabel?: string,
   mode: "quick" | "king" = "quick",
   tournamentRef?: { code: string; matchId: string },
+  hostProfileUsername?: string | null,
 ): GameState {
   let code: string;
   do {
@@ -792,6 +801,7 @@ export function createRoom(
   const host: Player = {
     id: hostSocketId,
     name: hostPlayerName,
+    profileUsername: hostProfileUsername ?? null,
     socketId: hostSocketId,
     index: 0,
   };
@@ -803,7 +813,8 @@ export function createRoom(
 export function joinRoom(
   roomCode: string,
   playerName: string,
-  socketId: string
+  socketId: string,
+  profileUsername?: string | null,
 ): { state: GameState; playerIndex: 0 | 1 } {
   const state = rooms.get(roomCode);
   if (!state) throw new Error("Room not found");
@@ -817,6 +828,7 @@ export function joinRoom(
   const joiner: Player = {
     id: socketId,
     name: playerName,
+    profileUsername: profileUsername ?? null,
     socketId,
     index: 1,
   };
@@ -961,7 +973,11 @@ export function promoteNextChallenger(
   let loserIdx: 0 | 1;
   const p0 = state.players[0];
   const p1 = state.players[1];
-  if (p0 && !p1)      { winnerIdx = 0; loserIdx = 1; }
+  if (state.winnerSeat === 0 || state.winnerSeat === 1) {
+    winnerIdx = state.winnerSeat;
+    loserIdx = winnerIdx === 0 ? 1 : 0;
+  }
+  else if (p0 && !p1)      { winnerIdx = 0; loserIdx = 1; }
   else if (!p0 && p1) { winnerIdx = 1; loserIdx = 0; }
   else if (!p0 && !p1) {
     // Both seats empty — KotT can't auto-resolve, abandon.

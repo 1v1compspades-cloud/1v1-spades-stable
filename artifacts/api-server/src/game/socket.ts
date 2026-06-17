@@ -41,6 +41,8 @@ import {
   deleteReconnectTokensForRoom,
   loadAllActiveRooms,
   expireStaleRoomStates,
+  saveCompletedMatchResult,
+  type MatchResultReason,
 } from "./persistence.js";
 import type { Card } from "./deck.js";
 import {
@@ -228,6 +230,12 @@ function clearRateForSocket(socketId: string): void {
   }
 }
 
+function normalizeProfileUsername(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().replace(/\s+/g, " ").slice(0, 32);
+  return normalized.length > 0 ? normalized : null;
+}
+
 // ── Stale entity sweeper ────────────────────────────────────────────────
 // Removes rooms idle for > 30min in non-active phases, and tournaments
 // that have been complete for > 1h or stalled in lobby for > 24h.
@@ -270,9 +278,7 @@ export function sanitizeStateForPlayer(
   playerIndex: 0 | 1
 ): Record<string, unknown> {
   const opponentIndex = playerIndex === 0 ? 1 : 0;
-  const publicPlayers = state.players.map((p) =>
-    p ? { name: p.name, index: p.index } : null,
-  );
+  const publicPlayers = state.players.map(publicPlayer);
   return {
     roomCode: state.roomCode,
     phase: state.phase,
@@ -312,13 +318,12 @@ export function sanitizeStateForPlayer(
     turnDeadline: state.turnDeadline ?? null,
     isPaused: state.isPaused ?? false,
     gameOverReason: state.gameOverReason ?? null,
+    winnerSeat: state.winnerSeat ?? null,
   };
 }
 
 export function sanitizeStateForSpectator(state: GameState): Record<string, unknown> {
-  const publicPlayers = state.players.map((p) =>
-    p ? { name: p.name, index: p.index } : null,
-  );
+  const publicPlayers = state.players.map(publicPlayer);
   return {
     roomCode: state.roomCode,
     phase: state.phase,
@@ -358,6 +363,7 @@ export function sanitizeStateForSpectator(state: GameState): Record<string, unkn
     turnDeadline: state.turnDeadline ?? null,
     isPaused: state.isPaused ?? false,
     gameOverReason: state.gameOverReason ?? null,
+    winnerSeat: state.winnerSeat ?? null,
   };
 }
 
@@ -403,6 +409,12 @@ function emitSanitizedGameState(
   io.to(socketId).emit("game_state", view);
 }
 
+function publicPlayer(p: GameState["players"][number]): { name: string; index: 0 | 1; username: string | null } | null {
+  return p
+    ? { name: p.name, index: p.index, username: p.profileUsername ?? null }
+    : null;
+}
+
 export function shouldRejectDuplicateReconnect(
   currentSocketId: string | null | undefined,
   incomingSocketId: string,
@@ -411,12 +423,50 @@ export function shouldRejectDuplicateReconnect(
   return Boolean(currentSocketId && currentSocketId !== incomingSocketId && currentSocketConnected);
 }
 
-// ── Turn timers (tournament rooms only) ─────────────────────────────────────
-// Per-turn soft clock: when a tournament room's actor (bidder or card-player)
-// is idle past `turnTimeoutMs`, the server auto-bids / auto-plays for them.
-// Quick Match and KotT rooms set turnTimeoutMs = null and never arm a timer.
+function resultReasonForGameOver(state: GameState): MatchResultReason {
+  const label = (state.gameOverReason ?? "").toLowerCase();
+  if (label.includes("afk")) return "afk_forfeit";
+  if (label.includes("forfeit")) return "forfeit";
+  if (label.includes("auto victory") || label.includes("auto-win") || state.winnerSeat !== null && state.winnerSeat !== undefined) {
+    return "auto_victory";
+  }
+  return "normal_win";
+}
 
-const TOURNAMENT_TURN_TIMEOUT_MS = 30_000;
+function winnerSeatForCompletedMatch(state: GameState): 0 | 1 | null {
+  if (state.winnerSeat === 0 || state.winnerSeat === 1) return state.winnerSeat;
+  if (state.scores[0] === state.scores[1]) return null;
+  return state.scores[0] > state.scores[1] ? 0 : 1;
+}
+
+function recordCompletedMatch(state: GameState, resultReason = resultReasonForGameOver(state)): void {
+  if (state.phase !== "game_over") return;
+  const winnerSeat = winnerSeatForCompletedMatch(state);
+  if (winnerSeat === null) return;
+  const loserSeat: 0 | 1 = winnerSeat === 0 ? 1 : 0;
+  const winner = state.players[winnerSeat];
+  const loser = state.players[loserSeat];
+  void saveCompletedMatchResult({
+    roomCode: state.roomCode,
+    mode: state.mode,
+    matchLabel: state.matchLabel ?? null,
+    tournamentRef: state.tournamentRef ?? null,
+    winnerSeat,
+    loserSeat,
+    winnerName: winner?.name ?? `Seat ${winnerSeat + 1}`,
+    loserName: loser?.name ?? `Seat ${loserSeat + 1}`,
+    winnerUsername: winner?.profileUsername ?? winner?.name ?? null,
+    loserUsername: loser?.profileUsername ?? loser?.name ?? null,
+    finalScores: [state.scores[0], state.scores[1]],
+    resultReason,
+  });
+}
+
+// ── Active-turn AFK timers ──────────────────────────────────────────────────
+// Every bidding/playing turn gets a 120s inactivity deadline. The client shows
+// warnings at 60s and 90s; the server awards the opponent an AFK auto-win at
+// 120s if the same actor is still on turn.
+const ACTIVE_TURN_AFK_TIMEOUT_MS = 120_000;
 const TOURNAMENT_AUTO_FORFEIT_MS = 300_000; // 5-min disconnect grace before auto-forfeit
 const turnTimers = new Map<string, NodeJS.Timeout>();
 
@@ -429,12 +479,12 @@ function clearTurnTimer(roomCode: string): void {
 }
 
 /**
- * Arm (or rearm) the turn timer for a tournament-linked room. MUTATES
+ * Arm (or rearm) the active-turn AFK timer. MUTATES
  * `state.turnDeadline` so callers should `armTurnTimer` BEFORE calling
  * `broadcastState` so clients receive the new deadline in one push.
  *
- * No-op when `state.turnTimeoutMs` is null/0 (non-tournament rooms) or
- * when there's no current actor (animation / round_over / game_over).
+ * No-op when there's no current actor (lobby/loading/reconnecting/pregame/
+ * animations/round_over/game_over).
  */
 function armTurnTimer(io: SocketIOServer, state: GameState): void {
   clearTurnTimer(state.roomCode);
@@ -444,7 +494,7 @@ function armTurnTimer(io: SocketIOServer, state: GameState): void {
     state.turnDeadline = null;
     return;
   }
-  const budget = state.turnTimeoutMs;
+  const budget = state.turnTimeoutMs ?? ACTIVE_TURN_AFK_TIMEOUT_MS;
   if (!budget || budget <= 0) {
     state.turnDeadline = null;
     return;
@@ -457,6 +507,8 @@ function armTurnTimer(io: SocketIOServer, state: GameState): void {
     state.turnDeadline = null;
     return;
   }
+  state.lastActiveAt[actor] = Date.now();
+  state.turnTimeoutMs = budget;
   const deadline = Date.now() + budget;
   state.turnDeadline = deadline;
 
@@ -468,10 +520,15 @@ function armTurnTimer(io: SocketIOServer, state: GameState): void {
       // Bail if a real action moved the game on — the deadline marker is the
       // authoritative "this scheduled callback is still relevant" check.
       if (cur.turnDeadline !== deadline) return;
-      if (cur.phase === "bidding" && cur.currentBidder === actor) {
-        autoBidFor(io, cur, actor);
-      } else if (cur.phase === "playing" && cur.currentTurnIndex === actor) {
-        autoPlayFor(io, cur, actor);
+      if (
+        (cur.phase === "bidding" && cur.currentBidder === actor) ||
+        (cur.phase === "playing" && cur.currentTurnIndex === actor)
+      ) {
+        void forfeitActiveMatch(io, cur.roomCode, actor, {
+          label: "AFK Forfeit",
+          eventReason: "afk_forfeit",
+          action: "afk_forfeit",
+        });
       }
     } catch (err) {
       logger.error({ err, roomCode: state.roomCode }, "Turn timer auto-action failed");
@@ -616,6 +673,9 @@ async function handlePlayResult(
           if (merged.phase === "game_over" && merged.tournamentRef) {
             void advanceTournamentOnGameOver(io, merged);
           }
+          if (merged.phase === "game_over") {
+            recordCompletedMatch(merged);
+          }
         } catch (err) {
           logger.error({ err, roomCode }, "handlePlayResult post-delay failed");
         }
@@ -708,8 +768,9 @@ function cancelAutoForfeit(roomCode: string, playerIndex: 0 | 1): void {
 
 /**
  * Mark a tournament match as forfeited by `forfeitSeat`. The opposing side
- * is recorded as winner at `matchTarget`, the game flips to game_over, and
- * the bracket advancement pipeline runs as if the match had naturally ended.
+ * is recorded as winner, the game flips to game_over, and the bracket
+ * advancement pipeline runs as if the match had naturally ended. Displayed
+ * scores are preserved at their real values; `winnerSeat` carries the result.
  * Idempotent: no-op if already past game_over or not a tournament room.
  */
 function forfeitTournamentMatch(
@@ -727,10 +788,6 @@ function forfeitTournamentMatch(
     clearTurnTimer(roomCode);
     const winnerSeat: 0 | 1 = forfeitSeat === 0 ? 1 : 0;
     const finalScores: [number, number] = [state.scores[0], state.scores[1]];
-    finalScores[winnerSeat] = Math.max(finalScores[winnerSeat], state.matchTarget);
-    if (finalScores[winnerSeat] <= finalScores[forfeitSeat]) {
-      finalScores[winnerSeat] = finalScores[forfeitSeat] + 1;
-    }
 
     const forfeitedName = state.players[forfeitSeat]?.name ?? null;
     const winnerName = state.players[winnerSeat]?.name ?? null;
@@ -741,6 +798,11 @@ function forfeitTournamentMatch(
       currentBidder: null,
       currentTurnIndex: null,
       turnDeadline: null,
+      winnerSeat,
+      gameOverReason:
+        reason === "disconnect"
+          ? "Auto Victory — opponent disconnected."
+          : "Opponent Forfeit",
     };
     await commit(finalState, {
       action: "forfeit",
@@ -755,6 +817,7 @@ function forfeitTournamentMatch(
       reason,
     });
     broadcastState(io, finalState);
+    recordCompletedMatch(finalState, reason === "disconnect" ? "auto_victory" : "forfeit");
     await advanceTournamentOnGameOver(io, finalState);
   });
 }
@@ -764,8 +827,8 @@ function forfeitTournamentMatch(
  * winner, routing through the SAME game-over pipeline a naturally-completed
  * match uses (commit → broadcast → tournament advancement / KotT rotation).
  *
- * It does NOT touch bidding/scoring/card/bracket/KotT logic — it only sets a
- * winning score and flips phase to game_over, then defers to the existing
+ * It does NOT touch bidding/scoring/card/bracket/KotT logic — it only marks a
+ * winner and flips phase to game_over, then defers to the existing
  * downstream handlers (`advanceTournamentOnGameOver`, `scheduleKingNextMatch`),
  * exactly as `handlePlayResult` does on a real game_over. This keeps tournament
  * advancement, KotT winner/loser flow, and the 1v1 Game Over screen all on
@@ -791,15 +854,7 @@ function endMatchForTesting(
     const loserSeat: 0 | 1 = winnerSeat === 0 ? 1 : 0;
 
     clearTurnTimer(roomCode);
-    // Give the winner a decisive, non-tied final score at/above target — the
-    // same shape forfeitTournamentMatch produces, so every downstream consumer
-    // (game-over screen, advanceTournamentOnGameOver, promoteNextChallenger)
-    // reads an unambiguous winner.
     const finalScores: [number, number] = [state.scores[0], state.scores[1]];
-    finalScores[winnerSeat] = Math.max(finalScores[winnerSeat], state.matchTarget);
-    if (finalScores[winnerSeat] <= finalScores[loserSeat]) {
-      finalScores[winnerSeat] = finalScores[loserSeat] + 1;
-    }
     const winnerName = state.players[winnerSeat]?.name ?? null;
     const loserName = state.players[loserSeat]?.name ?? null;
     const finalState: GameState = {
@@ -809,6 +864,8 @@ function endMatchForTesting(
       currentBidder: null,
       currentTurnIndex: null,
       turnDeadline: null,
+      winnerSeat,
+      gameOverReason: "Auto Victory",
     };
     await commit(finalState, {
       action: "fast_finish_test",
@@ -820,6 +877,7 @@ function endMatchForTesting(
       "Match ended by Fast Finish host/admin test tool",
     );
     broadcastState(io, finalState);
+    recordCompletedMatch(finalState, "auto_victory");
 
     // Tournament: advance the bracket via the normal pipeline (writes its own
     // DB-backed audit row through recordMatchResultTx).
@@ -837,14 +895,19 @@ function endMatchForTesting(
 
 /**
  * Player-initiated quick/KotT/tournament forfeit. The forfeiting socket must
- * currently occupy a seated player slot. We end the match by giving the other
- * player a decisive non-tied score, then reuse the normal game_over follow-ups.
+ * currently occupy a seated player slot. We end the match by marking the other
+ * player as winner, while preserving the displayed scores at their real values.
  */
 function forfeitActiveMatch(
   io: SocketIOServer,
   roomCode: string,
   forfeitSeat: 0 | 1,
-  actorSocketId: string,
+  opts: {
+    actorSocketId?: string;
+    label?: string;
+    eventReason?: string;
+    action?: "player_forfeit" | "afk_forfeit";
+  } = {},
 ): Promise<{ ok: boolean; error?: string }> {
   return withRoomLock(roomCode, async () => {
     const state = getRoom(roomCode);
@@ -854,16 +917,12 @@ function forfeitActiveMatch(
     if (!state.players[0] || !state.players[1]) {
       return { ok: false, error: "Both seats must be filled to forfeit" };
     }
-    if (state.players[forfeitSeat]?.socketId !== actorSocketId) {
+    if (opts.actorSocketId && state.players[forfeitSeat]?.socketId !== opts.actorSocketId) {
       return { ok: false, error: "Forfeiting player is not seated" };
     }
 
     const winnerSeat: 0 | 1 = forfeitSeat === 0 ? 1 : 0;
     const finalScores: [number, number] = [state.scores[0], state.scores[1]];
-    finalScores[winnerSeat] = Math.max(finalScores[winnerSeat], state.matchTarget);
-    if (finalScores[winnerSeat] <= finalScores[forfeitSeat]) {
-      finalScores[winnerSeat] = finalScores[forfeitSeat] + 1;
-    }
 
     const forfeitedName = state.players[forfeitSeat]?.name ?? null;
     const winnerName = state.players[winnerSeat]?.name ?? null;
@@ -875,10 +934,11 @@ function forfeitActiveMatch(
       currentBidder: null,
       currentTurnIndex: null,
       turnDeadline: null,
-      gameOverReason: `${forfeitedName ?? `Seat ${forfeitSeat + 1}`} forfeited.`,
+      winnerSeat,
+      gameOverReason: opts.label ?? "Opponent Forfeit",
     };
     await commit(finalState, {
-      action: "player_forfeit",
+      action: opts.action ?? "player_forfeit",
       actorSeat: forfeitSeat,
       payload: { forfeitedName, winnerName, winnerSeat, finalScores },
     });
@@ -888,9 +948,10 @@ function forfeitActiveMatch(
       forfeitedName,
       winnerSeat,
       winnerName,
-      reason: "player_forfeit",
+      reason: opts.eventReason ?? "player_forfeit",
     });
     broadcastState(io, finalState);
+    recordCompletedMatch(finalState, opts.action === "afk_forfeit" ? "afk_forfeit" : "forfeit");
 
     if (finalState.tournamentRef) {
       await advanceTournamentOnGameOver(io, finalState);
@@ -1257,12 +1318,14 @@ async function advanceTournamentOnGameOver(io: SocketIOServer, state: GameState)
     return;
   }
   const [s0, s1] = state.scores;
-  if (s0 === s1) {
+  const explicitWinner = state.winnerSeat ?? null;
+  if (explicitWinner === null && s0 === s1) {
     // Spades engine prevents true ties at game_over, but be defensive.
     logger.warn({ code, matchId, s0, s1 }, "Tournament match ended in a tie — cannot advance");
     return;
   }
-  const winnerSeat: "A" | "B" = s0 > s1 ? "A" : "B";
+  const winnerSeat: "A" | "B" =
+    explicitWinner !== null ? (explicitWinner === 0 ? "A" : "B") : s0 > s1 ? "A" : "B";
 
   const resolution = await recordMatchResult(code, matchId, winnerSeat, {
     finalScores: [s0, s1],
@@ -1583,12 +1646,13 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           const rawLabel = typeof data.matchLabel === "string" ? data.matchLabel.trim() : "";
           const label = rawLabel ? rawLabel.slice(0, 40) : undefined;
           const mode: "quick" | "king" = data.mode === "king" ? "king" : "quick";
-          const state = createRoom(data.playerName, socket.id, target, label, mode);
+          const profileUsername = normalizeProfileUsername((data as { profileUsername?: string }).profileUsername);
+          const state = createRoom(data.playerName, socket.id, target, label, mode, undefined, profileUsername);
           await withRoomLock(state.roomCode, async () => {
             await commit(state, {
               action: "room_created",
               actorSeat: 0,
-              payload: { mode, matchTarget: target, host: data.playerName, label },
+              payload: { mode, matchTarget: target, host: data.playerName, profileUsername, label },
             });
           });
           // Issue the seat-0 reconnect token AFTER commit so the row exists if
@@ -1624,7 +1688,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
     socket.on(
       "join_room",
       async (
-        data: { roomCode: string; playerName: string },
+        data: { roomCode: string; playerName: string; profileUsername?: string },
         callback: (res: { ok: boolean; playerIndex?: number; token?: string; error?: string }) => void
       ) => {
         try {
@@ -1632,6 +1696,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
             return callback({ ok: false, error: "Slow down — too many join attempts." });
           }
           const code = data.roomCode.toUpperCase().trim();
+          const profileUsername = normalizeProfileUsername(data.profileUsername);
           let result: { state: GameState; playerIndex: number } | null = null;
           let joinErr: Error | null = null;
           await withRoomLock(code, async () => {
@@ -1680,12 +1745,12 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
                   return;
                 }
               }
-              const r = joinRoom(code, data.playerName, socket.id);
+              const r = joinRoom(code, data.playerName, socket.id, profileUsername);
               result = r;
               await commit(r.state, {
                 action: "player_joined",
                 actorSeat: r.playerIndex,
-                payload: { name: data.playerName },
+                payload: { name: data.playerName, profileUsername },
               });
             } catch (e) {
               joinErr = e as Error;
@@ -1867,7 +1932,12 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
               (p) => p?.socketId === socket.id
             ) as 0 | 1;
             if (playerIndex < 0) throw new Error("Player not found");
-            const result = await forfeitActiveMatch(io, data.roomCode, playerIndex, socket.id);
+            const result = await forfeitActiveMatch(io, data.roomCode, playerIndex, {
+              actorSocketId: socket.id,
+              label: "Opponent Forfeit",
+              eventReason: "player_forfeit",
+              action: "player_forfeit",
+            });
             callback(result);
           } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : "Unknown error";
@@ -1970,6 +2040,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           await withRoomLock(code, async () => {
             try {
               state = reconnectPlayer(code, data.playerIndex, socket.id, data.playerName);
+              armTurnTimer(io, state);
               await commit(state, {
                 action: "reconnect",
                 actorSeat: data.playerIndex,

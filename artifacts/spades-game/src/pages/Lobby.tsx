@@ -16,9 +16,11 @@ export default function Lobby() {
   const { connect, connected, socket, createRoom, joinRoom, joinAsSpectator, createTournament, joinTournament, isAdmin, unlockAdmin } = useSocket();
   const {
     playerName,
+    profileUsername,
     roomCode: storedRoomCode,
     playerIndex: storedPlayerIndex,
     savePlayerName,
+    saveProfileUsername,
     saveRoomCode,
     savePlayerIndex,
     saveIsSpectator,
@@ -39,6 +41,7 @@ export default function Lobby() {
   })();
 
   const [nameInput, setNameInput] = useState(playerName);
+  const [profileInput, setProfileInput] = useState(profileUsername);
   const [joinCodeInput, setJoinCodeInput] = useState(initialParams.code);
   const [matchTarget, setMatchTarget] = useState<250 | 500>(250);
   const [tournamentSize, setTournamentSize] = useState<4 | 8 | 16 | 32>(4);
@@ -117,7 +120,10 @@ export default function Lobby() {
     if (blockIfActiveGame()) return;
     setIsCreating(true);
     try {
-      savePlayerName(nameInput);
+      const displayName = nameInput.trim();
+      const profile = (profileInput.trim() || displayName).slice(0, 32);
+      savePlayerName(displayName);
+      saveProfileUsername(profile);
       saveIsSpectator(false);
       if (matchMode === "custom") {
         // SECURITY: tournaments are admin-only and the admin is NOT seeded as a
@@ -133,7 +139,7 @@ export default function Lobby() {
         return;
       }
       const serverMode: "quick" | "king" = matchMode === "king" ? "king" : "quick";
-      const res = await createRoom(nameInput, matchTarget, undefined, serverMode);
+      const res = await createRoom(displayName, matchTarget, undefined, serverMode, profile);
       if (res.roomCode && res.playerIndex !== undefined) {
         saveRoomCode(res.roomCode);
         savePlayerIndex(res.playerIndex as 0 | 1);
@@ -154,7 +160,10 @@ export default function Lobby() {
     if (!joinCodeInput.trim()) { toast({ description: "Please enter a code", variant: "destructive" }); return; }
     setIsJoining(true);
     try {
-      savePlayerName(nameInput);
+      const displayName = nameInput.trim();
+      const profile = (profileInput.trim() || displayName).slice(0, 32);
+      savePlayerName(displayName);
+      saveProfileUsername(profile);
       saveIsSpectator(false);
       const code = joinCodeInput.toUpperCase();
       if (matchMode === "custom") {
@@ -164,7 +173,7 @@ export default function Lobby() {
         // the same browser), pass it so the server treats this as the same
         // seat rather than failing with "name taken".
         const existing = getTournamentToken(code);
-        const res = await joinTournament(code, nameInput.trim(), existing || undefined);
+        const res = await joinTournament(code, displayName, existing || undefined);
         saveTournamentToken(code, res.token);
         setLocation(`/tournament/${code}`);
         return;
@@ -178,7 +187,7 @@ export default function Lobby() {
           return;
         }
         if (blockIfActiveGame()) return;
-        const res = await joinRoom(code, nameInput);
+        const res = await joinRoom(code, displayName, profile);
         if (res.playerIndex !== undefined) {
           saveRoomCode(code);
           savePlayerIndex(res.playerIndex as 0 | 1);
@@ -194,10 +203,10 @@ export default function Lobby() {
         // into the challenger queue + spectator list so they can watch and
         // auto-rotate in when a seat opens.
         if (matchMode === "king" && /(full|already started)/i.test(msg)) {
-          await joinAsSpectator(code, nameInput);
+          await joinAsSpectator(code, displayName);
           try { await new Promise<void>((resolve, reject) => {
             if (!socket) return reject("No socket");
-            socket.emit("join_queue", { roomCode: code, name: nameInput }, (r: { ok: boolean; error?: string }) => r.ok ? resolve() : reject(r.error));
+            socket.emit("join_queue", { roomCode: code, name: displayName }, (r: { ok: boolean; error?: string }) => r.ok ? resolve() : reject(r.error));
           }); } catch { /* spectator-only fallback is still fine */ }
           savePlayerIndex(null);
           saveIsSpectator(true);
@@ -228,13 +237,16 @@ export default function Lobby() {
     if (!nameInput.trim()) { toast({ description: "Please enter your name", variant: "destructive" }); return; }
     if (!joinCodeInput.trim()) { toast({ description: "Please enter a room code", variant: "destructive" }); return; }
     const code = joinCodeInput.toUpperCase();
+    const displayName = nameInput.trim();
+    const profile = (profileInput.trim() || displayName).slice(0, 32);
     setIsSpectating(true);
     try {
-      savePlayerName(nameInput);
+      savePlayerName(displayName);
+      saveProfileUsername(profile);
       savePlayerIndex(null);
       saveIsSpectator(true);
       saveRoomCode(code);
-      await joinAsSpectator(code, nameInput);
+      await joinAsSpectator(code, displayName);
       setLocation(`/room/${code}`);
     } catch (err: any) {
       saveIsSpectator(false);
@@ -307,6 +319,21 @@ export default function Lobby() {
               onChange={(e) => setNameInput(e.target.value)}
               className="text-lg py-6"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="profile-username">Profile Username</Label>
+            <Input
+              id="profile-username"
+              placeholder="Persistent username"
+              value={profileInput}
+              onChange={(e) => setProfileInput(e.target.value.slice(0, 32))}
+              className="text-lg py-6"
+              data-testid="input-profile-username"
+            />
+            <p className="text-xs text-muted-foreground">
+              Saved on this device for match history. Guest play still works.
+            </p>
           </div>
 
           <div className="space-y-2 pt-2 border-t border-border/50">

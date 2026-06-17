@@ -4,9 +4,11 @@ import {
   db,
   activeRoomsTable,
   gameAuditLogTable,
+  matchResultsTable,
   reconnectTokensTable,
   tournamentMatchesTable,
   type ActiveRoomRow,
+  type InsertMatchResult,
   type TournamentMatchRow,
 } from "@workspace/db";
 import { updateRoom, type GameState } from "./engine.js";
@@ -40,6 +42,66 @@ export const TTL_GAME_OVER_MS = 2 * 60 * 60 * 1000;
 export const TTL_WAITING_IDLE_MS = 30 * 60 * 1000;
 export const TTL_MIDGAME_IDLE_MS = 6 * 60 * 60 * 1000;
 export const TTL_AUDIT_LOG_MS = 30 * 24 * 60 * 60 * 1000;
+
+export type MatchResultReason =
+  | "normal_win"
+  | "forfeit"
+  | "afk_forfeit"
+  | "auto_victory";
+
+export interface CompletedMatchResultInput {
+  roomCode: string;
+  mode: string;
+  matchLabel?: string | null;
+  tournamentRef?: { code: string; matchId: string } | null;
+  winnerSeat: 0 | 1;
+  loserSeat: 0 | 1;
+  winnerName: string;
+  loserName: string;
+  winnerUsername?: string | null;
+  loserUsername?: string | null;
+  finalScores: [number, number];
+  resultReason: MatchResultReason;
+  completedAt?: Date;
+}
+
+export async function saveCompletedMatchResult(
+  result: CompletedMatchResultInput,
+): Promise<void> {
+  const completedAt = result.completedAt ?? new Date();
+  const row: InsertMatchResult = {
+    roomCode: result.roomCode,
+    mode: result.mode,
+    matchLabel: result.matchLabel ?? null,
+    tournamentCode: result.tournamentRef?.code ?? null,
+    tournamentMatchId: result.tournamentRef?.matchId ?? null,
+    winnerSeat: result.winnerSeat,
+    loserSeat: result.loserSeat,
+    winnerName: result.winnerName,
+    loserName: result.loserName,
+    winnerUsername: result.winnerUsername ?? null,
+    loserUsername: result.loserUsername ?? null,
+    score0: result.finalScores[0],
+    score1: result.finalScores[1],
+    resultReason: result.resultReason,
+    completedAt,
+    summary: {
+      winner: result.winnerName,
+      loser: result.loserName,
+      finalScores: result.finalScores,
+      resultReason: result.resultReason,
+      timestamp: completedAt.toISOString(),
+    },
+  };
+  try {
+    await db.insert(matchResultsTable).values(row);
+  } catch (err) {
+    logger.warn(
+      { err, roomCode: result.roomCode, resultReason: result.resultReason },
+      "saveCompletedMatchResult failed (live game unaffected)",
+    );
+  }
+}
 
 /**
  * Sanitize a live `GameState` for durable storage. Strips ephemeral fields

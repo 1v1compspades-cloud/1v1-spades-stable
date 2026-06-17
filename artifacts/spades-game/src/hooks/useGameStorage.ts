@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 
 export function useGameStorage() {
   const [playerName, setPlayerName] = useState(() => localStorage.getItem("spades_playerName") || "");
+  const [profileUsername, setProfileUsername] = useState(
+    () => localStorage.getItem("spades_profile_username") || localStorage.getItem("spades_playerName") || "",
+  );
   const [roomCode, setRoomCode] = useState(() => localStorage.getItem("spades_roomCode") || "");
   const [playerIndex, setPlayerIndex] = useState<0 | 1 | null>(() => {
     const saved = localStorage.getItem("spades_playerIndex");
@@ -14,6 +17,13 @@ export function useGameStorage() {
   const savePlayerName = (name: string) => {
     setPlayerName(name);
     localStorage.setItem("spades_playerName", name);
+  };
+
+  const saveProfileUsername = (username: string) => {
+    const normalized = username.trim().replace(/\s+/g, " ").slice(0, 32);
+    setProfileUsername(normalized);
+    if (normalized) localStorage.setItem("spades_profile_username", normalized);
+    else localStorage.removeItem("spades_profile_username");
   };
 
   const saveRoomCode = (code: string) => {
@@ -155,10 +165,12 @@ export function useGameStorage() {
 
   return {
     playerName,
+    profileUsername,
     roomCode,
     playerIndex,
     isSpectator,
     savePlayerName,
+    saveProfileUsername,
     saveRoomCode,
     savePlayerIndex,
     saveIsSpectator,
