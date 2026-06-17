@@ -14,8 +14,8 @@ const EXPECTED = {
   buildNumber: "23",
   bundleIdentifier: "com.oneononespades.freeplay",
   easProjectId: "9b64353d-700c-4be9-ac70-3101400335b8",
-  easBuildId: "pending",
-  easSubmissionId: "pending",
+  easBuildId: "3823f18e-c164-4298-b8f9-ac25252e55a5",
+  easSubmissionId: "6bab3402-f947-4238-95a5-452c154e9f1f",
   ascAppId: "6776721716",
 };
 
