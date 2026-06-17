@@ -1096,7 +1096,7 @@ export default function Room() {
 
     return (
       <div className="flex-1 overflow-y-auto px-4 py-6 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
-        <div className="mx-auto w-full max-w-2xl">
+        <div className="spades-room-content">
           <div className="spades-panel rounded-2xl border-2 border-primary/40 backdrop-blur-sm overflow-hidden">
             {/* Header */}
             <div className="px-5 pt-6 pb-4 text-center border-b border-primary/20">
@@ -1288,7 +1288,7 @@ export default function Room() {
   // ── Spectator waiting screen ──────────────────────────────────────────────
   const renderSpectatorWaiting = () => (
     <div className="flex-1 overflow-y-auto px-4 py-6 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
-      <div className="mx-auto w-full max-w-2xl">
+      <div className="spades-room-content">
         <div className="spades-panel rounded-2xl border-2 border-primary/40 backdrop-blur-sm overflow-hidden">
           <div className="px-5 pt-6 pb-4 text-center border-b border-primary/20">
             <Badge variant="outline" className="border-primary/40 text-primary uppercase tracking-widest text-[10px] mb-2">
@@ -1370,7 +1370,7 @@ export default function Room() {
       : "You";
 
     return (
-      <div className="spades-table-surface flex min-h-[18rem] flex-none flex-col items-center justify-center relative overflow-hidden px-2 py-3 sm:min-h-0 sm:flex-1 sm:py-0">
+      <div className="spades-game-board spades-table-surface flex min-h-[18rem] flex-none flex-col items-center justify-center relative overflow-hidden px-2 py-3 sm:min-h-0 sm:flex-1 sm:py-0">
         {/* Top seat hidden hand (always hidden — even players don't see opponent's cards) */}
         <div className="absolute top-3 sm:top-4 flex justify-center w-full pointer-events-none">
           <div className="flex items-center gap-2">
@@ -1473,22 +1473,9 @@ export default function Room() {
           );
         })()}
 
-        {/* Bidding overlay (players only) */}
-        {/* Layout/stacking notes:
-            - The dim backdrop and the bid PANEL are split into two separate
-              `fixed` siblings on purpose. The bottom-player score row is
-              `relative z-[110]` so it stays visible during bidding; the backdrop
-              therefore sits BELOW it (z-[90]) so the score isn't dimmed, while
-              the bid panel sits ABOVE it (z-[120]) so the Confirm button is
-              never painted behind the score row / cards (the old single-layer
-              z-[100] modal lost this fight and the button became un-tappable).
-            - `fixed inset-0` covers the whole viewport (the absolute table
-              parent excludes the hand-fan area on mobile).
-            - Backdrop is `pointer-events-none` so swipes pass through to scroll
-              the 13-card hand; the panel is `pointer-events-auto` for taps.
-            - The panel is compact + `max-h`/internal scroll so it never grows
-              down into the bottom score row, and carries safe-area padding so
-              Confirm clears the iOS home indicator. */}
+        {/* Bidding overlay (players only).
+            Keep controls away from the bottom hand tray so all 13 cards remain
+            visible and horizontally scrollable while a bid is being chosen. */}
         {!spectator && gameState.phase === "bidding" && gameState.currentBidder === playerIndex && (
           <>
             <div
@@ -1497,33 +1484,33 @@ export default function Room() {
               aria-hidden="true"
             />
             <div
-              className="fixed inset-0 z-[120] flex items-end justify-center overflow-y-auto pointer-events-none sm:items-center"
+              className="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto pointer-events-none sm:items-center"
               style={{
-                paddingTop: "max(1rem, env(safe-area-inset-top))",
-                paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
-                paddingLeft: "max(1rem, env(safe-area-inset-left))",
-                paddingRight: "max(1rem, env(safe-area-inset-right))",
+                paddingTop: "max(0.5rem, env(safe-area-inset-top))",
+                paddingBottom: "calc(env(safe-area-inset-bottom) + 8.25rem)",
+                paddingLeft: "max(0.5rem, env(safe-area-inset-left))",
+                paddingRight: "max(0.5rem, env(safe-area-inset-right))",
               }}
               data-testid="bidding-overlay"
             >
-              <div className="bg-card border border-border p-3 sm:p-5 rounded-t-2xl sm:rounded-xl shadow-2xl space-y-2.5 sm:space-y-3 w-full max-w-[calc(100vw-0.75rem)] sm:max-w-sm text-center max-h-[72dvh] sm:max-h-[80vh] overflow-y-auto pointer-events-auto">
-                <h3 className="text-base sm:text-lg font-serif text-primary">Place your bid</h3>
+              <div className="bg-card/96 border border-border p-2.5 sm:p-5 rounded-xl shadow-2xl space-y-2 sm:space-y-3 w-full max-w-[min(34rem,calc(100vw-1rem))] text-center max-h-[48dvh] sm:max-h-[80vh] overflow-y-auto pointer-events-auto backdrop-blur-md">
+                <h3 className="text-sm sm:text-lg font-serif text-primary">Place your bid</h3>
                 {gameState.bids[0] === null && gameState.bids[1] === null && (
-                  <p className="text-[11px] uppercase tracking-widest text-primary/80">
+                  <p className="text-[10px] sm:text-[11px] uppercase tracking-widest text-primary/80">
                     You bid first this round (Round {gameState.roundNumber})
                   </p>
                 )}
                 {(gameState.bids[0] !== null || gameState.bids[1] !== null) && (
-                  <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
+                  <p className="text-[10px] sm:text-[11px] uppercase tracking-widest text-muted-foreground">
                     You bid second this round
                   </p>
                 )}
-                <p className="text-[11px] sm:text-xs text-muted-foreground">
+                <p className="text-[10px] sm:text-xs text-muted-foreground">
                   You have {gameState.hand.length} cards. Bid 0 for Nil (+/−100).
                 </p>
                 <div
                   data-testid="bid-buttons"
-                  className="grid grid-cols-7 gap-1.5 w-full"
+                  className="grid grid-cols-7 gap-1 w-full sm:gap-1.5"
                 >
                   {Array.from({ length: 14 }).map((_, i) => {
                     const val = i.toString();
@@ -1535,7 +1522,7 @@ export default function Room() {
                         data-testid={`bid-btn-${i}`}
                         onClick={() => setBidAmount(val)}
                         className={cn(
-                          "min-h-[38px] sm:min-h-[44px] rounded-lg border text-sm font-bold tabular-nums transition-colors",
+                          "min-h-[32px] sm:min-h-[44px] rounded-lg border text-xs sm:text-sm font-bold tabular-nums transition-colors",
                           selected
                             ? "bg-primary text-primary-foreground border-primary shadow-md"
                             : "bg-white/[0.04] text-foreground border-white/20 hover:bg-white/[0.08] active:bg-white/10"
@@ -1546,13 +1533,11 @@ export default function Room() {
                     );
                   })}
                 </div>
-                {/* Sticky so the Confirm button stays pinned and tappable even
-                    if the panel scrolls internally on very short screens. */}
-                <div className="sticky bottom-0 -mx-3 -mb-3 px-3 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:-mx-5 sm:-mb-5 sm:px-5 sm:pb-4 bg-card">
+                <div className="sticky bottom-0 -mx-2.5 -mb-2.5 px-2.5 pt-1.5 pb-2.5 sm:-mx-5 sm:-mb-5 sm:px-5 sm:pb-4 bg-card/96">
                   <Button
                     onClick={handleBid}
                     disabled={!bidAmount || isSubmitting}
-                    className="mx-auto block h-auto min-h-[42px] sm:min-h-[44px] w-full max-w-[220px] px-6 py-2.5 text-base"
+                    className="mx-auto block h-auto min-h-[38px] sm:min-h-[44px] w-full max-w-[220px] px-5 py-2 text-sm sm:text-base"
                     data-testid="button-confirm-bid"
                   >
                     {bidAmount ? `Bid ${bidAmount === "0" ? "Nil" : bidAmount}` : "Select a bid first"}
@@ -1949,11 +1934,41 @@ export default function Room() {
   // is a full tap target on mobile. Suit groups are visually separated.
   const renderMyHand = () => {
     const groups = sortHandBySuit(gameState.hand);
+    const biddingNow = gameState.phase === "bidding";
+    const playingNow = gameState.phase === "playing";
+    const isMyPlayTurn = playingNow && gameState.currentTurnIndex === playerIndex;
+    const playableCards = gameState.hand.filter((card) =>
+      isCardPlayable(card, gameState, playerIndex as 0 | 1)
+    );
+    const handHint = biddingNow
+      ? "Review your cards, then choose a bid."
+      : isMyPlayTurn
+        ? `Your turn: tap a highlighted card${playableCards.length > 1 ? ` (${playableCards.length} legal)` : ""}.`
+        : playingNow
+          ? "Opponent's turn: wait for the other player to play."
+          : "Your hand";
     return (
       <div
         data-testid="my-hand"
-        className="spades-hand-tray flex-shrink-0 overflow-x-auto overflow-y-hidden snap-x pt-2 pb-hand-safe border-t shadow-[0_-10px_34px_-24px_hsla(35,90%,55%,0.5)]"
+        className={cn(
+          "spades-hand-tray relative flex-shrink-0 overflow-x-auto overflow-y-hidden snap-x pt-2 pb-hand-safe border-t shadow-[0_-10px_34px_-24px_hsla(35,90%,55%,0.5)] touch-pan-x",
+          biddingNow && "z-[130] ring-1 ring-primary/35",
+          isMyPlayTurn && "ring-2 ring-emerald-400/50"
+        )}
       >
+        <div
+          data-testid="hand-turn-hint"
+          className={cn(
+            "sticky left-0 z-10 mx-2 mb-2 w-[calc(100vw-1rem)] rounded-lg border px-3 py-2 text-center text-xs font-bold uppercase tracking-widest backdrop-blur-sm sm:mx-3 sm:w-[calc(100vw-1.5rem)]",
+            isMyPlayTurn
+              ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200"
+              : playingNow
+                ? "border-yellow-400/45 bg-yellow-500/10 text-yellow-200"
+                : "border-primary/35 bg-black/45 text-primary"
+          )}
+        >
+          {handHint}
+        </div>
         <div className="flex flex-nowrap items-end gap-1 px-2 sm:gap-2 sm:px-3 sm:justify-center min-w-min">
           {groups.map((group, gi) => (
             <div
@@ -1969,9 +1984,6 @@ export default function Room() {
                 // Only dim during the playing phase on YOUR turn — illegal cards
                 // get a muted look so legal ones stand out. Never dim during
                 // bidding or on the opponent's turn (cards must stay readable).
-                const isMyPlayTurn =
-                  gameState.phase === "playing" &&
-                  gameState.currentTurnIndex === playerIndex;
                 return (
                   <CardComponent
                     key={`${card.suit}-${card.rank}`}
@@ -1979,7 +1991,10 @@ export default function Room() {
                     onClick={playable ? () => handlePlayCard(card) : undefined}
                     disabled={!playable}
                     dimmed={isMyPlayTurn && !playable}
-                    className="snap-center"
+                    className={cn(
+                      "snap-center",
+                      playable && "ring-4 ring-emerald-400 ring-offset-2 ring-offset-background -translate-y-1 shadow-[0_0_22px_rgba(52,211,153,0.45)]"
+                    )}
                   />
                 );
               })}
@@ -2314,7 +2329,7 @@ export default function Room() {
 
   if (spectator && gameState.phase === "waiting") {
     return (
-      <div className="spades-screen min-h-[100dvh] sm:h-[100dvh] flex flex-col bg-background overflow-y-auto overflow-x-hidden sm:overflow-hidden relative">
+      <div className="spades-screen spades-gameplay-screen min-h-[100dvh] sm:h-[100dvh] flex flex-col bg-background overflow-y-auto overflow-x-hidden sm:overflow-hidden relative">
         {renderStatusPill()}
         {renderOpponentOffline()}
         {renderQueuePanel()}
@@ -2325,7 +2340,7 @@ export default function Room() {
   }
 
   return (
-    <div className="spades-screen min-h-[100dvh] sm:h-[100dvh] flex flex-col bg-background overflow-y-auto overflow-x-hidden sm:overflow-hidden relative">
+    <div className="spades-screen spades-gameplay-screen min-h-[100dvh] sm:h-[100dvh] flex flex-col bg-background overflow-y-auto overflow-x-hidden sm:overflow-hidden relative">
       {renderStatusPill()}
       {renderOpponentOffline()}
       {!spectator && gameState.phase === "waiting" ? (

@@ -229,6 +229,29 @@
       linear-gradient(135deg, rgba(255,255,255,0.025), transparent 32%, rgba(255,255,255,0.015));
   }
 
+  .spades-gameplay-screen {
+    width: 100vw;
+    max-width: none;
+    min-height: 100dvh;
+    margin: 0;
+    box-sizing: border-box;
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  .spades-room-content {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    box-sizing: border-box;
+  }
+
+  .spades-game-board {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+  }
+
   .spades-panel {
     position: relative;
     overflow: hidden;
@@ -254,6 +277,9 @@
   }
 
   .spades-table-surface {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
     background:
       radial-gradient(ellipse at center, rgba(18, 91, 62, 0.56), rgba(6, 47, 35, 0.44) 44%, rgba(8, 7, 5, 0.76) 74%),
       repeating-linear-gradient(45deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 9px);
@@ -280,6 +306,11 @@
   }
 
   .spades-hand-tray {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
     background:
       linear-gradient(180deg, rgba(10, 8, 5, 0.78), rgba(0,0,0,0.94)),
       radial-gradient(ellipse at 50% 0%, rgba(245, 197, 24, 0.12), transparent 70%);
@@ -328,6 +359,20 @@
     .spades-table-pocket {
       width: min(82vw, 18rem);
       height: min(82vw, 18rem);
+    }
+  }
+
+  @media (min-width: 768px) {
+    .spades-gameplay-screen {
+      padding-left: max(1rem, env(safe-area-inset-left));
+      padding-right: max(1rem, env(safe-area-inset-right));
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .spades-gameplay-screen {
+      padding-left: max(2rem, env(safe-area-inset-left));
+      padding-right: max(2rem, env(safe-area-inset-right));
     }
   }
 }

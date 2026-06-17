@@ -11,11 +11,11 @@ const execFileAsync = promisify(execFile);
 const EXPECTED = {
   name: "Spades Free Play",
   version: "1.0.0",
-  buildNumber: "22",
+  buildNumber: "23",
   bundleIdentifier: "com.oneononespades.freeplay",
   easProjectId: "9b64353d-700c-4be9-ac70-3101400335b8",
-  easBuildId: "40ad8e0a-f866-470d-93cd-61a90eb087a4",
-  easSubmissionId: "945fc363-18e0-4f66-8df6-f8e2149fc401",
+  easBuildId: "pending",
+  easSubmissionId: "pending",
   ascAppId: "6776721716",
 };
 
@@ -27,8 +27,8 @@ const URLS = [
 ];
 
 const CHECKBOXES = {
-  appleProcessing: "Apple processing complete for build 22",
-  internalTesting: "Build 22 added to internal TestFlight testing",
+  appleProcessing: "Apple processing complete for build 23",
+  internalTesting: "Build 23 added to internal TestFlight testing",
   smokeTest: "TestFlight smoke test checklist complete",
   hostedLayout: "Hosted web mobile layout fix deployed to 1v1spades.com",
   screenshots: "App Store screenshots uploaded",
@@ -152,15 +152,24 @@ async function checkEas() {
   const builds = extractJsonArray(buildOutput);
   if (Array.isArray(builds) && builds[0]) {
     const build = builds[0];
-    build.id === EXPECTED.easBuildId ? pass("Latest EAS build id", build.id) : warn("Latest EAS build id", `${build.id} != tracked ${EXPECTED.easBuildId}`);
+    if (EXPECTED.easBuildId === "pending") {
+      warn("Latest EAS build id", `Build ${EXPECTED.buildNumber} not built yet`);
+    } else {
+      build.id === EXPECTED.easBuildId ? pass("Latest EAS build id", build.id) : warn("Latest EAS build id", `${build.id} != tracked ${EXPECTED.easBuildId}`);
+    }
     build.status === "FINISHED" ? pass("Latest EAS build status", build.status) : fail("Latest EAS build status", build.status ?? "unknown");
-    build.appBuildVersion === EXPECTED.buildNumber ? pass("Latest EAS build number", build.appBuildVersion) : fail("Latest EAS build number", `${build.appBuildVersion} != ${EXPECTED.buildNumber}`);
+    build.appBuildVersion === EXPECTED.buildNumber ? pass("Latest EAS build number", build.appBuildVersion) : warn("Latest EAS build number", `${build.appBuildVersion} != ${EXPECTED.buildNumber}`);
   }
 
   await checkTrackedSubmission();
 }
 
 async function checkTrackedSubmission() {
+  if (EXPECTED.easSubmissionId === "pending") {
+    warn("Tracked EAS submission lookup", `Build ${EXPECTED.buildNumber} has not been submitted yet`);
+    return;
+  }
+
   let session = null;
   try {
     const state = JSON.parse(await readFile(resolve(homedir(), ".expo/state.json"), "utf8"));
@@ -239,6 +248,7 @@ async function checkManualTasks() {
 }
 
 function chooseNextAction(manualState) {
+  if (EXPECTED.easBuildId === "pending" || EXPECTED.easSubmissionId === "pending") return `Build and submit iOS build ${EXPECTED.buildNumber}.`;
   if (!manualState.appleProcessing) return "Wait for Apple processing.";
   if (!manualState.internalTesting) return "Add to internal TestFlight and smoke test.";
   if (!manualState.smokeTest) return "Complete smoke test checklist.";
