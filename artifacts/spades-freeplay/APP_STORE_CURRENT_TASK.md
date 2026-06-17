@@ -53,6 +53,7 @@ workspace root, to print the automated dashboard.
 ## Current blockers
 
 - [ ] Smoke test visual layout failure seen on build 21: iPhone bidding/game screen clipped horizontally, score counters overflowed past the right edge, bid modal was too wide/tall for the viewport, bottom hand was partially cut off, and the Report Bug button truncated. Build 22 includes the mobile layout fix; do not mark smoke test complete until build 22 is processed, installed, and verified on device.
+- [ ] Smoke test visual layout failure seen on hosted build 22 candidate: room code/header was truncated on the iPhone-width layout. The local web fix now shows a dedicated full room-code strip and wrap-safe lobby code; deploy to `1v1spades.com` and verify before App Review.
 
 ## App Review notes draft
 

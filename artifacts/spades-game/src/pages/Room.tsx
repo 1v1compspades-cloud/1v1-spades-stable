@@ -730,11 +730,23 @@ export default function Room() {
   const renderMatchLabelBar = () => (
     <div
       data-testid="match-label"
-      className="text-center py-1 px-4 text-[11px] tracking-widest uppercase bg-primary/15 text-primary font-semibold border-b border-primary/20"
+      className="flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-center py-1 px-3 text-[11px] tracking-widest uppercase bg-primary/15 text-primary font-semibold border-b border-primary/20"
     >
-      {gameState.matchLabel}
-      <span className="text-muted-foreground/70 normal-case tracking-normal font-normal ml-2">
-        · Room <span className="font-mono">{roomCode}</span>
+      <span>{gameState.matchLabel}</span>
+      <span className="text-muted-foreground/80 normal-case tracking-normal font-normal">
+        Room <span className="font-mono font-semibold text-primary tracking-[0.14em] break-all">{roomCode}</span>
+      </span>
+    </div>
+  );
+
+  const renderRoomCodeStrip = () => (
+    <div
+      data-testid="active-room-code"
+      className="border-b border-primary/20 bg-black/35 px-3 py-2 text-center text-[11px] uppercase tracking-widest text-muted-foreground"
+    >
+      <span className="mr-2">Room Code</span>
+      <span className="font-mono text-sm font-bold tracking-[0.14em] text-primary select-all break-all">
+        {roomCode}
       </span>
     </div>
   );
@@ -1083,7 +1095,7 @@ export default function Room() {
               </p>
               <div
                 data-testid="lobby-room-code"
-                className="text-4xl sm:text-5xl font-mono tracking-[0.3em] font-bold text-center text-primary bg-black/50 py-4 rounded-lg border-2 border-primary/50 shadow-[inset_0_0_20px_rgba(234,179,8,0.15)] select-all"
+                className="text-4xl sm:text-5xl font-mono tracking-[0.14em] sm:tracking-[0.3em] font-bold text-center text-primary bg-black/50 py-4 px-3 rounded-lg border-2 border-primary/50 shadow-[inset_0_0_20px_rgba(234,179,8,0.15)] select-all break-all"
               >
                 {roomCode}
               </div>
@@ -1237,7 +1249,7 @@ export default function Room() {
             <p className="text-[10px] uppercase tracking-widest text-muted-foreground text-center">
               Room Code
             </p>
-            <div className="text-4xl sm:text-5xl font-mono tracking-[0.3em] font-bold text-center text-primary bg-black/50 py-4 rounded-lg border-2 border-primary/50 shadow-[inset_0_0_20px_rgba(234,179,8,0.15)] select-all">
+            <div className="text-4xl sm:text-5xl font-mono tracking-[0.14em] sm:tracking-[0.3em] font-bold text-center text-primary bg-black/50 py-4 px-3 rounded-lg border-2 border-primary/50 shadow-[inset_0_0_20px_rgba(234,179,8,0.15)] select-all break-all">
               {roomCode}
             </div>
             <Button
@@ -2267,6 +2279,7 @@ export default function Room() {
       ) : (
         <>
           {renderPlayerInfo(topIndex, { isTopSeat: true })}
+          {renderRoomCodeStrip()}
           {renderQueuePanel()}
           {renderStatusBanner()}
           {renderTable()}
