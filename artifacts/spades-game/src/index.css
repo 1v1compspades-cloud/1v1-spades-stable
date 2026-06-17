@@ -167,7 +167,7 @@
   }
   .pb-hand-safe {
     /* ~96px breathing room + iPhone home indicator */
-    padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 0.75rem);
   }
 }
 
@@ -326,8 +326,8 @@
 
   @media (max-width: 640px) {
     .spades-table-pocket {
-      width: min(88vw, 20rem);
-      height: min(88vw, 20rem);
+      width: min(82vw, 18rem);
+      height: min(82vw, 18rem);
     }
   }
 }

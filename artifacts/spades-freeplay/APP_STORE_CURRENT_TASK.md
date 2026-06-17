@@ -24,7 +24,7 @@ workspace root, to print the automated dashboard.
 ## Manual launch checklist
 
 - [x] Apple processing complete for build 21
-- [ ] Build 21 added to internal TestFlight testing
+- [x] Build 21 added to internal TestFlight testing
 - [ ] TestFlight smoke test checklist complete
 - [ ] Hosted web mobile layout fix deployed to 1v1spades.com
 - [ ] App Store screenshots uploaded
@@ -48,6 +48,10 @@ workspace root, to print the automated dashboard.
 7. Track App Review status: Waiting for Review, In Review, Rejected, or Approved.
 8. If approved, manually release by default.
 9. Verify the public App Store listing, install path, live URLs, and first-launch flow.
+
+## Current blockers
+
+- [ ] Smoke test visual layout failure on build 21: iPhone bidding/game screen clips horizontally, score counters overflow past the right edge, bid modal is too wide/tall for the viewport, bottom hand is partially cut off, and the Report Bug button truncates. A local web fix is implemented; do not mark smoke test complete until it is deployed to `1v1spades.com` and verified on device.
 
 ## App Review notes draft
 

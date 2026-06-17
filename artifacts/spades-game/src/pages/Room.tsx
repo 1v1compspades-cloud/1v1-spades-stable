@@ -868,7 +868,7 @@ export default function Room() {
           // relative + z-[110] keeps the score row above the bidding modal
           // backdrop (z-[100]) so the bottom-player score stays visible while
           // bidding. The modal itself stays centered between the two rows.
-          "spades-seat-bar relative z-[110] flex w-full max-w-full min-w-0 items-center justify-between gap-2 px-2.5 sm:px-4 py-2.5 sm:py-3 border-y backdrop-blur-sm transition-shadow overflow-hidden",
+          "spades-seat-bar relative z-[110] flex w-full max-w-full min-w-0 flex-col items-stretch gap-1.5 px-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-2 sm:px-4 py-2 sm:py-3 border-y backdrop-blur-sm transition-shadow overflow-hidden",
           isActive
             ? "border-primary/60 shadow-[inset_0_0_0_1px_hsla(35,90%,55%,0.5),0_0_12px_-2px_hsla(35,90%,55%,0.35)]"
             : "border-border",
@@ -877,7 +877,7 @@ export default function Room() {
       >
         <div className="flex flex-1 items-center gap-2 sm:gap-3 min-w-0">
           <div className="flex min-w-0 shrink flex-col leading-tight">
-            <span className="text-xs text-muted-foreground uppercase tracking-wider">
+            <span className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">
               {seatLabel}{isMe ? " · You" : ""}
             </span>
             <span className="font-bold font-serif truncate max-w-[6.5rem] sm:max-w-[10rem]">
@@ -924,13 +924,13 @@ export default function Room() {
         </div>
 
         {gameState.phase !== "waiting" && (
-          <div className="flex shrink-0 gap-2 sm:gap-5 text-right">
-            <div className="flex flex-col items-center">
-              <span className="text-muted-foreground text-[10px] uppercase tracking-wider">Bid</span>
+          <div className="flex shrink-0 justify-end gap-3 sm:gap-5 text-right">
+            <div className="flex min-w-[3rem] flex-col items-center">
+              <span className="text-muted-foreground text-[9px] sm:text-[10px] uppercase tracking-wider">Bid</span>
               <span className="text-lg sm:text-xl font-bold font-mono">{bid !== null ? bid : "—"}</span>
             </div>
-            <div className="flex flex-col items-center">
-              <span className="text-muted-foreground text-[10px] uppercase tracking-wider">Tricks</span>
+            <div className="flex min-w-[3rem] flex-col items-center">
+              <span className="text-muted-foreground text-[9px] sm:text-[10px] uppercase tracking-wider">Tricks</span>
               <span className={`text-lg sm:text-xl font-bold font-mono ${bid !== null && tricks > bid ? "text-yellow-400" : tricks === bid && bid !== null ? "text-green-400" : ""}`}>
                 {tricks}
               </span>
@@ -1301,7 +1301,7 @@ export default function Room() {
       : "You";
 
     return (
-      <div className="spades-table-surface flex-1 flex flex-col items-center justify-center relative overflow-hidden px-2">
+      <div className="spades-table-surface flex min-h-[18rem] flex-none flex-col items-center justify-center relative overflow-hidden px-2 py-3 sm:min-h-0 sm:flex-1 sm:py-0">
         {/* Top seat hidden hand (always hidden — even players don't see opponent's cards) */}
         <div className="absolute top-3 sm:top-4 flex justify-center w-full pointer-events-none">
           <div className="flex items-center gap-2">
@@ -1428,7 +1428,7 @@ export default function Room() {
               aria-hidden="true"
             />
             <div
-              className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto pointer-events-none"
+              className="fixed inset-0 z-[120] flex items-end justify-center overflow-y-auto pointer-events-none sm:items-center"
               style={{
                 paddingTop: "max(1rem, env(safe-area-inset-top))",
                 paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
@@ -1437,8 +1437,8 @@ export default function Room() {
               }}
               data-testid="bidding-overlay"
             >
-              <div className="bg-card border border-border p-5 rounded-xl shadow-2xl space-y-3 max-w-sm w-full text-center my-auto max-h-[80vh] overflow-y-auto pointer-events-auto">
-                <h3 className="text-lg font-serif text-primary">Place your bid</h3>
+              <div className="bg-card border border-border p-3 sm:p-5 rounded-t-2xl sm:rounded-xl shadow-2xl space-y-2.5 sm:space-y-3 w-full max-w-[calc(100vw-0.75rem)] sm:max-w-sm text-center max-h-[72dvh] sm:max-h-[80vh] overflow-y-auto pointer-events-auto">
+                <h3 className="text-base sm:text-lg font-serif text-primary">Place your bid</h3>
                 {gameState.bids[0] === null && gameState.bids[1] === null && (
                   <p className="text-[11px] uppercase tracking-widest text-primary/80">
                     You bid first this round (Round {gameState.roundNumber})
@@ -1449,12 +1449,12 @@ export default function Room() {
                     You bid second this round
                   </p>
                 )}
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[11px] sm:text-xs text-muted-foreground">
                   You have {gameState.hand.length} cards. Bid 0 for Nil (+/−100).
                 </p>
                 <div
                   data-testid="bid-buttons"
-                  className="grid grid-cols-5 sm:grid-cols-7 gap-1.5 w-full"
+                  className="grid grid-cols-7 gap-1.5 w-full"
                 >
                   {Array.from({ length: 14 }).map((_, i) => {
                     const val = i.toString();
@@ -1466,7 +1466,7 @@ export default function Room() {
                         data-testid={`bid-btn-${i}`}
                         onClick={() => setBidAmount(val)}
                         className={cn(
-                          "min-h-[44px] rounded-lg border text-sm font-bold tabular-nums transition-colors",
+                          "min-h-[38px] sm:min-h-[44px] rounded-lg border text-sm font-bold tabular-nums transition-colors",
                           selected
                             ? "bg-primary text-primary-foreground border-primary shadow-md"
                             : "bg-white/[0.04] text-foreground border-white/20 hover:bg-white/[0.08] active:bg-white/10"
@@ -1479,11 +1479,11 @@ export default function Room() {
                 </div>
                 {/* Sticky so the Confirm button stays pinned and tappable even
                     if the panel scrolls internally on very short screens. */}
-                <div className="sticky bottom-0 -mx-5 -mb-5 px-5 pt-2 pb-4 bg-card">
+                <div className="sticky bottom-0 -mx-3 -mb-3 px-3 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:-mx-5 sm:-mb-5 sm:px-5 sm:pb-4 bg-card">
                   <Button
                     onClick={handleBid}
                     disabled={!bidAmount || isSubmitting}
-                    className="mx-auto block h-auto min-h-[44px] w-full max-w-[200px] px-6 py-2.5 text-base"
+                    className="mx-auto block h-auto min-h-[42px] sm:min-h-[44px] w-full max-w-[220px] px-6 py-2.5 text-base"
                     data-testid="button-confirm-bid"
                   >
                     {bidAmount ? `Bid ${bidAmount === "0" ? "Nil" : bidAmount}` : "Select a bid first"}
@@ -2245,7 +2245,7 @@ export default function Room() {
 
   if (spectator && gameState.phase === "waiting") {
     return (
-      <div className="spades-screen h-[100dvh] flex flex-col bg-background overflow-hidden relative">
+      <div className="spades-screen min-h-[100dvh] sm:h-[100dvh] flex flex-col bg-background overflow-y-auto overflow-x-hidden sm:overflow-hidden relative">
         {renderStatusPill()}
         {renderOpponentOffline()}
         {renderQueuePanel()}
@@ -2256,7 +2256,7 @@ export default function Room() {
   }
 
   return (
-    <div className="spades-screen h-[100dvh] flex flex-col bg-background overflow-hidden relative">
+    <div className="spades-screen min-h-[100dvh] sm:h-[100dvh] flex flex-col bg-background overflow-y-auto overflow-x-hidden sm:overflow-hidden relative">
       {renderStatusPill()}
       {renderOpponentOffline()}
       {!spectator && gameState.phase === "waiting" ? (

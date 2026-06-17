@@ -26,7 +26,7 @@ export function CardComponent({ card, hidden, className, onClick, disabled, sele
     return (
       <div
         className={cn(
-          "spades-card-back relative flex-shrink-0 w-[4.35rem] h-[6.25rem] sm:w-24 sm:h-36 rounded-xl border-2 shadow-md flex items-center justify-center overflow-hidden",
+        "spades-card-back relative flex-shrink-0 w-[3.85rem] h-[5.55rem] sm:w-24 sm:h-36 rounded-xl border-2 shadow-md flex items-center justify-center overflow-hidden",
           "after:absolute after:inset-2 after:rounded-lg after:border after:border-primary/25",
           className
         )}
@@ -46,8 +46,8 @@ export function CardComponent({ card, hidden, className, onClick, disabled, sele
       aria-label={`${card.rank} of ${card.suit}`}
       className={cn(
         // Compact mobile card so a horizontal hand strip fits on one row.
-        // 64×88 mobile is still a solid tap target; sm: bumps back to 96×144.
-        "spades-card-face relative flex-shrink-0 w-[4.35rem] h-[6.25rem] sm:w-24 sm:h-36 rounded-xl border border-amber-200/70 shadow-md flex flex-col items-center justify-center p-1.5 select-none transition-transform duration-150",
+        // Compact mobile card keeps the 13-card hand usable in a WebView.
+        "spades-card-face relative flex-shrink-0 w-[3.85rem] h-[5.55rem] sm:w-24 sm:h-36 rounded-xl border border-amber-200/70 shadow-md flex flex-col items-center justify-center p-1.5 select-none transition-transform duration-150",
         // Suit-tinted left edge bar for fast scanning even when fanned
         "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1.5 before:rounded-l-xl",
         card.suit === "spades"   && "before:bg-slate-900",
@@ -69,19 +69,19 @@ export function CardComponent({ card, hidden, className, onClick, disabled, sele
     >
       {/* Top-left corner index: rank stacked over suit */}
       <div className="absolute top-1 left-2 flex flex-col items-center leading-[0.85]">
-        <span className="text-base sm:text-lg font-bold font-serif tabular-nums">{card.rank}</span>
+        <span className="text-sm sm:text-lg font-bold font-serif tabular-nums">{card.rank}</span>
         <span className="text-sm sm:text-base">{symbol}</span>
       </div>
 
       {/* Center: large stacked value over suit — the dominant face */}
       <div className="flex flex-col items-center justify-center leading-none pointer-events-none">
-        <span className="text-3xl sm:text-4xl font-bold font-serif tabular-nums drop-shadow-sm">{card.rank}</span>
-        <span className="text-3xl sm:text-4xl mt-0.5 drop-shadow-sm">{symbol}</span>
+        <span className="text-2xl sm:text-4xl font-bold font-serif tabular-nums drop-shadow-sm">{card.rank}</span>
+        <span className="text-2xl sm:text-4xl mt-0.5 drop-shadow-sm">{symbol}</span>
       </div>
 
       {/* Bottom-right corner index (rotated) */}
       <div className="absolute bottom-1 right-2 flex flex-col items-center leading-[0.85] rotate-180">
-        <span className="text-base sm:text-lg font-bold font-serif tabular-nums">{card.rank}</span>
+        <span className="text-sm sm:text-lg font-bold font-serif tabular-nums">{card.rank}</span>
         <span className="text-sm sm:text-base">{symbol}</span>
       </div>
     </button>
