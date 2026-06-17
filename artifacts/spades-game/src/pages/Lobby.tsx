@@ -77,6 +77,13 @@ export default function Lobby() {
   };
   const savedPlayerSession = savedRoomCode ? getSavedPlayerSession(savedRoomCode) : null;
   const canReconnectToCurrentGame = !!savedRoomCode && !!savedPlayerSession;
+  const activeGameMessage = "You are already in a game. Reconnect or forfeit first.";
+
+  const blockIfActiveGame = (): boolean => {
+    if (!canReconnectToCurrentGame) return false;
+    toast({ description: activeGameMessage, variant: "destructive" });
+    return true;
+  };
 
   useEffect(() => {
     connect();
@@ -107,6 +114,7 @@ export default function Lobby() {
 
   const handleCreate = async (): Promise<void> => {
     if (!nameInput.trim()) { toast({ description: "Please enter your name", variant: "destructive" }); return; }
+    if (blockIfActiveGame()) return;
     setIsCreating(true);
     try {
       savePlayerName(nameInput);
@@ -150,6 +158,7 @@ export default function Lobby() {
       saveIsSpectator(false);
       const code = joinCodeInput.toUpperCase();
       if (matchMode === "custom") {
+        if (blockIfActiveGame()) return;
         // Join the tournament lobby, then navigate to the tournament page.
         // If we already have a token cached for this code (e.g. reconnect from
         // the same browser), pass it so the server treats this as the same
@@ -168,6 +177,7 @@ export default function Lobby() {
           setLocation(`/room/${code}?reconnect=1&seat=${savedSession.seat}`);
           return;
         }
+        if (blockIfActiveGame()) return;
         const res = await joinRoom(code, nameInput);
         if (res.playerIndex !== undefined) {
           saveRoomCode(code);

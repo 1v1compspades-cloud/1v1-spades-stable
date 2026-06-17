@@ -111,6 +111,7 @@ export default function Room() {
     playerIndex, isSpectator,
     savePlayerName,
     saveRoomCode, savePlayerIndex, saveIsSpectator,
+    clearStorage,
     getPlayerToken, savePlayerToken, clearPlayerToken,
   } = useGameStorage();
   const { toast } = useToast();
@@ -118,6 +119,7 @@ export default function Room() {
   const [bidAmount, setBidAmount] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [forfeitConfirmOpen, setForfeitConfirmOpen] = useState(false);
   const [spectatorNameInput, setSpectatorNameInput] = useState<string>("");
   // Dev/host Fast Finish test tool: opens a confirm overlay with a winner pick.
   const [fastFinishOpen, setFastFinishOpen] = useState(false);
@@ -587,6 +589,23 @@ export default function Room() {
   const handleStartGame = () => startGame(roomCode!);
   const handleNextRound = () => nextRound(roomCode!);
   const handleNewMatch  = () => newMatch(roomCode!);
+  const activeForfeitPhase =
+    gameState.phase === "bidding" ||
+    gameState.phase === "playing" ||
+    gameState.phase === "round_over";
+  const canForfeit =
+    !spectator &&
+    playerIndex !== null &&
+    activeForfeitPhase;
+
+  const handleConfirmForfeit = () => {
+    if (!roomCode || playerIndex === null) return;
+    clearPlayerToken(roomCode, playerIndex);
+    clearStorage();
+    toast({ description: "You forfeited this game. Your active session was cleared." });
+    setForfeitConfirmOpen(false);
+    setLocation("/");
+  };
 
   // KotT queue actions (spectators only).
   const isKingMode = gameState?.mode === "king";
@@ -2460,6 +2479,55 @@ export default function Room() {
     </button>
   );
 
+  const renderForfeitControl = () =>
+    canForfeit ? (
+      <>
+        <button
+          type="button"
+          onClick={() => setForfeitConfirmOpen(true)}
+          data-testid="button-forfeit"
+          className="absolute bottom-[calc(env(safe-area-inset-bottom)+6.5rem)] left-3 z-[55] px-3 py-1.5 rounded-full border border-red-500/45 bg-black/75 text-red-200 text-[10px] font-semibold uppercase tracking-widest backdrop-blur-sm shadow-lg hover:bg-red-500/10 active:scale-95 transition"
+        >
+          Forfeit
+        </button>
+        {forfeitConfirmOpen && (
+          <div
+            className="fixed inset-0 z-[140] flex items-center justify-center bg-black/75 p-4"
+            data-testid="forfeit-confirm-overlay"
+            onClick={() => setForfeitConfirmOpen(false)}
+          >
+            <div
+              className="bg-card border border-red-500/35 rounded-xl shadow-2xl p-5 max-w-sm w-full space-y-4 text-center"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <h3 className="font-serif text-xl text-primary">Forfeit game?</h3>
+              <p className="text-sm text-muted-foreground">
+                Are you sure you want to forfeit this game?
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setForfeitConfirmOpen(false)}
+                  data-testid="button-forfeit-cancel"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleConfirmForfeit}
+                  data-testid="button-forfeit-confirm"
+                >
+                  Forfeit
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    ) : null;
+
   // Host Fast Finish / End Game test tool. ADMIN-ONLY: shown ONLY to a socket
   // unlocked with the secret host key (the streamer/host, even when spectating
   // a KotT/tournament table). There is deliberately NO dev/preview path —
@@ -2569,6 +2637,7 @@ export default function Room() {
           {renderTable()}
           {renderPlayerInfo(bottomIndex)}
           {spectator ? renderSpectatorFooter() : renderMyHand()}
+          {renderForfeitControl()}
           {showHostResetFab && renderHostResetFab()}
           {canFastFinish && renderFastFinishTool()}
         </>
