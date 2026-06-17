@@ -8,7 +8,10 @@
     "dev:lan": "expo start --dev-client --host lan --port 8081",
     "build": "node scripts/build.js",
     "serve": "node server/serve.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "appstore:status": "node scripts/app-store-status.mjs",
+    "appstore:check": "tsc -p tsconfig.json --noEmit && node scripts/app-store-status.mjs",
+    "appstore:submit-latest": "eas submit --platform ios --profile production --latest --non-interactive"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
