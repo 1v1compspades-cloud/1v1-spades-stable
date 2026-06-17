@@ -1,0 +1,47 @@
+Do not make broad new changes. The previous June 1 bug-fix pass is complete and tests are passing.
+
+Run a targeted post-fix verification for reconnect identity and tournament host permissions.
+
+Specifically verify:
+
+1. Reconnect identity / “YOU” label
+- Reproduce the OgSoloSpader vs Shank case:
+  - OgSoloSpader wins 270–127.
+  - OgSoloSpader’s session should show “You Won.”
+  - Shank’s session should show “You Lost.”
+- Refresh/reconnect both sessions after game over.
+- Try opening or joining another tournament/lobby from one browser, then return to the completed match.
+- Confirm the browser does not swap identity from OgSoloSpader to Shank.
+- Confirm the “YOU” label stays attached to the correct player.
+- Confirm the win/loss message is based on official winnerId vs the room-specific player token.
+- Confirm player identity is scoped per tournamentCode/matchId/roomCode, not one global currentPlayer value.
+
+2. Tournament host vs room host
+- Confirm tournamentAdminHost never changes after tournament creation.
+- Confirm roomHost/matchHost/start-button ownership does not grant tournament admin permissions.
+- Confirm a match winner or next-round player may be allowed to start their own match room only if intended, but they cannot use tournament admin tools.
+- Confirm Grace-style behavior cannot become a real admin transfer.
+- Server-side host/admin actions must reject non-host tokens.
+
+3. Next-round join
+- Complete a 4-player tournament from start to champion.
+- Confirm both semifinal winners can join finals.
+- Confirm Join button routes to the correct finals room.
+- Confirm no dead Join button.
+
+4. Disconnect/back button
+- Disconnect or refresh during a live match.
+- Press Back.
+- Confirm it returns to the active game, not generic lobby.
+- Confirm player seat and host identity are preserved.
+
+5. Final report only
+Do not implement changes unless a critical failure is found.
+Report:
+A) build/checkpoint tested
+B) whether reconnect identity passed
+C) whether tournament host permissions passed
+D) whether next-round join passed
+E) whether disconnect/back-to-game passed
+F) any remaining risks
+G) Go / No-Go recommendation for June 1

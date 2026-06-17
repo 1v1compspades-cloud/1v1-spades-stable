@@ -1,0 +1,74 @@
+Fix the gameplay UI bug where the bid box / bidding controls cover the bottom player's score.
+
+Important:
+This should be a low-risk CSS/layout fix only.
+Do not change game logic, scoring logic, bid validation, sockets, tournament advancement, room state, timers, or card-play rules.
+
+Problem:
+On mobile/tablet gameplay view, the bottom player's bidding box overlaps the bottom player's score area. The score becomes hard to see or blocked. Also make sure the bidding area remains usable, scrollable if needed, and is not blurred out or hidden behind overlays.
+
+Goals:
+1. Bottom player score must always be visible.
+2. Bid controls must never cover the score.
+3. Bid controls must still be clickable/tappable.
+4. Bid controls must still scroll if the screen is small.
+5. Bid controls must not be blurred, faded, clipped, or hidden behind another layer.
+6. Fix should work in normal 1v1 rooms and tournament rooms.
+
+Implementation requirements:
+- Find the gameplay component/layout that renders:
+  - player score / scoreboard
+  - bottom player area
+  - bid box / bidding controls
+  - mobile action panel or bottom control panel
+- Adjust CSS/layout so the score has reserved space above the bid controls.
+- If the bid box is absolutely/fixed positioned, make sure it is offset below the score or moved into a normal layout flow.
+- Add padding/margin/gap between the bottom score display and bidding panel.
+- Use a safe z-index hierarchy:
+  - score should be visible above background/game board
+  - bid controls should be visible and interactive
+  - no overlay should blur or cover either one
+- If the bid controls are inside a scroll container, preserve:
+  - overflow-y: auto
+  - max-height appropriate for mobile
+  - -webkit-overflow-scrolling: touch
+- Do not use backdrop-filter or blur on the bid panel.
+- Do not set pointer-events: none on the bid controls or parent container.
+- Do not hide the score during bidding.
+
+Responsive behavior:
+At small screen widths, especially mobile portrait:
+- Keep bottom player score visible.
+- Move bid box below the score or into a separate bottom action area.
+- Allow bid buttons to wrap into multiple rows if needed.
+- If vertical space is tight, make only the bid panel scroll, not the entire game unusable.
+- Cards should still remain playable after bidding.
+
+Test these widths:
+- 390px mobile portrait
+- 430px large iPhone portrait
+- 768px tablet
+- desktop
+
+Acceptance checks:
+1. Start a normal 1v1 game.
+2. Reach bidding phase.
+3. Confirm bottom player's score is visible while bid controls are open.
+4. Confirm bid buttons are clickable.
+5. Confirm bid panel can scroll on small screens if needed.
+6. Confirm score is not blurred, dimmed, clipped, or behind the bid box.
+7. Confirm tournament room bidding view has the same fix.
+8. Confirm no gameplay or tournament tests broke.
+
+After changes, run:
+npm test
+npm run typecheck
+
+If available, also run:
+npm run build
+
+Report:
+- files changed
+- what CSS/layout was adjusted
+- test results
+- whether mobile 390px and 430px were checked

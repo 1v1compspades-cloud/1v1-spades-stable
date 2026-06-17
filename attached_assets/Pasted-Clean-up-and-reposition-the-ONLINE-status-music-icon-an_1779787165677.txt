@@ -1,0 +1,208 @@
+Clean up and reposition the ONLINE status, music icon, and Last Hand Played UI on mobile.
+
+Current problems:
+1. The ONLINE signal is cluttered and overlapping/too close to the BID/TRICKS area.
+2. The music icon is too close to the top-right gameplay UI.
+3. The Last Hand Played box is now centered, but make sure it stays clean and aligned with the center card area.
+
+Do not change game logic, bidding, scoring, turns, trick resolution, cards, or multiplayer behavior. This is UI/layout only.
+
+ONLINE STATUS REQUIREMENTS:
+- Move ONLINE into a small clean pill at the very top-right of the screen.
+- It should sit above the opponent stat row, not inside the BID/TRICKS area.
+- It must never overlap BID, TRICKS, card count, score boxes, player names, or card areas.
+- Make it compact:
+  - small green dot
+  - text ONLINE
+  - subtle dark background
+  - thin green border
+  - no big glow
+  - no oversized container
+
+MUSIC ICON REQUIREMENTS:
+- Move the music/sound icon away from the ONLINE badge and away from BID/TRICKS.
+- Put it as a floating button on the lower-right side of the screen.
+- Keep it above the mobile browser bottom bar.
+- Keep it away from the Reset Room button and player hand cards.
+- Make it about 38–42px wide on mobile.
+- It should not cover cards, buttons, score panels, or the last hand display.
+
+LAST HAND PLAYED REQUIREMENTS:
+- Keep Last Hand Played centered with the main card/table area.
+- It should show the previous completed trick only, not the current trick.
+- Format:
+  LAST HAND PLAYED
+  S1: [card]   S2: [card]
+- It should be centered horizontally in the play circle/table area.
+- Keep it compact and readable.
+- Do not place it on the far right anymore.
+- Do not overlap the current trick card slots.
+
+Use or adapt this CSS. If my existing class names are different, apply these styles to the current matching elements instead of creating duplicate UI.
+
+CSS:
+
+.online-status {
+  position: absolute;
+  top: max(8px, env(safe-area-inset-top));
+  right: 12px;
+  z-index: 40;
+
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  padding: 4px 8px;
+  border-radius: 999px;
+
+  background: rgba(5, 25, 18, 0.86);
+  border: 1px solid rgba(0, 255, 150, 0.35);
+
+  color: #caffdf;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+  line-height: 1;
+
+  box-shadow: none;
+  pointer-events: none;
+}
+
+.online-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #00e083;
+  flex-shrink: 0;
+}
+
+.music-floating-button,
+.music-icon,
+.sound-toggle {
+  position: fixed;
+  right: 12px;
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  z-index: 35;
+
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(8, 20, 16, 0.88);
+  border: 1px solid rgba(255, 180, 60, 0.35);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.last-hand-played {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 8%;
+  z-index: 10;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  padding: 7px 14px;
+  border: 1px solid rgba(255, 180, 60, 0.75);
+  border-radius: 10px;
+
+  background: rgba(10, 14, 16, 0.82);
+  color: white;
+
+  font-size: 12px;
+  line-height: 1.2;
+  pointer-events: none;
+  min-width: 180px;
+  max-width: 80%;
+}
+
+.last-hand-played-title {
+  color: #f5b84b;
+  font-weight: 800;
+  font-size: 10px;
+  letter-spacing: 3px;
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+
+.last-hand-played-cards {
+  display: flex;
+  gap: 22px;
+  justify-content: center;
+  align-items: center;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.top-player-panel,
+.opponent-panel,
+.seat-top {
+  position: relative;
+  padding-top: 32px;
+}
+
+@media (max-width: 768px) {
+  .online-status {
+    top: max(8px, env(safe-area-inset-top));
+    right: 12px;
+    padding: 4px 8px;
+    font-size: 9px;
+  }
+
+  .music-floating-button,
+  .music-icon,
+  .sound-toggle {
+    right: 12px;
+    bottom: calc(100px + env(safe-area-inset-bottom));
+    width: 38px;
+    height: 38px;
+  }
+
+  .last-hand-played {
+    bottom: 7%;
+    padding: 6px 12px;
+    min-width: 165px;
+    font-size: 11px;
+  }
+
+  .last-hand-played-title {
+    font-size: 9px;
+    letter-spacing: 2.5px;
+  }
+
+  .last-hand-played-cards {
+    gap: 18px;
+    font-size: 12px;
+  }
+}
+
+Logic requirement for Last Hand Played:
+Only update lastCompletedTrick after both players have played and the trick winner has been resolved. Do not update Last Hand Played when the first current card is played. The current trick and previous trick must stay separate.
+
+JSX/HTML structure should be similar to:
+
+<div className="online-status">
+  <span className="online-status-dot"></span>
+  <span>ONLINE</span>
+</div>
+
+<div className="last-hand-played">
+  <div className="last-hand-played-title">LAST HAND PLAYED</div>
+  <div className="last-hand-played-cards">
+    <span>S1: {lastCompletedTrick?.seat1 || "—"}</span>
+    <span>S2: {lastCompletedTrick?.seat2 || "—"}</span>
+  </div>
+</div>
+
+Final mobile layout goal:
+- ONLINE: tiny pill top-right, clean and above stats.
+- Music icon: floating lower-right, away from all score/bid UI.
+- Last Hand Played: centered inside the table/play area with the cards.
+- No overlapping UI.

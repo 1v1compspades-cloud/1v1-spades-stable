@@ -1,0 +1,62 @@
+URGENT security fix: admin/test tools are leaking to normal King of the Table players.
+
+Issue:
+In King of the Table, a second client opened in private Safari as a normal challenger/player was able to see the End Game admin/testing tool. Normal players, challengers, spectators, and room creators without a valid admin token must never see or use End Game, Fast Finish, Reset Room, Remake Room, Start New Match, or any admin/test controls.
+
+Goal:
+Admin/testing tools must be visible and usable only by true admin/host-token users. This must be enforced server-side, not just hidden in the UI.
+
+Requirements:
+1. Do not change gameplay rules, bidding, scoring, cards, timers, tournament advancement, or normal King of the Table winner/queue logic.
+2. This is a permission/security fix only.
+3. Audit all admin/test tools:
+   - End Game
+   - Fast Finish
+   - Reset Room
+   - Remake Room
+   - Start New Match
+   - Force Forfeit
+   - Mark Winner
+   - Reset Table
+   - Any dev-only test controls
+4. Normal players must never see these tools.
+5. Challengers must never see these tools.
+6. Spectators must never see these tools.
+7. A normal quick-match room creator must not automatically receive admin tools.
+8. A King of the Table King/challenger must not automatically receive admin tools.
+9. Tournament players must not receive admin tools.
+10. Only valid host/admin token users should see host/admin controls.
+11. Server/socket/API handlers must reject unauthorized admin actions with 403 Unauthorized or socket error.
+12. Do not rely only on frontend hiding.
+13. Strip hostToken/adminToken/dev/test params from all player, challenger, spectator, lobby, match, and KOTT invite links.
+14. If a non-admin route receives hostToken/adminToken in the URL, strip it before joining as player/challenger.
+15. Host/admin identity must stay isolated from player identity across normal Safari, private Safari, desktop, and second devices.
+16. Add logs when unauthorized users attempt admin/test actions.
+17. Add tests for permission isolation.
+
+Tests required:
+- KOTT host/admin can see admin tools only from valid host/admin view.
+- KOTT King without admin token cannot see End Game/Fast Finish/Reset tools.
+- KOTT challenger from private Safari cannot see End Game/Fast Finish/Reset tools.
+- KOTT spectator cannot see admin tools.
+- Normal quick-match player cannot see admin tools.
+- Tournament player cannot see admin tools.
+- Spectator cannot see admin tools.
+- Direct unauthorized socket/API call to End Game/Fast Finish/Reset is blocked.
+- Copied KOTT challenger link contains no hostToken/adminToken/playerToken/private session token/dev flag.
+- Copied tournament player/spectator links contain no host/admin tokens.
+- Valid host/admin token still allows approved host tools.
+
+Acceptance test:
+1. Create King of the Table as host/admin.
+2. Open challenger link in private Safari as second account.
+3. Confirm second account does not see End Game, Fast Finish, Reset, Remake, Start New Match, or admin tools.
+4. Try direct unauthorized End Game/Fast Finish socket/API call and confirm blocked.
+5. Confirm valid host/admin still has tools.
+6. Finish KOTT match and confirm normal KOTT flow still works:
+   - winner becomes/stays King
+   - loser sees Rejoin Queue / Back to KOTT Lobby / Leave
+   - Copy Challenger Link remains visible
+   - invite link stays token-free
+
+This is tournament/stream critical. Do not ship King of the Table until normal players cannot access admin/test tools.

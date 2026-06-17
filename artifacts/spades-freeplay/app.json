@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "Spades Free Play",
+    "slug": "spades-freeplay",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "spades-freeplay",
+    "userInterfaceStyle": "dark",
+    "primaryColor": "#d4af37",
+    "description": "Free, head-to-head Spades for two players. Create a room, invite an opponent, and play for fun.",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0b0b0d"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.oneononespades.freeplay",
+      "buildNumber": "24",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
+      }
+    },
+    "android": {
+      "package": "com.oneononespades.freeplay",
+      "versionCode": 1
+    },
+    "web": {
+      "favicon": "./assets/images/icon.png"
+    },
+    "plugins": [
+      "expo-dev-client",
+      [
+        "expo-router",
+        {
+          "origin": "https://1v1spades.com/"
+        }
+      ],
+      "expo-font",
+      "expo-web-browser",
+      "expo-notifications"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "9b64353d-700c-4be9-ac70-3101400335b8"
+      }
+    }
+  }
+}

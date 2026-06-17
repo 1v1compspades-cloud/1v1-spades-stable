@@ -1,0 +1,88 @@
+You are fixing only critical pre–June 1 tournament stability bugs. Do not redesign the app, do not change scoring rules, do not change tournament structure, and do not add major new systems. Keep changes minimal, targeted, and safe.
+
+Current known bugs to fix:
+
+1. Disconnect “Back” button bug
+- When a player disconnects or lands on the reconnect/disconnect screen, the Back button currently sends them to the main lobby/home page.
+- This causes them to lose their game/tournament context and sometimes prevents them from retaking their host/player spot.
+- Fix behavior so the button returns the user to the active game/match room if they have an active roomCode, matchId, tournamentCode, or reconnect token.
+- Only send them to the main lobby if there is no recoverable active game/tournament context.
+- Preserve host identity, player seat, roomCode, matchId, tournamentCode, and reconnect token through refresh/disconnect/back navigation.
+
+2. Pregame lobby disconnect stability
+- Investigate why people disconnect or lose their spot when leaving/rejoining the pregame lobby.
+- Make lobby rejoin idempotent: if the same player reconnects with the same token/name/session, they should reclaim their existing slot instead of creating a duplicate or being blocked.
+- Leaving the lobby temporarily, refreshing, or pressing back should not destroy their tournament slot unless they intentionally click a true “Leave Tournament” action.
+- Add clear separation between:
+  a) temporary disconnect / refresh
+  b) intentional leave tournament
+- Do not auto-remove players from tournament lobby just because they disconnect briefly.
+
+3. Bid button hidden under cards/hands
+- On mobile and smaller screens, the bid button is almost hidden underneath the player hand/cards.
+- Adjust layout/z-index/spacing so bid controls are always visible and tappable.
+- Do not shrink cards aggressively unless necessary.
+- Ensure bid controls sit above the hand area or in a fixed safe control zone.
+- Test portrait mobile layout specifically.
+
+4. Tournament invite issue
+- Tournament code works, but invite flow is still unreliable.
+- Fix tournament invite so invited players can join the correct tournament lobby/match using the tournamentCode.
+- Make sure invite links/buttons preserve tournamentCode and do not route users to the generic lobby accidentally.
+- If invite link contains a tournamentCode, it should open the tournament lobby directly.
+- Confirm multiple invited players can join the same tournament.
+
+5. Tournament next-round join bug
+- Tournament played well overall, but after advancing, the next-round “Join” button appeared and would not work.
+- Fix next-round match joining so when a player advances, their next match assignment correctly includes:
+  - tournamentCode
+  - round number
+  - matchId
+  - roomCode
+  - player token/session
+- The Join button should route directly into the correct next-round room.
+- If the next-round room is created lazily, make sure it exists before showing/enabling the Join button.
+- Add guardrails: if a join fails, show a useful error and offer “Retry Join Match,” not a dead button.
+
+6. Host transferred incorrectly
+- Bug: host control transferred to the winner/player in the next round. Grace had the button to start next even though she should not have been tournament host.
+- Tournament host identity must remain locked to the original host token/session for the entire tournament.
+- Winning a match must never grant tournament-host powers.
+- Player role and host role must be separate:
+  - Match winner = advances in bracket
+  - Tournament host = original host/admin only
+- Only the original host should see host-only controls like start next round, mark winner, reset/remake, force forfeit, etc.
+- Add validation server-side, not just UI hiding, so non-hosts cannot call host actions.
+
+7. Bracket score display improvement
+- Low-risk polish only: display the last round score on the bracket after a match completes.
+- Store or read completed match result score and show it near the winning/losing player names.
+- Example: “Shaw def. Grace 253–188”
+- Do not change scoring logic. Display only.
+- If score data is missing, fallback gracefully to “Winner advanced” instead of crashing.
+
+Important constraints:
+- Keep this as a June 1 stability patch.
+- Do not implement full tournament persistence yet.
+- Do not add bye support.
+- Do not change bracket sizes.
+- Do not touch core scoring unless required to display final score.
+- Do not rebuild the whole tournament engine.
+- Preserve current working tournament flow.
+- Make a checkpoint before changes named: pre-june-1-critical-bugfixes
+- After changes, run all existing tests.
+- Add/adjust tests for:
+  1. reconnect back button returns to game
+  2. lobby refresh reclaims same slot
+  3. bid button visible on mobile viewport
+  4. invite link opens correct tournament
+  5. next-round join button opens correct match
+  6. match winner does not become tournament host
+  7. only original host can use host actions
+
+After implementation, give me:
+- files changed
+- exact bugs fixed
+- tests run
+- any remaining risks
+- rollback checkpoint/commit

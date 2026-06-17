@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/spades-freeplay/"
+title = "Spades Free Play"
+version = "1.0.0"
+id = "artifacts/spades-freeplay"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/spades-freeplay/" ]
+localPort = 25718
+
+[services.development]
+run = "pnpm --filter @workspace/spades-freeplay run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/spades-freeplay", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/spades-freeplay", "run", "serve" ]
+
+[services.env]
+PORT = "25718"
+BASE_PATH = "/spades-freeplay/"

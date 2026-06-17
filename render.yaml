@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: spades-game
+    runtime: static
+    buildCommand: env CI=true corepack pnpm install --frozen-lockfile && env PORT=21046 BASE_PATH=/ corepack pnpm --filter @workspace/spades-game run build
+    staticPublishPath: artifacts/spades-game/dist/public
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

@@ -1,0 +1,84 @@
+Run a full production-readiness stability audit for my current deployed 1v1 Competitive Spades build.
+
+Goal:
+Give me a clear YES or NO for:
+1. Can I safely run King of the Hill / King of the Table tomorrow?
+2. Can I safely run the June 1 tournament?
+
+Do not change code yet unless I approve. First inspect and report.
+
+Check these areas:
+
+A) Build and deployment health
+- Confirm the current app builds successfully.
+- Confirm the deployed/live URL is using the intended stable build.
+- Confirm there are no TypeScript/build/runtime errors.
+- Confirm environment variables needed for production are present.
+- Confirm there are no obvious console/server errors on load.
+
+B) Core gameplay stability
+- Create or simulate a room.
+- Confirm players can join.
+- Confirm deal starts correctly.
+- Confirm bidding works.
+- Confirm cards can be played.
+- Confirm turn order works.
+- Confirm score updates.
+- Confirm hand/game completion works.
+- Confirm refresh/rejoin does not break the room when possible.
+
+C) Tournament mode stability
+- Create a 4-player test tournament.
+- Confirm all players can join.
+- Confirm bracket generates.
+- Confirm Round 1 match rooms are created.
+- Confirm winners advance.
+- Confirm finals/champion screen works.
+- Confirm host tools are visible and usable.
+- Confirm mark winner/force forfeit/remake room/pause/resume do not crash.
+- Confirm players have a way to return to bracket after matches.
+
+D) King of the Hill / King of the Table stability
+- Create a King of the Table lobby.
+- Confirm invite code/link works.
+- Confirm 3+ players can join.
+- Confirm the first match starts.
+- Confirm winner stays as king.
+- Confirm next challenger rotates in correctly.
+- Confirm a player leaving/disconnecting does not permanently break the lobby.
+- Confirm duplicate tabs/accounts do not corrupt the rotation, or report the risk clearly.
+
+E) Spectator/stream safety
+- Confirm spectator view does not expose hidden hands.
+- Confirm stream/watch view shows useful public information only.
+- Confirm score, bids, books, current player, and played cards are visible enough for viewers.
+- Confirm mobile layout is not broken.
+
+F) DNS/domain check
+- Confirm https://1v1spades.com works.
+- Confirm https://www.1v1spades.com works or report if DNS is still pending.
+- Confirm players can use the clean public link to join.
+
+G) Risk report
+Give me a final report with this exact format:
+
+KING OF THE TABLE TOMORROW: YES or NO
+Confidence percentage:
+Reason:
+Must-fix before running:
+Safe workarounds:
+
+JUNE 1 TOURNAMENT: YES or NO
+Confidence percentage:
+Reason:
+Must-fix before running:
+Safe workarounds:
+
+Top 5 remaining risks:
+1.
+2.
+3.
+4.
+5.
+
+Do not overstate confidence. If a risk is host-recoverable with host tools, say that. If a risk can kill the event, say that clearly.

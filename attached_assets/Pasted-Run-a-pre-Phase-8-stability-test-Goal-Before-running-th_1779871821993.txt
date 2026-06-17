@@ -1,0 +1,82 @@
+Run a pre-Phase-8 stability test.
+
+Goal:
+Before running the full Phase 8 smoke test, verify that the current tournament build is stable after Phase 6/Phase 7 work and identify any tournament blockers early.
+
+Do not add new features.
+Do not implement tournament persistence.
+Do not add schema files or migrations.
+Only fix issues if they are obvious tournament blockers and low-risk.
+
+Test these areas:
+
+1. App health
+- typecheck passes
+- app starts cleanly
+- no console/server errors on load
+- no obvious socket connection errors
+
+2. Tournament creation
+- create 4-player tournament
+- create 8-player tournament if fast
+- confirm bracket generates correctly
+- confirm host dashboard loads
+- confirm tournament code works
+
+3. Player join flow
+- player 1 joins correct match
+- player 2 joins correct match
+- refresh returns player to same assignment if supported
+- player does not get wrong seat
+- player cannot join opponent seat incorrectly
+
+4. Game flow
+- cards deal correctly
+- bidding works
+- turn order works
+- card play works
+- follow-suit validation still works
+- scoring updates
+- match can complete
+
+5. Bracket flow
+- match result records once
+- winner advances correctly
+- duplicate match result does not corrupt bracket
+- final/champion screen still works if tested
+
+6. Host tools
+- pause match
+- resume match
+- reset timer
+- remake room
+- mark winner
+- force forfeit
+- confirm audit log records admin actions
+
+7. Spectator/stream safety
+- spectator can watch a match
+- spectator refresh works
+- spectator does not receive hidden hands
+- stream/spectator route does not expose raw room state
+- Watch Live link works if already added
+
+8. Mobile layout
+- bid buttons visible
+- cards playable
+- no major overlap
+- last trick area readable
+- connection pill does not block gameplay
+
+9. Known risk checks
+- exact 4/8/16/32 bracket size enforcement still works
+- no bye support expected
+- no full tournament persistence expected
+- server restart still requires operational mitigation unless persistence is implemented later
+
+Return:
+- Green/Yellow/Red status for each area
+- any tournament blockers
+- low-risk fixes recommended before Phase 8
+- manual test checklist for me to run
+- whether we should proceed to Phase 8

@@ -1,0 +1,378 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-card-border: hsl(var(--card-border));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-popover-border: hsl(var(--popover-border));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --font-sans: var(--app-font-sans);
+  --font-serif: var(--app-font-serif);
+  --font-mono: var(--app-font-mono);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --app-font-sans: 'Inter', sans-serif;
+  --app-font-serif: 'Playfair Display', Georgia, serif;
+  --app-font-mono: 'Space Mono', monospace;
+  --radius: 0.5rem;
+
+  /* Black & Gold Casino Aesthetic */
+  --background: 40 8% 7%;        /* near-black warm charcoal */
+  --foreground: 45 22% 93%;      /* clean off-white */
+
+  --border: 40 8% 18%;
+  --input: 40 8% 18%;
+  --ring: 43 78% 53%;            /* gold */
+
+  --card: 40 9% 9%;              /* raised charcoal */
+  --card-foreground: 45 22% 93%;
+  --card-border: 43 45% 24%;     /* subtle gold-tinted edge */
+
+  --popover: 40 10% 8%;
+  --popover-foreground: 45 22% 93%;
+  --popover-border: 43 45% 24%;
+
+  --primary: 43 78% 53%; /* Rich Gold */
+  --primary-foreground: 40 30% 7%;
+
+  --secondary: 40 8% 15%;
+  --secondary-foreground: 45 22% 93%;
+
+  --muted: 40 8% 15%;
+  --muted-foreground: 42 10% 65%;
+
+  --accent: 43 78% 53%;
+  --accent-foreground: 40 30% 7%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+
+  --chart-1: 43 78% 53%;
+  --chart-2: 42 50% 40%;
+  --chart-3: 45 85% 60%;
+  --chart-4: 0 72% 51%;
+  --chart-5: 200 70% 50%;
+  
+  --sidebar: var(--background);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-border: var(--border);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-ring: var(--ring);
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);
+  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.5);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.6), 0 2px 4px -2px rgb(0 0 0 / 0.6);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.6), 0 4px 6px -4px rgb(0 0 0 / 0.6);
+}
+
+.dark {
+  /* Same as root since it's a dark-only game */
+  --background: 40 8% 7%;
+  --foreground: 45 22% 93%;
+
+  --border: 40 8% 18%;
+  --input: 40 8% 18%;
+  --ring: 43 78% 53%;
+
+  --card: 40 9% 9%;
+  --card-foreground: 45 22% 93%;
+  --card-border: 43 45% 24%;
+
+  --popover: 40 10% 8%;
+  --popover-foreground: 45 22% 93%;
+  --popover-border: 43 45% 24%;
+
+  --primary: 43 78% 53%; /* Rich Gold */
+  --primary-foreground: 40 30% 7%;
+
+  --secondary: 40 8% 15%;
+  --secondary-foreground: 45 22% 93%;
+
+  --muted: 40 8% 15%;
+  --muted-foreground: 42 10% 65%;
+
+  --accent: 43 78% 53%;
+  --accent-foreground: 40 30% 7%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply font-sans antialiased bg-background text-foreground selection:bg-primary selection:text-primary-foreground;
+    /* Casino black: gold-tinted top glow, deep vignette + soft noise overlay */
+    background-color: hsl(var(--background));
+    background-image:
+      radial-gradient(ellipse at 50% 0%, hsla(43, 78%, 53%, 0.10), transparent 55%),
+      radial-gradient(ellipse at 50% 120%, hsla(43, 60%, 40%, 0.06), transparent 55%),
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
+    background-attachment: fixed, fixed, fixed;
+    /* iPhone safe-area awareness for fixed/full-screen layouts */
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  #root {
+    min-height: 100dvh;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+}
+
+/* Utility: bottom safe-area padding for hand strip / bottom buttons */
+@layer utilities {
+  .pb-safe {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+  .pb-hand-safe {
+    /* ~96px breathing room + iPhone home indicator */
+    padding-bottom: calc(env(safe-area-inset-bottom) + 0.75rem);
+  }
+}
+
+/* ── Shuffle / deal animation (used by ShuffleOverlay during phase==="shuffling") ── */
+@keyframes shuffle-stack-in-left {
+  0%   { transform: translateX(-180px) rotate(-18deg); opacity: 0; }
+  20%  { opacity: 1; }
+  100% { transform: translateX(-44px) rotate(-6deg); opacity: 1; }
+}
+@keyframes shuffle-stack-in-right {
+  0%   { transform: translateX(180px) rotate(18deg); opacity: 0; }
+  20%  { opacity: 1; }
+  100% { transform: translateX(44px) rotate(6deg); opacity: 1; }
+}
+@keyframes shuffle-riffle-left {
+  0%   { transform: translateX(-44px) rotate(-6deg); }
+  50%  { transform: translateX(-6px)  rotate(-2deg); }
+  100% { transform: translateX(0)     rotate(0deg); }
+}
+@keyframes shuffle-riffle-right {
+  0%   { transform: translateX(44px)  rotate(6deg); }
+  50%  { transform: translateX(6px)   rotate(2deg); }
+  100% { transform: translateX(0)     rotate(0deg); }
+}
+@keyframes shuffle-cut {
+  0%   { transform: rotate(0deg)   translateY(0); }
+  35%  { transform: rotate(-14deg) translateY(-22px); }
+  65%  { transform: rotate(10deg)  translateY(-10px); }
+  100% { transform: rotate(0deg)   translateY(0); }
+}
+/* Kept-hand (You / Opponent) gold pulse during the discard moment. The deal
+   itself is driven by inline CSS transitions in ShuffleOverlay.tsx (reliable
+   dynamic transforms), so only this ambient glow lives here as a keyframe. */
+@keyframes deal-keep-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 197, 24, 0); }
+  50%      { box-shadow: 0 0 18px 3px rgba(245, 197, 24, 0.5); }
+}
+@keyframes shuffle-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes shuffle-fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+
+/* Spades premium table overlay system */
+@layer utilities {
+  .spades-screen {
+    background-color: hsl(var(--background));
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+    background-image:
+      radial-gradient(circle at 50% -10%, rgba(245, 197, 24, 0.16), transparent 36rem),
+      radial-gradient(circle at 18% 18%, rgba(8, 92, 65, 0.22), transparent 24rem),
+      radial-gradient(circle at 82% 14%, rgba(72, 44, 16, 0.18), transparent 22rem),
+      linear-gradient(135deg, rgba(255,255,255,0.025), transparent 32%, rgba(255,255,255,0.015));
+  }
+
+  .spades-gameplay-screen {
+    width: 100vw;
+    max-width: none;
+    min-height: 100dvh;
+    margin: 0;
+    box-sizing: border-box;
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  .spades-room-content {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    box-sizing: border-box;
+  }
+
+  .spades-game-board {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+  }
+
+  .spades-panel {
+    position: relative;
+    overflow: hidden;
+    border-color: rgba(245, 197, 24, 0.34);
+    background:
+      linear-gradient(180deg, rgba(30, 27, 20, 0.94), rgba(10, 9, 7, 0.96)),
+      radial-gradient(circle at top, rgba(245, 197, 24, 0.15), transparent 26rem);
+    box-shadow:
+      0 28px 90px -42px rgba(245, 197, 24, 0.55),
+      0 24px 80px -46px rgba(0, 0, 0, 0.9),
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      inset 0 -1px 0 rgba(0,0,0,0.75);
+  }
+
+  .spades-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(90deg, transparent, rgba(245, 197, 24, 0.14), transparent) top / 100% 1px no-repeat,
+      linear-gradient(90deg, transparent, rgba(245, 197, 24, 0.10), transparent) bottom / 100% 1px no-repeat;
+  }
+
+  .spades-table-surface {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+    background:
+      radial-gradient(ellipse at center, rgba(18, 91, 62, 0.56), rgba(6, 47, 35, 0.44) 44%, rgba(8, 7, 5, 0.76) 74%),
+      repeating-linear-gradient(45deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 9px);
+  }
+
+  .spades-table-pocket {
+    width: min(76vw, 24rem);
+    height: min(76vw, 24rem);
+    border: 1px solid rgba(245, 197, 24, 0.34);
+    background:
+      radial-gradient(circle at 50% 48%, rgba(15, 95, 64, 0.86), rgba(5, 44, 33, 0.88) 52%, rgba(6, 5, 4, 0.74) 100%),
+      repeating-radial-gradient(circle at center, rgba(245, 197, 24, 0.07) 0 1px, transparent 1px 18px);
+    box-shadow:
+      inset 0 0 0 10px rgba(245, 197, 24, 0.055),
+      inset 0 0 70px rgba(0,0,0,0.62),
+      0 30px 90px -55px rgba(245, 197, 24, 0.5);
+  }
+
+  .spades-seat-bar {
+    background:
+      linear-gradient(90deg, rgba(9, 8, 6, 0.94), rgba(31, 26, 17, 0.86), rgba(9, 8, 6, 0.94));
+    border-color: rgba(245, 197, 24, 0.2);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.055), inset 0 -1px 0 rgba(0,0,0,0.7);
+  }
+
+  .spades-hand-tray {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    background:
+      linear-gradient(180deg, rgba(10, 8, 5, 0.78), rgba(0,0,0,0.94)),
+      radial-gradient(ellipse at 50% 0%, rgba(245, 197, 24, 0.12), transparent 70%);
+    border-color: rgba(245, 197, 24, 0.28);
+  }
+
+  .spades-card-face {
+    background:
+      linear-gradient(135deg, #fffef8, #f8f1df 52%, #eee2c6),
+      radial-gradient(circle at 50% 18%, rgba(245, 197, 24, 0.18), transparent 34%);
+    box-shadow:
+      0 14px 26px -18px rgba(0,0,0,0.9),
+      inset 0 1px 0 rgba(255,255,255,0.95),
+      inset 0 0 0 1px rgba(132, 98, 28, 0.2);
+  }
+
+  .spades-card-face::after {
+    content: "";
+    position: absolute;
+    inset: 0.42rem;
+    border: 1px solid rgba(132, 98, 28, 0.18);
+    border-radius: 0.42rem;
+    pointer-events: none;
+  }
+
+  .spades-card-back {
+    border-color: rgba(245, 197, 24, 0.38);
+    background:
+      linear-gradient(135deg, rgba(245, 197, 24, 0.18), transparent 22%, rgba(245, 197, 24, 0.11) 52%, transparent),
+      repeating-linear-gradient(45deg, rgba(245, 197, 24, 0.16) 0 2px, rgba(10, 20, 24, 0.95) 2px 8px),
+      #111827;
+    box-shadow:
+      0 14px 28px -20px rgba(0,0,0,0.95),
+      inset 0 0 0 2px rgba(0,0,0,0.35),
+      inset 0 0 0 5px rgba(245, 197, 24, 0.08);
+  }
+
+  .spades-gold-button {
+    background: linear-gradient(180deg, #f7d15a, #d59a18);
+    color: #160f05;
+    border-color: rgba(255, 229, 137, 0.72);
+    box-shadow: 0 16px 32px -22px rgba(245, 197, 24, 0.8), inset 0 1px 0 rgba(255,255,255,0.45);
+  }
+
+  @media (max-width: 640px) {
+    .spades-table-pocket {
+      width: min(82vw, 18rem);
+      height: min(82vw, 18rem);
+    }
+  }
+
+  @media (min-width: 768px) {
+    .spades-gameplay-screen {
+      padding-left: max(1rem, env(safe-area-inset-left));
+      padding-right: max(1rem, env(safe-area-inset-right));
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .spades-gameplay-screen {
+      padding-left: max(2rem, env(safe-area-inset-left));
+      padding-right: max(2rem, env(safe-area-inset-right));
+    }
+  }
+}

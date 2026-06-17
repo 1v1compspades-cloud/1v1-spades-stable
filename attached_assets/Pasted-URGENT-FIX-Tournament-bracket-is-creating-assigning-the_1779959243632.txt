@@ -1,0 +1,130 @@
+URGENT FIX: Tournament bracket is creating/assigning the wrong next match after semifinals.
+
+Context:
+In a 4-player tournament, Grace and Kinzie played Semifinal 1. After that match, the system queued/opened “Semifinal 2” incorrectly instead of preserving the correct bracket flow. Expected next/finals flow should have been Grace vs Shaw based on bracket state, but the app created or assigned the wrong match room.
+
+Goal:
+Rewrite the tournament advancement logic so bracket progression is deterministic, idempotent, and cannot duplicate players into the wrong round.
+
+Fix requirements:
+
+1. Create one single safe advancement path
+Make sure natural game-over, host “mark winner,” force forfeit, and any admin winner action all call the SAME function.
+
+Suggested function name:
+recordTournamentMatchResultAndAdvance(tournamentCode, matchId, winnerPlayerId, loserPlayerId, source)
+
+2. Add hard validation before recording result
+Before advancing, validate:
+- tournament exists
+- match exists inside tournament
+- match status is not already completed
+- winnerPlayerId is one of match.player1Id or match.player2Id
+- loserPlayerId is the other player
+- winner and loser are not the same
+- match has both players unless it is an intentional bye
+- player cannot advance from a match they were not assigned to
+
+If validation fails, do NOT advance. Log error and return safe failure.
+
+3. Make match result idempotent
+If the same match result is submitted twice:
+- do not create another room
+- do not advance again
+- return the already-recorded match result
+- do not overwrite winner unless host explicitly resets the match first
+
+4. Fix 4-player bracket flow
+For a 4-player tournament:
+- Semifinal 1 is player 1 vs player 2
+- Semifinal 2 is player 3 vs player 4
+- Winner of Semifinal 1 goes to Finals slot 1
+- Winner of Semifinal 2 goes to Finals slot 2
+- Finals room is not playable until both semifinal winners exist
+- A semifinal winner should NEVER be placed into the other semifinal
+- A losing player should NEVER appear in finals
+
+5. Fix lazy room creation
+Lazy-created rooms must only be created from bracket feeder data.
+
+Correct logic:
+- If next match is finals and only one feeder winner exists, store winner in finals slot but DO NOT create/join playable room yet.
+- If both feeder winners exist, then create one finals room.
+- Before creating any room, check if a room already exists for that matchId.
+- Never create Semifinal 2 as a result of Semifinal 1 finishing. Semifinal 2 should already exist or be assigned from original bracket players.
+
+6. Lock advancement per tournament/match
+Prevent race conditions:
+- Use tournamentLocks or DB transaction lock around match result recording.
+- Lock key should include tournamentCode and matchId.
+- Only one advancement operation can run per match at a time.
+
+7. Repair match assignment / pendingAssignment
+When player refreshes or joins:
+- match_assigned must read from authoritative bracket match state
+- do not assign player to latest active room just because they are in tournament
+- only assign them to the match where their playerId is listed
+- if player has no active match, show bracket/waiting screen
+- if player already lost, show eliminated/bracket screen
+- if player is waiting for finals opponent, show “Waiting for other semifinal to finish”
+
+8. Add bracket integrity checker
+Add a helper:
+
+validateTournamentBracket(tournament)
+
+It should check:
+- no completed match has invalid winner
+- no player appears twice in same round
+- loser does not appear in later round
+- finals does not exist as playable room until both semifinal winners are set
+- match.roomCode matches matchId and not another match
+- every active room’s players match the bracket’s assigned players
+
+If invalid, host dashboard should show warning:
+“Bracket state mismatch detected. Use Remake Room or Manual Advance.”
+
+9. Add host recovery button if missing
+In host tools, add:
+- “Remake Current Match Room”
+- “Force Correct Match Assignment”
+- “Reset Match Result”
+- “Advance Winner”
+These should only be available to host/admin token.
+
+10. Add tests immediately
+Add or update tests for:
+
+A. 4-player normal flow:
+Players A, B, C, D.
+A beats B in Semifinal 1.
+C beats D in Semifinal 2.
+Finals becomes A vs C.
+
+B. Semifinal 1 finishing does not create Semifinal 2 using A or B.
+
+C. Same semifinal result submitted twice does not create duplicate finals room.
+
+D. Losing player cannot be assigned to finals.
+
+E. Refresh/rejoin after semifinal does not put winner into wrong semifinal.
+
+F. Host mark winner and natural game-over produce identical bracket state.
+
+G. Two semifinals finishing close together does not corrupt finals assignment.
+
+H. Player with no active match sees waiting/bracket screen, not wrong room.
+
+Implementation notes:
+- Do not rewrite gameplay engine.
+- Do not touch card logic, bidding, scoring, tricks, or timers unless directly required.
+- Focus only on tournament bracket progression, room creation, match assignment, and host recovery.
+- Preserve current 4/8/16/32 tournament support.
+- Keep existing roomCode behavior if possible.
+- Make this safe for June 1.
+
+After code changes:
+1. Run full test suite.
+2. Run 4-player tournament smoke test.
+3. Print final bracket state after each match result.
+4. Confirm no duplicate rooms and correct finals assignment.

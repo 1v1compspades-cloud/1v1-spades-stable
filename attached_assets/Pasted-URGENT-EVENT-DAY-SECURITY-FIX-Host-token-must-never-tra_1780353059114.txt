@@ -1,0 +1,72 @@
+URGENT EVENT-DAY SECURITY FIX: Host token must never transfer to players.
+
+Current issue:
+The tournament host token / host permissions are sometimes going to a random player. This means a normal player can get host functions. I need host functions to only belong to Mehdi/the original host, and never be passed to any player through invite links, joins, redirects, reconnects, localStorage, socket payloads, or room assignment.
+
+Goal:
+Lock host permissions so only the original tournament creator with the valid host token can access host tools/admin actions. Players should never receive host token or host controls.
+
+Critical requirements:
+1. Do NOT change gameplay, scoring, bidding, dealing, card logic, bracket advancement, match creation, or tournament engine.
+2. Do NOT build full account system right now.
+3. Do NOT build host-only mode right now unless absolutely required.
+4. Only fix host-token ownership/leakage and permission checks.
+
+Host token rules:
+1. Host token is generated only when the tournament is created.
+2. Host token belongs only to the creating browser/session.
+3. Host token must never be included in public invite links.
+4. Host token must never be sent in any player join response.
+5. Host token must never be broadcast over sockets.
+6. Host token must never be copied from one user/player to another.
+7. Host token must never be stored under a shared tournament code key that another player could reuse.
+8. Normal invite links should contain only tournament code/public join info, not host token.
+
+Server-side security:
+1. Every host/admin endpoint must require the valid host token.
+2. Validate the token server-side against the tournament’s stored host token before allowing:
+   - start tournament
+   - pause/resume
+   - reset timer
+   - remake room
+   - mark winner
+   - force forfeit
+   - copy/export host/admin data
+   - any host-only action
+3. If the token is missing, invalid, or belongs to another session, return 403 and do not perform the action.
+4. Client-side hiding is not enough; server must enforce.
+
+Client/UI behavior:
+1. Show Host Tools tab/buttons only if this browser has the valid host token.
+2. Players should see lobby/game/bracket only, not host controls.
+3. Spectators should never see host controls.
+4. If a player somehow has stale localStorage claiming host, clear it when server rejects validation.
+5. Add a simple “Validate host token” check when loading Host Tools. If invalid, show:
+   “Host access denied. This browser is not the tournament host.”
+
+Rejoin issue:
+Do not solve full rejoining with accounts today.
+For now:
+1. Keep current reconnect behavior as-is unless it is causing host-token leakage.
+2. Make sure reconnect/player restore never grants host permissions.
+3. Future plan: once accounts exist, user account IDs can own player identity/rejoin tokens separately from host tokens.
+
+Testing required:
+1. Create a 4-player tournament from Mehdi’s browser.
+2. Confirm only Mehdi’s browser sees Host Tools.
+3. Copy invite link and join from 3 other devices/browsers.
+4. Confirm none of the joined players see Host Tools.
+5. Confirm invite URL does not contain hostToken/adminToken.
+6. Refresh all player browsers.
+7. Confirm players still do not get Host Tools.
+8. Refresh Mehdi’s host browser.
+9. Confirm Mehdi still has Host Tools.
+10. Try calling start/admin action from a player browser with no token and confirm server returns 403.
+11. Start tournament and confirm spectator links appear after matches begin.
+12. Confirm hidden hands/cards are never exposed to host/spectators.
+
+Add a short audit note after fixing:
+- where host token is generated
+- where it is stored
+- what endpoints validate it
+- proof that invite links/player joins/socket payloads do not include it

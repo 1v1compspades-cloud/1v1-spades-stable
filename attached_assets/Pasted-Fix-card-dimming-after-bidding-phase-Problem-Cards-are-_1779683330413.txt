@@ -1,0 +1,50 @@
+Fix card dimming after bidding phase.
+
+Problem:
+Cards are readable during bidding now, but after bidding ends they are not undimming correctly. The player’s hand stays visually dim/gray even when it is their turn to play.
+
+Goal:
+After bidding is complete and the game phase changes to playing, the current player’s legal/playable cards must become fully bright and readable.
+
+Requirements:
+1. When phase changes from "bidding" to "playing", remove all bidding/disabled/dim classes from the player hand and cards.
+2. Do not leave any stuck classes like:
+   - bidding
+   - hand-disabled
+   - cards-disabled
+   - inactive-hand
+   - not-turn
+   - dimmed
+   - disabled
+   - waiting
+3. Recalculate playable cards immediately after bidding ends.
+4. If it is the player’s turn, legal cards should be fully bright and clickable.
+5. Illegal cards can be slightly visually marked, but still readable.
+6. If it is not the player’s turn, cards can be non-clickable, but do not make them unreadable.
+7. The card UI must update anytime these values change:
+   - phase
+   - currentPlayer
+   - biddingPlayer
+   - leadSuit
+   - played cards
+   - hand contents
+8. Make sure renderHand() or the equivalent card-rendering function runs after both players lock bids.
+9. Do not rely on old CSS classes staying on DOM elements. Clear old card classes before applying new state classes.
+
+Likely bug:
+The app is applying dim/disabled styling during bidding, but not removing it when phase becomes "playing".
+
+Fix approach:
+In the card rendering function, rebuild the card class list from scratch every render based on the current game state.
+
+Pseudo logic:
+- If phase === "bidding":
+  show all hand cards bright, but prevent playing.
+- If phase === "playing" && currentPlayer === mySeat:
+  show legal playable cards bright and clickable.
+- If phase === "playing" && currentPlayer !== mySeat:
+  show hand cards readable but non-clickable.
+- Never let bidding disabled styling carry into playing phase.
+
+Important:
+After bid phase ends, cards must immediately undim for the player whose turn it is.

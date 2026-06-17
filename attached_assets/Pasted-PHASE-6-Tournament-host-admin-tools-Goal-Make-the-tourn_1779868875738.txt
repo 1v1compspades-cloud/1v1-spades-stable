@@ -1,0 +1,77 @@
+PHASE 6 — Tournament host/admin tools
+
+Goal:
+Make the tournament easy to run live even when players disconnect, go AFK, crash, or need help.
+
+Do not expose admin controls to normal players or spectators.
+
+Admin/host tools to add:
+1. Host dashboard
+   - list all active tournament matches
+   - show player names
+   - show room code/link
+   - show match status: waiting, active, paused, completed, forfeited
+   - show connection status for each player
+   - show current score and round if available
+
+2. Match controls
+   - force start match
+   - pause match
+   - resume match
+   - remake room
+   - copy room link
+   - mark player as winner
+   - force forfeit player
+   - reset stuck timer
+   - manually advance bracket if needed
+
+3. Safety confirmations
+   - force forfeit requires confirmation dialog
+   - mark winner requires confirmation dialog
+   - reset/remake room requires confirmation dialog
+   - destructive actions should show player names clearly
+
+4. Audit logging
+   - every admin action logs:
+     - host/admin identifier
+     - action type
+     - match ID
+     - room ID
+     - affected player
+     - timestamp
+     - previous status
+     - new status
+
+5. Permissions
+   - only host/admin can access dashboard
+   - players cannot call admin routes/socket events
+   - spectators cannot call admin routes/socket events
+
+6. Bracket repair protection
+   - manual winner advance should be idempotent
+   - prevent double-advancing same match
+   - prevent two winners from one match
+   - if conflict exists, show error instead of silently changing bracket
+
+7. Mobile host usability
+   - host dashboard must be usable on phone
+   - buttons should be large enough
+   - match list should be clean and not cluttered
+
+Testing:
+- host force forfeits player
+- host marks winner
+- host pauses/resumes match
+- host remakes room
+- non-host tries admin action and gets blocked
+- duplicate winner submission does not corrupt bracket
+- admin action appears in audit log
+
+Return:
+- changed files
+- admin routes/events added
+- safety checks added
+- manual test checklist
+- any remaining risks
+
+Run typecheck and tests before summary.

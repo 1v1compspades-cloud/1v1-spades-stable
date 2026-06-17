@@ -1,0 +1,81 @@
+Fix King of the Table room capacity and move tournament UI labels into Tournament Mode only.
+
+CURRENT BUG:
+In King of the Table / KotT mode, a third player cannot join the room and gets “Room is full.”
+That is wrong. KotT needs more than 2 total users in the room because only 2 are active players, while everyone else should be challenger, queued player, or spectator.
+
+KING OF THE TABLE REQUIREMENTS:
+1. In normal 1v1 mode, keep the current 2-player room limit.
+2. In King of the Table mode, do NOT block the 3rd user from joining.
+3. KotT room structure should support:
+   - king: current defending player
+   - challenger: current opponent
+   - queue: waiting challengers
+   - spectators: users watching but not currently playing
+4. Only king and challenger should have active game controls.
+5. Users beyond the first 2 should join as queued challengers or spectators.
+6. Add clear role labels:
+   - King
+   - Challenger
+   - Up Next
+   - Spectator
+7. Do not let queued/spectator players bid, play cards, start game, or interfere with current match.
+8. When the challenger beats the king:
+   - challenger becomes new king
+   - old king moves out of active seat
+   - next queued player becomes challenger
+9. When the king wins:
+   - king stays king
+   - defeated challenger rotates out
+   - next queued player becomes challenger
+10. Preserve existing 1v1 spades gameplay, bidding, scoring, turn order, and trick logic.
+
+ROOM FULL FIX:
+Find the code that checks if room.players.length >= 2 or similar.
+Update it so that the 2-player limit only applies to standard 1v1 mode.
+For KotT mode, allow additional users and assign them to queue/spectator instead of rejecting them.
+
+Example logic:
+if room.mode !== "kingOfTheTable" and activePlayers.length >= 2:
+    reject with "Room is full"
+else if room.mode === "kingOfTheTable":
+    allow join and assign role based on availability
+
+TOURNAMENT UI CLEANUP:
+Move tournament labels, tournament mode buttons, bracket labels, and tournament-only controls into the Tournament Mode screen/lobby only.
+
+Requirements:
+1. Do not show tournament labels in normal 1v1 rooms.
+2. Do not show tournament labels in casual rooms.
+3. Tournament labels should appear only when:
+   - selectedMode === "tournament"
+   - room.mode === "tournament"
+   - or user is inside the tournament lobby/dashboard
+4. Create a clean Tournament Mode section with built-in labels/options:
+   - Tournament Lobby
+   - Bracket
+   - Players
+   - Match Format
+   - Race To Score
+   - Start Tournament
+   - Current Match
+   - Winner Advances
+5. Keep King of the Table separate from Tournament Mode.
+6. Keep KotT labels inside KotT only:
+   - King
+   - Challenger
+   - Queue
+   - Spectators
+   - Win Streak
+7. Make sure the homepage/mode select looks clean and not cluttered.
+
+IMPORTANT:
+Do not rewrite the whole app.
+Do not break existing working 1v1 mode.
+Only update room joining logic, mode-based role assignment, and conditional UI rendering.
+After the fix, test:
+- normal 1v1 room rejects 3rd player
+- KotT room allows 3rd/4th/5th user
+- only 2 players can play in KotT
+- tournament labels only appear inside tournament mode
+- no tournament clutter appears in normal games

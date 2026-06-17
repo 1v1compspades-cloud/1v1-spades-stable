@@ -1,0 +1,67 @@
+uploads = []
+
+[[generated]]
+id = "rHRMvt5LRT8GtlbLk9FaZ"
+uri = "file://attached_assets/generated_images/app_icon_for_a_4c1e.png"
+type = "image"
+title = "generated_image"
+
+[[outputs]]
+id = "jG2rOWET4LdsTqwcd2gTz"
+uri = "file://spades-multiplayer.tar.gz"
+type = "unspecified"
+title = "Spades Multiplayer — with invite links + spectator mode"
+
+[[outputs]]
+id = "nNFtPTQTiAP9vr6aNyUSi"
+uri = "file://solo-spades-v-mobile-card-polish.zip"
+type = "unspecified"
+title = "Spades — mobile card readability polish"
+
+[[outputs]]
+id = "fC9K314dXo4T5GiNkockm"
+uri = "file://solo-spades-v-mock-tourney-tools.zip"
+type = "unspecified"
+title = "Spades — Trick display + first-bidder leads"
+
+[[outputs]]
+id = "JYb6YhT4u-OrN3pw2Mr7P"
+uri = "file://artifacts/spades-game/public/audio/spades_lofi_loop.mp3"
+type = "audio"
+title = "spades_lofi_loop"
+
+[[outputs]]
+id = "kyhQhhmas1hgcsj8zJifI"
+uri = "file://attached_assets/phase-8-final-report.md"
+type = "text"
+title = "Phase 8 Final Report — june-1-stable"
+
+[[outputs]]
+id = "MxM-c9DHUh3LpF6jz9ODs"
+uri = "file://BUILD_LOCK.md"
+type = "text"
+title = "BUILD LOCK — june-1-stable"
+
+[[outputs]]
+id = "iNTy9s2B8Im2QUzqMKFEW"
+uri = "file://attached_assets/june-1-risk-assessment.md"
+type = "text"
+title = "June 1 Risk Assessment — ~92% confidence"
+
+[[outputs]]
+id = "dN2W0i9CsAWs8qKFKBRzP"
+uri = "file://artifacts/spades-freeplay/PHASE3_COMPLETE.md"
+type = "text"
+title = "Phase 3 Completion Summary"
+
+[[outputs]]
+id = "reAFnUnq4S0cWMjIXY4bo"
+uri = "file://artifacts/spades-freeplay/APP_STORE_CHECKLIST.md"
+type = "text"
+title = "App Store / TestFlight Readiness Checklist"
+
+[[outputs]]
+id = "OcwLeozTuD0nTtU6rk1UL"
+uri = "file://artifacts/spades-freeplay/TESTFLIGHT_SUBMISSION.md"
+type = "text"
+title = "Final TestFlight / App Store Submission Checklist"

@@ -1,0 +1,90 @@
+Add simple visitor analytics tracking to 1v1Spades.com without changing gameplay, tournament logic, sockets, bidding, scoring, room state, or bracket advancement.
+
+Goal:
+I need to see basic site traffic and investor-friendly numbers.
+
+Add a lightweight analytics system that tracks:
+- total page visits
+- unique visitors by anonymous browser ID
+- daily visitors
+- live users online in the last 5 minutes
+- most visited pages/routes
+- tournament lobby visits
+- tournament join attempts
+- game room visits
+- spectator visits
+- champion/bracket page visits if available
+- device type if easy: mobile / desktop / tablet
+- referrer/source if available
+
+Privacy rules:
+- Do not collect passwords.
+- Do not collect hidden cards/hands.
+- Do not collect payment info.
+- Do not collect private game state.
+- Do not collect exact GPS/location.
+- Anonymous visitor ID only.
+
+Implementation:
+1. Create a small analytics tracking endpoint:
+   POST /api/analytics/event
+
+2. Track events from the client:
+   - page_view
+   - tournament_lobby_view
+   - tournament_join_click
+   - game_room_view
+   - spectator_view
+   - champion_screen_view
+   - login_view
+   - signup_view if applicable
+
+3. Store analytics in the existing database if safe.
+   If no analytics table exists, create a minimal analytics_events table with:
+   - id
+   - anonymousVisitorId
+   - eventName
+   - path
+   - referrer
+   - userAgent
+   - deviceType
+   - tournamentCode optional
+   - roomCode optional
+   - createdAt
+
+4. Add a host/admin-only analytics dashboard page:
+   /admin/analytics
+
+Show:
+- visitors today
+- visitors last 7 days
+- total visits
+- unique visitors
+- live users now
+- top pages
+- tournament lobby views
+- join clicks
+- spectator views
+- champion screen views
+- simple daily chart/table
+
+5. Protect /admin/analytics behind the same host/admin token system already used for host tools.
+
+6. Make this low-risk:
+   - analytics failure must never break gameplay
+   - wrap all analytics calls in try/catch
+   - if tracking endpoint fails, silently continue
+   - no blocking UI
+   - no changes to core game/tournament engine
+
+7. Add tests if the project test setup supports it:
+   - analytics endpoint accepts valid event
+   - rejects invalid/oversized event
+   - admin analytics route requires host/admin access
+   - analytics failure does not crash client
+
+After implementation:
+- run typecheck
+- run tests
+- report files changed
+- report how I can view the analytics dashboard

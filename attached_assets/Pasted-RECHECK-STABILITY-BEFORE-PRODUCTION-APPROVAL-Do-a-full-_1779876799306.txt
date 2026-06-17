@@ -1,0 +1,72 @@
+RECHECK STABILITY BEFORE PRODUCTION APPROVAL
+
+Do a full stability audit of the current build before I approve deployment/migrations.
+
+Critical goal:
+Confirm the app is safe to publish and does not break tournament creation, invites, host tools, 1v1 match rooms, or card dealing.
+
+Run/check the following:
+
+1. Confirm current backup exists
+- Verify checkpoint/build exists:
+  1db9fd6859fbcc3e5c0116cda16e230cde57113c
+  alias: june-1-stable
+- Create a new checkpoint named:
+  pre-publish-stability-check
+
+2. Database migration safety
+- List every migration included in this publish.
+- Explain what tables/columns are changed.
+- Confirm whether these migrations are required for the latest fixes.
+- Confirm rollback risk:
+  - Can code rollback alone fix issues?
+  - Or would database rollback/restoration be required?
+- Do not apply production migrations until I explicitly approve.
+
+3. Tournament lobby capacity test
+- Create a 4-player tournament lobby.
+- Confirm host can add/invite 3 other players.
+- Create an 8-player tournament lobby.
+- Confirm host can add/invite more than 1 person.
+- Confirm lobby shows:
+  Players: X / bracketSize
+- Confirm add/invite disables only when full.
+- Confirm duplicate players cannot be added.
+
+4. Host tools visibility test
+- As tournament host, confirm Host Tools are visible before tournament start.
+- Confirm Host Tools are visible during tournament.
+- Confirm normal players/spectators cannot see Host Tools.
+- Confirm host token persists after refresh.
+- Confirm visible error appears if host token is missing instead of silently hiding tools.
+- Verify these tools exist:
+  pause/resume, reset timer, remake room, mark winner, force forfeit, audit log if available.
+
+5. Match room safety
+- Confirm tournament match rooms are still 1v1 only.
+- Confirm normal 1v1 quick match still works.
+- Confirm tournament lobby capacity logic does not affect individual match room max players.
+- Confirm no hidden hands/card values are exposed to spectators, host tools, or logs.
+
+6. Card animation test
+- Start one normal 1v1 match.
+- Start one tournament match.
+- Confirm the active game screen is using the new 1v1 four-pile deal animation.
+- Confirm 4 piles are visually dealt.
+- Confirm side hands are shown as discarded using card backs only.
+- Confirm no card faces are revealed during animation.
+- Confirm actual deal/gameplay logic is unchanged.
+
+7. Regression tests
+- Run the full test suite.
+- Report total passing/failing tests.
+- If any tests fail, stop and explain before publishing.
+- Specifically check tournament bracket advancement, match assignment, reconnect/refresh recovery, spectator view sanitization, and host admin actions.
+
+8. Production readiness verdict
+After all checks, give me one of these:
+- GREEN: safe to approve publish
+- YELLOW: safe only with specific warnings
+- RED: do not approve publish
+
+Do not make risky schema or persistence changes during this audit. Only inspect, test, and report unless a tiny obvious bug blocks testing.

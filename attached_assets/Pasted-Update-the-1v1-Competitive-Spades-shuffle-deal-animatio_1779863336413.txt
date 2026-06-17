@@ -1,0 +1,51 @@
+Update the 1v1 Competitive Spades shuffle/deal animation to use the same visual structure as 2v2 spades.
+
+Goal:
+In 1v1 mode, the deal animation should show 4 piles being dealt like a normal 2v2 spades table, then clearly show the two side hands being discarded.
+
+Requirements:
+
+1. Use 4 visual pile positions during the shuffle/deal animation:
+   - Left side pile
+   - Opponent/top pile
+   - Right side pile
+   - Dealer/bottom pile
+
+2. Keep the shuffle and cut animation on the dealer’s side.
+   - The dealer should visually control the shuffle.
+   - The cut should still appear near the dealer/deck area.
+
+3. Deal the cards around the table in normal spades order:
+   - Start dealing to the left pile
+   - Then top/opponent pile
+   - Then right pile
+   - Then bottom/dealer pile
+   - Repeat until all cards are dealt
+
+4. After the 4 piles are dealt, show that the side hands are discarded:
+   - Left pile and right pile should briefly glow/fade/dim
+   - Add a label over each side pile that says “Discarded”
+   - Then animate those two piles sliding/fading away into a discard zone
+   - Do not reveal the actual cards in those side piles
+
+5. The playable hands should remain:
+   - Top/opponent pile
+   - Bottom/dealer pile
+
+6. Add a small text explanation during the discard moment:
+   “Side hands discarded — 1v1 hands locked in”
+
+7. Do not change actual game logic unless needed.
+   - This is mostly a visual animation update.
+   - The real hands should still match the existing 1v1 deal logic.
+   - Side/discard hands should stay hidden by default.
+
+8. Make sure this works on mobile.
+   - Do not let the animation cover bidding buttons, player cards, score, or trick area.
+   - Use compact labels and smooth fade/slide animations.
+
+9. Keep the 2v2 shuffle animation unchanged.
+   - Only apply the discard-side-hands visual behavior when game mode is 1v1.
+
+Expected result:
+The player sees a normal 4-pile spades deal, understands that the left and right side hands are discarded, and then the match continues with only the top and bottom hands active.
