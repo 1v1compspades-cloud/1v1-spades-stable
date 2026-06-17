@@ -63,11 +63,20 @@ export default function Lobby() {
   const [adminKeyInput, setAdminKeyInput] = useState("");
   const [adminUnlocking, setAdminUnlocking] = useState(false);
   const savedRoomCode = storedRoomCode.toUpperCase().trim();
-  const savedPlayerToken =
-    savedRoomCode && storedPlayerIndex !== null
-      ? getPlayerToken(savedRoomCode, storedPlayerIndex)
-      : null;
-  const canReconnectToCurrentGame = !!savedRoomCode && storedPlayerIndex !== null && !!savedPlayerToken;
+  const getSavedPlayerSession = (code: string): { seat: 0 | 1; token: string } | null => {
+    const normalized = code.toUpperCase().trim();
+    if (!normalized) return null;
+    const seats: (0 | 1)[] = storedPlayerIndex !== null
+      ? [storedPlayerIndex, storedPlayerIndex === 0 ? 1 : 0]
+      : [0, 1];
+    for (const seat of seats) {
+      const token = getPlayerToken(normalized, seat);
+      if (token) return { seat, token };
+    }
+    return null;
+  };
+  const savedPlayerSession = savedRoomCode ? getSavedPlayerSession(savedRoomCode) : null;
+  const canReconnectToCurrentGame = !!savedRoomCode && !!savedPlayerSession;
 
   useEffect(() => {
     connect();
@@ -152,6 +161,13 @@ export default function Lobby() {
         return;
       }
       try {
+        const savedSession = getSavedPlayerSession(code);
+        if (savedSession && code === savedRoomCode) {
+          saveRoomCode(code);
+          savePlayerIndex(savedSession.seat);
+          setLocation(`/room/${code}`);
+          return;
+        }
         const res = await joinRoom(code, nameInput);
         if (res.playerIndex !== undefined) {
           saveRoomCode(code);
@@ -219,7 +235,10 @@ export default function Lobby() {
   };
 
   const handleReconnectToCurrentGame = (): void => {
-    if (!canReconnectToCurrentGame) return;
+    if (!savedPlayerSession) return;
+    saveRoomCode(savedRoomCode);
+    savePlayerIndex(savedPlayerSession.seat);
+    saveIsSpectator(false);
     setLocation(`/room/${savedRoomCode}`);
   };
 
