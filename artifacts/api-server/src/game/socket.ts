@@ -914,17 +914,18 @@ function forfeitActiveMatch(
     if (!state) return { ok: false, error: "Room not found" };
     if (state.phase === "game_over") return { ok: false, error: "Match is already over" };
     if (state.phase === "waiting") return { ok: false, error: "Match has not started yet" };
-    if (!state.players[0] || !state.players[1]) {
-      return { ok: false, error: "Both seats must be filled to forfeit" };
+    const forfeitingPlayer = state.players[forfeitSeat];
+    if (!forfeitingPlayer) {
+      return { ok: false, error: "Forfeiting player is not seated" };
     }
-    if (opts.actorSocketId && state.players[forfeitSeat]?.socketId !== opts.actorSocketId) {
+    if (opts.actorSocketId && forfeitingPlayer.socketId !== opts.actorSocketId) {
       return { ok: false, error: "Forfeiting player is not seated" };
     }
 
     const winnerSeat: 0 | 1 = forfeitSeat === 0 ? 1 : 0;
     const finalScores: [number, number] = [state.scores[0], state.scores[1]];
 
-    const forfeitedName = state.players[forfeitSeat]?.name ?? null;
+    const forfeitedName = forfeitingPlayer.name;
     const winnerName = state.players[winnerSeat]?.name ?? null;
     clearTurnTimer(roomCode);
     const finalState: GameState = {
@@ -2040,7 +2041,13 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           await withRoomLock(code, async () => {
             try {
               state = reconnectPlayer(code, data.playerIndex, socket.id, data.playerName);
-              armTurnTimer(io, state);
+              const activeActor: 0 | 1 | null =
+                state.phase === "bidding" ? state.currentBidder :
+                state.phase === "playing" ? state.currentTurnIndex :
+                null;
+              if (activeActor === data.playerIndex) {
+                armTurnTimer(io, state);
+              }
               await commit(state, {
                 action: "reconnect",
                 actorSeat: data.playerIndex,
