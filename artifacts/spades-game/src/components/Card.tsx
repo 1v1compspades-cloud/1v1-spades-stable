@@ -15,17 +15,17 @@ interface CardProps {
 // Four-color suit palette for clear visual distinction at a glance.
 // Each color is dark enough to read on the white card face.
 const SUIT_FACE_COLORS: Record<CardType["suit"], string> = {
-  spades:   "text-slate-900",
-  hearts:   "text-red-600",
-  clubs:    "text-emerald-700",
-  diamonds: "text-blue-700",
+  spades:   "text-black",
+  hearts:   "text-red-700",
+  clubs:    "text-emerald-800",
+  diamonds: "text-blue-800",
 };
 
 const SUIT_EDGE_COLORS: Record<CardType["suit"], string> = {
-  spades:   "before:bg-slate-900",
-  hearts:   "before:bg-red-600",
-  clubs:    "before:bg-emerald-700",
-  diamonds: "before:bg-blue-700",
+  spades:   "before:bg-black",
+  hearts:   "before:bg-red-700",
+  clubs:    "before:bg-emerald-800",
+  diamonds: "before:bg-blue-800",
 };
 
 const SUIT_BORDER_COLORS: Record<CardType["suit"], string> = {
@@ -62,7 +62,7 @@ export function CardComponent({ card, hidden, className, onClick, disabled, sele
       className={cn(
         // Compact mobile card so a horizontal hand strip fits on one row.
         // Compact mobile card keeps the 13-card hand usable in a WebView.
-        "spades-card-face relative flex-shrink-0 w-[3.85rem] h-[5.55rem] sm:w-24 sm:h-36 rounded-xl border-2 shadow-md flex flex-col items-center justify-center p-1.5 select-none transition-transform duration-150 disabled:opacity-100",
+        "spades-card-face relative flex-shrink-0 w-[4.05rem] h-[5.8rem] sm:w-24 sm:h-36 rounded-xl border-2 shadow-md flex flex-col items-center justify-center p-1.5 select-none transition-transform duration-150 disabled:opacity-100",
         // Suit-tinted left edge bar for fast scanning even when fanned
         "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1.5 before:rounded-l-xl",
         SUIT_EDGE_COLORS[card.suit],
@@ -81,20 +81,20 @@ export function CardComponent({ card, hidden, className, onClick, disabled, sele
     >
       {/* Top-left corner index: rank stacked over suit */}
       <div className={cn("absolute top-1 left-2 flex flex-col items-center leading-[0.85]", markClass)}>
-        <span className="text-sm sm:text-lg font-bold font-serif tabular-nums">{card.rank}</span>
-        <span className="text-sm sm:text-base">{symbol}</span>
+        <span className="text-base sm:text-lg font-bold font-serif tabular-nums">{card.rank}</span>
+        <span className="text-base sm:text-lg font-bold">{symbol}</span>
       </div>
 
       {/* Center: large stacked value over suit — the dominant face */}
       <div className={cn("flex flex-col items-center justify-center leading-none pointer-events-none", markClass)}>
-        <span className="text-2xl sm:text-4xl font-bold font-serif tabular-nums drop-shadow-sm">{card.rank}</span>
-        <span className="text-2xl sm:text-4xl mt-0.5 drop-shadow-sm">{symbol}</span>
+        <span className="text-[1.75rem] sm:text-4xl font-black font-serif tabular-nums drop-shadow-sm">{card.rank}</span>
+        <span className="text-[2rem] sm:text-5xl mt-0.5 font-black drop-shadow-sm">{symbol}</span>
       </div>
 
       {/* Bottom-right corner index (rotated) */}
       <div className={cn("absolute bottom-1 right-2 flex flex-col items-center leading-[0.85] rotate-180", markClass)}>
-        <span className="text-sm sm:text-lg font-bold font-serif tabular-nums">{card.rank}</span>
-        <span className="text-sm sm:text-base">{symbol}</span>
+        <span className="text-base sm:text-lg font-bold font-serif tabular-nums">{card.rank}</span>
+        <span className="text-base sm:text-lg font-bold">{symbol}</span>
       </div>
     </button>
   );

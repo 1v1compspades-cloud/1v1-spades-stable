@@ -1671,7 +1671,7 @@ export default function Room() {
               }}
               data-testid="bidding-overlay"
             >
-              <div className="bg-card/96 border border-border p-3 sm:p-5 rounded-xl shadow-2xl space-y-3 w-full max-w-[min(34rem,calc(100vw-1rem))] text-center max-h-[min(70dvh,32rem)] sm:max-h-[80dvh] overflow-y-auto pointer-events-auto backdrop-blur-md">
+              <div className="bg-card/96 border border-border p-3 sm:p-5 rounded-xl shadow-2xl space-y-3 w-full max-w-[min(34rem,calc(100vw-1rem))] text-center max-h-[min(72dvh,34rem)] sm:max-h-[80dvh] overflow-y-auto pointer-events-auto backdrop-blur-md">
                 <h3 className="text-sm sm:text-lg font-serif text-primary">Place your bid</h3>
                 {gameState.bids[0] === null && gameState.bids[1] === null && (
                   <p className="text-[10px] sm:text-[11px] uppercase tracking-widest text-primary/80">
@@ -1686,6 +1686,27 @@ export default function Room() {
                 <p className="text-[10px] sm:text-xs text-muted-foreground">
                   You have {gameState.hand.length} cards. Bid 0 for Nil (+/−100).
                 </p>
+                {(() => {
+                  const mySeat = playerIndex as 0 | 1;
+                  const oppSeat = mySeat === 0 ? 1 : 0;
+                  const oppBid = gameState.bids[oppSeat];
+                  const oppName = gameState.players[oppSeat]?.name ?? `Seat ${oppSeat + 1}`;
+                  return (
+                    <div
+                      data-testid="bidding-opponent-bid"
+                      className="rounded-lg border border-primary/35 bg-black/50 px-3 py-2 text-left"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          {oppName}
+                        </span>
+                        <span className="shrink-0 rounded-md border border-primary/40 bg-primary/10 px-3 py-1 font-mono text-sm font-black text-primary">
+                          {oppBid === null ? "Bid pending" : oppBid === 0 ? "Nil" : oppBid}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
                 <div
                   data-testid="bid-buttons"
                   className="grid grid-cols-7 gap-1.5 w-full sm:gap-2"
@@ -1728,13 +1749,13 @@ export default function Room() {
 
         {/* Round over overlay (shown to everyone, including spectators) */}
         {gameState.phase === "round_over" && lastRound && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-            <div className="bg-card border border-border p-5 sm:p-7 lg:p-8 rounded-xl shadow-2xl w-full max-w-[min(46rem,calc(100vw-2rem))] mx-4 space-y-6">
-              <h3 className="text-2xl sm:text-3xl font-serif text-center text-primary border-b border-border pb-4">
+          <div className="absolute inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/80 p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md sm:items-center sm:p-4">
+            <div className="bg-card border border-border p-4 sm:p-7 lg:p-8 rounded-xl shadow-2xl w-full max-w-[min(46rem,calc(100vw-1rem))] mx-auto space-y-4 sm:space-y-6">
+              <h3 className="text-xl sm:text-3xl font-serif text-center text-primary border-b border-border pb-3 sm:pb-4">
                 Round {lastRound.round} Summary
               </h3>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 text-center">
+              <div className="grid grid-cols-2 gap-2 sm:gap-5 text-center">
                 {([0, 1] as (0 | 1)[]).map((idx) => {
                   const isMyCol  = !spectator && idx === playerIndex;
                   const pName    = gameState.players[idx]?.name ?? `Seat ${idx + 1}`;
@@ -1754,10 +1775,10 @@ export default function Room() {
                   const bagPenalty = Math.floor(freshBags / bagThreshold) * bagPenaltyAmt;
 
                   return (
-                    <div key={idx} className={`space-y-3 p-4 sm:p-5 rounded-lg ${isMyCol ? "bg-primary/10 border border-primary/20" : "bg-white/5"}`}>
-                      <div className="text-sm text-muted-foreground uppercase tracking-wider truncate">{pName}</div>
+                    <div key={idx} className={`space-y-2 p-3 sm:space-y-3 sm:p-5 rounded-lg ${isMyCol ? "bg-primary/10 border border-primary/20" : "bg-white/5"}`}>
+                      <div className="text-[11px] sm:text-sm text-muted-foreground uppercase tracking-wider truncate">{pName}</div>
 
-                      <div className="text-sm sm:text-base space-y-2 text-left">
+                      <div className="text-xs sm:text-base space-y-1.5 sm:space-y-2 text-left">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Bid</span>
                           <span className="font-mono">{bid === 0 ? "Nil" : bid}</span>
@@ -1792,13 +1813,13 @@ export default function Room() {
                         )}
                       </div>
 
-                      {nilMade   && <div className="text-xs sm:text-sm text-green-400 font-semibold">✓ Nil made</div>}
-                      {nilBroken && <div className="text-xs sm:text-sm text-red-400 font-semibold">✗ Nil broken</div>}
+                      {nilMade   && <div className="text-[11px] sm:text-sm text-green-400 font-semibold">✓ Nil made</div>}
+                      {nilBroken && <div className="text-[11px] sm:text-sm text-red-400 font-semibold">✗ Nil broken</div>}
                       {!isNil && made && tricks > bid && (
-                        <div className="text-xs sm:text-sm text-yellow-400">+{tricks - bid} bag{tricks - bid !== 1 ? "s" : ""}</div>
+                        <div className="text-[11px] sm:text-sm text-yellow-400">+{tricks - bid} bag{tricks - bid !== 1 ? "s" : ""}</div>
                       )}
                       {!isNil && !made && (
-                        <div className="text-xs sm:text-sm text-red-400">Set — missed by {bid - tricks}</div>
+                        <div className="text-[11px] sm:text-sm text-red-400">Set — missed by {bid - tricks}</div>
                       )}
                     </div>
                   );
@@ -1809,12 +1830,12 @@ export default function Room() {
                 {roundNextCountdown !== null && (
                   <div
                     data-testid="next-round-countdown"
-                    className="rounded-lg border border-primary/35 bg-black/35 px-4 py-3 text-center"
+                    className="rounded-lg border border-primary/35 bg-black/35 px-4 py-2.5 sm:py-3 text-center"
                   >
                     <div className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.28em] text-primary/80">
                       Next round
                     </div>
-                    <div className="mt-1 font-serif text-2xl sm:text-3xl font-bold text-primary">
+                    <div className="mt-1 font-serif text-xl sm:text-3xl font-bold text-primary">
                       Starting in {roundNextCountdown}
                     </div>
                   </div>
