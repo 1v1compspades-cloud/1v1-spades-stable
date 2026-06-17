@@ -1698,10 +1698,10 @@ export default function Room() {
                     >
                       <div className="flex items-center justify-between gap-3">
                         <span className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                          {oppName}
+                          {oppName} bid this round
                         </span>
-                        <span className="shrink-0 rounded-md border border-primary/40 bg-primary/10 px-3 py-1 font-mono text-sm font-black text-primary">
-                          {oppBid === null ? "Bid pending" : oppBid === 0 ? "Nil" : oppBid}
+                        <span className="shrink-0 rounded-md border border-primary/40 bg-primary/10 px-3 py-1 font-mono text-sm font-black text-primary whitespace-nowrap">
+                          {oppBid === null ? "No bid yet" : oppBid === 0 ? "Nil" : oppBid}
                         </span>
                       </div>
                     </div>
