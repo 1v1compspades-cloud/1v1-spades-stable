@@ -497,6 +497,13 @@ export default function Room() {
           setLocation(`/tournament/${tournamentCode}`);
           return;
         }
+        if (/room not found/i.test(msg)) {
+          clearPersistedRoomSession(roomCode);
+          clearReconnectRetry();
+          toast({ description: "Previous room was closed. You can create or join again." });
+          setLocation("/");
+          return;
+        }
         toast({ description: err || "Session expired. Please rejoin.", variant: "destructive" });
         // Only a genuine token mismatch is terminal for this browser. Safari
         // can briefly report the old socket as active after a disconnect; keep
