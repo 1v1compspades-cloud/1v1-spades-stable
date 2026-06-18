@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ConnectionPill } from "@/components/ConnectionPill";
 import { InfoMenu } from "@/components/InfoMenu";
+import { LegalFooter, MatchAgreementNotice } from "@/components/LegalFooter";
 import { PreGameChecklist } from "@/components/PreGameChecklist";
 
 export default function Lobby() {
@@ -465,6 +466,8 @@ export default function Lobby() {
             </div>
           </div>
 
+          <MatchAgreementNotice />
+
           <div className="pt-4 border-t border-border/50 space-y-2">
             <Button
               onClick={handleSpectate}
@@ -539,6 +542,10 @@ export default function Lobby() {
                 </div>
               </div>
             )}
+          </div>
+
+          <div className="pt-4 border-t border-border/40 text-center">
+            <LegalFooter />
           </div>
         </CardContent>
       </Card>

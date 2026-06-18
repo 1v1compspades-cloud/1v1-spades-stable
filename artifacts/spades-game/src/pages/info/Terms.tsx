@@ -7,19 +7,20 @@ export default function Terms() {
   return (
     <>
       <Seo
-        title="Terms of Use | Spades Free Play"
-        description="Terms of Use for the Spades Free Play app. A free, for-entertainment card game with no payment features or redeemable rewards."
+        title="Terms of Service | Spades Free Play"
+        description="Terms of Service for the Spades Free Play app. A free, for-entertainment card game with no payment features or redeemable rewards."
         path="/terms"
       />
       <InfoPageLayout
-        title="Terms of Use"
-        intro={`Please read these Terms of Use before using the Spades Free Play app. Effective ${EFFECTIVE_DATE}.`}
+        title="Terms of Service"
+        intro={`Please read these Terms of Service before using the Spades Free Play app. Effective ${EFFECTIVE_DATE}.`}
       >
         <section>
           <h2>Acceptance of these terms</h2>
           <p>
             By downloading or using Spades Free Play (the "app"), you agree to
-            these Terms of Use. If you do not agree, please do not use the app.
+            these Terms of Service. If you do not agree, please do not use the
+            app.
           </p>
         </section>
 
@@ -117,10 +118,10 @@ export default function Terms() {
         <section>
           <h2>Changes to these terms</h2>
           <p>
-            We may update these Terms of Use from time to time. Continued use of
-            the app after changes take effect constitutes acceptance of the
-            updated terms. The effective date at the top of this page reflects the
-            latest version.
+            We may update these Terms of Service from time to time. Continued
+            use of the app after changes take effect constitutes acceptance of
+            the updated terms. The effective date at the top of this page
+            reflects the latest version.
           </p>
         </section>
 

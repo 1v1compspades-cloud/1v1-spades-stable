@@ -6,7 +6,7 @@ export default function Tournaments() {
     <>
       <Seo
         title="Online Spades Tournaments | 1V1 Competitive Spades"
-        description="Join free-entry private online 1V1 Spades tournaments with sponsor-funded prizes, champion brackets, live matches, and weekly competitive events."
+        description="Join free-entry private online 1V1 Spades tournaments with champion brackets, live matches, and weekly competitive events."
         path="/tournaments"
       />
       <InfoPageLayout
@@ -44,11 +44,11 @@ export default function Tournaments() {
         </section>
 
         <section>
-          <h2>Sponsor-funded prize pools</h2>
+          <h2>Recognition-only events</h2>
           <p>
-            Select events feature prize pools funded by sponsors. Entry stays
-            free for players — sponsors back the rewards — keeping the focus on
-            competition and community rather than buy-ins.
+            Events are free to enter and are played for competition, standings,
+            and community recognition only. There are no buy-ins, deposits,
+            wagering, cash payouts, or redeemable rewards.
           </p>
         </section>
 

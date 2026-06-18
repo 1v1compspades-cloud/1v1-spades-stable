@@ -8,7 +8,7 @@ export default function Privacy() {
     <>
       <Seo
         title="Privacy Policy | Spades Free Play"
-        description="Privacy Policy for the Spades Free Play app. A free card game with no accounts required, no payment features, and no sale of personal data."
+        description="Privacy Policy for the Spades Free Play app. A free card game with optional local profile names, no payment features, and no sale of personal data."
         path="/privacy"
       />
       <InfoPageLayout
@@ -29,9 +29,11 @@ export default function Privacy() {
           <h2>Information we collect</h2>
           <ul>
             <li>
-              <strong>Display name:</strong> the nickname you choose is used to
-              identify you to your opponent during a match. It is stored on your
-              device and sent to the game server only to run live games.
+              <strong>Display name and profile username:</strong> the names you
+              choose are used to identify you to your opponent during a match
+              and to label completed match results. They are stored on your
+              device and sent to the game server only to run live games and
+              preserve match history.
             </li>
             <li>
               <strong>Game session data:</strong> temporary information such as a
@@ -40,15 +42,16 @@ export default function Privacy() {
               ephemeral and is not used to build a profile.
             </li>
             <li>
-              <strong>Gameplay actions:</strong> bids and card plays are sent to
-              the game server in real time so the match can be played. Game state
-              is held in server memory for the duration of a match and is not
-              tied to a personal account.
+              <strong>Gameplay actions and match results:</strong> bids and card
+              plays are sent to the game server in real time so the match can be
+              played. Completed match records may include winner, loser, display
+              names or profile usernames, final scores, result reason, and
+              timestamp.
             </li>
           </ul>
           <p>
-            The app does not require you to create an account, and it does not
-            ask for your email address, phone number, contacts, photos, or
+            The app does not require sign-in or a verified account, and it does
+            not ask for your email address, phone number, contacts, photos, or
             precise location.
           </p>
         </section>
@@ -57,9 +60,9 @@ export default function Privacy() {
           <h2>How we use information</h2>
           <p>
             We use the limited information above only to operate live matches,
-            let you reconnect to a game in progress, and keep the service
-            running. We do not sell your personal information, and we do not use
-            it for advertising profiles.
+            let you reconnect to a game in progress, preserve completed match
+            results, and keep the service running. We do not sell your personal
+            information, and we do not use it for advertising profiles.
           </p>
         </section>
 
@@ -78,9 +81,11 @@ export default function Privacy() {
           <h2>Data retention</h2>
           <p>
             Live game state is temporary and is cleared from the server when a
-            match ends or the server restarts. Information stored locally on your
-            device (such as your display name) remains until you clear the app's
-            data or uninstall the app.
+            match ends or the server restarts. Completed match result records
+            may be retained to support match history, fair-play review, and
+            service integrity. Information stored locally on your device (such as
+            your display name, profile username, and reconnect token) remains
+            until you clear the app's data or uninstall the app.
           </p>
         </section>
 
@@ -88,9 +93,10 @@ export default function Privacy() {
           <h2>Children's privacy</h2>
           <p>
             The app is suitable for general audiences and does not knowingly
-            collect personal information from children. Because no account is
-            required and no payment features exist, the app does not request
-            personal details from any user.
+            collect personal information from children. Because no sign-in,
+            payment, or financial account features exist, the app does not
+            request personal details beyond the display/profile name used for
+            gameplay.
           </p>
         </section>
 

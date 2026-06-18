@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
 import { Link } from "wouter";
+import { FREE_PLAY_DISCLAIMER } from "@/components/LegalFooter";
 
 const NAV = [
   { href: "/rules", label: "Rules" },
-  { href: "/fair-play", label: "Fair Play" },
-  { href: "/privacy", label: "Privacy" },
-  { href: "/terms", label: "Terms" },
+  { href: "/fair-play", label: "Fair Play Policy" },
+  { href: "/privacy", label: "Privacy Policy" },
+  { href: "/terms", label: "Terms of Service" },
   { href: "/support", label: "Support" },
 ];
 
@@ -91,21 +92,24 @@ export function InfoPageLayout({
       </main>
 
       <footer className="border-t border-border/50">
-        <div className="mx-auto max-w-3xl px-5 py-6 flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-          <Link href="/" className="hover:text-primary transition-colors">
-            ← Back to the homepage
-          </Link>
-          <nav aria-label="Footer" className="flex flex-wrap gap-x-4 gap-y-1">
-            {NAV.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="hover:text-primary transition-colors"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+        <div className="mx-auto max-w-3xl px-5 py-6 space-y-4 text-sm text-muted-foreground">
+          <p className="text-xs leading-relaxed">{FREE_PLAY_DISCLAIMER}</p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Link href="/" className="hover:text-primary transition-colors">
+              ← Back to the homepage
+            </Link>
+            <nav aria-label="Footer" className="flex flex-wrap gap-x-4 gap-y-1">
+              {NAV.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="hover:text-primary transition-colors"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
         </div>
       </footer>
     </div>

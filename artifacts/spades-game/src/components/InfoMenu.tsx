@@ -11,9 +11,9 @@ import {
 
 const LINKS = [
   { href: "/rules", label: "Rules", testid: "info-link-rules" },
-  { href: "/fair-play", label: "Fair Play & Anti-Cheat", testid: "info-link-fair-play" },
+  { href: "/fair-play", label: "Fair Play Policy", testid: "info-link-fair-play" },
   { href: "/privacy", label: "Privacy Policy", testid: "info-link-privacy" },
-  { href: "/terms", label: "Terms of Use", testid: "info-link-terms" },
+  { href: "/terms", label: "Terms of Service", testid: "info-link-terms" },
   { href: "/support", label: "Support", testid: "info-link-support" },
 ];
 

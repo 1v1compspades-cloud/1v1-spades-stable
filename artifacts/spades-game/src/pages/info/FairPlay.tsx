@@ -5,19 +5,19 @@ const RISK_ROWS: { context: string; range: string }[] = [
   { context: "Open public casual lobbies", range: "10%–25%" },
   { context: "Private invite lobbies", range: "3%–8%" },
   { context: "Host-managed events", range: "2%–5%" },
-  { context: "Future accounts + logs + replay review", range: "1%–3%" },
+  { context: "Persistent names + logs + replay review", range: "1%–3%" },
 ];
 
 export default function FairPlay() {
   return (
     <>
       <Seo
-        title="Fair Play & Anti-Cheat | Spades Free Play"
+        title="Fair Play Policy | Spades Free Play"
         description="Learn how Spades Free Play uses private lobbies, hidden spectator hands, server rules, and fair-play policies to reduce cheating risk."
         path="/fair-play"
       />
       <InfoPageLayout
-        title="Fair Play & Anti-Cheat"
+        title="Fair Play Policy"
         intro="Fair play is the foundation of Spades Free Play. We combine private rooms, server-enforced rules, and clear session controls to make cheating hard to attempt and easier to detect."
       >
         <section>
@@ -44,8 +44,8 @@ export default function FairPlay() {
               host can use them.
             </li>
             <li>
-              <strong>One-player, one-account, one-tab policy:</strong> a player
-              is expected to occupy a single seat from a single session,
+              <strong>One-player, one-seat, one-tab policy:</strong> a player is
+              expected to occupy a single seat from a single session,
               discouraging multi-seat or multi-window manipulation.
             </li>
             <li>
@@ -142,9 +142,9 @@ export default function FairPlay() {
           <h2>Where we're headed</h2>
           <p>
             Integrity improves over time. Planned additions such as player
-            accounts, detailed game logs, and replay review are designed to push
-            risk lower still and make post-match investigation faster and more
-            thorough.
+            identity controls, detailed game logs, and replay review are
+            designed to push risk lower still and make post-match investigation
+            faster and more thorough.
           </p>
         </section>
       </InfoPageLayout>
