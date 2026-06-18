@@ -2629,53 +2629,63 @@ export default function Room() {
     </button>
   );
 
-  const renderForfeitControl = () =>
+  const renderMatchActionsPanel = () =>
     canForfeit ? (
-      <>
-        <button
-          type="button"
-          onClick={() => setForfeitConfirmOpen(true)}
-          data-testid="button-forfeit"
-          className="absolute bottom-[calc(env(safe-area-inset-bottom)+6.5rem)] left-3 z-[55] px-3 py-1.5 rounded-full border border-red-500/45 bg-black/75 text-red-200 text-[10px] font-semibold uppercase tracking-widest backdrop-blur-sm shadow-lg hover:bg-red-500/10 active:scale-95 transition"
-        >
-          Forfeit
-        </button>
-        {forfeitConfirmOpen && (
-          <div
-            className="fixed inset-0 z-[140] flex items-center justify-center bg-black/75 p-4"
-            data-testid="forfeit-confirm-overlay"
-            onClick={() => setForfeitConfirmOpen(false)}
+      <details
+        data-testid="match-actions-panel"
+        className="mx-3 my-2 rounded-lg border border-primary/25 bg-black/45 px-3 py-2 text-xs backdrop-blur-sm"
+      >
+        <summary className="cursor-pointer select-none list-none font-semibold uppercase tracking-widest text-primary [&::-webkit-details-marker]:hidden">
+          Match Actions
+        </summary>
+        <div className="mt-2 border-t border-primary/20 pt-2">
+          <button
+            type="button"
+            onClick={() => setForfeitConfirmOpen(true)}
+            data-testid="button-forfeit"
+            className="w-full rounded-md border border-red-500/45 bg-red-950/30 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-widest text-red-200 transition hover:bg-red-500/10 active:scale-[0.99]"
           >
-            <div
-              className="bg-card border border-red-500/35 rounded-xl shadow-2xl p-5 max-w-sm w-full space-y-4 text-center"
-              onClick={(event) => event.stopPropagation()}
+            Forfeit Match
+          </button>
+        </div>
+      </details>
+    ) : null;
+
+  const renderForfeitConfirmDialog = () =>
+    canForfeit && forfeitConfirmOpen ? (
+      <div
+        className="fixed inset-0 z-[140] flex items-center justify-center bg-black/75 p-4"
+        data-testid="forfeit-confirm-overlay"
+        onClick={() => setForfeitConfirmOpen(false)}
+      >
+        <div
+          className="bg-card border border-red-500/35 rounded-xl shadow-2xl p-5 max-w-sm w-full space-y-4 text-center"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <h3 className="font-serif text-xl text-primary">Forfeit match?</h3>
+          <p className="text-sm text-muted-foreground">
+            Forfeit this match? This will count as a loss.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setForfeitConfirmOpen(false)}
+              data-testid="button-forfeit-cancel"
             >
-              <h3 className="font-serif text-xl text-primary">Forfeit game?</h3>
-              <p className="text-sm text-muted-foreground">
-                Are you sure you want to forfeit this game?
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setForfeitConfirmOpen(false)}
-                  data-testid="button-forfeit-cancel"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={handleConfirmForfeit}
-                  data-testid="button-forfeit-confirm"
-                >
-                  Forfeit
-                </Button>
-              </div>
-            </div>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleConfirmForfeit}
+              data-testid="button-forfeit-confirm"
+            >
+              Forfeit Match
+            </Button>
           </div>
-        )}
-      </>
+        </div>
+      </div>
     ) : null;
 
   // Host Fast Finish / End Game test tool. ADMIN-ONLY: shown ONLY to a socket
@@ -2784,10 +2794,11 @@ export default function Room() {
           {renderRoomCodeStrip()}
           {renderQueuePanel()}
           {renderStatusBanner()}
+          {renderMatchActionsPanel()}
           {renderTable()}
           {renderPlayerInfo(bottomIndex)}
           {spectator ? renderSpectatorFooter() : renderMyHand()}
-          {renderForfeitControl()}
+          {renderForfeitConfirmDialog()}
           {showHostResetFab && renderHostResetFab()}
           {canFastFinish && renderFastFinishTool()}
         </>
