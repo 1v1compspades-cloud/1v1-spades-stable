@@ -136,6 +136,22 @@ export function useGameStorage() {
     localStorage.removeItem(playerTokenKey(code, seat));
   };
 
+  const clearPersistedRoomSession = (code?: string) => {
+    const savedCode = localStorage.getItem("spades_roomCode") || "";
+    const normalized = (code || savedCode).toUpperCase().trim();
+    if (normalized) {
+      clearPlayerToken(normalized, 0);
+      clearPlayerToken(normalized, 1);
+      localStorage.removeItem(`spades_room_tournament_${normalized}`);
+    }
+
+    if (!code || savedCode.toUpperCase().trim() === normalized) {
+      localStorage.removeItem("spades_roomCode");
+      localStorage.removeItem("spades_playerIndex");
+      localStorage.removeItem("spades_isSpectator");
+    }
+  };
+
   // One-time sweep on mount: drop any expired tournament/player tokens left
   // behind from past sessions, so localStorage doesn't grow unbounded. The
   // legacy `spades_tournament_host_token_` prefix is kept here ONLY to purge
@@ -181,5 +197,6 @@ export function useGameStorage() {
     savePlayerToken,
     getPlayerToken,
     clearPlayerToken,
+    clearPersistedRoomSession,
   };
 }

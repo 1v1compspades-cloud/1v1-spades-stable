@@ -110,7 +110,7 @@ export default function Room() {
   const {
     socket,
     connected, status, gameState, error, connect, joinRoom, reconnect,
-    startGame, placeBid, playCard, nextRound, newMatch,
+    startGame, placeBid, playCard, nextRound,
     resetRoom: doResetRoom,
     setReady: doSetReady,
     joinAsSpectator,
@@ -129,7 +129,7 @@ export default function Room() {
     savePlayerName,
     saveRoomCode, savePlayerIndex, saveIsSpectator,
     clearStorage,
-    getPlayerToken, savePlayerToken, clearPlayerToken,
+    getPlayerToken, savePlayerToken, clearPlayerToken, clearPersistedRoomSession,
   } = useGameStorage();
   const { toast } = useToast();
 
@@ -153,6 +153,7 @@ export default function Room() {
   const readyAutoStartKeyRef = useRef<string | null>(null);
   const [roundNextCountdown, setRoundNextCountdown] = useState<number | null>(null);
   const roundAutoNextKeyRef = useRef<string | null>(null);
+  const completedSessionCleanupKeyRef = useRef<string | null>(null);
   const [reconnectRetryTick, setReconnectRetryTick] = useState(0);
   const reconnectRetryCountRef = useRef(0);
 
@@ -164,6 +165,33 @@ export default function Room() {
   }, []);
 
   const isHost = !isSpectator && playerIndex === 0;
+  const spectator = !!gameState?.isSpectator || isSpectator;
+
+  useEffect(() => {
+    if (!roomCode || !gameState || gameState.mode === "king") return;
+
+    const cleanupKey = `${roomCode}:${gameState.roundNumber}:completed`;
+    if (gameState.phase === "game_over") {
+      if (!spectator && completedSessionCleanupKeyRef.current !== cleanupKey) {
+        completedSessionCleanupKeyRef.current = cleanupKey;
+        clearPersistedRoomSession(roomCode);
+      }
+      return;
+    }
+
+    if (completedSessionCleanupKeyRef.current?.startsWith(`${roomCode}:`)) {
+      setLocation(gameState.tournamentRef ? `/tournament/${gameState.tournamentRef.code}` : "/");
+    }
+  }, [
+    roomCode,
+    gameState?.phase,
+    gameState?.mode,
+    gameState?.roundNumber,
+    gameState?.tournamentRef?.code,
+    spectator,
+    clearPersistedRoomSession,
+    setLocation,
+  ]);
 
   useEffect(() => {
     if (!roomCode || !gameState || gameState.phase !== "waiting") {
@@ -570,7 +598,6 @@ export default function Room() {
 
   // Spectator: no "me" perspective. We use absolute seats: seat 1 (top) and seat 2 (bottom).
   // Player: bottom = self, top = opponent.
-  const spectator = !!gameState.isSpectator || isSpectator;
   const topIndex: 0 | 1 = spectator ? 0 : ((playerIndex === 0 ? 1 : 0) as 0 | 1);
   const bottomIndex: 0 | 1 = spectator ? 1 : (playerIndex as 0 | 1);
 
@@ -605,7 +632,6 @@ export default function Room() {
 
   const handleStartGame = () => startGame(roomCode!);
   const handleNextRound = () => nextRound(roomCode!);
-  const handleNewMatch  = () => newMatch(roomCode!);
   const activeForfeitPhase =
     gameState.phase === "bidding" ||
     gameState.phase === "playing" ||
@@ -2163,13 +2189,9 @@ export default function Room() {
                     );
                   })()
                 ) : gameState.tournamentRef ? null : spectator ? (
-                  <p className="text-center text-muted-foreground italic text-sm">Waiting for host to start a new match…</p>
-                ) : playerIndex === 0 ? (
-                  <Button onClick={handleNewMatch} className="w-full h-11 text-base">
-                    Start New Match →
-                  </Button>
+                  <p className="text-center text-muted-foreground italic text-sm">Match complete. Return to the lobby to play again.</p>
                 ) : (
-                  <p className="text-center text-muted-foreground italic text-sm">Waiting for host to start a new match…</p>
+                  <p className="text-center text-muted-foreground italic text-sm">Match complete. Return to the lobby to create or join the next game.</p>
                 )}
                 {isKingMode && spectator && !inQueue && (
                   <Button
