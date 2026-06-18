@@ -1835,18 +1835,38 @@ export default function Room() {
                   const oppSeat = mySeat === 0 ? 1 : 0;
                   const oppBid = gameState.bids[oppSeat];
                   const oppName = gameState.players[oppSeat]?.name ?? `Seat ${oppSeat + 1}`;
+                  const myName = gameState.players[mySeat]?.name ?? "You";
+                  const myScore = gameState.scores[mySeat] ?? 0;
+                  const oppScore = gameState.scores[oppSeat] ?? 0;
                   return (
-                    <div
-                      data-testid="bidding-opponent-bid"
-                      className="rounded-lg border border-primary/35 bg-black/50 px-3 py-2 text-left"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                          {oppName} bid this round
-                        </span>
-                        <span className="shrink-0 rounded-md border border-primary/40 bg-primary/10 px-3 py-1 font-mono text-sm font-black text-primary whitespace-nowrap">
-                          {oppBid === null ? "No bid yet" : oppBid === 0 ? "Nil" : oppBid}
-                        </span>
+                    <div className="space-y-2">
+                      <div
+                        data-testid="bidding-score-summary"
+                        className="grid grid-cols-2 gap-2 rounded-lg border border-primary/35 bg-black/55 px-3 py-2 text-left"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-[9px] font-bold uppercase tracking-widest text-muted-foreground">You</p>
+                          <p className="truncate text-sm font-black tabular-nums text-foreground">{myScore} pts</p>
+                          <p className="truncate text-[9px] text-muted-foreground">{myName}</p>
+                        </div>
+                        <div className="min-w-0 text-right">
+                          <p className="truncate text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Opponent</p>
+                          <p className="truncate text-sm font-black tabular-nums text-foreground">{oppScore} pts</p>
+                          <p className="truncate text-[9px] text-muted-foreground">{oppName}</p>
+                        </div>
+                      </div>
+                      <div
+                        data-testid="bidding-opponent-bid"
+                        className="rounded-lg border border-primary/35 bg-black/50 px-3 py-2 text-left"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                            {oppName} bid this round
+                          </span>
+                          <span className="shrink-0 rounded-md border border-primary/40 bg-primary/10 px-3 py-1 font-mono text-sm font-black text-primary whitespace-nowrap">
+                            {oppBid === null ? "No bid yet" : oppBid === 0 ? "Nil" : oppBid}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   );
