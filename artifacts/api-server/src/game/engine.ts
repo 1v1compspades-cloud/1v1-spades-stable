@@ -881,6 +881,46 @@ export function removePlayerFromRoom(socketId: string): GameState | null {
   return null;
 }
 
+export function leaveWaitingRoom(
+  roomCode: string,
+  socketId: string,
+): { state: GameState | null; removed: boolean; cleanedUp: boolean } {
+  const state = rooms.get(roomCode);
+  if (!state) return { state: null, removed: false, cleanedUp: false };
+  if (state.phase !== "waiting") {
+    throw new Error("Cannot leave an active match from the ready screen");
+  }
+
+  let removed = false;
+  for (let i = 0; i < state.players.length; i++) {
+    if (state.players[i]?.socketId === socketId) {
+      state.players[i] = null;
+      state.ready[i as 0 | 1] = false;
+      removed = true;
+    }
+  }
+
+  const spectatorCountBefore = state.spectators.length;
+  state.spectators = state.spectators.filter((s) => s.socketId !== socketId);
+  if (state.spectators.length !== spectatorCountBefore) removed = true;
+
+  const queueCountBefore = state.challengerQueue.length;
+  state.challengerQueue = state.challengerQueue.filter((c) => c.socketId !== socketId);
+  if (state.challengerQueue.length !== queueCountBefore) removed = true;
+
+  if (!removed) return { state, removed: false, cleanedUp: false };
+
+  const hasSeatedPlayers = state.players.some(Boolean);
+  const hasObservers = state.spectators.length > 0 || state.challengerQueue.length > 0;
+  if (!hasSeatedPlayers && !hasObservers) {
+    cleanupRoom(roomCode);
+    return { state: null, removed: true, cleanedUp: true };
+  }
+
+  rooms.set(roomCode, state);
+  return { state, removed: true, cleanedUp: false };
+}
+
 // ── King of the Table helpers ────────────────────────────────────────────────
 
 export function addChallenger(

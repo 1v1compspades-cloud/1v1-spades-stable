@@ -113,8 +113,10 @@ export default function Room() {
     startGame, placeBid, playCard, nextRound,
     resetRoom: doResetRoom,
     setReady: doSetReady,
+    clearGameState,
     joinAsSpectator,
     reconnectAsSpectator,
+    leaveRoom,
     joinQueue, leaveQueue, kottStepDown,
     forfeitMatch,
     fastFinishMatch,
@@ -156,6 +158,15 @@ export default function Room() {
   const completedSessionCleanupKeyRef = useRef<string | null>(null);
   const [reconnectRetryTick, setReconnectRetryTick] = useState(0);
   const reconnectRetryCountRef = useRef(0);
+  const reconnectRetryTimeoutRef = useRef<number | null>(null);
+
+  const clearReconnectRetry = () => {
+    if (reconnectRetryTimeoutRef.current !== null) {
+      window.clearTimeout(reconnectRetryTimeoutRef.current);
+      reconnectRetryTimeoutRef.current = null;
+    }
+    reconnectRetryCountRef.current = 0;
+  };
 
   // Tick every 15s so AFK indicators re-render without depending on socket events.
   const [now, setNow] = useState<number>(() => Date.now());
@@ -178,10 +189,6 @@ export default function Room() {
       }
       return;
     }
-
-    if (completedSessionCleanupKeyRef.current?.startsWith(`${roomCode}:`)) {
-      setLocation(gameState.tournamentRef ? `/tournament/${gameState.tournamentRef.code}` : "/");
-    }
   }, [
     roomCode,
     gameState?.phase,
@@ -192,6 +199,14 @@ export default function Room() {
     clearPersistedRoomSession,
     setLocation,
   ]);
+
+  useEffect(() => {
+    if (gameState || !roomCode || playerIndex === null || isSpectator) {
+      clearReconnectRetry();
+    }
+  }, [gameState, roomCode, playerIndex, isSpectator]);
+
+  useEffect(() => clearReconnectRetry, []);
 
   useEffect(() => {
     if (!roomCode || !gameState || gameState.phase !== "waiting") {
@@ -457,8 +472,13 @@ export default function Room() {
             : null;
         if (/seat already active in another tab/i.test(msg)) {
           if (reconnectRetryCountRef.current < 20) {
-            reconnectRetryCountRef.current += 1;
-            window.setTimeout(() => setReconnectRetryTick(tick => tick + 1), 1500);
+            if (reconnectRetryTimeoutRef.current === null) {
+              reconnectRetryCountRef.current += 1;
+              reconnectRetryTimeoutRef.current = window.setTimeout(() => {
+                reconnectRetryTimeoutRef.current = null;
+                setReconnectRetryTick(tick => tick + 1);
+              }, 1500);
+            }
             return;
           }
           toast({
@@ -647,6 +667,7 @@ export default function Room() {
       await forfeitMatch(roomCode);
       clearPlayerToken(roomCode, playerIndex);
       clearStorage();
+      clearReconnectRetry();
       toast({ description: "You forfeited this game. Your opponent was awarded the win." });
       setForfeitConfirmOpen(false);
       setLocation("/");
@@ -864,6 +885,30 @@ export default function Room() {
   const handleLeaveSpectate = () => {
     saveIsSpectator(false);
     setLocation("/");
+  };
+
+  const handleLeaveWaitingRoom = async () => {
+    if (!roomCode) {
+      clearStorage();
+      clearGameState();
+      setLocation("/");
+      return;
+    }
+    try {
+      await leaveRoom(roomCode);
+    } catch (err: any) {
+      toast({
+        description: typeof err === "string" ? err : "Leaving room locally.",
+      });
+    } finally {
+      if (playerIndex !== null) {
+        clearPlayerToken(roomCode, playerIndex);
+      }
+      clearStorage();
+      clearGameState();
+      clearReconnectRetry();
+      setLocation("/");
+    }
   };
 
   const handleToggleReady = async () => {
@@ -1509,7 +1554,7 @@ export default function Room() {
                 )}
                 <Button
                   variant="ghost"
-                  onClick={() => setLocation("/")}
+                  onClick={handleLeaveWaitingRoom}
                   data-testid="button-leave-room"
                   className={cn(
                     "min-h-[44px] text-muted-foreground hover:text-foreground",

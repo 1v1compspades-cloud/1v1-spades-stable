@@ -19,6 +19,7 @@ import {
   resetMatch,
   resetRoom,
   setPlayerReady,
+  leaveWaitingRoom,
   addSpectator,
   reconnectSpectator,
   performCoinToss,
@@ -2270,6 +2271,45 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           if (rErr || !state) throw rErr ?? new Error("set_ready failed");
           callback?.({ ok: true });
           broadcastState(io, state!);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          callback?.({ ok: false, error: msg });
+        }
+      }
+    );
+
+    socket.on(
+      "leave_room",
+      async (
+        data: { roomCode: string },
+        callback?: (res: { ok: boolean; error?: string }) => void
+      ) => {
+        try {
+          const code = data.roomCode.toUpperCase().trim();
+          let state: GameState | null = null;
+          let cleanedUp = false;
+          await withRoomLock(code, async () => {
+            const result = leaveWaitingRoom(code, socket.id);
+            state = result.state;
+            cleanedUp = result.cleanedUp;
+            if (result.removed && state) {
+              await commit(state, {
+                action: "leave_waiting_room",
+                payload: { socketId: socket.id },
+              });
+            } else if (cleanedUp) {
+              clearLastHashFor(code);
+              await deleteRoomState(code).catch((err) => {
+                logger.warn({ err, roomCode: code }, "deleteRoomState failed after leave_room cleanup");
+              });
+              await deleteReconnectTokensForRoom(code).catch((err) => {
+                logger.warn({ err, roomCode: code }, "deleteReconnectTokensForRoom failed after leave_room cleanup");
+              });
+            }
+          });
+          socket.leave(code);
+          callback?.({ ok: true });
+          if (state) broadcastState(io, state);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           callback?.({ ok: false, error: msg });

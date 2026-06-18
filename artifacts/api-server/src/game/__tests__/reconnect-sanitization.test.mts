@@ -8,6 +8,7 @@ import {
   createRoom,
   getRoom,
   joinRoom,
+  leaveWaitingRoom,
   reconnectPlayer,
   removePlayerFromRoom,
   startRound,
@@ -155,6 +156,42 @@ console.log("\n— Reconnect + sanitized websocket payloads —");
     msg = (e as Error).message;
   }
   ok("duplicate display name cannot occupy opponent seat", /already seated/i.test(msg), msg);
+}
+
+// Explicit Leave Room on the ready screen cleans up an empty waiting room.
+{
+  const room = createRoom("Ready Host", `sock-ready-host-${Date.now()}-${Math.random()}`);
+  const result = leaveWaitingRoom(room.roomCode, room.players[0]!.socketId);
+
+  ok("ready-screen leave removes the host", result.removed === true);
+  ok("ready-screen leave cleans up empty room", result.cleanedUp === true);
+  ok("ready-screen leave removes room from memory", getRoom(room.roomCode) === undefined);
+}
+
+// If the opponent already disconnected before start, the remaining player's
+// Leave Room still cleans the stale waiting room.
+{
+  const room = createRoom("Ready Host", `sock-wait-host-${Date.now()}-${Math.random()}`);
+  joinRoom(room.roomCode, "Ready Guest", "sock-wait-guest");
+  removePlayerFromRoom("sock-wait-guest");
+  const result = leaveWaitingRoom(room.roomCode, room.players[0]!.socketId);
+
+  ok("ready-screen leave after opponent disconnect removes remaining player", result.removed === true);
+  ok("ready-screen leave after opponent disconnect cleans room", result.cleanedUp === true);
+  ok("ready-screen leave after opponent disconnect removes room from memory", getRoom(room.roomCode) === undefined);
+}
+
+// Leave Room is a ready-screen cleanup only; active gameplay still uses
+// forfeit/reconnect paths.
+{
+  const room = createDealtRoom();
+  let msg = "";
+  try {
+    leaveWaitingRoom(room.roomCode, room.players[0]!.socketId);
+  } catch (e) {
+    msg = (e as Error).message;
+  }
+  ok("ready-screen leave rejects active matches", /active match/i.test(msg), msg);
 }
 
 console.log(`\nResult: ${pass} passed, ${fail} failed`);

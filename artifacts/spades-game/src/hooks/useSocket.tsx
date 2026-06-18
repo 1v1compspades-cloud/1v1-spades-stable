@@ -36,6 +36,7 @@ interface SocketContextType {
   setActiveRoom: (roomCode: string | null) => void;
   joinAsSpectator: (code: string, name: string) => Promise<void>;
   reconnectAsSpectator: (code: string, name: string) => Promise<void>;
+  leaveRoom: (code: string) => Promise<void>;
   joinQueue: (code: string, name: string) => Promise<void>;
   leaveQueue: (code: string) => Promise<void>;
   kottStepDown: (code: string, rejoin: boolean) => Promise<void>;
@@ -255,6 +256,16 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       socket.emit("leave_queue", { roomCode }, (res: { ok: boolean; error?: string }) => {
         if (res.ok) resolve();
         else reject(res.error || "Could not leave queue");
+      });
+    });
+  };
+
+  const leaveRoom = (roomCode: string) => {
+    return new Promise<void>((resolve, reject) => {
+      if (!socket) return reject("No socket");
+      socket.emit("leave_room", { roomCode }, (res: { ok: boolean; error?: string }) => {
+        if (res.ok) resolve();
+        else reject(res.error || "Could not leave room");
       });
     });
   };
@@ -556,6 +567,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       setActiveRoom,
       joinAsSpectator,
       reconnectAsSpectator,
+      leaveRoom,
       joinQueue,
       leaveQueue,
       kottStepDown,
