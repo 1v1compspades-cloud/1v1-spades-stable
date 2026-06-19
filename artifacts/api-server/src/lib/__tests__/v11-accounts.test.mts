@@ -51,7 +51,12 @@ class FakeAccountDb {
             ) {
               throw new FakeUniqueError("v11_accounts_email_hash_unique");
             }
+            const now = new Date();
             const account = {
+              status: "active",
+              metadata: {},
+              createdAt: now,
+              updatedAt: now,
               deletionRequestedAt: null,
               deletedAt: null,
               ...row,

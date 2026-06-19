@@ -148,15 +148,10 @@ export async function createV11Account(
   db: V11AccountDb,
   input: { displayName: unknown; emailHash?: unknown },
 ): Promise<PublicV11Account> {
-  const now = new Date();
   const row: InsertV11Account = {
     id: randomUUID(),
     displayName: sanitizeDisplayName(input.displayName),
     emailHash: sanitizeEmailHash(input.emailHash),
-    status: "active",
-    metadata: {},
-    createdAt: now,
-    updatedAt: now,
   };
 
   try {
