@@ -2,6 +2,7 @@ import { Server as SocketIOServer, type Socket } from "socket.io";
 import type { Server as HttpServer } from "node:http";
 import { timingSafeEqual, randomUUID } from "node:crypto";
 import { logger } from "../lib/logger.js";
+import { isV11FlagEnabled } from "../lib/v11-flags.js";
 import {
   createRoom,
   joinRoom,
@@ -45,6 +46,10 @@ import {
   saveCompletedMatchResult,
   type MatchResultReason,
 } from "./persistence.js";
+import {
+  FindMatchQueue,
+  type FindMatchMatchedPayload,
+} from "./findMatchmaking.js";
 import type { Card } from "./deck.js";
 import {
   createTournament as createTournamentEntity,
@@ -1548,6 +1553,122 @@ function broadcastState(
 //   - TTL-expired rooms get pruned in one pass so we don't rehydrate
 //     garbage.
 const POST_BOOT_GRACE_MS = 2_000;
+const DEFAULT_FIND_MATCH_TIMEOUT_MS = 60_000;
+
+function getFindMatchTimeoutMs(): number {
+  const configured = Number(process.env.V11_MATCHMAKING_TIMEOUT_MS);
+  if (Number.isFinite(configured) && configured > 0 && configured <= 10 * 60_000) {
+    return Math.floor(configured);
+  }
+  return DEFAULT_FIND_MATCH_TIMEOUT_MS;
+}
+
+function normalizeFindMatchPlayerName(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value.trim().replace(/\s+/g, " ").slice(0, 32);
+}
+
+async function createFindMatchRoom(
+  io: SocketIOServer,
+  first: { socket: Socket; playerName: string; profileUsername: string | null },
+  second: { socket: Socket; playerName: string; profileUsername: string | null },
+): Promise<[FindMatchMatchedPayload, FindMatchMatchedPayload]> {
+  if (getAllRooms().length >= MAX_TOTAL_ROOMS) {
+    throw new Error("Server is at capacity. Please try again later.");
+  }
+
+  const state = createRoom(
+    first.playerName,
+    first.socket.id,
+    250,
+    "Find Match",
+    "quick",
+    undefined,
+    first.profileUsername,
+  );
+  await withRoomLock(state.roomCode, async () => {
+    await commit(state, {
+      action: "room_created",
+      actorSeat: 0,
+      payload: {
+        mode: "quick",
+        matchTarget: 250,
+        host: first.playerName,
+        profileUsername: first.profileUsername,
+        label: "Find Match",
+        via: "find_match",
+      },
+    });
+  });
+
+  let firstToken: string | undefined;
+  try {
+    firstToken = await issueReconnectToken(state.roomCode, 0, first.playerName);
+    state.tokenizedSeats = state.tokenizedSeats ?? [false, false];
+    state.tokenizedSeats[0] = true;
+    await withRoomLock(state.roomCode, async () => {
+      await commit(state, { action: "token_issued", actorSeat: 0, payload: { seat: 0 } });
+    });
+  } catch (err) {
+    logger.warn({ err, roomCode: state.roomCode }, "issueReconnectToken failed (find_match host)");
+  }
+
+  let joinResult: { state: GameState; playerIndex: number } | null = null;
+  let joinErr: Error | null = null;
+  await withRoomLock(state.roomCode, async () => {
+    try {
+      const result = joinRoom(state.roomCode, second.playerName, second.socket.id, second.profileUsername);
+      joinResult = result;
+      await commit(result.state, {
+        action: "player_joined",
+        actorSeat: result.playerIndex,
+        payload: { name: second.playerName, profileUsername: second.profileUsername, via: "find_match" },
+      });
+    } catch (err) {
+      joinErr = err as Error;
+    }
+  });
+  if (joinErr || !joinResult) throw joinErr ?? new Error("Unable to join matched room.");
+
+  const joined = joinResult as { state: GameState; playerIndex: number };
+  let secondToken: string | undefined;
+  try {
+    secondToken = await issueReconnectToken(state.roomCode, joined.playerIndex as 0 | 1, second.playerName);
+    joined.state.tokenizedSeats = joined.state.tokenizedSeats ?? [false, false];
+    joined.state.tokenizedSeats[joined.playerIndex as 0 | 1] = true;
+    await withRoomLock(state.roomCode, async () => {
+      await commit(joined.state, {
+        action: "token_issued",
+        actorSeat: joined.playerIndex,
+        payload: { seat: joined.playerIndex },
+      });
+    });
+  } catch (err) {
+    logger.warn({ err, roomCode: state.roomCode }, "issueReconnectToken failed (find_match guest)");
+  }
+
+  first.socket.join(state.roomCode);
+  second.socket.join(state.roomCode);
+  (first.socket.data as { playerName?: string }).playerName = first.playerName;
+  (second.socket.data as { playerName?: string }).playerName = second.playerName;
+  logger.info(
+    { roomCode: state.roomCode, hostSocketId: first.socket.id, guestSocketId: second.socket.id },
+    "Find Match created room",
+  );
+
+  io.to(first.socket.id).emit("opponent_joined", { playerName: second.playerName });
+  broadcastState(io, joined.state);
+
+  return [
+    { roomCode: state.roomCode, playerIndex: 0, token: firstToken, route: `/room/${state.roomCode}` },
+    {
+      roomCode: state.roomCode,
+      playerIndex: joined.playerIndex as 0 | 1,
+      token: secondToken,
+      route: `/room/${state.roomCode}`,
+    },
+  ];
+}
 
 export async function rehydrateRoomsOnBoot(io: SocketIOServer): Promise<{
   loaded: number;
@@ -1612,6 +1733,11 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
     },
     path: "/socket.io",
   });
+  const findMatchQueue = new FindMatchQueue<Socket>({
+    isEnabled: () => isV11FlagEnabled("V11_MATCHMAKING_ENABLED"),
+    timeoutMs: getFindMatchTimeoutMs,
+    matchPlayers: (first, second) => createFindMatchRoom(io, first, second),
+  });
 
   io.on("connection", (socket) => {
     totalConnectionsSinceStart += 1;
@@ -1619,6 +1745,31 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
     const concurrent = io.engine.clientsCount;
     if (concurrent > peakConcurrentSockets) peakConcurrentSockets = concurrent;
     logger.info({ socketId: socket.id }, "Socket connected");
+
+    socket.on("find_match_join", (data: { playerName?: string; profileUsername?: string } = {}) => {
+      if (!checkRate(socket.id, "find_match_join", 10, 30_000)) {
+        socket.emit("find_match_error", {
+          code: "rate_limited",
+          message: "Slow down — too many Find Match attempts.",
+        });
+        return;
+      }
+      if (!checkIpRate(socket.handshake.address, "find_match_join", 30, 10 * 60_000)) {
+        socket.emit("find_match_error", {
+          code: "rate_limited",
+          message: "Too many Find Match attempts from this network. Try again later.",
+        });
+        return;
+      }
+
+      const playerName = normalizeFindMatchPlayerName(data.playerName);
+      const profileUsername = normalizeProfileUsername(data.profileUsername);
+      void findMatchQueue.join({ socket, playerName, profileUsername });
+    });
+
+    socket.on("find_match_cancel", () => {
+      findMatchQueue.cancel(socket);
+    });
 
     socket.on(
       "create_room",
@@ -3386,6 +3537,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
     );
 
     socket.on("disconnect", () => {
+      findMatchQueue.disconnect(socket);
       clearRateForSocket(socket.id);
       adminSockets.delete(socket.id);
       const playerName = (socket.data as { playerName?: string }).playerName;
