@@ -586,15 +586,50 @@
   }
 
   .spades-card-back {
-    border-color: rgba(245, 197, 24, 0.38);
+    border-color: rgba(244, 220, 148, 0.72);
     background:
-      linear-gradient(135deg, rgba(245, 197, 24, 0.18), transparent 22%, rgba(245, 197, 24, 0.11) 52%, transparent),
-      repeating-linear-gradient(45deg, rgba(245, 197, 24, 0.16) 0 2px, rgba(10, 20, 24, 0.95) 2px 8px),
-      #111827;
+      radial-gradient(circle at 50% 50%, rgba(245, 197, 24, 0.14), transparent 38%),
+      linear-gradient(135deg, transparent 0 17%, rgba(255,255,255,0.08) 18%, transparent 19% 54%, rgba(245,197,24,0.12) 55%, transparent 56%),
+      repeating-linear-gradient(45deg, rgba(245, 197, 24, 0.16) 0 1px, transparent 1px 9px),
+      linear-gradient(145deg, #050504, #15120b 48%, #030303);
     box-shadow:
       0 14px 28px -20px rgba(0,0,0,0.95),
-      inset 0 0 0 2px rgba(0,0,0,0.35),
-      inset 0 0 0 5px rgba(245, 197, 24, 0.08);
+      inset 0 0 0 2px rgba(0,0,0,0.5),
+      inset 0 0 0 5px rgba(245, 197, 24, 0.14),
+      inset 0 0 0 8px rgba(0,0,0,0.38),
+      inset 0 0 24px rgba(245, 197, 24, 0.12);
+  }
+
+  .spades-card-back::before {
+    content: "1v1";
+    position: absolute;
+    inset: 1.15rem 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(245, 197, 24, 0.88);
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 1.45rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-shadow:
+      0 1px 0 rgba(255,255,255,0.24),
+      0 0 12px rgba(245,197,24,0.28);
+  }
+
+  .spades-card-back::after {
+    content: "";
+    position: absolute;
+    inset: 0.55rem;
+    border: 1px solid rgba(245, 197, 24, 0.42);
+    border-radius: 0.58rem;
+    pointer-events: none;
+    background:
+      linear-gradient(45deg, transparent 43%, rgba(245,197,24,0.4) 44% 45%, transparent 46%),
+      linear-gradient(-45deg, transparent 43%, rgba(245,197,24,0.28) 44% 45%, transparent 46%);
+    box-shadow:
+      inset 0 0 0 1px rgba(0,0,0,0.6),
+      0 0 12px rgba(245,197,24,0.13);
   }
 
   .spades-gold-button {
