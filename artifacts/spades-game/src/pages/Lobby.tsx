@@ -12,6 +12,7 @@ import { ConnectionPill } from "@/components/ConnectionPill";
 import { InfoMenu } from "@/components/InfoMenu";
 import { LegalFooter, MatchAgreementNotice } from "@/components/LegalFooter";
 import { PreGameChecklist } from "@/components/PreGameChecklist";
+import { V11LeaderboardPanel } from "@/components/V11LeaderboardPanel";
 import { v11WebFlags } from "@/lib/v11Flags";
 
 type FindMatchMatchedPayload = {
@@ -810,6 +811,8 @@ export default function Lobby() {
           </div>
 
           <MatchAgreementNotice />
+
+          <V11LeaderboardPanel />
 
           <div className="pt-4 border-t border-border/50 space-y-2">
             <Button
