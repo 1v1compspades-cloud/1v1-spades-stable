@@ -109,6 +109,37 @@ async function testSecondPlayerMatches() {
   ok("finding match count clears on match", counts.join(",") === "1,0", counts);
 }
 
+async function testAccountIdentityCarriesThroughMatchCallback() {
+  const first = new FakeSocket("s-account-first");
+  const second = new FakeSocket("s-account-second");
+  const queue = new FindMatchQueue<FakeSocket>({
+    isEnabled: () => true,
+    timeoutMs: () => 1_000,
+    matchPlayers: async (a, b) => {
+      ok("first account identity reaches match callback", a.accountId === "acct-1" && a.accountUsername === "Alpha", a);
+      ok("second account identity reaches match callback", b.accountId === "acct-2" && b.accountUsername === "Bravo", b);
+      return [matched("ACCT12", 0), matched("ACCT12", 1)];
+    },
+  });
+
+  await queue.join({
+    socket: first,
+    playerName: "Guest One",
+    profileUsername: null,
+    accountId: "acct-1",
+    accountUsername: "Alpha",
+  });
+  await queue.join({
+    socket: second,
+    playerName: "Guest Two",
+    profileUsername: null,
+    accountId: "acct-2",
+    accountUsername: "Bravo",
+  });
+
+  ok("account identity match emits room", !!last(first, "find_match_matched") && !!last(second, "find_match_matched"));
+}
+
 async function testCancelClearsQueue() {
   const first = new FakeSocket("s-cancel");
   const second = new FakeSocket("s-after-cancel");
@@ -170,6 +201,7 @@ async function main() {
   await testFlagOffRejects();
   await testFirstPlayerWaitsAndDuplicateIsIdempotent();
   await testSecondPlayerMatches();
+  await testAccountIdentityCarriesThroughMatchCallback();
   await testCancelClearsQueue();
   await testDisconnectClearsQueue();
   await testTimeoutClearsQueue();

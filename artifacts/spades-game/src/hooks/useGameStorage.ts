@@ -5,6 +5,12 @@ export function useGameStorage() {
   const [profileUsername, setProfileUsername] = useState(
     () => localStorage.getItem("spades_profile_username") || "",
   );
+  const [accountId, setAccountId] = useState(
+    () => localStorage.getItem("spades_v11_account_id") || "",
+  );
+  const [accountUsername, setAccountUsername] = useState(
+    () => localStorage.getItem("spades_v11_account_username") || "",
+  );
   const [roomCode, setRoomCode] = useState(() => localStorage.getItem("spades_roomCode") || "");
   const [playerIndex, setPlayerIndex] = useState<0 | 1 | null>(() => {
     const saved = localStorage.getItem("spades_playerIndex");
@@ -24,6 +30,27 @@ export function useGameStorage() {
     setProfileUsername(normalized);
     if (normalized) localStorage.setItem("spades_profile_username", normalized);
     else localStorage.removeItem("spades_profile_username");
+  };
+
+  const saveAccountIdentity = (id: string, username: string) => {
+    const normalizedId = id.trim();
+    const normalizedUsername = username.trim();
+    setAccountId(normalizedId);
+    setAccountUsername(normalizedUsername);
+    if (normalizedId) {
+      localStorage.setItem("spades_v11_account_id", normalizedId);
+    } else {
+      localStorage.removeItem("spades_v11_account_id");
+    }
+    if (normalizedUsername) {
+      localStorage.setItem("spades_v11_account_username", normalizedUsername);
+    } else {
+      localStorage.removeItem("spades_v11_account_username");
+    }
+  };
+
+  const clearAccountIdentity = () => {
+    saveAccountIdentity("", "");
   };
 
   const saveRoomCode = (code: string) => {
@@ -182,11 +209,15 @@ export function useGameStorage() {
   return {
     playerName,
     profileUsername,
+    accountId,
+    accountUsername,
     roomCode,
     playerIndex,
     isSpectator,
     savePlayerName,
     saveProfileUsername,
+    saveAccountIdentity,
+    clearAccountIdentity,
     saveRoomCode,
     savePlayerIndex,
     saveIsSpectator,

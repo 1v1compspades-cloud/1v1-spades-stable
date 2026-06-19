@@ -25,6 +25,8 @@ export interface Player {
   id: string;
   name: string;
   profileUsername?: string | null;
+  accountId?: string | null;
+  accountUsername?: string | null;
   socketId: string;
   index: 0 | 1;
 }
@@ -790,6 +792,7 @@ export function createRoom(
   mode: "quick" | "king" = "quick",
   tournamentRef?: { code: string; matchId: string },
   hostProfileUsername?: string | null,
+  hostAccountIdentity?: { accountId: string; accountUsername: string } | null,
 ): GameState {
   let code: string;
   do {
@@ -802,6 +805,8 @@ export function createRoom(
     id: hostSocketId,
     name: hostPlayerName,
     profileUsername: hostProfileUsername ?? null,
+    accountId: hostAccountIdentity?.accountId ?? null,
+    accountUsername: hostAccountIdentity?.accountUsername ?? null,
     socketId: hostSocketId,
     index: 0,
   };
@@ -815,6 +820,7 @@ export function joinRoom(
   playerName: string,
   socketId: string,
   profileUsername?: string | null,
+  accountIdentity?: { accountId: string; accountUsername: string } | null,
 ): { state: GameState; playerIndex: 0 | 1 } {
   const state = rooms.get(roomCode);
   if (!state) throw new Error("Room not found");
@@ -829,6 +835,8 @@ export function joinRoom(
     id: socketId,
     name: playerName,
     profileUsername: profileUsername ?? null,
+    accountId: accountIdentity?.accountId ?? null,
+    accountUsername: accountIdentity?.accountUsername ?? null,
     socketId,
     index: 1,
   };

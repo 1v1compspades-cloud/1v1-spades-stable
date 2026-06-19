@@ -16,6 +16,8 @@ export type FindMatchPlayer<TSocket extends FindMatchSocketLike = FindMatchSocke
   socket: TSocket;
   playerName: string;
   profileUsername: string | null;
+  accountId?: string | null;
+  accountUsername?: string | null;
 };
 
 export type FindMatchMatchedPayload = {

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useSocket } from "@/hooks/useSocket";
+import type { AccountIdentityPayload } from "@/hooks/useSocket";
 import { useGameStorage } from "@/hooks/useGameStorage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,10 +37,14 @@ export default function Lobby() {
   const {
     playerName,
     profileUsername,
+    accountId,
+    accountUsername,
     roomCode: storedRoomCode,
     playerIndex: storedPlayerIndex,
     savePlayerName,
     saveProfileUsername,
+    saveAccountIdentity,
+    clearAccountIdentity,
     saveRoomCode,
     savePlayerIndex,
     saveIsSpectator,
@@ -61,6 +66,10 @@ export default function Lobby() {
 
   const [nameInput, setNameInput] = useState(playerName);
   const [profileInput, setProfileInput] = useState(profileUsername);
+  const [accountDisplayNameInput, setAccountDisplayNameInput] = useState(playerName);
+  const [accountUsernameInput, setAccountUsernameInput] = useState(accountUsername);
+  const [accountBusy, setAccountBusy] = useState(false);
+  const [accountStatus, setAccountStatus] = useState<string | null>(null);
   const [joinCodeInput, setJoinCodeInput] = useState(initialParams.code);
   const [matchTarget, setMatchTarget] = useState<250 | 500>(250);
   const [tournamentSize, setTournamentSize] = useState<4 | 8 | 16 | 32>(4);
@@ -114,6 +123,14 @@ export default function Lobby() {
   const optionalProfileUsername = (): string | undefined => {
     const normalized = profileInput.trim().replace(/\s+/g, " ").slice(0, 32);
     return normalized || undefined;
+  };
+
+  const optionalAccountIdentity = (): AccountIdentityPayload | undefined => {
+    if (!v11WebFlags.accounts) return undefined;
+    const id = accountId.trim();
+    const username = accountUsername.trim();
+    if (!id || !username) return undefined;
+    return { accountId: id, accountUsername: username };
   };
 
   useEffect(() => {
@@ -185,7 +202,14 @@ export default function Lobby() {
         return;
       }
       const serverMode: "quick" | "king" = matchMode === "king" ? "king" : "quick";
-      const res = await createRoom(displayName, matchTarget, undefined, serverMode, profile);
+      const res = await createRoom(
+        displayName,
+        matchTarget,
+        undefined,
+        serverMode,
+        profile,
+        optionalAccountIdentity(),
+      );
       if (res.roomCode && res.playerIndex !== undefined) {
         saveRoomCode(res.roomCode);
         savePlayerIndex(res.playerIndex as 0 | 1);
@@ -264,7 +288,11 @@ export default function Lobby() {
     socket.on("find_match_cancelled", onCancelled);
     socket.on("find_match_error", onError);
     findMatchCleanupRef.current = cleanup;
-    socket.emit("find_match_join", { playerName: displayName, profileUsername: profile });
+    socket.emit("find_match_join", {
+      playerName: displayName,
+      profileUsername: profile,
+      ...optionalAccountIdentity(),
+    });
   };
 
   const handleCancelFindMatch = (): void => {
@@ -305,7 +333,7 @@ export default function Lobby() {
           return;
         }
         if (blockIfActiveGame()) return;
-        const res = await joinRoom(code, displayName, profile);
+        const res = await joinRoom(code, displayName, profile, optionalAccountIdentity());
         if (res.playerIndex !== undefined) {
           saveRoomCode(code);
           savePlayerIndex(res.playerIndex as 0 | 1);
@@ -382,6 +410,76 @@ export default function Lobby() {
     setLocation(`/room/${savedRoomCode}?reconnect=1&seat=${savedPlayerSession.seat}`);
   };
 
+  const handleCreateAccount = async (): Promise<void> => {
+    if (!v11WebFlags.accounts) return;
+    const displayName = (accountDisplayNameInput || nameInput).trim();
+    if (!displayName) {
+      toast({ description: "Enter a display name first.", variant: "destructive" });
+      return;
+    }
+    setAccountBusy(true);
+    setAccountStatus(null);
+    try {
+      const res = await fetch("/api/v1.1/accounts/create", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ displayName }),
+      });
+      const body = await res.json();
+      if (!res.ok || !body?.account?.id) {
+        throw new Error(body?.message || "Could not create account.");
+      }
+      saveAccountIdentity(body.account.id, "");
+      setAccountUsernameInput("");
+      setAccountStatus("Account created. Claim a username next.");
+    } catch (err) {
+      toast({
+        description: err instanceof Error ? err.message : "Could not create account.",
+        variant: "destructive",
+      });
+    } finally {
+      setAccountBusy(false);
+    }
+  };
+
+  const handleClaimUsername = async (): Promise<void> => {
+    if (!v11WebFlags.accounts) return;
+    const id = accountId.trim();
+    const username = accountUsernameInput.trim();
+    if (!id) {
+      toast({ description: "Create an account first.", variant: "destructive" });
+      return;
+    }
+    if (!username) {
+      toast({ description: "Enter a username first.", variant: "destructive" });
+      return;
+    }
+    setAccountBusy(true);
+    setAccountStatus(null);
+    try {
+      const res = await fetch("/api/v1.1/accounts/claim-username", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ accountId: id, username }),
+      });
+      const body = await res.json();
+      if (!res.ok || !body?.username?.displayUsername) {
+        throw new Error(body?.message || "Could not claim username.");
+      }
+      saveAccountIdentity(id, body.username.displayUsername);
+      saveProfileUsername(body.username.displayUsername);
+      setProfileInput(body.username.displayUsername);
+      setAccountStatus(`Using account username ${body.username.displayUsername}.`);
+    } catch (err) {
+      toast({
+        description: err instanceof Error ? err.message : "Could not claim username.",
+        variant: "destructive",
+      });
+    } finally {
+      setAccountBusy(false);
+    }
+  };
+
   return (
     <div className="spades-screen min-h-[100dvh] flex items-center justify-center p-3 sm:p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
       <ConnectionPill />
@@ -454,6 +552,85 @@ export default function Lobby() {
               Saved on this device for match history. Guest play still works.
             </p>
           </div>
+          )}
+
+          {v11WebFlags.accounts && (
+            <details
+              className="rounded-md border border-border/50 bg-white/[0.03] px-3 py-2 text-left"
+              data-testid="v11-account-panel"
+            >
+              <summary className="cursor-pointer text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Staging account
+              </summary>
+              <div className="mt-3 space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="account-display-name" className="text-xs">Display name</Label>
+                  <Input
+                    id="account-display-name"
+                    value={accountDisplayNameInput}
+                    onChange={(e) => setAccountDisplayNameInput(e.target.value.slice(0, 32))}
+                    placeholder="Account display name"
+                    disabled={accountBusy}
+                    data-testid="input-v11-account-display-name"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleCreateAccount()}
+                  disabled={accountBusy || !accountDisplayNameInput.trim()}
+                  className="w-full"
+                  data-testid="button-v11-create-account"
+                >
+                  {accountId ? "Create New Account" : "Create Account"}
+                </Button>
+                <div className="space-y-2">
+                  <Label htmlFor="account-username" className="text-xs">Username</Label>
+                  <Input
+                    id="account-username"
+                    value={accountUsernameInput}
+                    onChange={(e) => setAccountUsernameInput(e.target.value.slice(0, 20))}
+                    placeholder="username"
+                    disabled={accountBusy || !accountId}
+                    data-testid="input-v11-account-username"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleClaimUsername()}
+                  disabled={accountBusy || !accountId || !accountUsernameInput.trim()}
+                  className="w-full"
+                  data-testid="button-v11-claim-username"
+                >
+                  Claim Username
+                </Button>
+                {accountId && (
+                  <div className="rounded-md border border-emerald-500/25 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-100">
+                    Account ready: {accountUsername || "username not claimed"}
+                  </div>
+                )}
+                {accountStatus && (
+                  <p className="text-xs text-muted-foreground" data-testid="v11-account-status">
+                    {accountStatus}
+                  </p>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    clearAccountIdentity();
+                    setAccountUsernameInput("");
+                    setAccountStatus("Account identity cleared from this device.");
+                  }}
+                  disabled={accountBusy || !accountId}
+                  className="w-full text-xs"
+                  data-testid="button-v11-clear-account"
+                >
+                  Clear Account On This Device
+                </Button>
+              </div>
+            </details>
           )}
 
           <div className="space-y-2 pt-2 border-t border-border/50">

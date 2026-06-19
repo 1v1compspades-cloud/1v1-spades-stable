@@ -4,6 +4,10 @@ import { timingSafeEqual, randomUUID } from "node:crypto";
 import { db } from "@workspace/db";
 import { logger } from "../lib/logger.js";
 import { isV11FlagEnabled } from "../lib/v11-flags.js";
+import {
+  normalizeV11AccountIdentity,
+  type V11AccountIdentity,
+} from "../lib/v11-account-identity.js";
 import { recordV11CompletedMatchLeaderboardResult } from "../lib/v11-leaderboards.js";
 import {
   createRoom,
@@ -1626,10 +1630,29 @@ function normalizeFindMatchPlayerName(value: unknown): string {
   return value.trim().replace(/\s+/g, " ").slice(0, 32);
 }
 
+function normalizeAccountIdentity(data: {
+  accountId?: unknown;
+  accountUsername?: unknown;
+}): V11AccountIdentity | null {
+  return normalizeV11AccountIdentity(data, isV11FlagEnabled("V11_ACCOUNTS_ENABLED"));
+}
+
 async function createFindMatchRoom(
   io: SocketIOServer,
-  first: { socket: Socket; playerName: string; profileUsername: string | null },
-  second: { socket: Socket; playerName: string; profileUsername: string | null },
+  first: {
+    socket: Socket;
+    playerName: string;
+    profileUsername: string | null;
+    accountId?: string | null;
+    accountUsername?: string | null;
+  },
+  second: {
+    socket: Socket;
+    playerName: string;
+    profileUsername: string | null;
+    accountId?: string | null;
+    accountUsername?: string | null;
+  },
 ): Promise<[FindMatchMatchedPayload, FindMatchMatchedPayload]> {
   if (getAllRooms().length >= MAX_TOTAL_ROOMS) {
     throw new Error("Server is at capacity. Please try again later.");
@@ -1643,6 +1666,9 @@ async function createFindMatchRoom(
     "quick",
     undefined,
     first.profileUsername,
+    first.accountId && first.accountUsername
+      ? { accountId: first.accountId, accountUsername: first.accountUsername }
+      : null,
   );
   await withRoomLock(state.roomCode, async () => {
     await commit(state, {
@@ -1653,6 +1679,7 @@ async function createFindMatchRoom(
         matchTarget: 250,
         host: first.playerName,
         profileUsername: first.profileUsername,
+        accountAttached: Boolean(first.accountId && first.accountUsername),
         label: "Find Match",
         via: "find_match",
       },
@@ -1675,12 +1702,25 @@ async function createFindMatchRoom(
   let joinErr: Error | null = null;
   await withRoomLock(state.roomCode, async () => {
     try {
-      const result = joinRoom(state.roomCode, second.playerName, second.socket.id, second.profileUsername);
+      const result = joinRoom(
+        state.roomCode,
+        second.playerName,
+        second.socket.id,
+        second.profileUsername,
+        second.accountId && second.accountUsername
+          ? { accountId: second.accountId, accountUsername: second.accountUsername }
+          : null,
+      );
       joinResult = result;
       await commit(result.state, {
         action: "player_joined",
         actorSeat: result.playerIndex,
-        payload: { name: second.playerName, profileUsername: second.profileUsername, via: "find_match" },
+        payload: {
+          name: second.playerName,
+          profileUsername: second.profileUsername,
+          accountAttached: Boolean(second.accountId && second.accountUsername),
+          via: "find_match",
+        },
       });
     } catch (err) {
       joinErr = err as Error;
@@ -1814,7 +1854,12 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
     emitOnlineCountUpdate();
     logger.info({ socketId: socket.id }, "Socket connected");
 
-    socket.on("find_match_join", (data: { playerName?: string; profileUsername?: string } = {}) => {
+    socket.on("find_match_join", (data: {
+      playerName?: string;
+      profileUsername?: string;
+      accountId?: string;
+      accountUsername?: string;
+    } = {}) => {
       if (!checkRate(socket.id, "find_match_join", 10, 30_000)) {
         socket.emit("find_match_error", {
           code: "rate_limited",
@@ -1832,7 +1877,14 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
 
       const playerName = normalizeFindMatchPlayerName(data.playerName);
       const profileUsername = normalizeProfileUsername(data.profileUsername);
-      void findMatchQueue.join({ socket, playerName, profileUsername });
+      const accountIdentity = normalizeAccountIdentity(data);
+      void findMatchQueue.join({
+        socket,
+        playerName,
+        profileUsername,
+        accountId: accountIdentity?.accountId ?? null,
+        accountUsername: accountIdentity?.accountUsername ?? null,
+      });
     });
 
     socket.on("find_match_cancel", () => {
@@ -1842,7 +1894,15 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
     socket.on(
       "create_room",
       async (
-        data: { playerName: string; matchTarget?: number; matchLabel?: string; mode?: string },
+        data: {
+          playerName: string;
+          matchTarget?: number;
+          matchLabel?: string;
+          mode?: string;
+          profileUsername?: string;
+          accountId?: string;
+          accountUsername?: string;
+        },
         callback: (res: { ok: boolean; roomCode?: string; playerIndex?: number; token?: string; error?: string }) => void
       ) => {
         try {
@@ -1868,12 +1928,29 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           const label = rawLabel ? rawLabel.slice(0, 40) : undefined;
           const mode: "quick" | "king" = data.mode === "king" ? "king" : "quick";
           const profileUsername = normalizeProfileUsername((data as { profileUsername?: string }).profileUsername);
-          const state = createRoom(data.playerName, socket.id, target, label, mode, undefined, profileUsername);
+          const accountIdentity = normalizeAccountIdentity(data);
+          const state = createRoom(
+            data.playerName,
+            socket.id,
+            target,
+            label,
+            mode,
+            undefined,
+            profileUsername,
+            accountIdentity,
+          );
           await withRoomLock(state.roomCode, async () => {
             await commit(state, {
               action: "room_created",
               actorSeat: 0,
-              payload: { mode, matchTarget: target, host: data.playerName, profileUsername, label },
+              payload: {
+                mode,
+                matchTarget: target,
+                host: data.playerName,
+                profileUsername,
+                accountAttached: Boolean(accountIdentity),
+                label,
+              },
             });
           });
           // Issue the seat-0 reconnect token AFTER commit so the row exists if
@@ -1909,7 +1986,13 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
     socket.on(
       "join_room",
       async (
-        data: { roomCode: string; playerName: string; profileUsername?: string },
+        data: {
+          roomCode: string;
+          playerName: string;
+          profileUsername?: string;
+          accountId?: string;
+          accountUsername?: string;
+        },
         callback: (res: { ok: boolean; playerIndex?: number; token?: string; error?: string }) => void
       ) => {
         try {
@@ -1918,6 +2001,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           }
           const code = data.roomCode.toUpperCase().trim();
           const profileUsername = normalizeProfileUsername(data.profileUsername);
+          const accountIdentity = normalizeAccountIdentity(data);
           let result: { state: GameState; playerIndex: number } | null = null;
           let joinErr: Error | null = null;
           await withRoomLock(code, async () => {
@@ -1966,12 +2050,22 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
                   return;
                 }
               }
-              const r = joinRoom(code, data.playerName, socket.id, profileUsername);
+              const r = joinRoom(
+                code,
+                data.playerName,
+                socket.id,
+                profileUsername,
+                accountIdentity,
+              );
               result = r;
               await commit(r.state, {
                 action: "player_joined",
                 actorSeat: r.playerIndex,
-                payload: { name: data.playerName, profileUsername },
+                payload: {
+                  name: data.playerName,
+                  profileUsername,
+                  accountAttached: Boolean(accountIdentity),
+                },
               });
             } catch (e) {
               joinErr = e as Error;

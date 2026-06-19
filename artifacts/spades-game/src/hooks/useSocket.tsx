@@ -3,6 +3,10 @@ import { io, Socket } from "socket.io-client";
 import { GameState, Card, TournamentState, MatchAssignedPayload, TournamentDisconnectNotice, AdminAuditEntry, AdminDashboardSnapshot } from "@/lib/game";
 
 export type SocketStatus = "connecting" | "online" | "reconnecting" | "offline";
+export type AccountIdentityPayload = {
+  accountId: string;
+  accountUsername: string;
+};
 
 // SECURITY: the admin unlock lives ONLY in sessionStorage (cleared when the tab
 // closes), never localStorage, links, or shared state. It holds an opaque,
@@ -16,8 +20,8 @@ interface SocketContextType {
   gameState: GameState | null;
   error: string | null;
   connect: () => void;
-  createRoom: (name: string, matchTarget?: number, matchLabel?: string, mode?: "quick" | "king", profileUsername?: string) => Promise<{ roomCode?: string; playerIndex?: number; token?: string }>;
-  joinRoom: (code: string, name: string, profileUsername?: string) => Promise<{ playerIndex?: number; token?: string }>;
+  createRoom: (name: string, matchTarget?: number, matchLabel?: string, mode?: "quick" | "king", profileUsername?: string, accountIdentity?: AccountIdentityPayload) => Promise<{ roomCode?: string; playerIndex?: number; token?: string }>;
+  joinRoom: (code: string, name: string, profileUsername?: string, accountIdentity?: AccountIdentityPayload) => Promise<{ playerIndex?: number; token?: string }>;
   reconnect: (roomCode: string, playerIndex: 0 | 1, playerName: string, token?: string) => Promise<{ ok: boolean }>;
   startGame: (code: string) => void;
   placeBid: (code: string, amount: number) => Promise<void>;
@@ -230,10 +234,25 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const createRoom = (playerName: string, matchTarget?: number, matchLabel?: string, mode?: "quick" | "king", profileUsername?: string) => {
+  const createRoom = (
+    playerName: string,
+    matchTarget?: number,
+    matchLabel?: string,
+    mode?: "quick" | "king",
+    profileUsername?: string,
+    accountIdentity?: AccountIdentityPayload,
+  ) => {
     return new Promise<{ roomCode?: string; playerIndex?: number; token?: string }>((resolve, reject) => {
       if (!socket) return reject("No socket");
-      socket.emit("create_room", { playerName, matchTarget, matchLabel, mode, profileUsername }, (res: any) => {
+      socket.emit("create_room", {
+        playerName,
+        matchTarget,
+        matchLabel,
+        mode,
+        profileUsername,
+        accountId: accountIdentity?.accountId,
+        accountUsername: accountIdentity?.accountUsername,
+      }, (res: any) => {
         if (res.ok) resolve({ roomCode: res.roomCode, playerIndex: res.playerIndex, token: res.token });
         else reject(res.error);
       });
@@ -303,10 +322,21 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const joinRoom = (roomCode: string, playerName: string, profileUsername?: string) => {
+  const joinRoom = (
+    roomCode: string,
+    playerName: string,
+    profileUsername?: string,
+    accountIdentity?: AccountIdentityPayload,
+  ) => {
     return new Promise<{ playerIndex?: number; token?: string }>((resolve, reject) => {
       if (!socket) return reject("No socket");
-      socket.emit("join_room", { roomCode, playerName, profileUsername }, (res: any) => {
+      socket.emit("join_room", {
+        roomCode,
+        playerName,
+        profileUsername,
+        accountId: accountIdentity?.accountId,
+        accountUsername: accountIdentity?.accountUsername,
+      }, (res: any) => {
         if (res.ok) resolve({ playerIndex: res.playerIndex, token: res.token });
         else reject(res.error);
       });
