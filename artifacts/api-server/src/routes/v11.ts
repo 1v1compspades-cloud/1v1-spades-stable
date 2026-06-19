@@ -47,6 +47,32 @@ function serializeAccountError(error: unknown) {
     return { message: String(error) };
   }
 
+  const safePgFields = (value: unknown) => {
+    if (!value || typeof value !== "object") return undefined;
+    const candidate = value as {
+      message?: unknown;
+      code?: unknown;
+      table?: unknown;
+      column?: unknown;
+      constraint?: unknown;
+      detail?: unknown;
+    };
+
+    return {
+      message:
+        typeof candidate.message === "string" ? candidate.message : undefined,
+      code: typeof candidate.code === "string" ? candidate.code : undefined,
+      table: typeof candidate.table === "string" ? candidate.table : undefined,
+      column:
+        typeof candidate.column === "string" ? candidate.column : undefined,
+      constraint:
+        typeof candidate.constraint === "string"
+          ? candidate.constraint
+          : undefined,
+      detail: typeof candidate.detail === "string" ? candidate.detail : undefined,
+    };
+  };
+
   const candidate = error as {
     name?: unknown;
     message?: unknown;
@@ -55,6 +81,7 @@ function serializeAccountError(error: unknown) {
     table?: unknown;
     column?: unknown;
     constraint?: unknown;
+    cause?: unknown;
   };
 
   return {
@@ -70,6 +97,7 @@ function serializeAccountError(error: unknown) {
       typeof candidate.constraint === "string"
         ? candidate.constraint
         : undefined,
+    cause: safePgFields(candidate.cause),
   };
 }
 
