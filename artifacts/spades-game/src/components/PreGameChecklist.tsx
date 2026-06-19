@@ -15,6 +15,7 @@ export function PreGameChecklist({
   const items = [
     "Open in Safari or Chrome (not an app's built-in browser)",
     "Avoid social app built-in browsers",
+    "On desktop, play in full screen",
     "No private / incognito mode",
     "Close old game tabs",
     "One player, one device, one tab",
