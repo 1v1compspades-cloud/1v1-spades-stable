@@ -727,8 +727,12 @@ function GameOverView({
   onLeave: () => void;
   colors: Colors;
 }) {
-  const iWon = gs.scores[mySeat] > gs.scores[otherSeat(mySeat)];
-  const tie = gs.scores[0] === gs.scores[1];
+  const explicitWinner = gs.winnerSeat ?? null;
+  const oppSeat = otherSeat(mySeat);
+  const tie = explicitWinner == null && gs.scores[0] === gs.scores[1];
+  const iWon = explicitWinner != null
+    ? explicitWinner === mySeat
+    : gs.scores[mySeat] > gs.scores[oppSeat];
   return (
     <View style={styles.phaseStack}>
       <View
@@ -742,7 +746,7 @@ function GameOverView({
           {tie ? "It's a tie" : iWon ? "You win!" : "You lose"}
         </Text>
         <Text style={[styles.gameOverScore, { color: colors.mutedForeground }]}>
-          Final {gs.scores[mySeat]} — {gs.scores[otherSeat(mySeat)]}
+          Final {gs.scores[mySeat]} — {gs.scores[oppSeat]}
         </Text>
         {gs.gameOverReason ? (
           <Text style={[styles.hint, { color: colors.mutedForeground, textAlign: "center" }]}>

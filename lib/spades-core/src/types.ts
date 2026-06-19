@@ -82,8 +82,13 @@ export interface GameState {
   /** Host has paused this match (tournament admin). Unused in free play. */
   isPaused?: boolean;
   /**
-   * Set only when the match ended via the bust-out floor rule (a total reached
-   * the loss floor). Null/undefined for normal target or tiebreaker wins.
+   * Explicit winner for non-score-derived endings such as forfeits,
+   * disconnect timeouts, or host auto-victory. Normal scoring wins leave this
+   * unset and derive the winner from the displayed score.
+   */
+  winnerSeat?: 0 | 1 | null;
+  /**
+   * Human-readable game-over reason, including bust-out and auto-victory labels.
    */
   gameOverReason?: string | null;
 }
