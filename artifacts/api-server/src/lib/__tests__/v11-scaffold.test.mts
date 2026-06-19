@@ -49,6 +49,15 @@ function readAccountPrivacyScaffold(): string {
   );
 }
 
+function readV11AccountSchema(): string {
+  return readFileSync(
+    fileURLToPath(
+      new URL("../../../../../lib/db/src/schema/v11-accounts.ts", import.meta.url),
+    ),
+    "utf8",
+  );
+}
+
 test("v1.1 scaffold keeps all planned feature flags explicit", () => {
   assert.deepEqual([...serverFlags], [
     "V11_ACCOUNTS_ENABLED",
@@ -111,4 +120,23 @@ test("v1.1 historical guest identity policy remains blocked for review", () => {
   const source = readAccountPrivacyScaffold();
 
   assert.match(source, /id: "historical-guest-results-unclaimed"[\s\S]*status: "blocked"/);
+});
+
+test("v1.1 account schema includes deletion and anonymization planning fields", () => {
+  const source = readV11AccountSchema();
+
+  assert.match(source, /v11AccountsTable/);
+  assert.match(source, /deletionRequestedAt/);
+  assert.match(source, /deletedAt/);
+  assert.match(source, /emailHash/);
+  assert.match(source, /metadata/);
+});
+
+test("v1.1 username schema stays separate from historical match result names", () => {
+  const source = readV11AccountSchema();
+
+  assert.match(source, /v11UsernamesTable/);
+  assert.match(source, /normalizedUsername/);
+  assert.match(source, /displayUsername/);
+  assert.match(source, /pre-account match name is not claimable identity/);
 });
