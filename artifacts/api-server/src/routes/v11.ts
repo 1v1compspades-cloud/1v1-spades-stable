@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Response } from "express";
 import { db } from "@workspace/db";
 import { isV11FlagEnabled } from "../lib/v11-flags.js";
+import { logger } from "../lib/logger.js";
 import {
   claimV11Username,
   createV11Account,
@@ -41,6 +42,37 @@ function statusForAccountError(error: V11AccountError): number {
   }
 }
 
+function serializeAccountError(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return { message: String(error) };
+  }
+
+  const candidate = error as {
+    name?: unknown;
+    message?: unknown;
+    stack?: unknown;
+    code?: unknown;
+    table?: unknown;
+    column?: unknown;
+    constraint?: unknown;
+  };
+
+  return {
+    name: typeof candidate.name === "string" ? candidate.name : undefined,
+    message:
+      typeof candidate.message === "string" ? candidate.message : undefined,
+    stack: typeof candidate.stack === "string" ? candidate.stack : undefined,
+    code: typeof candidate.code === "string" ? candidate.code : undefined,
+    table: typeof candidate.table === "string" ? candidate.table : undefined,
+    column:
+      typeof candidate.column === "string" ? candidate.column : undefined,
+    constraint:
+      typeof candidate.constraint === "string"
+        ? candidate.constraint
+        : undefined,
+  };
+}
+
 function handleAccountError(res: Response, error: unknown) {
   if (error instanceof V11AccountError) {
     res.status(statusForAccountError(error)).json({
@@ -50,6 +82,15 @@ function handleAccountError(res: Response, error: unknown) {
     });
     return;
   }
+
+  logger.error(
+    {
+      err: serializeAccountError(error),
+      feature: "v1.1_accounts",
+      code: "account_error",
+    },
+    "v1.1 account request failed",
+  );
 
   res.status(500).json({
     ok: false,
