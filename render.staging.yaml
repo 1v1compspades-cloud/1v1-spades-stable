@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: onev1-spades-staging
+    runtime: node
+    buildCommand: env CI=true corepack pnpm install --frozen-lockfile && env CI=true corepack pnpm run build:render-staging
+    startCommand: corepack pnpm --filter @workspace/api-server run start
