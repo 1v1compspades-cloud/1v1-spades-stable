@@ -62,7 +62,11 @@ const USERNAME_PATTERN = /^[a-z0-9_]+$/;
 
 function isUniqueViolation(error: unknown, constraint?: string): boolean {
   if (!error || typeof error !== "object") return false;
-  const candidate = error as { code?: string; constraint?: string };
+  const source =
+    "cause" in error && error.cause && typeof error.cause === "object"
+      ? error.cause
+      : error;
+  const candidate = source as { code?: string; constraint?: string };
   if (candidate.code !== "23505") return false;
   return !constraint || candidate.constraint === constraint;
 }

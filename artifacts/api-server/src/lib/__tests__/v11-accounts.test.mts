@@ -24,16 +24,42 @@ class FakeUniqueError extends Error {
   }
 }
 
+class FakeWrappedUniqueError extends Error {
+  cause: FakeUniqueError;
+
+  constructor(constraint: string) {
+    super("Failed query");
+    this.cause = new FakeUniqueError(constraint);
+  }
+}
+
 class FakeAccountDb {
   accounts: V11AccountRow[] = [];
   usernames: V11UsernameRow[] = [];
 
+  private getEqValue(condition: unknown): string | null {
+    if (!condition || typeof condition !== "object") return null;
+    const chunks = (condition as { queryChunks?: Array<{ value?: unknown }> })
+      .queryChunks;
+    const value = chunks?.find((chunk) => typeof chunk.value === "string")?.value;
+    return typeof value === "string" ? value : null;
+  }
+
   select() {
     return {
       from: (table: unknown) => ({
-        where: async () => {
-          if (table === v11AccountsTable) return this.accounts;
-          if (table === v11UsernamesTable) return this.usernames;
+        where: async (condition: unknown) => {
+          const value = this.getEqValue(condition);
+          if (table === v11AccountsTable) {
+            return value
+              ? this.accounts.filter((account) => account.id === value)
+              : this.accounts;
+          }
+          if (table === v11UsernamesTable) {
+            return value
+              ? this.usernames.filter((username) => username.accountId === value)
+              : this.usernames;
+          }
           return [];
         },
       }),
@@ -49,7 +75,7 @@ class FakeAccountDb {
               row.emailHash &&
               this.accounts.some((account) => account.emailHash === row.emailHash)
             ) {
-              throw new FakeUniqueError("v11_accounts_email_hash_unique");
+              throw new FakeWrappedUniqueError("v11_accounts_email_hash_unique");
             }
             const now = new Date();
             const account = {
@@ -69,11 +95,10 @@ class FakeAccountDb {
             if (
               this.usernames.some(
                 (username) =>
-                  username.normalizedUsername === row.normalizedUsername &&
-                  username.status === "active",
+                  username.normalizedUsername === row.normalizedUsername,
               )
             ) {
-              throw new FakeUniqueError("v11_usernames_pkey");
+              throw new FakeWrappedUniqueError("v11_usernames_pkey");
             }
             if (
               this.usernames.some(
@@ -81,7 +106,7 @@ class FakeAccountDb {
                   username.accountId === row.accountId && username.status === "active",
               )
             ) {
-              throw new FakeUniqueError("v11_usernames_account_unique");
+              throw new FakeWrappedUniqueError("v11_usernames_account_unique");
             }
             const username = {
               releasedAt: null,
@@ -220,6 +245,7 @@ test("v1.1 account deletion anonymizes identity and releases usernames safely", 
     displayName: "Player One",
     emailHash: "c".repeat(64),
   });
+  const other = await createV11Account(db, { displayName: "Player Two" });
   await claimV11Username(db, { accountId: account.id, username: "PlayerOne" });
 
   const deleted = await deleteV11Account(db, { accountId: account.id });
@@ -234,4 +260,9 @@ test("v1.1 account deletion anonymizes identity and releases usernames safely", 
   const repeated = await deleteV11Account(db, { accountId: account.id });
   assert.equal(repeated.deleted, true);
   assert.equal(repeated.account.status, "deleted");
+
+  await assertAccountError(
+    claimV11Username(db, { accountId: other.id, username: "PlayerOne" }),
+    "username_taken",
+  );
 });
