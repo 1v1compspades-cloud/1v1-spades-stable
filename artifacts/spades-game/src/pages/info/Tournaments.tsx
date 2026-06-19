@@ -47,7 +47,7 @@ export default function Tournaments() {
           <h2>Recognition-only events</h2>
           <p>
             Events are free to enter and are played for competition, standings,
-            and community recognition only. There are no buy-ins, deposits,
+            and recognition only. There are no buy-ins, deposits,
             wagering, cash payouts, or redeemable rewards.
           </p>
         </section>
@@ -56,7 +56,7 @@ export default function Tournaments() {
           <h2>Weekly schedule</h2>
           <p>
             Tournaments run on a regular weekly cadence, with events on
-            <strong> Mondays and Fridays</strong>. Watch the community for
+            <strong> Mondays and Fridays</strong>. Watch the schedule for
             announcements, check-in times, and bracket links for each event.
           </p>
         </section>

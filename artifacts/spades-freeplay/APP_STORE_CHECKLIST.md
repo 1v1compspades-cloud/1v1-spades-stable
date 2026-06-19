@@ -131,7 +131,7 @@ Have each tester confirm:
 - ⬜ Reconnect: background/relaunch returns the player to their seat
 - ⬜ "How Dealing Works": animation plays, Skip / Fast Deal / Replay all work
 - ⬜ How to Play and Fair Play screens render correctly
-- ⬜ External links open in the browser: Website, Tournaments, Discord, Privacy, Terms, Support
+- ⬜ External links open in the browser: Website, Tournaments, Privacy, Terms, Support
 - ⬜ Black/gold theme is consistent across every screen
 - ⬜ Layout is safe on notch + home-indicator devices (no clipped content)
 - ⬜ No cash / deposit / wallet / prize / gambling wording anywhere

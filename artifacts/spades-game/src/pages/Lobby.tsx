@@ -483,19 +483,6 @@ export default function Lobby() {
             </p>
           </div>
 
-          <a
-            href="/discord"
-            className="block rounded-md border border-primary/30 bg-primary/10 px-4 py-3 text-center no-underline transition-colors hover:border-primary/60 hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            data-testid="home-discord-promo"
-          >
-            <span className="block text-sm font-bold text-primary">
-              Find opponents on Discord
-            </span>
-            <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
-              Optional community link for room codes, questions, and free-play events.
-            </span>
-          </a>
-
           <PreGameChecklist />
 
           {/* Admin access — discreet entry. Tournaments are admin-only; this

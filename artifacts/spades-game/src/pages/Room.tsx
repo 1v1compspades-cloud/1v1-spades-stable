@@ -2085,7 +2085,7 @@ export default function Room() {
                 </div>
               </div>
 
-              {/* Tournament result copy block — plain text + Discord-formatted */}
+              {/* Tournament result copy block — plain text + shareable formatted */}
               {(() => {
                 const s0 = gameState.scores[0], s1 = gameState.scores[1];
                 const n0 = gameState.players[0]?.name ?? "Seat 1";
@@ -2117,7 +2117,7 @@ export default function Room() {
                 ].filter(Boolean);
 
                 const plain = lines.join("\n");
-                const discord = "```\n" + plain + "\n```";
+                const shareable = "```\n" + plain + "\n```";
 
                 return (
                   <div className="space-y-2 text-left">
@@ -2125,7 +2125,7 @@ export default function Room() {
                     <pre
                       data-testid="report-text"
                       className="text-[11px] leading-snug font-mono bg-black/40 border border-border rounded-md p-3 whitespace-pre-wrap break-words max-h-32 overflow-y-auto text-left"
-                    >{discord}</pre>
+                    >{shareable}</pre>
                     <div className="grid grid-cols-2 gap-2">
                       <Button
                         size="sm"
@@ -2138,7 +2138,7 @@ export default function Room() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => copyToClipboard(discord, "Shareable report")}
+                        onClick={() => copyToClipboard(shareable, "Shareable report")}
                         data-testid="button-copy-shareable-report"
                       >
                         Copy shareable report

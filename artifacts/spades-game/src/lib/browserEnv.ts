@@ -5,17 +5,16 @@
 export type InAppBrowserInfo = {
   /** True when we believe the page is running inside an embedded app webview. */
   inApp: boolean;
-  /** Friendly name of the host app when known (e.g. "Discord"), else null. */
+  /** Friendly name of the host app when known, else null. */
   name: string | null;
   isIOS: boolean;
   isAndroid: boolean;
 };
 
 /**
- * Best-effort detection of an in-app browser (Discord / Facebook / Instagram /
- * TikTok / Snapchat / etc.) from the User-Agent string. These embedded webviews
- * frequently break clipboard, popups, storage persistence and OAuth, which is
- * exactly what bit a player who opened a room link from Discord.
+ * Best-effort detection of an in-app browser from the User-Agent string. These
+ * embedded webviews frequently break clipboard, popups, storage persistence and
+ * OAuth.
  */
 export function detectInAppBrowser(
   ua: string = typeof navigator !== "undefined" ? navigator.userAgent : "",
@@ -25,7 +24,8 @@ export function detectInAppBrowser(
   const isAndroid = /Android/i.test(u);
 
   let name: string | null = null;
-  if (/Discord/i.test(u)) name = "Discord";
+  let inApp = false;
+  if (/Discord/i.test(u)) inApp = true;
   else if (/FBAN|FBAV|FB_IAB|FBIOS|FBBV/i.test(u)) name = "Facebook";
   else if (/Instagram/i.test(u)) name = "Instagram";
   else if (/(BytedanceWebview|musical_ly|TikTok|Bytedance)/i.test(u)) name = "TikTok";
@@ -35,5 +35,5 @@ export function detectInAppBrowser(
   else if (/WhatsApp/i.test(u)) name = "WhatsApp";
   else if (/Pinterest/i.test(u)) name = "Pinterest";
 
-  return { inApp: name !== null, name, isIOS, isAndroid };
+  return { inApp: inApp || name !== null, name, isIOS, isAndroid };
 }
