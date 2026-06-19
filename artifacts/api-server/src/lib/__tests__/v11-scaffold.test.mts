@@ -77,27 +77,20 @@ test("v1.1 scaffold keeps all planned feature flags explicit", () => {
 
 test("v1.1 feature flags require explicit opt-in values", () => {
   const key = envByFeature.accounts;
-  const previous = process.env[key];
 
-  try {
-    process.env[key] = "1";
-    assert.equal(enabled(process.env[key]), true);
+  assert.equal(enabled("1"), true);
+  assert.equal(enabled("true"), true);
+  assert.equal(enabled("yes"), true);
+  assert.equal(enabled("0"), false);
+  assert.equal(enabled(undefined), false);
 
-    process.env[key] = "true";
-    assert.equal(enabled(process.env[key]), true);
-
-    process.env[key] = "yes";
-    assert.equal(enabled(process.env[key]), true);
-
-    process.env[key] = "0";
-    assert.equal(enabled(process.env[key]), false);
-
-    delete process.env[key];
-    assert.equal(enabled(process.env[key]), false);
-  } finally {
-    if (previous === undefined) delete process.env[key];
-    else process.env[key] = previous;
-  }
+  const flagSource = readFileSync(
+    fileURLToPath(new URL("../v11-flags.ts", import.meta.url)),
+    "utf8",
+  );
+  assert.match(flagSource, /value === "1"/);
+  assert.match(flagSource, /value === "true"/);
+  assert.match(flagSource, /value === "yes"/);
 });
 
 test("v1.1 username planning uses stable normalization examples", () => {
@@ -139,4 +132,17 @@ test("v1.1 username schema stays separate from historical match result names", (
   assert.match(source, /normalizedUsername/);
   assert.match(source, /displayUsername/);
   assert.match(source, /pre-account match name is not claimable identity/);
+});
+
+test("v1.1 account API contract stays disabled by default", () => {
+  const routeSource = readFileSync(
+    fileURLToPath(new URL("../../routes/v11.ts", import.meta.url)),
+    "utf8",
+  );
+
+  assert.match(routeSource, /\/accounts\/status/);
+  assert.match(routeSource, /\/accounts\/delete/);
+  assert.match(routeSource, /V11_ACCOUNTS_ENABLED/);
+  assert.match(routeSource, /status\(503\)\.json\(disabledPayload/);
+  assert.match(routeSource, /status\(501\)\.json/);
 });
