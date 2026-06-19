@@ -2020,8 +2020,8 @@ export default function Room() {
 
         {/* Game over overlay (shown to everyone) */}
         {gameState.phase === "game_over" && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-lg overflow-y-auto p-4">
-            <div className="bg-card border border-border p-6 rounded-xl shadow-2xl max-w-sm w-full text-center space-y-5 my-auto">
+          <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/90 p-3 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-lg sm:items-center sm:p-4">
+            <div className="my-auto w-full max-w-sm rounded-xl border border-border bg-card p-4 text-center shadow-2xl space-y-4 sm:p-6 sm:space-y-5">
               {gameState.matchLabel && (
                 <div
                   data-testid="match-label"
