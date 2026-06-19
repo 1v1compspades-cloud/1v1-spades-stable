@@ -29,6 +29,8 @@ All flags are disabled by default. Guest play remains the default experience.
 ## Planned Scaffold Areas
 
 - Account and username tables should be defined before any migration is run.
+  Placeholder definitions now live in `lib/db/src/schema/v11-accounts.ts`;
+  do not run Drizzle push/migrations until the model is reviewed.
 - Matchmaking queue storage should stay separate from room gameplay and create
   ordinary existing rooms after a match is found.
 - Leaderboard aggregate storage may be useful later, while the first read path should use
@@ -75,3 +77,5 @@ Do not modify these without an explicit gameplay task:
   before and after account features are enabled.
 - Pre-account `match_results` display names are guest aliases, not authenticated
   identities, until a separate claim/merge policy is reviewed.
+- `v11_accounts` and `v11_usernames` are placeholder schema definitions only.
+  They are not live data model approval and do not enable account creation.
