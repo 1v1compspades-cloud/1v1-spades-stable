@@ -8,6 +8,11 @@ import {
   deleteV11Account,
   V11AccountError,
 } from "../lib/v11-accounts.js";
+import {
+  DEFAULT_V11_LEADERBOARD_SEASON,
+  listV11Leaderboard,
+  sanitizeLeaderboardSeason,
+} from "../lib/v11-leaderboards.js";
 
 const router: IRouter = Router();
 
@@ -23,6 +28,21 @@ function disabledPayload(feature: string) {
 function accountFeatureEnabled(res: Response, feature: string) {
   if (isV11FlagEnabled("V11_ACCOUNTS_ENABLED")) return true;
   res.status(503).json(disabledPayload(feature));
+  return false;
+}
+
+function leaderboardDisabledPayload() {
+  return {
+    enabled: false,
+    feature: "leaderboards",
+    status: "disabled",
+    message: "v1.1 leaderboards are not enabled.",
+  };
+}
+
+function leaderboardFeatureEnabled(res: Response) {
+  if (isV11FlagEnabled("V11_LEADERBOARDS_ENABLED")) return true;
+  res.status(503).json(leaderboardDisabledPayload());
   return false;
 }
 
@@ -141,6 +161,48 @@ router.post("/accounts/delete", async (req, res) => {
     res.status(200).json({ ok: true, ...result });
   } catch (error) {
     handleAccountError(res, error);
+  }
+});
+
+router.get("/leaderboards/status", (_req, res) => {
+  if (!leaderboardFeatureEnabled(res)) return;
+
+  res.status(200).json({
+    enabled: true,
+    feature: "leaderboards",
+    status: "enabled",
+    seasonKey: DEFAULT_V11_LEADERBOARD_SEASON,
+  });
+});
+
+router.get("/leaderboards", async (req, res) => {
+  if (!leaderboardFeatureEnabled(res)) return;
+
+  try {
+    const seasonKey = sanitizeLeaderboardSeason(req.query.season);
+    const entries = await listV11Leaderboard(db, {
+      limit: req.query.limit,
+      seasonKey,
+    });
+    res.status(200).json({
+      ok: true,
+      seasonKey,
+      entries,
+    });
+  } catch (error) {
+    logger.error(
+      {
+        err: serializeAccountError(error),
+        feature: "v1.1_leaderboards",
+        code: "leaderboard_error",
+      },
+      "v1.1 leaderboard request failed",
+    );
+    res.status(500).json({
+      ok: false,
+      code: "leaderboard_error",
+      message: "Leaderboard request failed.",
+    });
   }
 });
 

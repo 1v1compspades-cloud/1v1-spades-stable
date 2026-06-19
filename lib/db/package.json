@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./schema": "./src/schema/index.ts",
-    "./schema/v11-accounts": "./src/schema/v11-accounts.ts"
+    "./schema/v11-accounts": "./src/schema/v11-accounts.ts",
+    "./schema/v11-leaderboards": "./src/schema/v11-leaderboards.ts"
   },
   "scripts": {
     "push": "drizzle-kit push --config ./drizzle.config.ts",

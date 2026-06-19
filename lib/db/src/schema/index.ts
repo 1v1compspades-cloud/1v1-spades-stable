@@ -4,3 +4,4 @@ export * from "./game-audit-log";
 export * from "./reconnect-tokens";
 export * from "./match-results";
 export * from "./v11-accounts";
+export * from "./v11-leaderboards";

@@ -58,6 +58,15 @@ function readV11AccountSchema(): string {
   );
 }
 
+function readV11LeaderboardSchema(): string {
+  return readFileSync(
+    fileURLToPath(
+      new URL("../../../../../lib/db/src/schema/v11-leaderboards.ts", import.meta.url),
+    ),
+    "utf8",
+  );
+}
+
 test("v1.1 scaffold keeps all planned feature flags explicit", () => {
   assert.deepEqual([...serverFlags], [
     "V11_ACCOUNTS_ENABLED",
@@ -147,6 +156,25 @@ test("v1.1 account API contract stays disabled by default", () => {
   assert.match(routeSource, /V11_ACCOUNTS_ENABLED/);
   assert.match(routeSource, /status\(503\)\.json\(disabledPayload/);
   assert.doesNotMatch(routeSource, /status\(501\)\.json/);
+});
+
+test("v1.1 leaderboard scaffold is account-first and disabled by default", () => {
+  const schemaSource = readV11LeaderboardSchema();
+  const routeSource = readFileSync(
+    fileURLToPath(new URL("../../routes/v11.ts", import.meta.url)),
+    "utf8",
+  );
+
+  assert.match(schemaSource, /v11LeaderboardResultsTable/);
+  assert.match(schemaSource, /v11LeaderboardStatsTable/);
+  assert.match(schemaSource, /winnerAccountId/);
+  assert.match(schemaSource, /loserAccountId/);
+  assert.match(schemaSource, /seasonKey/);
+  assert.match(schemaSource, /guest play remains default/);
+  assert.match(routeSource, /\/leaderboards\/status/);
+  assert.match(routeSource, /\/leaderboards/);
+  assert.match(routeSource, /V11_LEADERBOARDS_ENABLED/);
+  assert.match(routeSource, /status\(503\)\.json\(leaderboardDisabledPayload/);
 });
 
 test("v1.1 account web page stays hidden behind Vite flag", () => {
