@@ -141,10 +141,12 @@ test("v1.1 account API contract stays disabled by default", () => {
   );
 
   assert.match(routeSource, /\/accounts\/status/);
+  assert.match(routeSource, /\/accounts\/create/);
+  assert.match(routeSource, /\/accounts\/claim-username/);
   assert.match(routeSource, /\/accounts\/delete/);
   assert.match(routeSource, /V11_ACCOUNTS_ENABLED/);
   assert.match(routeSource, /status\(503\)\.json\(disabledPayload/);
-  assert.match(routeSource, /status\(501\)\.json/);
+  assert.doesNotMatch(routeSource, /status\(501\)\.json/);
 });
 
 test("v1.1 account web page stays hidden behind Vite flag", () => {
