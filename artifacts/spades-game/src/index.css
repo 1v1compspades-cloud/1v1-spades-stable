@@ -254,6 +254,11 @@
 }
 
 .spades-live-coin {
+  --onyx-bg: #050607;
+  --onyx-panel: #121416;
+  --diamond-white: #f8fbff;
+  --diamond-silver: #b8c0ca;
+  --diamond-border: #e2e8f0;
   position: relative;
   width: 8.8rem;
   height: 8.8rem;
@@ -275,11 +280,11 @@
   border-radius: 50%;
   transform: translateZ(-0.42rem);
   background:
-    repeating-conic-gradient(from 0deg, #f7dc8f 0deg 2deg, #5b421c 2deg 4.5deg, #15120d 4.5deg 6.5deg),
-    linear-gradient(90deg, #16130f, #e2bd60 46%, #21170b);
+    repeating-conic-gradient(from 0deg, var(--diamond-white) 0deg 1.4deg, #31363b 1.4deg 3.2deg, #08090a 3.2deg 6.4deg),
+    linear-gradient(90deg, #070809, var(--diamond-silver) 48%, #0d0f11);
   box-shadow:
-    0 0 0.9rem rgba(235, 181, 72, 0.28),
-    0.18rem 0.1rem 0.18rem rgba(255, 242, 188, 0.18) inset;
+    0 0 1rem rgba(226, 232, 240, 0.22),
+    0.18rem 0.1rem 0.18rem rgba(248, 251, 255, 0.2) inset;
 }
 
 .spades-live-coin__face {
@@ -290,25 +295,25 @@
   border-radius: 50%;
   backface-visibility: hidden;
   overflow: hidden;
-  border: 0.42rem solid #d9b65c;
+  border: 0.42rem solid var(--diamond-border);
   background:
-    radial-gradient(circle at 32% 27%, rgba(255, 255, 255, 0.28) 0 0.12rem, transparent 0.14rem),
-    radial-gradient(circle at 68% 27%, rgba(255, 255, 255, 0.26) 0 0.12rem, transparent 0.14rem),
-    radial-gradient(circle at 84% 50%, rgba(255, 255, 255, 0.26) 0 0.12rem, transparent 0.14rem),
-    radial-gradient(circle at 68% 73%, rgba(255, 255, 255, 0.26) 0 0.12rem, transparent 0.14rem),
-    radial-gradient(circle at 32% 73%, rgba(255, 255, 255, 0.26) 0 0.12rem, transparent 0.14rem),
-    radial-gradient(circle at 16% 50%, rgba(255, 255, 255, 0.26) 0 0.12rem, transparent 0.14rem),
-    repeating-conic-gradient(from 0deg, transparent 0deg 12deg, rgba(244, 204, 105, 0.24) 12deg 13.5deg, transparent 13.5deg 24deg),
-    radial-gradient(circle at 42% 34%, rgba(255, 230, 158, 0.16), transparent 28%),
-    repeating-radial-gradient(circle at 50% 50%, rgba(255, 211, 116, 0.07) 0 0.12rem, rgba(255, 255, 255, 0.025) 0.12rem 0.16rem, transparent 0.16rem 0.42rem),
-    radial-gradient(circle at 50% 52%, #17140f 0 51%, #080807 52% 100%);
+    radial-gradient(circle at 32% 27%, rgba(248, 251, 255, 0.88) 0 0.08rem, rgba(184, 192, 202, 0.5) 0.08rem 0.14rem, transparent 0.15rem),
+    radial-gradient(circle at 68% 27%, rgba(248, 251, 255, 0.8) 0 0.08rem, rgba(184, 192, 202, 0.45) 0.08rem 0.14rem, transparent 0.15rem),
+    radial-gradient(circle at 84% 50%, rgba(248, 251, 255, 0.8) 0 0.08rem, rgba(184, 192, 202, 0.45) 0.08rem 0.14rem, transparent 0.15rem),
+    radial-gradient(circle at 68% 73%, rgba(248, 251, 255, 0.8) 0 0.08rem, rgba(184, 192, 202, 0.45) 0.08rem 0.14rem, transparent 0.15rem),
+    radial-gradient(circle at 32% 73%, rgba(248, 251, 255, 0.8) 0 0.08rem, rgba(184, 192, 202, 0.45) 0.08rem 0.14rem, transparent 0.15rem),
+    radial-gradient(circle at 16% 50%, rgba(248, 251, 255, 0.8) 0 0.08rem, rgba(184, 192, 202, 0.45) 0.08rem 0.14rem, transparent 0.15rem),
+    repeating-conic-gradient(from 45deg, transparent 0deg 10deg, rgba(226, 232, 240, 0.2) 10deg 11.4deg, transparent 11.4deg 22deg),
+    radial-gradient(circle at 42% 30%, rgba(248, 251, 255, 0.12), transparent 28%),
+    repeating-radial-gradient(circle at 50% 50%, rgba(226, 232, 240, 0.08) 0 0.1rem, rgba(248, 251, 255, 0.025) 0.1rem 0.15rem, transparent 0.15rem 0.42rem),
+    radial-gradient(circle at 50% 52%, var(--onyx-panel) 0 51%, var(--onyx-bg) 52% 100%);
   box-shadow:
-    inset 0 0 0 0.16rem #fff0b8,
-    inset 0 0 0 0.28rem #4e3719,
-    inset 0 0 0 0.54rem rgba(255, 226, 139, 0.22),
-    inset 0 0 0 0.8rem rgba(2, 2, 2, 0.72),
+    inset 0 0 0 0.14rem var(--diamond-white),
+    inset 0 0 0 0.3rem #343a40,
+    inset 0 0 0 0.56rem rgba(226, 232, 240, 0.18),
+    inset 0 0 0 0.82rem rgba(2, 3, 4, 0.82),
     inset 0 -1.2rem 2rem rgba(0, 0, 0, 0.55),
-    0 0 0.7rem rgba(230, 179, 83, 0.25);
+    0 0 0.8rem rgba(226, 232, 240, 0.18);
 }
 
 .spades-live-coin__face--tails {
@@ -318,52 +323,68 @@
 .spades-live-coin__rim {
   position: absolute;
   top: 0.72rem;
-  color: #f3d184;
+  color: var(--diamond-white);
   font-family: var(--app-font-mono);
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.18rem;
-  text-transform: uppercase;
-  text-shadow: 0 0.08rem 0 #251607, 0 0 0.45rem rgba(245, 197, 24, 0.34);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.08rem;
+  text-transform: none;
+  text-shadow: 0 0.08rem 0 #000, 0 0 0.42rem rgba(248, 251, 255, 0.34);
 }
 
 .spades-live-coin__spade {
   position: absolute;
-  color: rgba(236, 195, 95, 0.16);
-  font-size: 7.2rem;
+  color: rgba(226, 232, 240, 0.13);
+  font-size: 7.1rem;
   line-height: 1;
   transform: translateY(0.32rem);
   text-shadow:
-    0 0 0.12rem rgba(255, 228, 150, 0.25),
+    0 0 0.12rem rgba(248, 251, 255, 0.2),
     0 0.22rem 0.6rem rgba(0, 0, 0, 0.9);
+}
+
+.spades-live-coin__diamond {
+  position: absolute;
+  z-index: 1;
+  width: 4.55rem;
+  height: 4.55rem;
+  border: 0.12rem solid rgba(248, 251, 255, 0.82);
+  border-radius: 0.34rem;
+  transform: rotate(45deg);
+  background:
+    linear-gradient(135deg, rgba(248, 251, 255, 0.18), rgba(184, 192, 202, 0.04) 38%, rgba(248, 251, 255, 0.12)),
+    var(--onyx-bg);
+  box-shadow:
+    inset 0 0 0 0.12rem rgba(184, 192, 202, 0.28),
+    0 0 0.6rem rgba(248, 251, 255, 0.18);
 }
 
 .spades-live-coin__mark {
   position: relative;
-  z-index: 2;
-  color: #d7a945;
+  z-index: 3;
+  color: var(--diamond-white);
   font-family: var(--app-font-serif);
   font-size: 3.1rem;
   font-weight: 900;
   line-height: 1;
   letter-spacing: 0;
   text-shadow:
-    -0.04rem -0.04rem 0 #fff7ce,
-    0 0.08rem 0 #fff0b0,
-    0 0.22rem 0 #7a4d12,
-    0 0 0.55rem rgba(255, 222, 129, 0.22),
+    -0.04rem -0.04rem 0 var(--diamond-silver),
+    0 0.08rem 0 #7b8794,
+    0 0.22rem 0 #252a30,
+    0 0 0.55rem rgba(248, 251, 255, 0.22),
     0 0.52rem 0.7rem rgba(0, 0, 0, 0.82);
 }
 
 .spades-live-coin__side {
   position: absolute;
   bottom: 0.72rem;
-  color: #f3d184;
+  color: var(--diamond-white);
   font-family: var(--app-font-mono);
   font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.2rem;
-  text-shadow: 0 0.08rem 0 #251607;
+  text-shadow: 0 0.08rem 0 #000, 0 0 0.38rem rgba(248, 251, 255, 0.28);
 }
 
 .spades-live-coin__dragon {
@@ -377,15 +398,15 @@
 .spades-live-coin__dragon-body {
   position: absolute;
   inset: 0.72rem 0.58rem 0.28rem 0.32rem;
-  border: 0.58rem solid #11100e;
-  border-top-color: #d2a249;
-  border-right-color: #171512;
-  border-bottom-color: #070707;
+  border: 0.58rem solid var(--onyx-bg);
+  border-top-color: var(--diamond-silver);
+  border-right-color: #1a1d20;
+  border-bottom-color: #020303;
   border-radius: 50% 44% 52% 42%;
   transform: rotate(-17deg);
   box-shadow:
-    inset 0 0 0 0.08rem rgba(255, 238, 174, 0.36),
-    0 0.05rem 0 #f4d177,
+    inset 0 0 0 0.08rem rgba(248, 251, 255, 0.32),
+    0 0.05rem 0 var(--diamond-white),
     0 0.32rem 0.6rem rgba(0, 0, 0, 0.85);
 }
 
@@ -397,7 +418,7 @@
   width: 3.2rem;
   height: 0.52rem;
   background:
-    repeating-linear-gradient(115deg, #f5d36f 0 0.18rem, #0f0e0d 0.18rem 0.34rem);
+    repeating-linear-gradient(115deg, var(--diamond-white) 0 0.16rem, #16191c 0.16rem 0.32rem);
   border-radius: 999px;
   transform: rotate(16deg);
   box-shadow: 0 0.08rem 0.22rem rgba(0, 0, 0, 0.62);
@@ -409,12 +430,12 @@
   top: 1.1rem;
   width: 2.05rem;
   height: 1.28rem;
-  background: linear-gradient(135deg, #1b1916 0 36%, #070707 37% 100%);
-  border: 0.12rem solid #c99a3d;
+  background: linear-gradient(135deg, #202428 0 36%, #050607 37% 100%);
+  border: 0.12rem solid var(--diamond-silver);
   border-radius: 52% 38% 48% 44%;
   transform: rotate(-23deg);
   box-shadow:
-    inset 0.18rem 0.12rem 0.24rem rgba(255, 234, 171, 0.14),
+    inset 0.18rem 0.12rem 0.24rem rgba(248, 251, 255, 0.16),
     0 0.1rem 0.35rem rgba(0, 0, 0, 0.78);
 }
 
@@ -427,7 +448,7 @@
   height: 0;
   border-left: 0.24rem solid transparent;
   border-right: 0.24rem solid transparent;
-  border-bottom: 0.58rem solid #d7a945;
+  border-bottom: 0.58rem solid var(--diamond-white);
 }
 
 .spades-live-coin__dragon-head::before {
@@ -444,14 +465,14 @@
   position: absolute;
   right: 0.12rem;
   bottom: 0.58rem;
-  color: #d7a945;
+  color: var(--diamond-white);
   font-size: 2.25rem;
   line-height: 1;
   transform: rotate(31deg);
   text-shadow:
-    -0.04rem -0.04rem 0 #fff0b0,
+    -0.04rem -0.04rem 0 var(--diamond-silver),
     0 0.18rem 0.42rem rgba(0, 0, 0, 0.9),
-    0 0 0.45rem rgba(255, 218, 116, 0.24);
+    0 0 0.45rem rgba(248, 251, 255, 0.24);
 }
 
 @media (max-width: 430px) {

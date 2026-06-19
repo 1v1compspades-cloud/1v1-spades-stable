@@ -1759,13 +1759,14 @@ export default function Room() {
                     data-testid="live-coin-toss"
                   >
                     <div className="spades-live-coin__face spades-live-coin__face--heads">
-                      <div className="spades-live-coin__rim">1v1 SPADES</div>
+                      <div className="spades-live-coin__rim">1v1 Spades</div>
                       <div className="spades-live-coin__spade">♠</div>
+                      <div className="spades-live-coin__diamond" />
                       <div className="spades-live-coin__mark">1v1</div>
                       <div className="spades-live-coin__side">HEADS</div>
                     </div>
                     <div className="spades-live-coin__face spades-live-coin__face--tails">
-                      <div className="spades-live-coin__rim">1v1 SPADES</div>
+                      <div className="spades-live-coin__rim">1v1 Spades</div>
                       <div className="spades-live-coin__dragon" aria-hidden="true">
                         <span className="spades-live-coin__dragon-head" />
                         <span className="spades-live-coin__dragon-body" />
