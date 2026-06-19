@@ -1766,8 +1766,11 @@ export default function Room() {
                     </div>
                     <div className="spades-live-coin__face spades-live-coin__face--tails">
                       <div className="spades-live-coin__rim">1v1 SPADES</div>
-                      <div className="spades-live-coin__dragon">♞</div>
-                      <div className="spades-live-coin__spade spades-live-coin__spade--tails">♠</div>
+                      <div className="spades-live-coin__dragon" aria-hidden="true">
+                        <span className="spades-live-coin__dragon-head" />
+                        <span className="spades-live-coin__dragon-body" />
+                        <span className="spades-live-coin__dragon-tail">♠</span>
+                      </div>
                       <div className="spades-live-coin__side">TAILS</div>
                     </div>
                   </div>
