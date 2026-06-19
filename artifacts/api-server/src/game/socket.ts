@@ -1,8 +1,10 @@
 import { Server as SocketIOServer, type Socket } from "socket.io";
 import type { Server as HttpServer } from "node:http";
 import { timingSafeEqual, randomUUID } from "node:crypto";
+import { db } from "@workspace/db";
 import { logger } from "../lib/logger.js";
 import { isV11FlagEnabled } from "../lib/v11-flags.js";
+import { recordV11CompletedMatchLeaderboardResult } from "../lib/v11-leaderboards.js";
 import {
   createRoom,
   joinRoom,
@@ -446,6 +448,60 @@ function winnerSeatForCompletedMatch(state: GameState): 0 | 1 | null {
   return state.scores[0] > state.scores[1] ? 0 : 1;
 }
 
+function playerAccountIdentity(player: GameState["players"][number]): {
+  accountId: string | null;
+  username: string | null;
+} {
+  if (!player) return { accountId: null, username: null };
+  const candidate = player as typeof player & {
+    accountId?: unknown;
+    accountUsername?: unknown;
+  };
+  const accountId =
+    typeof candidate.accountId === "string" && candidate.accountId.trim()
+      ? candidate.accountId.trim()
+      : null;
+  const username =
+    typeof candidate.accountUsername === "string" && candidate.accountUsername.trim()
+      ? candidate.accountUsername.trim()
+      : player.profileUsername ?? null;
+  return { accountId, username };
+}
+
+function recordCompletedMatchForLeaderboard(
+  state: GameState,
+  resultReason: MatchResultReason,
+  winnerSeat: 0 | 1,
+  loserSeat: 0 | 1,
+): void {
+  const winner = playerAccountIdentity(state.players[winnerSeat]);
+  const loser = playerAccountIdentity(state.players[loserSeat]);
+
+  void recordV11CompletedMatchLeaderboardResult(
+    db,
+    {
+      roomCode: state.roomCode,
+      mode: state.mode,
+      phase: state.phase,
+      tournamentRef: state.tournamentRef ?? null,
+      resultReason,
+      winnerAccountId: winner.accountId,
+      loserAccountId: loser.accountId,
+      winnerUsername: winner.username,
+      loserUsername: loser.username,
+      finalScores: [state.scores[winnerSeat], state.scores[loserSeat]],
+      bags: [state.bags[winnerSeat], state.bags[loserSeat]],
+      roundsPlayed: state.roundHistory.length,
+    },
+    { enabled: isV11FlagEnabled("V11_LEADERBOARDS_ENABLED") },
+  ).catch((err) => {
+    logger.warn(
+      { err, roomCode: state.roomCode },
+      "v1.1 leaderboard completed match record failed (live game unaffected)",
+    );
+  });
+}
+
 function recordCompletedMatch(state: GameState, resultReason = resultReasonForGameOver(state)): void {
   if (state.phase !== "game_over") return;
   const winnerSeat = winnerSeatForCompletedMatch(state);
@@ -467,6 +523,7 @@ function recordCompletedMatch(state: GameState, resultReason = resultReasonForGa
     finalScores: [state.scores[0], state.scores[1]],
     resultReason,
   });
+  recordCompletedMatchForLeaderboard(state, resultReason, winnerSeat, loserSeat);
 }
 
 // ── Active-turn AFK timers ──────────────────────────────────────────────────

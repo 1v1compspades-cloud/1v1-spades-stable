@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   DEFAULT_V11_LEADERBOARD_SEASON,
   listV11Leaderboard,
+  recordV11CompletedMatchLeaderboardResult,
   recordV11LeaderboardResult,
   sanitizeLeaderboardLimit,
   sanitizeLeaderboardSeason,
@@ -349,6 +350,145 @@ test("v1.1 leaderboard result write rejects invalid and same-account results", a
   assert.equal(invalid.skipped, "invalid_result");
   assert.equal(sameAccount.recorded, false);
   assert.equal(sameAccount.skipped, "same_account");
+  assert.equal(db.results.length, 0);
+  assert.equal(db.stats.length, 0);
+});
+
+test("v1.1 completed match leaderboard write is feature gated", async () => {
+  const db = new FakeLeaderboardDb();
+
+  const result = await recordV11CompletedMatchLeaderboardResult(
+    db,
+    {
+      roomCode: "ROOM5",
+      mode: "quick",
+      phase: "game_over",
+      resultReason: "normal_win",
+      winnerAccountId: "acct-winner",
+      loserAccountId: "acct-loser",
+      winnerUsername: "Winner",
+      loserUsername: "Loser",
+      finalScores: [250, 220],
+      bags: [0, 2],
+      roundsPlayed: 6,
+    },
+    { enabled: false },
+  );
+
+  assert.deepEqual(result, {
+    recorded: false,
+    skipped: "feature_disabled",
+    seasonKey: DEFAULT_V11_LEADERBOARD_SEASON,
+  });
+  assert.equal(db.results.length, 0);
+  assert.equal(db.stats.length, 0);
+});
+
+test("v1.1 completed normal quick match records once", async () => {
+  const db = new FakeLeaderboardDb();
+
+  const result = await recordV11CompletedMatchLeaderboardResult(
+    db,
+    {
+      roomCode: "ROOM6",
+      mode: "quick",
+      phase: "game_over",
+      resultReason: "normal_win",
+      winnerAccountId: "acct-winner",
+      loserAccountId: "acct-loser",
+      winnerUsername: "Winner",
+      loserUsername: "Loser",
+      finalScores: [251, 180],
+      bags: [1, 0],
+      roundsPlayed: 7,
+    },
+    { enabled: true },
+  );
+  const duplicate = await recordV11CompletedMatchLeaderboardResult(
+    db,
+    {
+      roomCode: "ROOM6",
+      mode: "quick",
+      phase: "game_over",
+      resultReason: "normal_win",
+      winnerAccountId: "acct-winner",
+      loserAccountId: "acct-loser",
+      winnerUsername: "Winner",
+      loserUsername: "Loser",
+      finalScores: [251, 180],
+      bags: [1, 0],
+      roundsPlayed: 7,
+    },
+    { enabled: true },
+  );
+
+  assert.equal(result.recorded, true);
+  assert.deepEqual(duplicate, {
+    recorded: false,
+    skipped: "duplicate_result",
+    seasonKey: DEFAULT_V11_LEADERBOARD_SEASON,
+  });
+  assert.equal(db.results.length, 1);
+  assert.equal(db.stats.length, 2);
+  assert.equal(db.stats.reduce((sum, row) => sum + row.gamesPlayed, 0), 2);
+});
+
+test("v1.1 completed match leaderboard skips abandoned or incomplete games", async () => {
+  const db = new FakeLeaderboardDb();
+
+  const forfeit = await recordV11CompletedMatchLeaderboardResult(
+    db,
+    {
+      roomCode: "ROOM7",
+      mode: "quick",
+      phase: "game_over",
+      resultReason: "forfeit",
+      winnerAccountId: "acct-winner",
+      loserAccountId: "acct-loser",
+      winnerUsername: "Winner",
+      loserUsername: "Loser",
+      finalScores: [90, 80],
+    },
+    { enabled: true },
+  );
+  const incomplete = await recordV11CompletedMatchLeaderboardResult(
+    db,
+    {
+      roomCode: "ROOM8",
+      mode: "quick",
+      phase: "playing",
+      resultReason: "normal_win",
+      winnerAccountId: "acct-winner",
+      loserAccountId: "acct-loser",
+      winnerUsername: "Winner",
+      loserUsername: "Loser",
+      finalScores: [120, 90],
+    },
+    { enabled: true },
+  );
+  const tournament = await recordV11CompletedMatchLeaderboardResult(
+    db,
+    {
+      roomCode: "ROOM9",
+      mode: "quick",
+      phase: "game_over",
+      tournamentRef: { code: "T1", matchId: "M1" },
+      resultReason: "normal_win",
+      winnerAccountId: "acct-winner",
+      loserAccountId: "acct-loser",
+      winnerUsername: "Winner",
+      loserUsername: "Loser",
+      finalScores: [250, 200],
+    },
+    { enabled: true },
+  );
+
+  assert.equal(forfeit.recorded, false);
+  assert.equal(forfeit.skipped, "ineligible_match");
+  assert.equal(incomplete.recorded, false);
+  assert.equal(incomplete.skipped, "ineligible_match");
+  assert.equal(tournament.recorded, false);
+  assert.equal(tournament.skipped, "ineligible_match");
   assert.equal(db.results.length, 0);
   assert.equal(db.stats.length, 0);
 });

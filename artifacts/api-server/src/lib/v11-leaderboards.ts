@@ -48,11 +48,30 @@ export type V11LeaderboardRecordResult =
       recorded: false;
       skipped:
         | "duplicate_result"
+        | "feature_disabled"
+        | "ineligible_match"
         | "invalid_result"
         | "missing_account_identity"
         | "same_account";
       seasonKey: string;
     };
+
+export type V11CompletedMatchLeaderboardInput = {
+  roomCode: unknown;
+  mode: unknown;
+  phase: unknown;
+  tournamentRef?: unknown;
+  resultReason: unknown;
+  winnerAccountId?: unknown;
+  loserAccountId?: unknown;
+  winnerUsername?: unknown;
+  loserUsername?: unknown;
+  finalScores?: unknown;
+  bags?: unknown;
+  roundsPlayed?: unknown;
+  seasonKey?: unknown;
+  completedAt?: Date;
+};
 
 export const DEFAULT_V11_LEADERBOARD_SEASON = "v1_1_beta";
 const DEFAULT_LIMIT = 25;
@@ -287,4 +306,60 @@ export async function recordV11LeaderboardResult(
   }
 
   return { recorded: true, seasonKey };
+}
+
+function readScorePair(value: unknown): [number, number] | null {
+  if (!Array.isArray(value) || value.length < 2) return null;
+  const first = sanitizeInteger(value[0]);
+  const second = sanitizeInteger(value[1]);
+  return first === null || second === null ? null : [first, second];
+}
+
+export async function recordV11CompletedMatchLeaderboardResult(
+  db: V11LeaderboardDb,
+  input: V11CompletedMatchLeaderboardInput,
+  options: { enabled: boolean },
+): Promise<V11LeaderboardRecordResult> {
+  const seasonKey = sanitizeLeaderboardSeason(input.seasonKey);
+
+  if (!options.enabled) {
+    return { recorded: false, skipped: "feature_disabled", seasonKey };
+  }
+
+  if (
+    input.phase !== "game_over" ||
+    input.mode !== "quick" ||
+    input.tournamentRef ||
+    input.resultReason !== "normal_win"
+  ) {
+    return { recorded: false, skipped: "ineligible_match", seasonKey };
+  }
+
+  const finalScores = readScorePair(input.finalScores);
+  const bags = readScorePair(input.bags) ?? [0, 0];
+  if (!finalScores) {
+    return { recorded: false, skipped: "invalid_result", seasonKey };
+  }
+
+  const winnerScore = sanitizeInteger(finalScores[0]);
+  const loserScore = sanitizeInteger(finalScores[1]);
+  if (winnerScore === null || loserScore === null) {
+    return { recorded: false, skipped: "invalid_result", seasonKey };
+  }
+
+  return recordV11LeaderboardResult(db, {
+    roomCode: input.roomCode,
+    seasonKey,
+    winnerAccountId: input.winnerAccountId,
+    loserAccountId: input.loserAccountId,
+    winnerUsername: input.winnerUsername,
+    loserUsername: input.loserUsername,
+    winnerScore,
+    loserScore,
+    winnerBags: bags[0],
+    loserBags: bags[1],
+    roundsPlayed: input.roundsPlayed,
+    resultReason: input.resultReason,
+    completedAt: input.completedAt,
+  });
 }
