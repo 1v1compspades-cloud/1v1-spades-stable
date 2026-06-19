@@ -1758,22 +1758,25 @@ export default function Room() {
                     className={`spades-live-coin spades-live-coin--${resultSide}`}
                     data-testid="live-coin-toss"
                   >
-                    <div className="spades-live-coin__face spades-live-coin__face--heads">
-                      <div className="spades-live-coin__rim">1v1 Spades</div>
-                      <div className="spades-live-coin__spade">♠</div>
-                      <div className="spades-live-coin__diamond" />
-                      <div className="spades-live-coin__mark">1v1</div>
-                      <div className="spades-live-coin__side">HEADS</div>
-                    </div>
-                    <div className="spades-live-coin__face spades-live-coin__face--tails">
-                      <div className="spades-live-coin__rim">1v1 Spades</div>
-                      <div className="spades-live-coin__dragon" aria-hidden="true">
-                        <span className="spades-live-coin__dragon-head" />
-                        <span className="spades-live-coin__dragon-body" />
-                        <span className="spades-live-coin__dragon-tail">♠</span>
+                    {resultSide === "heads" ? (
+                      <div className="spades-live-coin__face spades-live-coin__face--heads">
+                        <div className="spades-live-coin__rim">1v1 Spades</div>
+                        <div className="spades-live-coin__spade">♠</div>
+                        <div className="spades-live-coin__diamond" />
+                        <div className="spades-live-coin__mark">1v1</div>
+                        <div className="spades-live-coin__side">HEADS</div>
                       </div>
-                      <div className="spades-live-coin__side">TAILS</div>
-                    </div>
+                    ) : (
+                      <div className="spades-live-coin__face spades-live-coin__face--tails">
+                        <div className="spades-live-coin__rim">1v1 Spades</div>
+                        <div className="spades-live-coin__dragon" aria-hidden="true">
+                          <span className="spades-live-coin__dragon-head" />
+                          <span className="spades-live-coin__dragon-body" />
+                          <span className="spades-live-coin__dragon-tail">♠</span>
+                        </div>
+                        <div className="spades-live-coin__side">TAILS</div>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <h3 className="text-2xl font-serif text-primary">Coin Toss</h3>

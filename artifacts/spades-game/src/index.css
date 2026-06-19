@@ -324,7 +324,7 @@
 }
 
 .spades-live-coin__face--tails {
-  transform: rotateY(180deg) translateZ(0.04rem);
+  transform: translateZ(0.04rem);
 }
 
 .spades-live-coin__rim {
