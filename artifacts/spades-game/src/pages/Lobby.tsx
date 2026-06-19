@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useSocket } from "@/hooks/useSocket";
 import { useGameStorage } from "@/hooks/useGameStorage";
@@ -11,6 +11,19 @@ import { ConnectionPill } from "@/components/ConnectionPill";
 import { InfoMenu } from "@/components/InfoMenu";
 import { LegalFooter, MatchAgreementNotice } from "@/components/LegalFooter";
 import { PreGameChecklist } from "@/components/PreGameChecklist";
+import { v11WebFlags } from "@/lib/v11Flags";
+
+type FindMatchMatchedPayload = {
+  roomCode?: string;
+  playerIndex?: 0 | 1;
+  token?: string;
+  route?: string;
+};
+
+type FindMatchErrorPayload = {
+  code?: string;
+  message?: string;
+};
 
 export default function Lobby() {
   const [, setLocation] = useLocation();
@@ -61,6 +74,9 @@ export default function Lobby() {
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [isSpectating, setIsSpectating] = useState(false);
+  const [isFindingMatch, setIsFindingMatch] = useState(false);
+  const [findMatchError, setFindMatchError] = useState<string | null>(null);
+  const findMatchCleanupRef = useRef<(() => void) | null>(null);
   const [invitedAsSpectator] = useState(initialParams.spectate && !!initialParams.code);
   const [autoSpectateTried, setAutoSpectateTried] = useState(false);
   const [adminDialogOpen, setAdminDialogOpen] = useState(false);
@@ -154,6 +170,78 @@ export default function Lobby() {
     } finally {
       setIsCreating(false);
     }
+  };
+
+  const handleFindMatch = async (): Promise<void> => {
+    if (!v11WebFlags.matchmaking) return;
+    if (!nameInput.trim()) { toast({ description: "Please enter your name", variant: "destructive" }); return; }
+    if (blockIfActiveGame()) return;
+    if (!socket) { toast({ description: "Connecting. Try again in a moment.", variant: "destructive" }); return; }
+
+    const displayName = nameInput.trim();
+    const profile = (profileInput.trim() || displayName).slice(0, 32);
+    setFindMatchError(null);
+    setIsFindingMatch(true);
+    findMatchCleanupRef.current?.();
+    savePlayerName(displayName);
+    saveProfileUsername(profile);
+    saveIsSpectator(false);
+
+    const cleanup = () => {
+      socket.off("find_match_waiting", onWaiting);
+      socket.off("find_match_matched", onMatched);
+      socket.off("find_match_cancelled", onCancelled);
+      socket.off("find_match_error", onError);
+      findMatchCleanupRef.current = null;
+    };
+    const onWaiting = () => {
+      setFindMatchError(null);
+      setIsFindingMatch(true);
+    };
+    const onMatched = (payload: FindMatchMatchedPayload) => {
+      cleanup();
+      const roomCode = payload?.roomCode?.toUpperCase().trim();
+      const playerIndex = payload?.playerIndex;
+      if (!roomCode || (playerIndex !== 0 && playerIndex !== 1)) {
+        setIsFindingMatch(false);
+        setFindMatchError("Match found, but the room details were incomplete.");
+        return;
+      }
+      saveRoomCode(roomCode);
+      savePlayerIndex(playerIndex);
+      saveIsSpectator(false);
+      if (payload.token) {
+        savePlayerToken(roomCode, playerIndex, payload.token);
+      }
+      setIsFindingMatch(false);
+      setLocation(`/room/${roomCode}`);
+    };
+    const onCancelled = () => {
+      cleanup();
+      setIsFindingMatch(false);
+    };
+    const onError = (payload: FindMatchErrorPayload) => {
+      cleanup();
+      setIsFindingMatch(false);
+      setFindMatchError(payload?.message || "Find Match is unavailable right now.");
+    };
+
+    socket.off("find_match_waiting", onWaiting);
+    socket.off("find_match_matched", onMatched);
+    socket.off("find_match_cancelled", onCancelled);
+    socket.off("find_match_error", onError);
+    socket.on("find_match_waiting", onWaiting);
+    socket.on("find_match_matched", onMatched);
+    socket.on("find_match_cancelled", onCancelled);
+    socket.on("find_match_error", onError);
+    findMatchCleanupRef.current = cleanup;
+    socket.emit("find_match_join", { playerName: displayName, profileUsername: profile });
+  };
+
+  const handleCancelFindMatch = (): void => {
+    socket?.emit("find_match_cancel");
+    findMatchCleanupRef.current?.();
+    setIsFindingMatch(false);
   };
 
   const handleJoin = async (): Promise<void> => {
@@ -347,7 +435,7 @@ export default function Lobby() {
                     key={m.id}
                     type="button"
                     onClick={() => setMatchMode(m.id)}
-                    disabled={isCreating || isJoining}
+                    disabled={isCreating || isJoining || isFindingMatch}
                     data-testid={`mode-${m.id}`}
                     className={`flex flex-col items-start text-left rounded-md border px-3 py-2 transition disabled:opacity-50 ${
                       active
@@ -426,11 +514,51 @@ export default function Lobby() {
             </p>
           </div>
 
+          {v11WebFlags.matchmaking && matchMode === "quick" && (
+            <div className="space-y-3 pt-2 border-t border-border/50" data-testid="find-match-panel">
+              {isFindingMatch ? (
+                <div className="rounded-md border border-primary/35 bg-primary/10 px-3 py-3 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-primary">Finding opponent...</p>
+                      <p className="text-xs text-muted-foreground">We'll send you to the room when a player joins.</p>
+                    </div>
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-primary animate-pulse" aria-hidden />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCancelFindMatch}
+                    className="w-full"
+                    data-testid="button-find-match-cancel"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  onClick={() => void handleFindMatch()}
+                  disabled={isCreating || isJoining || isSpectating || !connected}
+                  className="spades-gold-button w-full py-6 text-lg font-bold active:scale-[0.98] transition-transform"
+                  data-testid="button-find-match"
+                >
+                  Find Match
+                </Button>
+              )}
+              {findMatchError && (
+                <p className="text-xs text-destructive text-center" data-testid="find-match-error">
+                  {findMatchError}
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-border/50">
             <div className="space-y-4">
               <Button
                 onClick={handleCreate}
-                disabled={isCreating || isJoining || isSpectating}
+                disabled={isCreating || isJoining || isSpectating || isFindingMatch}
                 className="spades-gold-button w-full py-6 text-lg font-bold active:scale-[0.98] transition-transform"
                 data-testid="button-create"
               >
@@ -446,7 +574,7 @@ export default function Lobby() {
                   onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
                   onKeyDown={(e) => {
                     if (e.key !== "Enter") return;
-                    if (isCreating || isJoining || isSpectating || !joinCodeInput.trim()) return;
+                    if (isCreating || isJoining || isSpectating || isFindingMatch || !joinCodeInput.trim()) return;
                     e.preventDefault();
                     void handleJoin();
                   }}
@@ -456,7 +584,7 @@ export default function Lobby() {
               </div>
               <Button
                 onClick={handleJoin}
-                disabled={isCreating || isJoining || isSpectating || !joinCodeInput}
+                disabled={isCreating || isJoining || isSpectating || isFindingMatch || !joinCodeInput}
                 variant="secondary"
                 className="w-full py-6 text-lg font-bold active:scale-[0.98] transition-transform"
                 data-testid="button-join"
@@ -471,7 +599,7 @@ export default function Lobby() {
           <div className="pt-4 border-t border-border/50 space-y-2">
             <Button
               onClick={handleSpectate}
-              disabled={isCreating || isJoining || isSpectating || !joinCodeInput}
+              disabled={isCreating || isJoining || isSpectating || isFindingMatch || !joinCodeInput}
               variant="ghost"
               className="w-full h-12 text-sm font-medium border border-dashed border-border hover:border-primary/50"
               data-testid="button-spectate"
