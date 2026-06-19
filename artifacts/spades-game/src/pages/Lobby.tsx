@@ -71,10 +71,12 @@ export default function Lobby() {
   const [accountUsernameInput, setAccountUsernameInput] = useState(accountUsername);
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountStatus, setAccountStatus] = useState<string | null>(null);
+  const [accountPanelOpen, setAccountPanelOpen] = useState(false);
   const [joinCodeInput, setJoinCodeInput] = useState(initialParams.code);
   const [matchTarget, setMatchTarget] = useState<250 | 500>(250);
   const [tournamentSize, setTournamentSize] = useState<4 | 8 | 16 | 32>(4);
   const [tournamentName, setTournamentName] = useState<string>("");
+  const [gameSettingsOpen, setGameSettingsOpen] = useState(false);
   const ALL_MATCH_MODES = [
     { id: "quick",     label: "Quick Match",          blurb: "Single head-to-head match" },
     { id: "king",      label: "Table Streak",         blurb: "Winner stays, next player joins" },
@@ -487,11 +489,11 @@ export default function Lobby() {
       <ConnectionPill />
       <InfoMenu />
       <Card className="spades-panel w-full max-w-md border-primary/30 bg-card/80 backdrop-blur-sm">
-        <CardHeader className="text-center space-y-3 pb-4">
+        <CardHeader className="text-center space-y-2 pb-3">
           <div className="flex items-center justify-center gap-2 text-primary text-lg" aria-hidden>
             <span>♠</span><span className="text-red-500">♥</span><span className="text-blue-500">♦</span><span className="text-emerald-500">♣</span>
           </div>
-          <CardTitle className="text-[2rem] sm:text-4xl leading-tight font-serif text-primary tracking-wider drop-shadow-[0_2px_10px_rgba(234,179,8,0.34)]">
+          <CardTitle className="text-[1.75rem] sm:text-4xl leading-tight font-serif text-primary tracking-wider drop-shadow-[0_2px_10px_rgba(234,179,8,0.34)]">
             SPADES FREE PLAY
           </CardTitle>
           <CardDescription className="text-sm font-medium text-foreground/80">
@@ -501,7 +503,7 @@ export default function Lobby() {
             Create a room, send the code to your opponent, and play a live 1v1 match.
           </p>
         </CardHeader>
-        <CardContent className="space-y-7 mt-2">
+        <CardContent className="space-y-4 mt-1">
           {initialParams.code && (
             <div
               className={`text-center text-sm rounded-md border px-3 py-2 ${
@@ -541,7 +543,7 @@ export default function Lobby() {
               value={nameInput}
               onChange={(e) => setNameInput(e.target.value)}
               autoComplete="nickname"
-              className="text-lg py-6 bg-background/90"
+              className="text-lg py-5 bg-background/90"
               data-testid="input-player-name"
             />
             <p className="text-xs text-muted-foreground">
@@ -568,13 +570,15 @@ export default function Lobby() {
 
           {v11WebFlags.accounts && (
             <details
+              open={accountPanelOpen}
+              onToggle={(e) => setAccountPanelOpen(e.currentTarget.open)}
               className="rounded-md border border-border/50 bg-white/[0.03] px-3 py-2 text-left"
               data-testid="v11-account-panel"
             >
               <summary className="cursor-pointer text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                 Staging account
               </summary>
-              <div className="mt-3 space-y-3">
+              {accountPanelOpen && <div className="mt-3 space-y-3">
                 <div className="space-y-2">
                   <Label htmlFor="account-display-name" className="text-xs">Display name</Label>
                   <Input
@@ -641,101 +645,12 @@ export default function Lobby() {
                 >
                   Clear Account On This Device
                 </Button>
-              </div>
+              </div>}
             </details>
           )}
 
-          <div className="space-y-2 pt-2 border-t border-border/50">
-            <Label className="text-sm">Match mode</Label>
-            <div className="grid grid-cols-2 gap-2" data-testid="match-mode-picker">
-              {MATCH_MODES.map((m) => {
-                const active = matchMode === m.id;
-                return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setMatchMode(m.id)}
-                    disabled={isCreating || isJoining || isFindingMatch}
-                    data-testid={`mode-${m.id}`}
-                    className={`flex flex-col items-start text-left rounded-md border px-3 py-2 transition disabled:opacity-50 ${
-                      active
-                        ? "border-primary bg-primary/15 text-primary shadow-[0_0_0_1px_hsla(35,90%,55%,0.5)]"
-                        : "border-border bg-white/5 hover:border-primary/50 hover:bg-primary/5"
-                    }`}
-                  >
-                    <span className="text-sm font-semibold leading-tight">{m.label}</span>
-                    <span className="text-[10px] text-muted-foreground leading-snug mt-0.5">{m.blurb}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {matchMode === "king"
-                ? "Table Streak: winner stays, and the next player can join the table."
-                : matchMode === "custom"
-                ? "Private Event: host-managed invite bracket for organized groups."
-                : "Quick Match: one head-to-head game, first to the target wins."}
-            </p>
-          </div>
-
-          {matchMode === "custom" && (
-            <div className="space-y-3 pt-2 border-t border-border/50">
-              <div className="space-y-2">
-                <Label className="text-sm">Bracket size</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {([4, 8, 16, 32] as const).map((s) => (
-                    <Button
-                      key={s}
-                      type="button"
-                      variant={tournamentSize === s ? "default" : "outline"}
-                      onClick={() => setTournamentSize(s)}
-                      disabled={isCreating || isJoining}
-                      className="h-12 font-mono"
-                      data-testid={`tournament-size-${s}`}
-                    >
-                      {s} players
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="tournament-name" className="text-sm">Tournament name <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                <Input
-                  id="tournament-name"
-                  placeholder="e.g. Friday Night Spades"
-                  value={tournamentName}
-                  onChange={(e) => setTournamentName(e.target.value.slice(0, 40))}
-                  maxLength={40}
-                  disabled={isCreating || isJoining}
-                  data-testid="input-tournament-name"
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-2 pt-2 border-t border-border/50">
-            <Label className="text-sm">Match target</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {([250, 500] as const).map((t) => (
-                <Button
-                  key={t}
-                  type="button"
-                  variant={matchTarget === t ? "default" : "outline"}
-                  onClick={() => setMatchTarget(t)}
-                  disabled={isCreating || isJoining}
-                  className="h-12 font-mono"
-                >
-                  {t} pts
-                </Button>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              First player to reach the target while leading wins. Ties go to tiebreaker rounds.
-            </p>
-          </div>
-
           {v11WebFlags.matchmaking && matchMode === "quick" && (
-            <div className="space-y-3 pt-2 border-t border-border/50" data-testid="find-match-panel">
+            <div className="space-y-3 pt-1" data-testid="find-match-panel">
               <div
                 className="flex items-center justify-center gap-4 rounded-md border border-border/60 bg-white/[0.03] px-3 py-2 text-xs font-medium text-muted-foreground"
                 data-testid="online-count-indicator"
@@ -767,7 +682,7 @@ export default function Lobby() {
                   type="button"
                   onClick={() => void handleFindMatch()}
                   disabled={isCreating || isJoining || isSpectating || !connected || !hasGuestName}
-                  className="spades-gold-button w-full py-6 text-lg font-bold active:scale-[0.98] transition-transform"
+                  className="spades-gold-button w-full py-5 text-lg font-bold active:scale-[0.98] transition-transform"
                   data-testid="button-find-match"
                 >
                   Find Match
@@ -781,12 +696,12 @@ export default function Lobby() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-border/50">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 border-t border-border/50">
             <div className="space-y-4">
               <Button
                 onClick={handleCreate}
                 disabled={isCreating || isJoining || isSpectating || isFindingMatch || !hasGuestName}
-                className="spades-gold-button w-full py-6 text-lg font-bold active:scale-[0.98] transition-transform"
+                className="spades-gold-button w-full py-5 text-lg font-bold active:scale-[0.98] transition-transform"
                 data-testid="button-create"
               >
                 {isCreating ? "Creating..." : matchMode === "custom" ? "Create Event" : "Create Room"}
@@ -805,7 +720,7 @@ export default function Lobby() {
                     e.preventDefault();
                     void handleJoin();
                   }}
-                  className="text-center uppercase font-mono py-6 placeholder:normal-case placeholder:font-sans placeholder:tracking-normal"
+                  className="text-center uppercase font-mono py-5 placeholder:normal-case placeholder:font-sans placeholder:tracking-normal"
                   maxLength={6}
                 />
               </div>
@@ -813,13 +728,122 @@ export default function Lobby() {
                 onClick={handleJoin}
                 disabled={isCreating || isJoining || isSpectating || isFindingMatch || !joinCodeInput || !hasGuestName}
                 variant="secondary"
-                className="w-full py-6 text-lg font-bold active:scale-[0.98] transition-transform"
+                className="w-full py-5 text-lg font-bold active:scale-[0.98] transition-transform"
                 data-testid="button-join"
               >
                 {isJoining ? "Joining..." : matchMode === "custom" ? "Join Event" : "Join Match"}
               </Button>
             </div>
           </div>
+
+          <section
+            className="rounded-md border border-border/50 bg-white/[0.03] px-3 py-2 text-left"
+            data-testid="game-settings"
+          >
+            <button
+              type="button"
+              className="flex w-full items-center justify-between gap-3 text-left text-sm font-semibold text-foreground"
+              onClick={() => setGameSettingsOpen((open) => !open)}
+              aria-expanded={gameSettingsOpen}
+              aria-controls="game-settings-panel"
+              data-testid="button-game-settings"
+            >
+              <span>Game Settings</span>
+              <span className="text-xs font-normal text-muted-foreground">
+                {matchMode === "king" ? "Table Streak" : matchMode === "custom" ? "Private Event" : "Quick Match"} · {matchTarget} pts
+              </span>
+            </button>
+            {gameSettingsOpen && <div id="game-settings-panel" className="mt-4 space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm">Match mode</Label>
+                <div className="grid grid-cols-2 gap-2" data-testid="match-mode-picker">
+                  {MATCH_MODES.map((m) => {
+                    const active = matchMode === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setMatchMode(m.id)}
+                        disabled={isCreating || isJoining || isFindingMatch}
+                        data-testid={`mode-${m.id}`}
+                        className={`flex flex-col items-start text-left rounded-md border px-3 py-2 transition disabled:opacity-50 ${
+                          active
+                            ? "border-primary bg-primary/15 text-primary shadow-[0_0_0_1px_hsla(35,90%,55%,0.5)]"
+                            : "border-border bg-white/5 hover:border-primary/50 hover:bg-primary/5"
+                        }`}
+                      >
+                        <span className="text-sm font-semibold leading-tight">{m.label}</span>
+                        <span className="text-[10px] text-muted-foreground leading-snug mt-0.5">{m.blurb}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {matchMode === "king"
+                    ? "Table Streak: winner stays, and the next player can join the table."
+                    : matchMode === "custom"
+                    ? "Private Event: host-managed invite bracket for organized groups."
+                    : "Quick Match: one head-to-head game, first to the target wins."}
+                </p>
+              </div>
+
+              {matchMode === "custom" && (
+                <div className="space-y-3 pt-2 border-t border-border/50">
+                  <div className="space-y-2">
+                    <Label className="text-sm">Bracket size</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {([4, 8, 16, 32] as const).map((s) => (
+                        <Button
+                          key={s}
+                          type="button"
+                          variant={tournamentSize === s ? "default" : "outline"}
+                          onClick={() => setTournamentSize(s)}
+                          disabled={isCreating || isJoining}
+                          className="h-12 font-mono"
+                          data-testid={`tournament-size-${s}`}
+                        >
+                          {s} players
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="tournament-name" className="text-sm">Tournament name <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                    <Input
+                      id="tournament-name"
+                      placeholder="e.g. Friday Night Spades"
+                      value={tournamentName}
+                      onChange={(e) => setTournamentName(e.target.value.slice(0, 40))}
+                      maxLength={40}
+                      disabled={isCreating || isJoining}
+                      data-testid="input-tournament-name"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2 pt-2 border-t border-border/50">
+                <Label className="text-sm">Match target</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {([250, 500] as const).map((t) => (
+                    <Button
+                      key={t}
+                      type="button"
+                      variant={matchTarget === t ? "default" : "outline"}
+                      onClick={() => setMatchTarget(t)}
+                      disabled={isCreating || isJoining}
+                      className="h-12 font-mono"
+                    >
+                      {t} pts
+                    </Button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  First player to reach the target while leading wins. Ties go to tiebreaker rounds.
+                </p>
+              </div>
+            </div>}
+          </section>
 
           <MatchAgreementNotice />
 
