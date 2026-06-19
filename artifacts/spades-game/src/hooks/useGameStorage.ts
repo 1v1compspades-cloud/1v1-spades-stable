@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 export function useGameStorage() {
   const [playerName, setPlayerName] = useState(() => localStorage.getItem("spades_playerName") || "");
   const [profileUsername, setProfileUsername] = useState(
-    () => localStorage.getItem("spades_profile_username") || localStorage.getItem("spades_playerName") || "",
+    () => localStorage.getItem("spades_profile_username") || "",
   );
   const [roomCode, setRoomCode] = useState(() => localStorage.getItem("spades_roomCode") || "");
   const [playerIndex, setPlayerIndex] = useState<0 | 1 | null>(() => {

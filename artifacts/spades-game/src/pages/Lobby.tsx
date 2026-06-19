@@ -111,6 +111,11 @@ export default function Lobby() {
     return true;
   };
 
+  const optionalProfileUsername = (): string | undefined => {
+    const normalized = profileInput.trim().replace(/\s+/g, " ").slice(0, 32);
+    return normalized || undefined;
+  };
+
   useEffect(() => {
     connect();
   }, [connect]);
@@ -162,9 +167,9 @@ export default function Lobby() {
     setIsCreating(true);
     try {
       const displayName = nameInput.trim();
-      const profile = (profileInput.trim() || displayName).slice(0, 32);
+      const profile = optionalProfileUsername();
       savePlayerName(displayName);
-      saveProfileUsername(profile);
+      saveProfileUsername(profile ?? "");
       saveIsSpectator(false);
       if (matchMode === "custom") {
         // SECURITY: tournaments are admin-only and the admin is NOT seeded as a
@@ -203,12 +208,12 @@ export default function Lobby() {
     if (!socket) { toast({ description: "Connecting. Try again in a moment.", variant: "destructive" }); return; }
 
     const displayName = nameInput.trim();
-    const profile = (profileInput.trim() || displayName).slice(0, 32);
+    const profile = optionalProfileUsername();
     setFindMatchError(null);
     setIsFindingMatch(true);
     findMatchCleanupRef.current?.();
     savePlayerName(displayName);
-    saveProfileUsername(profile);
+    saveProfileUsername(profile ?? "");
     saveIsSpectator(false);
 
     const cleanup = () => {
@@ -274,9 +279,9 @@ export default function Lobby() {
     setIsJoining(true);
     try {
       const displayName = nameInput.trim();
-      const profile = (profileInput.trim() || displayName).slice(0, 32);
+      const profile = optionalProfileUsername();
       savePlayerName(displayName);
-      saveProfileUsername(profile);
+      saveProfileUsername(profile ?? "");
       saveIsSpectator(false);
       const code = joinCodeInput.toUpperCase();
       if (matchMode === "custom") {
@@ -351,11 +356,11 @@ export default function Lobby() {
     if (!joinCodeInput.trim()) { toast({ description: "Please enter a room code", variant: "destructive" }); return; }
     const code = joinCodeInput.toUpperCase();
     const displayName = nameInput.trim();
-    const profile = (profileInput.trim() || displayName).slice(0, 32);
+    const profile = optionalProfileUsername();
     setIsSpectating(true);
     try {
       savePlayerName(displayName);
-      saveProfileUsername(profile);
+      saveProfileUsername(profile ?? "");
       savePlayerIndex(null);
       saveIsSpectator(true);
       saveRoomCode(code);
@@ -434,6 +439,7 @@ export default function Lobby() {
             />
           </div>
 
+          {v11WebFlags.usernames && (
           <div className="space-y-2">
             <Label htmlFor="profile-username">Profile Username</Label>
             <Input
@@ -448,6 +454,7 @@ export default function Lobby() {
               Saved on this device for match history. Guest play still works.
             </p>
           </div>
+          )}
 
           <div className="space-y-2 pt-2 border-t border-border/50">
             <Label className="text-sm">Match mode</Label>
