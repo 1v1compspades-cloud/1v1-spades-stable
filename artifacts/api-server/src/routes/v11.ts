@@ -43,61 +43,29 @@ function statusForAccountError(error: V11AccountError): number {
 }
 
 function serializeAccountError(error: unknown) {
-  if (!error || typeof error !== "object") {
-    return { message: String(error) };
-  }
-
-  const safePgFields = (value: unknown) => {
-    if (!value || typeof value !== "object") return undefined;
-    const candidate = value as {
-      message?: unknown;
-      code?: unknown;
-      table?: unknown;
-      column?: unknown;
-      constraint?: unknown;
-      detail?: unknown;
-    };
-
-    return {
-      message:
-        typeof candidate.message === "string" ? candidate.message : undefined,
-      code: typeof candidate.code === "string" ? candidate.code : undefined,
-      table: typeof candidate.table === "string" ? candidate.table : undefined,
-      column:
-        typeof candidate.column === "string" ? candidate.column : undefined,
-      constraint:
-        typeof candidate.constraint === "string"
-          ? candidate.constraint
-          : undefined,
-      detail: typeof candidate.detail === "string" ? candidate.detail : undefined,
-    };
-  };
-
   const candidate = error as {
-    name?: unknown;
-    message?: unknown;
-    stack?: unknown;
-    code?: unknown;
-    table?: unknown;
-    column?: unknown;
-    constraint?: unknown;
     cause?: unknown;
   };
+  const cause =
+    candidate?.cause && typeof candidate.cause === "object"
+      ? (candidate.cause as {
+          message?: unknown;
+          code?: unknown;
+          table?: unknown;
+          column?: unknown;
+          constraint?: unknown;
+          detail?: unknown;
+        })
+      : {};
 
   return {
-    name: typeof candidate.name === "string" ? candidate.name : undefined,
-    message:
-      typeof candidate.message === "string" ? candidate.message : undefined,
-    stack: typeof candidate.stack === "string" ? candidate.stack : undefined,
-    code: typeof candidate.code === "string" ? candidate.code : undefined,
-    table: typeof candidate.table === "string" ? candidate.table : undefined,
-    column:
-      typeof candidate.column === "string" ? candidate.column : undefined,
-    constraint:
-      typeof candidate.constraint === "string"
-        ? candidate.constraint
-        : undefined,
-    cause: safePgFields(candidate.cause),
+    causeMessage: typeof cause.message === "string" ? cause.message : undefined,
+    causeCode: typeof cause.code === "string" ? cause.code : undefined,
+    causeConstraint:
+      typeof cause.constraint === "string" ? cause.constraint : undefined,
+    causeColumn: typeof cause.column === "string" ? cause.column : undefined,
+    causeTable: typeof cause.table === "string" ? cause.table : undefined,
+    causeDetail: typeof cause.detail === "string" ? cause.detail : undefined,
   };
 }
 
