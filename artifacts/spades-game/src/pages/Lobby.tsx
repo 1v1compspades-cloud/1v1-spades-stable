@@ -98,6 +98,7 @@ export default function Lobby() {
   const [adminDialogOpen, setAdminDialogOpen] = useState(false);
   const [adminKeyInput, setAdminKeyInput] = useState("");
   const [adminUnlocking, setAdminUnlocking] = useState(false);
+  const hasGuestName = !!nameInput.trim();
   const savedRoomCode = storedRoomCode.toUpperCase().trim();
   const getSavedPlayerSession = (code: string): { seat: 0 | 1; token: string } | null => {
     const normalized = code.toUpperCase().trim();
@@ -527,15 +528,25 @@ export default function Lobby() {
               Reconnect to Current Game
             </Button>
           )}
-          <div className="space-y-2">
-            <Label htmlFor="name">Your Name</Label>
+          <div
+            className="space-y-2 rounded-md border border-primary/30 bg-primary/10 p-3"
+            data-testid="guest-name-field"
+          >
+            <Label htmlFor="name" className="text-sm font-semibold text-foreground">
+              Your Name
+            </Label>
             <Input
               id="name"
               placeholder="Enter player name"
               value={nameInput}
               onChange={(e) => setNameInput(e.target.value)}
-              className="text-lg py-6"
+              autoComplete="nickname"
+              className="text-lg py-6 bg-background/90"
+              data-testid="input-player-name"
             />
+            <p className="text-xs text-muted-foreground">
+              Guest display name for this match. No account username required.
+            </p>
           </div>
 
           {v11WebFlags.usernames && (
@@ -755,7 +766,7 @@ export default function Lobby() {
                 <Button
                   type="button"
                   onClick={() => void handleFindMatch()}
-                  disabled={isCreating || isJoining || isSpectating || !connected}
+                  disabled={isCreating || isJoining || isSpectating || !connected || !hasGuestName}
                   className="spades-gold-button w-full py-6 text-lg font-bold active:scale-[0.98] transition-transform"
                   data-testid="button-find-match"
                 >
@@ -774,7 +785,7 @@ export default function Lobby() {
             <div className="space-y-4">
               <Button
                 onClick={handleCreate}
-                disabled={isCreating || isJoining || isSpectating || isFindingMatch}
+                disabled={isCreating || isJoining || isSpectating || isFindingMatch || !hasGuestName}
                 className="spades-gold-button w-full py-6 text-lg font-bold active:scale-[0.98] transition-transform"
                 data-testid="button-create"
               >
@@ -800,7 +811,7 @@ export default function Lobby() {
               </div>
               <Button
                 onClick={handleJoin}
-                disabled={isCreating || isJoining || isSpectating || isFindingMatch || !joinCodeInput}
+                disabled={isCreating || isJoining || isSpectating || isFindingMatch || !joinCodeInput || !hasGuestName}
                 variant="secondary"
                 className="w-full py-6 text-lg font-bold active:scale-[0.98] transition-transform"
                 data-testid="button-join"
@@ -817,7 +828,7 @@ export default function Lobby() {
           <div className="pt-4 border-t border-border/50 space-y-2">
             <Button
               onClick={handleSpectate}
-              disabled={isCreating || isJoining || isSpectating || isFindingMatch || !joinCodeInput}
+              disabled={isCreating || isJoining || isSpectating || isFindingMatch || !joinCodeInput || !hasGuestName}
               variant="ghost"
               className="w-full h-12 text-sm font-medium border border-dashed border-border hover:border-primary/50"
               data-testid="button-spectate"
