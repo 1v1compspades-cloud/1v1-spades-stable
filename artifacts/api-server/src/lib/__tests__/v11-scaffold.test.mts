@@ -146,3 +146,17 @@ test("v1.1 account API contract stays disabled by default", () => {
   assert.match(routeSource, /status\(503\)\.json\(disabledPayload/);
   assert.match(routeSource, /status\(501\)\.json/);
 });
+
+test("v1.1 account web page stays hidden behind Vite flag", () => {
+  const appSource = readFileSync(
+    fileURLToPath(new URL("../../../../spades-game/src/App.tsx", import.meta.url)),
+    "utf8",
+  );
+  const flagSource = readFileSync(
+    fileURLToPath(new URL("../../../../spades-game/src/lib/v11Flags.ts", import.meta.url)),
+    "utf8",
+  );
+
+  assert.match(flagSource, /VITE_V11_ACCOUNTS_ENABLED/);
+  assert.match(appSource, /v11WebFlags\.accounts && <Route path="\/account"/);
+});

@@ -41,6 +41,8 @@ All flags are disabled by default. Guest play remains the default experience.
   their server flags are explicitly enabled.
 - Future `/account`, `/find-match`, and `/leaderboards` web pages must be hidden
   behind Vite flags and should not be linked from the lobby until approved.
+  `/account` now exists as a disabled placeholder behind
+  `VITE_V11_ACCOUNTS_ENABLED`.
 
 ## Protected Areas
 
@@ -79,3 +81,5 @@ Do not modify these without an explicit gameplay task:
   identities, until a separate claim/merge policy is reviewed.
 - `v11_accounts` and `v11_usernames` are placeholder schema definitions only.
   They are not live data model approval and do not enable account creation.
+- `/account` is a hidden web placeholder only and must stay unlinked while the
+  account flag is disabled.
