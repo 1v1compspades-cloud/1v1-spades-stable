@@ -3,19 +3,42 @@ import assert from "node:assert/strict";
 import {
   DEFAULT_V11_LEADERBOARD_SEASON,
   listV11Leaderboard,
+  recordV11LeaderboardResult,
   sanitizeLeaderboardLimit,
   sanitizeLeaderboardSeason,
 } from "../v11-leaderboards.ts";
 import {
+  v11LeaderboardResultsTable,
   v11LeaderboardStatsTable,
+  type V11LeaderboardResultRow,
   type V11LeaderboardStatsRow,
 } from "@workspace/db/schema/v11-leaderboards";
 
-class FakeLeaderboardDb {
-  private readonly rows: V11LeaderboardStatsRow[];
+class FakeUniqueError extends Error {
+  code = "23505";
+  constraint: string;
 
-  constructor(rows: V11LeaderboardStatsRow[]) {
-    this.rows = rows;
+  constructor(constraint: string) {
+    super("duplicate key value violates unique constraint");
+    this.constraint = constraint;
+  }
+}
+
+class FakeWrappedUniqueError extends Error {
+  cause: FakeUniqueError;
+
+  constructor(constraint: string) {
+    super("Failed query");
+    this.cause = new FakeUniqueError(constraint);
+  }
+}
+
+class FakeLeaderboardDb {
+  results: V11LeaderboardResultRow[] = [];
+  stats: V11LeaderboardStatsRow[];
+
+  constructor(rows: V11LeaderboardStatsRow[] = []) {
+    this.stats = [...rows];
   }
 
   private getEqValue(condition: unknown): string | null {
@@ -34,7 +57,7 @@ class FakeLeaderboardDb {
             limit: async (limit: number) => {
               assert.equal(table, v11LeaderboardStatsTable);
               const season = this.getEqValue(condition);
-              return this.rows
+              return this.stats
                 .filter((row) => !season || row.seasonKey === season)
                 .sort((a, b) => {
                   if (b.wins !== a.wins) return b.wins - a.wins;
@@ -49,6 +72,70 @@ class FakeLeaderboardDb {
         }),
       }),
     };
+  }
+
+  insert(table: unknown) {
+    return {
+      values: (row: any) => {
+        if (table === v11LeaderboardResultsTable) {
+          return this.addResult(row);
+        }
+
+        return {
+          onConflictDoUpdate: async () => {
+            if (table !== v11LeaderboardStatsTable) {
+              throw new Error("Unknown table");
+            }
+
+            const existing = this.stats.find(
+              (stats) =>
+                stats.accountId === row.accountId &&
+                stats.seasonKey === row.seasonKey,
+            );
+
+            if (existing) {
+              existing.displayUsername = row.displayUsername;
+              existing.normalizedUsername = row.normalizedUsername;
+              existing.wins += row.wins;
+              existing.losses += row.losses;
+              existing.gamesPlayed += row.gamesPlayed;
+              existing.pointsFor += row.pointsFor;
+              existing.pointsAgainst += row.pointsAgainst;
+              if (row.currentStreak > 0) {
+                existing.currentStreak =
+                  existing.currentStreak > 0 ? existing.currentStreak + 1 : 1;
+              } else {
+                existing.currentStreak =
+                  existing.currentStreak < 0 ? existing.currentStreak - 1 : -1;
+              }
+              existing.updatedAt = row.updatedAt;
+            } else {
+              this.stats.push(statsRow(row));
+            }
+          },
+        };
+      },
+    };
+  }
+
+  async transaction<T>(callback: (tx: FakeLeaderboardDb) => Promise<T>): Promise<T> {
+    return callback(this);
+  }
+
+  async addResult(row: any): Promise<void> {
+    if (this.results.some((result) => result.roomCode === row.roomCode)) {
+      throw new FakeWrappedUniqueError("v11_leaderboard_results_room_unique");
+    }
+    this.results.push({
+      id: BigInt(this.results.length + 1),
+      seasonKey: DEFAULT_V11_LEADERBOARD_SEASON,
+      winnerBags: 0,
+      loserBags: 0,
+      roundsPlayed: 0,
+      completedAt: new Date("2026-06-19T00:00:00.000Z"),
+      createdAt: new Date("2026-06-19T00:00:00.000Z"),
+      ...row,
+    });
   }
 }
 
@@ -147,4 +234,121 @@ test("v1.1 leaderboard list filters season and applies limit", async () => {
 
   assert.equal(entries.length, 1);
   assert.equal(entries[0].username, "Current");
+});
+
+test("v1.1 leaderboard result write skips guest or unidentified games", async () => {
+  const db = new FakeLeaderboardDb();
+
+  const result = await recordV11LeaderboardResult(db, {
+    roomCode: "ROOM1",
+    winnerUsername: "Winner",
+    loserUsername: "Loser",
+    winnerScore: 250,
+    loserScore: 180,
+    resultReason: "normal_win",
+  });
+
+  assert.deepEqual(result, {
+    recorded: false,
+    skipped: "missing_account_identity",
+    seasonKey: DEFAULT_V11_LEADERBOARD_SEASON,
+  });
+  assert.equal(db.results.length, 0);
+  assert.equal(db.stats.length, 0);
+});
+
+test("v1.1 leaderboard result write records account-vs-account stats", async () => {
+  const db = new FakeLeaderboardDb();
+
+  const result = await recordV11LeaderboardResult(db, {
+    roomCode: "ROOM2",
+    winnerAccountId: "acct-winner",
+    loserAccountId: "acct-loser",
+    winnerUsername: "Winner",
+    loserUsername: "Loser",
+    winnerScore: 260,
+    loserScore: 170,
+    winnerBags: 2,
+    loserBags: 4,
+    roundsPlayed: 8,
+    resultReason: "normal_win",
+  });
+
+  assert.deepEqual(result, {
+    recorded: true,
+    seasonKey: DEFAULT_V11_LEADERBOARD_SEASON,
+  });
+  assert.equal(db.results.length, 1);
+  assert.equal(db.results[0].roomCode, "ROOM2");
+  assert.equal(db.stats.length, 2);
+
+  const winner = db.stats.find((row) => row.accountId === "acct-winner");
+  const loser = db.stats.find((row) => row.accountId === "acct-loser");
+  assert.ok(winner);
+  assert.ok(loser);
+  assert.equal(winner.wins, 1);
+  assert.equal(winner.gamesPlayed, 1);
+  assert.equal(winner.pointsFor, 260);
+  assert.equal(winner.pointsAgainst, 170);
+  assert.equal(winner.currentStreak, 1);
+  assert.equal(loser.losses, 1);
+  assert.equal(loser.currentStreak, -1);
+});
+
+test("v1.1 leaderboard result write is idempotent per room", async () => {
+  const db = new FakeLeaderboardDb();
+  const input = {
+    roomCode: "ROOM3",
+    winnerAccountId: "acct-winner",
+    loserAccountId: "acct-loser",
+    winnerUsername: "Winner",
+    loserUsername: "Loser",
+    winnerScore: 250,
+    loserScore: 190,
+    resultReason: "forfeit",
+  };
+
+  await recordV11LeaderboardResult(db, input);
+  const duplicate = await recordV11LeaderboardResult(db, input);
+
+  assert.deepEqual(duplicate, {
+    recorded: false,
+    skipped: "duplicate_result",
+    seasonKey: DEFAULT_V11_LEADERBOARD_SEASON,
+  });
+  assert.equal(db.results.length, 1);
+  assert.equal(db.stats.length, 2);
+  assert.equal(db.stats.reduce((sum, row) => sum + row.gamesPlayed, 0), 2);
+});
+
+test("v1.1 leaderboard result write rejects invalid and same-account results", async () => {
+  const db = new FakeLeaderboardDb();
+
+  const invalid = await recordV11LeaderboardResult(db, {
+    roomCode: "",
+    winnerAccountId: "acct-1",
+    loserAccountId: "acct-2",
+    winnerUsername: "One",
+    loserUsername: "Two",
+    winnerScore: 250,
+    loserScore: 190,
+    resultReason: "normal_win",
+  });
+  const sameAccount = await recordV11LeaderboardResult(db, {
+    roomCode: "ROOM4",
+    winnerAccountId: "acct-1",
+    loserAccountId: "acct-1",
+    winnerUsername: "One",
+    loserUsername: "Two",
+    winnerScore: 250,
+    loserScore: 190,
+    resultReason: "normal_win",
+  });
+
+  assert.equal(invalid.recorded, false);
+  assert.equal(invalid.skipped, "invalid_result");
+  assert.equal(sameAccount.recorded, false);
+  assert.equal(sameAccount.skipped, "same_account");
+  assert.equal(db.results.length, 0);
+  assert.equal(db.stats.length, 0);
 });
