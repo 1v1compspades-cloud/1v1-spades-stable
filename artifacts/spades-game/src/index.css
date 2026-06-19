@@ -250,6 +250,7 @@
   display: grid;
   place-items: center;
   perspective: 900px;
+  -webkit-perspective: 900px;
   filter: drop-shadow(0 1.25rem 1.8rem rgba(0, 0, 0, 0.58));
 }
 
@@ -263,6 +264,7 @@
   width: 8.8rem;
   height: 8.8rem;
   transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
 }
 
 .spades-live-coin--heads {
@@ -294,6 +296,7 @@
   place-items: center;
   border-radius: 50%;
   backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
   overflow: hidden;
   border: 0.42rem solid var(--diamond-border);
   background:
@@ -316,8 +319,12 @@
     0 0 0.8rem rgba(226, 232, 240, 0.18);
 }
 
+.spades-live-coin__face--heads {
+  transform: translateZ(0.04rem);
+}
+
 .spades-live-coin__face--tails {
-  transform: rotateY(180deg);
+  transform: rotateY(180deg) translateZ(0.04rem);
 }
 
 .spades-live-coin__rim {

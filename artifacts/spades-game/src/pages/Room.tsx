@@ -1810,16 +1810,10 @@ export default function Room() {
               aria-hidden="true"
             />
             <div
-              className="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto pointer-events-none sm:items-center"
-              style={{
-                paddingTop: "max(0.5rem, env(safe-area-inset-top))",
-                paddingBottom: "calc(env(safe-area-inset-bottom) + 8.25rem)",
-                paddingLeft: "max(0.5rem, env(safe-area-inset-left))",
-                paddingRight: "max(0.5rem, env(safe-area-inset-right))",
-              }}
+              className="fixed inset-0 z-[220] flex items-start justify-center overflow-y-auto pointer-events-none px-2 pt-[calc(env(safe-area-inset-top)+10.25rem)] pb-[calc(env(safe-area-inset-bottom)+11rem)] sm:items-center sm:p-4"
               data-testid="bidding-overlay"
             >
-              <div className="bg-card/96 border border-border p-3 sm:p-5 rounded-xl shadow-2xl space-y-3 w-full max-w-[min(34rem,calc(100vw-1rem))] text-center max-h-[min(72dvh,34rem)] sm:max-h-[80dvh] overflow-y-auto pointer-events-auto backdrop-blur-md">
+              <div className="bg-card/96 border border-border p-3 sm:p-5 rounded-xl shadow-2xl space-y-3 w-full max-w-[min(34rem,calc(100vw-1rem))] text-center max-h-[calc(100dvh-22rem)] min-[420px]:max-h-[calc(100dvh-20rem)] sm:max-h-[80dvh] overflow-y-auto pointer-events-auto backdrop-blur-md">
                 <h3 className="text-sm sm:text-lg font-serif text-primary">Place your bid</h3>
                 {gameState.bids[0] === null && gameState.bids[1] === null && (
                   <p className="text-[10px] sm:text-[11px] uppercase tracking-widest text-primary/80">
@@ -1917,8 +1911,8 @@ export default function Room() {
 
         {/* Round over overlay (shown to everyone, including spectators) */}
         {gameState.phase === "round_over" && lastRound && (
-          <div className="fixed inset-0 z-[190] flex items-start justify-center overflow-y-auto bg-black/80 p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md sm:items-center sm:p-4">
-            <div className="bg-card border border-border p-4 sm:p-7 lg:p-8 rounded-xl shadow-2xl w-full max-w-[min(46rem,calc(100vw-1rem))] mx-auto space-y-4 sm:space-y-6">
+          <div className="fixed inset-0 z-[220] flex items-start justify-center overflow-y-auto bg-black/80 px-3 pt-[calc(env(safe-area-inset-top)+9.5rem)] pb-[calc(env(safe-area-inset-bottom)+10.5rem)] backdrop-blur-md sm:items-center sm:p-4">
+            <div className="bg-card border border-border p-4 sm:p-7 lg:p-8 rounded-xl shadow-2xl w-full max-w-[min(46rem,calc(100vw-1rem))] max-h-[calc(100dvh-20rem)] min-[420px]:max-h-[calc(100dvh-18rem)] overflow-y-auto mx-auto space-y-4 sm:max-h-[85dvh] sm:space-y-6">
               <h3 className="text-xl sm:text-3xl font-serif text-center text-primary border-b border-border pb-3 sm:pb-4">
                 Round {lastRound.round} Summary
               </h3>
