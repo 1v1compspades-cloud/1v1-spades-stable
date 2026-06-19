@@ -2018,8 +2018,8 @@ export default function Room() {
 
         {/* Game over overlay (shown to everyone) */}
         {gameState.phase === "game_over" && (
-          <div className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/90 p-3 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-lg sm:items-center sm:p-4">
-            <div className="my-auto w-full max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain rounded-xl border border-border bg-card p-4 text-center shadow-2xl space-y-4 sm:p-6 sm:space-y-5">
+          <div className="fixed inset-0 isolate z-[500] flex items-start justify-center overflow-y-auto bg-black/90 p-3 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-lg sm:items-center sm:p-4">
+            <div className="relative z-[501] my-auto w-full max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain rounded-xl border border-border bg-card p-4 text-center shadow-2xl space-y-4 sm:p-6 sm:space-y-5">
               {gameState.matchLabel && (
                 <div
                   data-testid="match-label"
@@ -2794,8 +2794,8 @@ export default function Room() {
           {renderStatusBanner()}
           {renderMatchActionsPanel()}
           {renderTable()}
-          {renderPlayerInfo(bottomIndex)}
-          {spectator ? renderSpectatorFooter() : renderMyHand()}
+          {gameState.phase !== "game_over" && renderPlayerInfo(bottomIndex)}
+          {gameState.phase !== "game_over" && (spectator ? renderSpectatorFooter() : renderMyHand())}
           {renderForfeitConfirmDialog()}
           {showHostResetFab && renderHostResetFab()}
           {canFastFinish && renderFastFinishTool()}
