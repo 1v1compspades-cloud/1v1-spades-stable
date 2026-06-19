@@ -66,10 +66,12 @@ async function testFlagOffRejects() {
 
 async function testFirstPlayerWaitsAndDuplicateIsIdempotent() {
   const socket = new FakeSocket("s-wait");
+  const counts: number[] = [];
   const queue = new FindMatchQueue<FakeSocket>({
     isEnabled: () => true,
     timeoutMs: () => 1_000,
     matchPlayers: async () => [matched("ROOM1", 0), matched("ROOM1", 1)],
+    onWaitingCountChange: (count) => counts.push(count),
   });
 
   await queue.join({ socket, playerName: "Guest One", profileUsername: null });
@@ -77,15 +79,18 @@ async function testFirstPlayerWaitsAndDuplicateIsIdempotent() {
   const waits = socket.events.filter((entry) => entry.event === "find_match_waiting");
   ok("first player waits", waits.length === 2, waits);
   ok("duplicate queue from same socket is idempotent", queue.hasWaitingSocket(socket.id));
+  ok("finding match count increments only once for duplicate join", counts.join(",") === "1", counts);
   queue.cancel(socket);
 }
 
 async function testSecondPlayerMatches() {
   const first = new FakeSocket("s-first");
   const second = new FakeSocket("s-second");
+  const counts: number[] = [];
   const queue = new FindMatchQueue<FakeSocket>({
     isEnabled: () => true,
     timeoutMs: () => 1_000,
+    onWaitingCountChange: (count) => counts.push(count),
     matchPlayers: async (a, b) => {
       ok("match callback receives first queued player first", a.socket.id === first.id, a.socket.id);
       ok("match callback receives second player second", b.socket.id === second.id, b.socket.id);
@@ -101,15 +106,18 @@ async function testSecondPlayerMatches() {
   ok("first matched receives room and seat 0", firstMatch?.roomCode === "ABCD12" && firstMatch.playerIndex === 0, firstMatch);
   ok("second matched receives same room and seat 1", secondMatch?.roomCode === "ABCD12" && secondMatch.playerIndex === 1, secondMatch);
   ok("matched players are removed from queue", !queue.hasWaitingSocket(first.id) && !queue.hasWaitingSocket(second.id));
+  ok("finding match count clears on match", counts.join(",") === "1,0", counts);
 }
 
 async function testCancelClearsQueue() {
   const first = new FakeSocket("s-cancel");
   const second = new FakeSocket("s-after-cancel");
+  const counts: number[] = [];
   const queue = new FindMatchQueue<FakeSocket>({
     isEnabled: () => true,
     timeoutMs: () => 1_000,
     matchPlayers: async () => [matched("CANCEL", 0), matched("CANCEL", 1)],
+    onWaitingCountChange: (count) => counts.push(count),
   });
 
   await queue.join({ socket: first, playerName: "Guest One", profileUsername: null });
@@ -117,6 +125,7 @@ async function testCancelClearsQueue() {
   await queue.join({ socket: second, playerName: "Guest Two", profileUsername: null });
   ok("cancel clears queue", cleared && !queue.hasWaitingSocket(first.id) && queue.hasWaitingSocket(second.id));
   ok("cancel emits cancelled", (last(first, "find_match_cancelled") as { reason?: string })?.reason === "cancelled");
+  ok("finding match count updates on cancel and next join", counts.join(",") === "1,0,1", counts);
   queue.cancel(second);
 }
 
@@ -139,10 +148,12 @@ async function testDisconnectClearsQueue() {
 async function testTimeoutClearsQueue() {
   const first = new FakeSocket("s-timeout");
   const second = new FakeSocket("s-after-timeout");
+  const counts: number[] = [];
   const queue = new FindMatchQueue<FakeSocket>({
     isEnabled: () => true,
     timeoutMs: () => 20,
     matchPlayers: async () => [matched("TIME", 0), matched("TIME", 1)],
+    onWaitingCountChange: (count) => counts.push(count),
   });
 
   await queue.join({ socket: first, playerName: "Guest One", profileUsername: null });
@@ -150,6 +161,7 @@ async function testTimeoutClearsQueue() {
   await queue.join({ socket: second, playerName: "Guest Two", profileUsername: null });
   ok("timeout clears queue", !queue.hasWaitingSocket(first.id) && queue.hasWaitingSocket(second.id));
   ok("timeout emits cancelled", (last(first, "find_match_cancelled") as { reason?: string })?.reason === "timeout");
+  ok("finding match count updates on timeout and next join", counts.join(",") === "1,0,1", counts);
   queue.cancel(second);
 }
 

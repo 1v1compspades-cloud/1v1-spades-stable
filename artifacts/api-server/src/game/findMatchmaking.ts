@@ -38,6 +38,7 @@ type FindMatchQueueOptions<TSocket extends FindMatchSocketLike> = {
     first: FindMatchPlayer<TSocket>,
     second: FindMatchPlayer<TSocket>,
   ) => Promise<[FindMatchMatchedPayload, FindMatchMatchedPayload]>;
+  onWaitingCountChange?: (count: number) => void;
   now?: () => number;
 };
 
@@ -46,12 +47,14 @@ export class FindMatchQueue<TSocket extends FindMatchSocketLike = FindMatchSocke
   private readonly isEnabled: () => boolean;
   private readonly timeoutMs: () => number;
   private readonly matchPlayers: FindMatchQueueOptions<TSocket>["matchPlayers"];
+  private readonly onWaitingCountChange?: (count: number) => void;
   private readonly now: () => number;
 
   constructor(options: FindMatchQueueOptions<TSocket>) {
     this.isEnabled = options.isEnabled;
     this.timeoutMs = options.timeoutMs;
     this.matchPlayers = options.matchPlayers;
+    this.onWaitingCountChange = options.onWaitingCountChange;
     this.now = options.now ?? Date.now;
   }
 
@@ -109,6 +112,10 @@ export class FindMatchQueue<TSocket extends FindMatchSocketLike = FindMatchSocke
     return this.waiting?.socket.id === socketId;
   }
 
+  getWaitingCount(): number {
+    return this.waiting ? 1 : 0;
+  }
+
   private queue(player: FindMatchPlayer<TSocket>): void {
     const queuedAt = this.now();
     const timeoutAt = queuedAt + this.timeoutMs();
@@ -120,12 +127,15 @@ export class FindMatchQueue<TSocket extends FindMatchSocketLike = FindMatchSocke
     timeoutHandle.unref?.();
 
     this.waiting = { ...player, queuedAt, timeoutAt, timeoutHandle };
+    this.onWaitingCountChange?.(1);
     this.emitWaiting(this.waiting);
   }
 
   private clearWaiting(): void {
+    const hadWaiting = !!this.waiting;
     if (this.waiting) clearTimeout(this.waiting.timeoutHandle);
     this.waiting = null;
+    if (hadWaiting) this.onWaitingCountChange?.(0);
   }
 
   private emitWaiting(player: QueuedPlayer<TSocket>): void {

@@ -25,6 +25,11 @@ type FindMatchErrorPayload = {
   message?: string;
 };
 
+type OnlineCountUpdate = {
+  onlineCount: number;
+  findingMatchCount: number;
+};
+
 export default function Lobby() {
   const [, setLocation] = useLocation();
   const { connect, connected, socket, createRoom, joinRoom, joinAsSpectator, createTournament, joinTournament, isAdmin, unlockAdmin } = useSocket();
@@ -76,6 +81,7 @@ export default function Lobby() {
   const [isSpectating, setIsSpectating] = useState(false);
   const [isFindingMatch, setIsFindingMatch] = useState(false);
   const [findMatchError, setFindMatchError] = useState<string | null>(null);
+  const [onlineCounts, setOnlineCounts] = useState<OnlineCountUpdate | null>(null);
   const findMatchCleanupRef = useRef<(() => void) | null>(null);
   const [invitedAsSpectator] = useState(initialParams.spectate && !!initialParams.code);
   const [autoSpectateTried, setAutoSpectateTried] = useState(false);
@@ -108,6 +114,24 @@ export default function Lobby() {
   useEffect(() => {
     connect();
   }, [connect]);
+
+  useEffect(() => {
+    if (!v11WebFlags.matchmaking || !socket) return;
+    const onOnlineCountUpdate = (payload: OnlineCountUpdate) => {
+      if (
+        typeof payload?.onlineCount !== "number" ||
+        typeof payload?.findingMatchCount !== "number"
+      ) return;
+      setOnlineCounts({
+        onlineCount: Math.max(0, payload.onlineCount),
+        findingMatchCount: Math.max(0, payload.findingMatchCount),
+      });
+    };
+    socket.on("online_count_update", onOnlineCountUpdate);
+    return () => {
+      socket.off("online_count_update", onOnlineCountUpdate);
+    };
+  }, [socket]);
 
   // If admin access is lost (e.g. session token rejected on reconnect) while
   // the Custom Tournament tile is selected, fall back to Quick Match so the
@@ -516,6 +540,13 @@ export default function Lobby() {
 
           {v11WebFlags.matchmaking && matchMode === "quick" && (
             <div className="space-y-3 pt-2 border-t border-border/50" data-testid="find-match-panel">
+              <div
+                className="flex items-center justify-center gap-4 rounded-md border border-border/60 bg-white/[0.03] px-3 py-2 text-xs font-medium text-muted-foreground"
+                data-testid="online-count-indicator"
+              >
+                <span>Online: {onlineCounts?.onlineCount ?? "—"}</span>
+                <span>Finding match: {onlineCounts?.findingMatchCount ?? "—"}</span>
+              </div>
               {isFindingMatch ? (
                 <div className="rounded-md border border-primary/35 bg-primary/10 px-3 py-3 space-y-3">
                   <div className="flex items-center justify-between gap-3">

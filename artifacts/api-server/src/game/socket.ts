@@ -50,6 +50,7 @@ import {
   FindMatchQueue,
   type FindMatchMatchedPayload,
 } from "./findMatchmaking.js";
+import { OnlinePresenceTracker } from "./onlinePresence.js";
 import type { Card } from "./deck.js";
 import {
   createTournament as createTournamentEntity,
@@ -1733,10 +1734,18 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
     },
     path: "/socket.io",
   });
+  const onlinePresence = new OnlinePresenceTracker();
+  const emitOnlineCountUpdate = () => {
+    io.emit("online_count_update", onlinePresence.snapshot());
+  };
   const findMatchQueue = new FindMatchQueue<Socket>({
     isEnabled: () => isV11FlagEnabled("V11_MATCHMAKING_ENABLED"),
     timeoutMs: getFindMatchTimeoutMs,
     matchPlayers: (first, second) => createFindMatchRoom(io, first, second),
+    onWaitingCountChange: (count) => {
+      onlinePresence.setFindingMatchCount(count);
+      emitOnlineCountUpdate();
+    },
   });
 
   io.on("connection", (socket) => {
@@ -1744,6 +1753,8 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
     uniqueVisitorIps.add(clientIpFromSocket(socket));
     const concurrent = io.engine.clientsCount;
     if (concurrent > peakConcurrentSockets) peakConcurrentSockets = concurrent;
+    onlinePresence.connect(socket.id);
+    emitOnlineCountUpdate();
     logger.info({ socketId: socket.id }, "Socket connected");
 
     socket.on("find_match_join", (data: { playerName?: string; profileUsername?: string } = {}) => {
@@ -3538,6 +3549,8 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
 
     socket.on("disconnect", () => {
       findMatchQueue.disconnect(socket);
+      onlinePresence.disconnect(socket.id);
+      emitOnlineCountUpdate();
       clearRateForSocket(socket.id);
       adminSockets.delete(socket.id);
       const playerName = (socket.data as { playerName?: string }).playerName;
