@@ -1,5 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const serverFlags = [
   "V11_ACCOUNTS_ENABLED",
@@ -38,6 +40,13 @@ function enabled(value: string | undefined): boolean {
 
 function normalizeUsername(input: string): string {
   return input.trim().toLowerCase().replace(/\s+/g, "_");
+}
+
+function readAccountPrivacyScaffold(): string {
+  return readFileSync(
+    fileURLToPath(new URL("../v11-account-privacy.ts", import.meta.url)),
+    "utf8",
+  );
 }
 
 test("v1.1 scaffold keeps all planned feature flags explicit", () => {
@@ -86,4 +95,20 @@ test("v1.1 username planning uses stable normalization examples", () => {
   assert.equal(normalizeUsername(" Shaw_1 "), "shaw_1");
   assert.equal(normalizeUsername("Two Words"), "two_words");
   assert.equal(normalizeUsername("MiXeD_Case"), "mixed_case");
+});
+
+test("v1.1 account scaffold records deletion and privacy requirements", () => {
+  const source = readAccountPrivacyScaffold();
+
+  assert.match(source, /guest-play-default/);
+  assert.match(source, /in-app-account-deletion/);
+  assert.match(source, /delete-associated-personal-data/);
+  assert.match(source, /support-email-visible/);
+  assert.match(source, /historical-guest-results-unclaimed/);
+});
+
+test("v1.1 historical guest identity policy remains blocked for review", () => {
+  const source = readAccountPrivacyScaffold();
+
+  assert.match(source, /id: "historical-guest-results-unclaimed"[\s\S]*status: "blocked"/);
 });
