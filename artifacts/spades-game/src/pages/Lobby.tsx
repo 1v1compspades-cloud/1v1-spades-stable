@@ -869,20 +869,30 @@ export default function Lobby() {
           </div>
 
           <section
-            className="rounded-md border border-border/50 bg-white/[0.03] px-3 py-2 text-left"
+            className="rounded-md border border-primary/35 bg-black/20 text-left shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]"
             data-testid="game-settings"
           >
             <button
               type="button"
-              className="flex w-full items-center justify-between gap-3 text-left text-sm font-semibold text-foreground"
+              className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left"
               onClick={() => setGameSettingsOpen((open) => !open)}
               aria-expanded={gameSettingsOpen}
               aria-controls="game-settings-panel"
               data-testid="button-game-settings"
             >
-              <span>Game Settings</span>
-              <span className="text-xs font-normal text-muted-foreground">
-                {matchMode === "king" ? "Table Streak" : matchMode === "custom" ? "Private Event" : "Quick Match"} · {matchTarget} pts
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-primary/45 bg-primary/10 text-sm text-primary" aria-hidden>
+                  ♠
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-foreground">Game Settings</span>
+                  <span className="block truncate text-xs font-normal text-muted-foreground">
+                    {matchMode === "king" ? "Table Streak" : matchMode === "custom" ? "Private Event" : "Quick Match"} · {matchTarget} pts
+                  </span>
+                </span>
+              </span>
+              <span className={`shrink-0 text-primary transition-transform ${gameSettingsOpen ? "rotate-180" : ""}`} aria-hidden>
+                ▾
               </span>
             </button>
             {gameSettingsOpen && <div id="game-settings-panel" className="mt-4 space-y-4">
