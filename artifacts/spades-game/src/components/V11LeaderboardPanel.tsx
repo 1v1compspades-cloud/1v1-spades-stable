@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   computeLeaderboardPanelState,
+  formatBags,
   formatStreak,
   formatWinRate,
   leaderboardEndpoint,
@@ -104,6 +105,9 @@ export function V11LeaderboardPanel() {
                   </p>
                   <p className="mt-1 text-[11px] text-muted-foreground">
                     {entry.wins}-{entry.losses} · {formatWinRate(entry.winRate)} win · streak {formatStreak(entry.currentStreak)}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Bags +{formatBags(entry.bagsTaken)} / -{formatBags(entry.bagsGiven)}
                   </p>
                 </div>
                 <span className="shrink-0 rounded border border-border/50 px-2 py-1 text-[11px] font-mono text-muted-foreground">

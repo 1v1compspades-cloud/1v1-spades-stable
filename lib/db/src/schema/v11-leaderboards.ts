@@ -66,6 +66,8 @@ export const v11LeaderboardStatsTable = pgTable(
     gamesPlayed: integer("games_played").notNull().default(0),
     pointsFor: integer("points_for").notNull().default(0),
     pointsAgainst: integer("points_against").notNull().default(0),
+    bagsTaken: integer("bags_taken").notNull().default(0),
+    bagsGiven: integer("bags_given").notNull().default(0),
     currentStreak: integer("current_streak").notNull().default(0),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()

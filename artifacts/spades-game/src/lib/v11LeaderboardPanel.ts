@@ -6,6 +6,8 @@ export type V11LeaderboardEntry = {
   gamesPlayed: number;
   winRate: number;
   currentStreak: number;
+  bagsTaken?: number;
+  bagsGiven?: number;
 };
 
 export type V11LeaderboardResponse = {
@@ -33,6 +35,11 @@ export function formatWinRate(value: number): string {
 export function formatStreak(value: number): string {
   if (!Number.isFinite(value) || value === 0) return "0";
   return value > 0 ? `+${value}` : `${value}`;
+}
+
+export function formatBags(value: number | undefined): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "0";
+  return `${Math.max(0, Math.floor(value))}`;
 }
 
 export function computeLeaderboardPanelState(input: {

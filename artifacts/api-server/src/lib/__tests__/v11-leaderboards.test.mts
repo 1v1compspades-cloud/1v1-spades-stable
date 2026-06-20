@@ -102,6 +102,8 @@ class FakeLeaderboardDb {
               existing.gamesPlayed += row.gamesPlayed;
               existing.pointsFor += row.pointsFor;
               existing.pointsAgainst += row.pointsAgainst;
+              existing.bagsTaken += row.bagsTaken;
+              existing.bagsGiven += row.bagsGiven;
               if (row.currentStreak > 0) {
                 existing.currentStreak =
                   existing.currentStreak > 0 ? existing.currentStreak + 1 : 1;
@@ -155,6 +157,8 @@ function statsRow(
     gamesPlayed: 0,
     pointsFor: 0,
     pointsAgainst: 0,
+    bagsTaken: 0,
+    bagsGiven: 0,
     currentStreak: 0,
     updatedAt: new Date("2026-06-19T00:00:00.000Z"),
     ...patch,
@@ -206,6 +210,8 @@ test("v1.1 leaderboard list returns public account-safe rows", async () => {
   assert.equal(entries[0].rank, 1);
   assert.equal(entries[0].username, "Alpha");
   assert.equal(entries[0].winRate, 0.75);
+  assert.equal(entries[0].bagsTaken, 0);
+  assert.equal(entries[0].bagsGiven, 0);
   assert.equal(
     Object.prototype.hasOwnProperty.call(entries[0], "accountId"),
     false,
@@ -291,8 +297,12 @@ test("v1.1 leaderboard result write records account-vs-account stats", async () 
   assert.equal(winner.gamesPlayed, 1);
   assert.equal(winner.pointsFor, 260);
   assert.equal(winner.pointsAgainst, 170);
+  assert.equal(winner.bagsTaken, 2);
+  assert.equal(winner.bagsGiven, 4);
   assert.equal(winner.currentStreak, 1);
   assert.equal(loser.losses, 1);
+  assert.equal(loser.bagsTaken, 4);
+  assert.equal(loser.bagsGiven, 2);
   assert.equal(loser.currentStreak, -1);
 });
 
@@ -320,6 +330,8 @@ test("v1.1 leaderboard result write is idempotent per room", async () => {
   assert.equal(db.results.length, 1);
   assert.equal(db.stats.length, 2);
   assert.equal(db.stats.reduce((sum, row) => sum + row.gamesPlayed, 0), 2);
+  assert.equal(db.stats.reduce((sum, row) => sum + row.bagsTaken, 0), 0);
+  assert.equal(db.stats.reduce((sum, row) => sum + row.bagsGiven, 0), 0);
 });
 
 test("v1.1 leaderboard result write rejects invalid and same-account results", async () => {
@@ -431,6 +443,8 @@ test("v1.1 completed normal quick match records once", async () => {
   assert.equal(db.results.length, 1);
   assert.equal(db.stats.length, 2);
   assert.equal(db.stats.reduce((sum, row) => sum + row.gamesPlayed, 0), 2);
+  assert.equal(db.stats.reduce((sum, row) => sum + row.bagsTaken, 0), 1);
+  assert.equal(db.stats.reduce((sum, row) => sum + row.bagsGiven, 0), 1);
 });
 
 test("v1.1 completed match leaderboard skips abandoned or incomplete games", async () => {

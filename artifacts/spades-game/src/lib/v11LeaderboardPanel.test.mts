@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   computeLeaderboardPanelState,
+  formatBags,
   formatStreak,
   formatWinRate,
   leaderboardEndpoint,
@@ -38,6 +39,8 @@ test("leaderboard panel renders entries state", () => {
           gamesPlayed: 4,
           winRate: 0.75,
           currentStreak: 2,
+          bagsTaken: 5,
+          bagsGiven: 3,
         },
       ],
     },
@@ -45,6 +48,8 @@ test("leaderboard panel renders entries state", () => {
 
   assert.equal(state.kind, "entries");
   assert.equal(state.kind === "entries" && state.entries[0].username, "Alpha");
+  assert.equal(state.kind === "entries" && state.entries[0].bagsTaken, 5);
+  assert.equal(state.kind === "entries" && state.entries[0].bagsGiven, 3);
 });
 
 test("leaderboard panel renders empty and error states", () => {
@@ -75,4 +80,6 @@ test("leaderboard panel formats win rate and streak", () => {
   assert.equal(formatStreak(3), "+3");
   assert.equal(formatStreak(-2), "-2");
   assert.equal(formatStreak(0), "0");
+  assert.equal(formatBags(4.9), "4");
+  assert.equal(formatBags(undefined), "0");
 });

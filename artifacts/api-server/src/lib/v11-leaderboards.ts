@@ -21,6 +21,8 @@ export type PublicV11LeaderboardEntry = {
   gamesPlayed: number;
   pointsFor: number;
   pointsAgainst: number;
+  bagsTaken: number;
+  bagsGiven: number;
   winRate: number;
   currentStreak: number;
   updatedAt: Date;
@@ -134,6 +136,8 @@ function toPublicEntry(
     gamesPlayed,
     pointsFor: row.pointsFor,
     pointsAgainst: row.pointsAgainst,
+    bagsTaken: row.bagsTaken,
+    bagsGiven: row.bagsGiven,
     winRate: gamesPlayed > 0 ? Number((wins / gamesPlayed).toFixed(4)) : 0,
     currentStreak: row.currentStreak,
     updatedAt: row.updatedAt,
@@ -170,6 +174,8 @@ async function insertStatsDelta(
     won: boolean;
     pointsFor: number;
     pointsAgainst: number;
+    bagsTaken: number;
+    bagsGiven: number;
   },
 ): Promise<void> {
   await db
@@ -184,6 +190,8 @@ async function insertStatsDelta(
       gamesPlayed: 1,
       pointsFor: input.pointsFor,
       pointsAgainst: input.pointsAgainst,
+      bagsTaken: input.bagsTaken,
+      bagsGiven: input.bagsGiven,
       currentStreak: input.won ? 1 : -1,
       updatedAt: new Date(),
     })
@@ -204,6 +212,8 @@ async function insertStatsDelta(
         gamesPlayed: sql`${v11LeaderboardStatsTable.gamesPlayed} + 1`,
         pointsFor: sql`${v11LeaderboardStatsTable.pointsFor} + ${input.pointsFor}`,
         pointsAgainst: sql`${v11LeaderboardStatsTable.pointsAgainst} + ${input.pointsAgainst}`,
+        bagsTaken: sql`${v11LeaderboardStatsTable.bagsTaken} + ${input.bagsTaken}`,
+        bagsGiven: sql`${v11LeaderboardStatsTable.bagsGiven} + ${input.bagsGiven}`,
         currentStreak: input.won
           ? sql`case when ${v11LeaderboardStatsTable.currentStreak} > 0 then ${v11LeaderboardStatsTable.currentStreak} + 1 else 1 end`
           : sql`case when ${v11LeaderboardStatsTable.currentStreak} < 0 then ${v11LeaderboardStatsTable.currentStreak} - 1 else -1 end`,
@@ -224,6 +234,8 @@ async function recordV11LeaderboardResultWithDb(
     won: true,
     pointsFor: row.winnerScore,
     pointsAgainst: row.loserScore,
+    bagsTaken: row.winnerBags ?? 0,
+    bagsGiven: row.loserBags ?? 0,
   });
   await insertStatsDelta(db, {
     seasonKey: row.seasonKey ?? DEFAULT_V11_LEADERBOARD_SEASON,
@@ -232,6 +244,8 @@ async function recordV11LeaderboardResultWithDb(
     won: false,
     pointsFor: row.loserScore,
     pointsAgainst: row.winnerScore,
+    bagsTaken: row.loserBags ?? 0,
+    bagsGiven: row.winnerBags ?? 0,
   });
 }
 
