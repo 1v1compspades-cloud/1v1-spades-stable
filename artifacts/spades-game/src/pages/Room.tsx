@@ -159,6 +159,11 @@ export default function Room() {
   const [reconnectRetryTick, setReconnectRetryTick] = useState(0);
   const reconnectRetryCountRef = useRef(0);
   const reconnectRetryTimeoutRef = useRef<number | null>(null);
+  const latestGamePhaseRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    latestGamePhaseRef.current = gameState?.phase ?? null;
+  }, [gameState?.phase]);
 
   const clearReconnectRetry = () => {
     if (reconnectRetryTimeoutRef.current !== null) {
@@ -185,7 +190,6 @@ export default function Room() {
     if (gameState.phase === "game_over") {
       if (!spectator && completedSessionCleanupKeyRef.current !== cleanupKey) {
         completedSessionCleanupKeyRef.current = cleanupKey;
-        clearPersistedRoomSession(roomCode);
       }
       return;
     }
@@ -196,8 +200,6 @@ export default function Room() {
     gameState?.roundNumber,
     gameState?.tournamentRef?.code,
     spectator,
-    clearPersistedRoomSession,
-    setLocation,
   ]);
 
   useEffect(() => {
@@ -364,6 +366,7 @@ export default function Room() {
     if (!roomCode || reconnectSeatFromUrl === null || wantsSpectate) return;
     const token = getPlayerToken(roomCode, reconnectSeatFromUrl);
     if (!token) {
+      if (latestGamePhaseRef.current === "game_over") return;
       toast({ description: "Reconnect token missing. Please rejoin.", variant: "destructive" });
       setLocation("/");
       return;
@@ -458,6 +461,7 @@ export default function Room() {
         ? joinAsSpectator(roomCode, playerName)
         : reconnectAsSpectator(roomCode, playerName);
       spectateCall.catch(err => {
+        if (latestGamePhaseRef.current === "game_over") return;
         toast({ description: err || "Spectator session expired.", variant: "destructive" });
         saveIsSpectator(false);
         setLocation("/");
@@ -465,6 +469,7 @@ export default function Room() {
     } else if (playerIndex !== null) {
       const token = getPlayerToken(roomCode, playerIndex) || undefined;
       reconnect(roomCode, playerIndex, playerName, token).catch(err => {
+        if (latestGamePhaseRef.current === "game_over") return;
         const msg = typeof err === "string" ? err : (err?.message ?? "");
         const tournamentCode =
           typeof window !== "undefined"
@@ -520,6 +525,7 @@ export default function Room() {
           if (res.token) savePlayerToken(roomCode, res.playerIndex as 0 | 1, res.token);
         }
       }).catch(err => {
+        if (latestGamePhaseRef.current === "game_over") return;
         toast({ description: err || "Failed to join room", variant: "destructive" });
         setLocation("/");
       });
@@ -890,8 +896,22 @@ export default function Room() {
   };
 
   const handleLeaveSpectate = () => {
+    if (roomCode) {
+      clearPersistedRoomSession(roomCode);
+    }
+    clearGameState();
+    clearReconnectRetry();
     saveIsSpectator(false);
     setLocation("/");
+  };
+
+  const handleLeaveCompletedRoom = (target = "/") => {
+    if (roomCode) {
+      clearPersistedRoomSession(roomCode);
+    }
+    clearGameState();
+    clearReconnectRetry();
+    setLocation(target);
   };
 
   const handleLeaveWaitingRoom = async () => {
@@ -2267,7 +2287,7 @@ export default function Room() {
                 )}
                 {gameState.tournamentRef && (
                   <Button
-                    onClick={() => setLocation(`/tournament/${gameState.tournamentRef!.code}`)}
+                    onClick={() => handleLeaveCompletedRoom(`/tournament/${gameState.tournamentRef!.code}`)}
                     className="w-full h-11"
                     data-testid="button-back-to-tournament"
                   >
@@ -2275,7 +2295,7 @@ export default function Room() {
                   </Button>
                 )}
                 <Button
-                  onClick={spectator ? handleLeaveSpectate : () => setLocation("/")}
+                  onClick={spectator ? handleLeaveSpectate : () => handleLeaveCompletedRoom("/")}
                   variant="outline"
                   className="w-full h-11"
                   data-testid="button-leave-gameover"
