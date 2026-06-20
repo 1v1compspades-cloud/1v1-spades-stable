@@ -489,6 +489,8 @@ function recordCompletedMatchForLeaderboard(
       phase: state.phase,
       tournamentRef: state.tournamentRef ?? null,
       resultReason,
+      matchKind: state.matchKind ?? "casual",
+      leaderboardEligible: state.leaderboardEligible === true,
       winnerAccountId: winner.accountId,
       loserAccountId: loser.accountId,
       winnerUsername: winner.username,
@@ -1653,6 +1655,7 @@ async function createFindMatchRoom(
     accountId?: string | null;
     accountUsername?: string | null;
   },
+  options: { ranked?: boolean } = {},
 ): Promise<[FindMatchMatchedPayload, FindMatchMatchedPayload]> {
   if (getAllRooms().length >= MAX_TOTAL_ROOMS) {
     throw new Error("Server is at capacity. Please try again later.");
@@ -1669,6 +1672,9 @@ async function createFindMatchRoom(
     first.accountId && first.accountUsername
       ? { accountId: first.accountId, accountUsername: first.accountUsername }
       : null,
+    options.ranked
+      ? { matchKind: "ranked", leaderboardEligible: true }
+      : { matchKind: "casual", leaderboardEligible: false },
   );
   await withRoomLock(state.roomCode, async () => {
     await commit(state, {
@@ -1680,8 +1686,10 @@ async function createFindMatchRoom(
         host: first.playerName,
         profileUsername: first.profileUsername,
         accountAttached: Boolean(first.accountId && first.accountUsername),
+        ranked: Boolean(options.ranked),
+        leaderboardEligible: Boolean(state.leaderboardEligible),
         label: "Find Match",
-        via: "find_match",
+        via: options.ranked ? "ranked_match" : "find_match",
       },
     });
   });
@@ -1719,7 +1727,9 @@ async function createFindMatchRoom(
           name: second.playerName,
           profileUsername: second.profileUsername,
           accountAttached: Boolean(second.accountId && second.accountUsername),
-          via: "find_match",
+          ranked: Boolean(options.ranked),
+          leaderboardEligible: Boolean(result.state.leaderboardEligible),
+          via: options.ranked ? "ranked_match" : "find_match",
         },
       });
     } catch (err) {
@@ -1751,7 +1761,7 @@ async function createFindMatchRoom(
   (second.socket.data as { playerName?: string }).playerName = second.playerName;
   logger.info(
     { roomCode: state.roomCode, hostSocketId: first.socket.id, guestSocketId: second.socket.id },
-    "Find Match created room",
+    options.ranked ? "Ranked Match created room" : "Find Match created room",
   );
 
   io.to(first.socket.id).emit("opponent_joined", { playerName: second.playerName });
@@ -1844,6 +1854,21 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
       emitOnlineCountUpdate();
     },
   });
+  const rankedMatchQueue = new FindMatchQueue<Socket>({
+    isEnabled: () =>
+      isV11FlagEnabled("V11_MATCHMAKING_ENABLED") &&
+      isV11FlagEnabled("V11_ACCOUNTS_ENABLED") &&
+      isV11FlagEnabled("V11_LEADERBOARDS_ENABLED"),
+    requireAccountIdentity: true,
+    events: {
+      waiting: "ranked_match_waiting",
+      matched: "ranked_match_matched",
+      cancelled: "ranked_match_cancelled",
+      error: "ranked_match_error",
+    },
+    timeoutMs: getFindMatchTimeoutMs,
+    matchPlayers: (first, second) => createFindMatchRoom(io, first, second, { ranked: true }),
+  });
 
   io.on("connection", (socket) => {
     totalConnectionsSinceStart += 1;
@@ -1889,6 +1914,43 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
 
     socket.on("find_match_cancel", () => {
       findMatchQueue.cancel(socket);
+    });
+
+    socket.on("ranked_match_join", (data: {
+      playerName?: string;
+      profileUsername?: string;
+      accountId?: string;
+      accountUsername?: string;
+    } = {}) => {
+      if (!checkRate(socket.id, "ranked_match_join", 10, 30_000)) {
+        socket.emit("ranked_match_error", {
+          code: "rate_limited",
+          message: "Slow down — too many Ranked Match attempts.",
+        });
+        return;
+      }
+      if (!checkIpRate(socket.handshake.address, "ranked_match_join", 30, 10 * 60_000)) {
+        socket.emit("ranked_match_error", {
+          code: "rate_limited",
+          message: "Too many Ranked Match attempts from this network. Try again later.",
+        });
+        return;
+      }
+
+      const playerName = normalizeFindMatchPlayerName(data.playerName);
+      const profileUsername = normalizeProfileUsername(data.profileUsername);
+      const accountIdentity = normalizeAccountIdentity(data);
+      void rankedMatchQueue.join({
+        socket,
+        playerName,
+        profileUsername,
+        accountId: accountIdentity?.accountId ?? null,
+        accountUsername: accountIdentity?.accountUsername ?? null,
+      });
+    });
+
+    socket.on("ranked_match_cancel", () => {
+      rankedMatchQueue.cancel(socket);
     });
 
     socket.on(
@@ -3700,6 +3762,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
 
     socket.on("disconnect", () => {
       findMatchQueue.disconnect(socket);
+      rankedMatchQueue.disconnect(socket);
       onlinePresence.disconnect(socket.id);
       emitOnlineCountUpdate();
       clearRateForSocket(socket.id);

@@ -1,5 +1,6 @@
 export type FindMatchErrorCode =
   | "disabled"
+  | "account_required"
   | "invalid_name"
   | "rate_limited"
   | "server_full"
@@ -35,6 +36,13 @@ type QueuedPlayer<TSocket extends FindMatchSocketLike> = FindMatchPlayer<TSocket
 
 type FindMatchQueueOptions<TSocket extends FindMatchSocketLike> = {
   isEnabled: () => boolean;
+  requireAccountIdentity?: boolean;
+  events?: {
+    waiting: string;
+    matched: string;
+    cancelled: string;
+    error: string;
+  };
   timeoutMs: () => number;
   matchPlayers: (
     first: FindMatchPlayer<TSocket>,
@@ -47,6 +55,8 @@ type FindMatchQueueOptions<TSocket extends FindMatchSocketLike> = {
 export class FindMatchQueue<TSocket extends FindMatchSocketLike = FindMatchSocketLike> {
   private waiting: QueuedPlayer<TSocket> | null = null;
   private readonly isEnabled: () => boolean;
+  private readonly requireAccountIdentity: boolean;
+  private readonly events: Required<FindMatchQueueOptions<TSocket>>["events"];
   private readonly timeoutMs: () => number;
   private readonly matchPlayers: FindMatchQueueOptions<TSocket>["matchPlayers"];
   private readonly onWaitingCountChange?: (count: number) => void;
@@ -54,6 +64,13 @@ export class FindMatchQueue<TSocket extends FindMatchSocketLike = FindMatchSocke
 
   constructor(options: FindMatchQueueOptions<TSocket>) {
     this.isEnabled = options.isEnabled;
+    this.requireAccountIdentity = options.requireAccountIdentity ?? false;
+    this.events = options.events ?? {
+      waiting: "find_match_waiting",
+      matched: "find_match_matched",
+      cancelled: "find_match_cancelled",
+      error: "find_match_error",
+    };
     this.timeoutMs = options.timeoutMs;
     this.matchPlayers = options.matchPlayers;
     this.onWaitingCountChange = options.onWaitingCountChange;
@@ -71,6 +88,14 @@ export class FindMatchQueue<TSocket extends FindMatchSocketLike = FindMatchSocke
       return;
     }
 
+    if (
+      this.requireAccountIdentity &&
+      (!player.accountId?.trim() || !player.accountUsername?.trim())
+    ) {
+      this.emitError(player.socket, "account_required", "Account is required for ranked matches.");
+      return;
+    }
+
     if (this.waiting?.socket.id === player.socket.id) {
       this.emitWaiting(this.waiting);
       return;
@@ -85,8 +110,8 @@ export class FindMatchQueue<TSocket extends FindMatchSocketLike = FindMatchSocke
     this.clearWaiting();
     try {
       const [firstPayload, secondPayload] = await this.matchPlayers(first, player);
-      first.socket.emit("find_match_matched", firstPayload);
-      player.socket.emit("find_match_matched", secondPayload);
+      first.socket.emit(this.events.matched, firstPayload);
+      player.socket.emit(this.events.matched, secondPayload);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to create match.";
       this.emitError(first.socket, "match_failed", message);
@@ -96,11 +121,11 @@ export class FindMatchQueue<TSocket extends FindMatchSocketLike = FindMatchSocke
 
   cancel(socket: TSocket, reason: FindMatchCancelReason = "cancelled"): boolean {
     if (this.waiting?.socket.id !== socket.id) {
-      socket.emit("find_match_cancelled", { reason });
+      socket.emit(this.events.cancelled, { reason });
       return false;
     }
     this.clearWaiting();
-    socket.emit("find_match_cancelled", { reason });
+    socket.emit(this.events.cancelled, { reason });
     return true;
   }
 
@@ -124,7 +149,7 @@ export class FindMatchQueue<TSocket extends FindMatchSocketLike = FindMatchSocke
     const timeoutHandle = setTimeout(() => {
       if (this.waiting?.socket.id !== player.socket.id) return;
       this.clearWaiting();
-      player.socket.emit("find_match_cancelled", { reason: "timeout" });
+      player.socket.emit(this.events.cancelled, { reason: "timeout" });
     }, Math.max(0, timeoutAt - queuedAt));
     timeoutHandle.unref?.();
 
@@ -141,13 +166,13 @@ export class FindMatchQueue<TSocket extends FindMatchSocketLike = FindMatchSocke
   }
 
   private emitWaiting(player: QueuedPlayer<TSocket>): void {
-    player.socket.emit("find_match_waiting", {
+    player.socket.emit(this.events.waiting, {
       queuedAt: player.queuedAt,
       timeoutAt: player.timeoutAt,
     });
   }
 
   private emitError(socket: TSocket, code: FindMatchErrorCode, message: string): void {
-    socket.emit("find_match_error", { code, message });
+    socket.emit(this.events.error, { code, message });
   }
 }

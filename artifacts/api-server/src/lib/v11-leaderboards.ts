@@ -64,6 +64,8 @@ export type V11CompletedMatchLeaderboardInput = {
   phase: unknown;
   tournamentRef?: unknown;
   resultReason: unknown;
+  matchKind?: unknown;
+  leaderboardEligible?: unknown;
   winnerAccountId?: unknown;
   loserAccountId?: unknown;
   winnerUsername?: unknown;
@@ -343,6 +345,8 @@ export async function recordV11CompletedMatchLeaderboardResult(
   if (
     input.phase !== "game_over" ||
     input.mode !== "quick" ||
+    input.matchKind !== "ranked" ||
+    input.leaderboardEligible !== true ||
     input.tournamentRef ||
     input.resultReason !== "normal_win"
   ) {

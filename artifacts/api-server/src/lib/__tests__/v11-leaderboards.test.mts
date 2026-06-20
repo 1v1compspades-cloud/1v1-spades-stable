@@ -376,6 +376,8 @@ test("v1.1 completed match leaderboard write is feature gated", async () => {
       mode: "quick",
       phase: "game_over",
       resultReason: "normal_win",
+      matchKind: "ranked",
+      leaderboardEligible: true,
       winnerAccountId: "acct-winner",
       loserAccountId: "acct-loser",
       winnerUsername: "Winner",
@@ -396,7 +398,7 @@ test("v1.1 completed match leaderboard write is feature gated", async () => {
   assert.equal(db.stats.length, 0);
 });
 
-test("v1.1 completed normal quick match records once", async () => {
+test("v1.1 completed ranked normal quick match records once", async () => {
   const db = new FakeLeaderboardDb();
 
   const result = await recordV11CompletedMatchLeaderboardResult(
@@ -406,6 +408,8 @@ test("v1.1 completed normal quick match records once", async () => {
       mode: "quick",
       phase: "game_over",
       resultReason: "normal_win",
+      matchKind: "ranked",
+      leaderboardEligible: true,
       winnerAccountId: "acct-winner",
       loserAccountId: "acct-loser",
       winnerUsername: "Winner",
@@ -423,6 +427,8 @@ test("v1.1 completed normal quick match records once", async () => {
       mode: "quick",
       phase: "game_over",
       resultReason: "normal_win",
+      matchKind: "ranked",
+      leaderboardEligible: true,
       winnerAccountId: "acct-winner",
       loserAccountId: "acct-loser",
       winnerUsername: "Winner",
@@ -447,6 +453,38 @@ test("v1.1 completed normal quick match records once", async () => {
   assert.equal(db.stats.reduce((sum, row) => sum + row.bagsGiven, 0), 1);
 });
 
+test("v1.1 completed casual account match writes nothing", async () => {
+  const db = new FakeLeaderboardDb();
+
+  const result = await recordV11CompletedMatchLeaderboardResult(
+    db,
+    {
+      roomCode: "ROOM6C",
+      mode: "quick",
+      phase: "game_over",
+      resultReason: "normal_win",
+      matchKind: "casual",
+      leaderboardEligible: false,
+      winnerAccountId: "acct-winner",
+      loserAccountId: "acct-loser",
+      winnerUsername: "Winner",
+      loserUsername: "Loser",
+      finalScores: [251, 180],
+      bags: [1, 0],
+      roundsPlayed: 7,
+    },
+    { enabled: true },
+  );
+
+  assert.deepEqual(result, {
+    recorded: false,
+    skipped: "ineligible_match",
+    seasonKey: DEFAULT_V11_LEADERBOARD_SEASON,
+  });
+  assert.equal(db.results.length, 0);
+  assert.equal(db.stats.length, 0);
+});
+
 test("v1.1 completed match leaderboard skips abandoned or incomplete games", async () => {
   const db = new FakeLeaderboardDb();
 
@@ -457,6 +495,8 @@ test("v1.1 completed match leaderboard skips abandoned or incomplete games", asy
       mode: "quick",
       phase: "game_over",
       resultReason: "forfeit",
+      matchKind: "ranked",
+      leaderboardEligible: true,
       winnerAccountId: "acct-winner",
       loserAccountId: "acct-loser",
       winnerUsername: "Winner",
@@ -472,6 +512,8 @@ test("v1.1 completed match leaderboard skips abandoned or incomplete games", asy
       mode: "quick",
       phase: "playing",
       resultReason: "normal_win",
+      matchKind: "ranked",
+      leaderboardEligible: true,
       winnerAccountId: "acct-winner",
       loserAccountId: "acct-loser",
       winnerUsername: "Winner",
@@ -488,6 +530,8 @@ test("v1.1 completed match leaderboard skips abandoned or incomplete games", asy
       phase: "game_over",
       tournamentRef: { code: "T1", matchId: "M1" },
       resultReason: "normal_win",
+      matchKind: "ranked",
+      leaderboardEligible: true,
       winnerAccountId: "acct-winner",
       loserAccountId: "acct-loser",
       winnerUsername: "Winner",

@@ -162,6 +162,13 @@ export interface GameState {
   /** Human-readable game-over reason, including bust-out and auto-victory labels. */
   gameOverReason?: string | null;
   /**
+   * Matchmaking classification. Casual/guest matches remain unranked.
+   * Ranked is metadata only; it does not alter gameplay, scoring, bidding, or tricks.
+   */
+  matchKind?: "casual" | "ranked";
+  /** True only for ranked account-vs-account quick matches eligible for leaderboards. */
+  leaderboardEligible?: boolean;
+  /**
    * Explicit winner for non-score-derived endings such as forfeits,
    * disconnect timeouts, or host auto-victory. Natural scoring wins leave this
    * unset and derive the winner from the displayed score.
@@ -793,6 +800,7 @@ export function createRoom(
   tournamentRef?: { code: string; matchId: string },
   hostProfileUsername?: string | null,
   hostAccountIdentity?: { accountId: string; accountUsername: string } | null,
+  options: { matchKind?: "casual" | "ranked"; leaderboardEligible?: boolean } = {},
 ): GameState {
   let code: string;
   do {
@@ -800,6 +808,8 @@ export function createRoom(
   } while (rooms.has(code));
 
   const state = createGame(code, matchTarget, matchLabel, mode);
+  state.matchKind = options.matchKind ?? "casual";
+  state.leaderboardEligible = options.leaderboardEligible ?? false;
   if (tournamentRef) state.tournamentRef = tournamentRef;
   const host: Player = {
     id: hostSocketId,

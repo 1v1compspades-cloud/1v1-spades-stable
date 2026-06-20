@@ -92,15 +92,19 @@ export default function Lobby() {
   const [isJoining, setIsJoining] = useState(false);
   const [isSpectating, setIsSpectating] = useState(false);
   const [isFindingMatch, setIsFindingMatch] = useState(false);
+  const [isFindingRankedMatch, setIsFindingRankedMatch] = useState(false);
   const [findMatchError, setFindMatchError] = useState<string | null>(null);
+  const [rankedMatchError, setRankedMatchError] = useState<string | null>(null);
   const [onlineCounts, setOnlineCounts] = useState<OnlineCountUpdate | null>(null);
   const findMatchCleanupRef = useRef<(() => void) | null>(null);
+  const rankedMatchCleanupRef = useRef<(() => void) | null>(null);
   const [invitedAsSpectator] = useState(initialParams.spectate && !!initialParams.code);
   const [autoSpectateTried, setAutoSpectateTried] = useState(false);
   const [adminDialogOpen, setAdminDialogOpen] = useState(false);
   const [adminKeyInput, setAdminKeyInput] = useState("");
   const [adminUnlocking, setAdminUnlocking] = useState(false);
   const hasGuestName = !!nameInput.trim();
+  const hasRankedAccount = !!accountId.trim() && !!accountUsername.trim();
   const savedRoomCode = storedRoomCode.toUpperCase().trim();
   const getSavedPlayerSession = (code: string): { seat: 0 | 1; token: string } | null => {
     const normalized = code.toUpperCase().trim();
@@ -156,6 +160,13 @@ export default function Lobby() {
     socket.on("online_count_update", onOnlineCountUpdate);
     return () => {
       socket.off("online_count_update", onOnlineCountUpdate);
+    };
+  }, [socket]);
+
+  useEffect(() => {
+    return () => {
+      findMatchCleanupRef.current?.();
+      rankedMatchCleanupRef.current?.();
     };
   }, [socket]);
 
@@ -303,6 +314,87 @@ export default function Lobby() {
     socket?.emit("find_match_cancel");
     findMatchCleanupRef.current?.();
     setIsFindingMatch(false);
+  };
+
+  const handleRankedMatch = async (): Promise<void> => {
+    if (!v11WebFlags.matchmaking || !v11WebFlags.accounts) return;
+    if (!nameInput.trim()) { toast({ description: "Please enter your name", variant: "destructive" }); return; }
+    if (!hasRankedAccount) {
+      setRankedMatchError("Create account to play ranked");
+      return;
+    }
+    if (blockIfActiveGame()) return;
+    if (!socket) { toast({ description: "Connecting. Try again in a moment.", variant: "destructive" }); return; }
+
+    const displayName = nameInput.trim();
+    const profile = accountUsername.trim();
+    setRankedMatchError(null);
+    setIsFindingRankedMatch(true);
+    rankedMatchCleanupRef.current?.();
+    savePlayerName(displayName);
+    saveProfileUsername(profile);
+    saveIsSpectator(false);
+
+    const cleanup = () => {
+      socket.off("ranked_match_waiting", onWaiting);
+      socket.off("ranked_match_matched", onMatched);
+      socket.off("ranked_match_cancelled", onCancelled);
+      socket.off("ranked_match_error", onError);
+      rankedMatchCleanupRef.current = null;
+    };
+    const onWaiting = () => {
+      setRankedMatchError(null);
+      setIsFindingRankedMatch(true);
+    };
+    const onMatched = (payload: FindMatchMatchedPayload) => {
+      cleanup();
+      const roomCode = payload?.roomCode?.toUpperCase().trim();
+      const playerIndex = payload?.playerIndex;
+      if (!roomCode || (playerIndex !== 0 && playerIndex !== 1)) {
+        setIsFindingRankedMatch(false);
+        setRankedMatchError("Ranked match found, but the room details were incomplete.");
+        return;
+      }
+      saveRoomCode(roomCode);
+      savePlayerIndex(playerIndex);
+      saveIsSpectator(false);
+      if (payload.token) {
+        savePlayerToken(roomCode, playerIndex, payload.token);
+      }
+      setIsFindingRankedMatch(false);
+      setLocation(`/room/${roomCode}`);
+    };
+    const onCancelled = () => {
+      cleanup();
+      setIsFindingRankedMatch(false);
+    };
+    const onError = (payload: FindMatchErrorPayload) => {
+      cleanup();
+      setIsFindingRankedMatch(false);
+      setRankedMatchError(payload?.message || "Ranked Match is unavailable right now.");
+    };
+
+    socket.off("ranked_match_waiting", onWaiting);
+    socket.off("ranked_match_matched", onMatched);
+    socket.off("ranked_match_cancelled", onCancelled);
+    socket.off("ranked_match_error", onError);
+    socket.on("ranked_match_waiting", onWaiting);
+    socket.on("ranked_match_matched", onMatched);
+    socket.on("ranked_match_cancelled", onCancelled);
+    socket.on("ranked_match_error", onError);
+    rankedMatchCleanupRef.current = cleanup;
+    socket.emit("ranked_match_join", {
+      playerName: displayName,
+      profileUsername: profile,
+      accountId: accountId.trim(),
+      accountUsername: accountUsername.trim(),
+    });
+  };
+
+  const handleCancelRankedMatch = (): void => {
+    socket?.emit("ranked_match_cancel");
+    rankedMatchCleanupRef.current?.();
+    setIsFindingRankedMatch(false);
   };
 
   const handleJoin = async (): Promise<void> => {
@@ -678,19 +770,59 @@ export default function Lobby() {
                   </Button>
                 </div>
               ) : (
-                <Button
-                  type="button"
-                  onClick={() => void handleFindMatch()}
-                  disabled={isCreating || isJoining || isSpectating || !connected || !hasGuestName}
-                  className="spades-gold-button w-full py-5 text-lg font-bold active:scale-[0.98] transition-transform"
-                  data-testid="button-find-match"
-                >
-                  Find Match
-                </Button>
+                <div className="space-y-2">
+                  <Button
+                    type="button"
+                    onClick={() => void handleFindMatch()}
+                    disabled={isCreating || isJoining || isSpectating || isFindingRankedMatch || !connected || !hasGuestName}
+                    className="spades-gold-button w-full py-5 text-lg font-bold active:scale-[0.98] transition-transform"
+                    data-testid="button-find-match"
+                  >
+                    Find Match (Casual)
+                  </Button>
+                  {v11WebFlags.accounts && (
+                    isFindingRankedMatch ? (
+                      <div className="rounded-md border border-primary/35 bg-primary/10 px-3 py-3 space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-primary">Finding ranked opponent...</p>
+                            <p className="text-xs text-muted-foreground">Only account players are matched here.</p>
+                          </div>
+                          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-primary animate-pulse" aria-hidden />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleCancelRankedMatch}
+                          className="w-full"
+                          data-testid="button-ranked-match-cancel"
+                        >
+                          Cancel Ranked Match
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => void handleRankedMatch()}
+                        disabled={isCreating || isJoining || isSpectating || isFindingMatch || !connected || !hasGuestName || !hasRankedAccount}
+                        className="w-full py-5 text-lg font-bold active:scale-[0.98] transition-transform"
+                        data-testid="button-ranked-match"
+                      >
+                        {hasRankedAccount ? "Ranked Match" : "Create account to play ranked"}
+                      </Button>
+                    )
+                  )}
+                </div>
               )}
               {findMatchError && (
                 <p className="text-xs text-destructive text-center" data-testid="find-match-error">
                   {findMatchError}
+                </p>
+              )}
+              {rankedMatchError && (
+                <p className="text-xs text-destructive text-center" data-testid="ranked-match-error">
+                  {rankedMatchError}
                 </p>
               )}
             </div>
@@ -700,7 +832,7 @@ export default function Lobby() {
             <div className="space-y-4">
               <Button
                 onClick={handleCreate}
-                disabled={isCreating || isJoining || isSpectating || isFindingMatch || !hasGuestName}
+                disabled={isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch || !hasGuestName}
                 className="spades-gold-button w-full py-5 text-lg font-bold active:scale-[0.98] transition-transform"
                 data-testid="button-create"
               >
@@ -716,7 +848,7 @@ export default function Lobby() {
                   onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
                   onKeyDown={(e) => {
                     if (e.key !== "Enter") return;
-                    if (isCreating || isJoining || isSpectating || isFindingMatch || !joinCodeInput.trim()) return;
+                    if (isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch || !joinCodeInput.trim()) return;
                     e.preventDefault();
                     void handleJoin();
                   }}
@@ -726,7 +858,7 @@ export default function Lobby() {
               </div>
               <Button
                 onClick={handleJoin}
-                disabled={isCreating || isJoining || isSpectating || isFindingMatch || !joinCodeInput || !hasGuestName}
+                disabled={isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch || !joinCodeInput || !hasGuestName}
                 variant="secondary"
                 className="w-full py-5 text-lg font-bold active:scale-[0.98] transition-transform"
                 data-testid="button-join"
@@ -852,7 +984,7 @@ export default function Lobby() {
           <div className="pt-4 border-t border-border/50 space-y-2">
             <Button
               onClick={handleSpectate}
-              disabled={isCreating || isJoining || isSpectating || isFindingMatch || !joinCodeInput || !hasGuestName}
+              disabled={isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch || !joinCodeInput || !hasGuestName}
               variant="ghost"
               className="w-full h-12 text-sm font-medium border border-dashed border-border hover:border-primary/50"
               data-testid="button-spectate"

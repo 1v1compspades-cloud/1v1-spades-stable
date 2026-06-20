@@ -11,6 +11,8 @@ test("guest create and join still work without account identity", () => {
   assert.equal(joined.state.players[1]?.name, "Guest Two");
   assert.equal(joined.state.players[0]?.accountId ?? null, null);
   assert.equal(joined.state.players[1]?.accountId ?? null, null);
+  assert.equal(joined.state.matchKind, "casual");
+  assert.equal(joined.state.leaderboardEligible, false);
 });
 
 test("account identity attaches to seated players when provided", () => {
@@ -38,4 +40,33 @@ test("account identity attaches to seated players when provided", () => {
   assert.equal(joined.state.players[1]?.accountUsername, "GuestUser");
   assert.equal(joined.state.players[0]?.profileUsername, "HostProfile");
   assert.equal(joined.state.players[1]?.profileUsername, "GuestProfile");
+});
+
+test("ranked metadata is opt-in and does not affect seating", () => {
+  const room = createRoom(
+    "Ranked Host",
+    "sock-ranked-host",
+    250,
+    "Find Match",
+    "quick",
+    undefined,
+    "RankedHost",
+    { accountId: "acct-ranked-host", accountUsername: "RankedHost" },
+    { matchKind: "ranked", leaderboardEligible: true },
+  );
+
+  const joined = joinRoom(
+    room.roomCode,
+    "Ranked Guest",
+    "sock-ranked-guest",
+    "RankedGuest",
+    { accountId: "acct-ranked-guest", accountUsername: "RankedGuest" },
+  );
+
+  assert.equal(joined.playerIndex, 1);
+  assert.equal(joined.state.mode, "quick");
+  assert.equal(joined.state.matchKind, "ranked");
+  assert.equal(joined.state.leaderboardEligible, true);
+  assert.equal(joined.state.players[0]?.accountId, "acct-ranked-host");
+  assert.equal(joined.state.players[1]?.accountId, "acct-ranked-guest");
 });

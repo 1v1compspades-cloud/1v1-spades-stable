@@ -140,6 +140,68 @@ async function testAccountIdentityCarriesThroughMatchCallback() {
   ok("account identity match emits room", !!last(first, "find_match_matched") && !!last(second, "find_match_matched"));
 }
 
+async function testRankedQueueRequiresAccountIdentity() {
+  const socket = new FakeSocket("s-ranked-missing-account");
+  const queue = new FindMatchQueue<FakeSocket>({
+    isEnabled: () => true,
+    requireAccountIdentity: true,
+    events: {
+      waiting: "ranked_match_waiting",
+      matched: "ranked_match_matched",
+      cancelled: "ranked_match_cancelled",
+      error: "ranked_match_error",
+    },
+    timeoutMs: () => 1_000,
+    matchPlayers: async () => [matched("RANKED", 0), matched("RANKED", 1)],
+  });
+
+  await queue.join({ socket, playerName: "Ranked One", profileUsername: null });
+  const payload = last(socket, "ranked_match_error") as { code?: string } | undefined;
+  ok("ranked queue requires account identity", payload?.code === "account_required", payload);
+  ok("ranked missing account does not wait", queue.getWaitingCount() === 0, queue.getWaitingCount());
+}
+
+async function testRankedQueueUsesRankedEvents() {
+  const first = new FakeSocket("s-ranked-first");
+  const second = new FakeSocket("s-ranked-second");
+  const queue = new FindMatchQueue<FakeSocket>({
+    isEnabled: () => true,
+    requireAccountIdentity: true,
+    events: {
+      waiting: "ranked_match_waiting",
+      matched: "ranked_match_matched",
+      cancelled: "ranked_match_cancelled",
+      error: "ranked_match_error",
+    },
+    timeoutMs: () => 1_000,
+    matchPlayers: async (a, b) => {
+      ok("ranked first account reaches match callback", a.accountId === "acct-r1", a);
+      ok("ranked second account reaches match callback", b.accountId === "acct-r2", b);
+      return [matched("RANK12", 0), matched("RANK12", 1)];
+    },
+  });
+
+  await queue.join({
+    socket: first,
+    playerName: "Ranked One",
+    profileUsername: null,
+    accountId: "acct-r1",
+    accountUsername: "RankOne",
+  });
+  await queue.join({
+    socket: second,
+    playerName: "Ranked Two",
+    profileUsername: null,
+    accountId: "acct-r2",
+    accountUsername: "RankTwo",
+  });
+
+  ok("ranked first waits on ranked event", !!last(first, "ranked_match_waiting"));
+  ok("ranked first matched on ranked event", !!last(first, "ranked_match_matched"));
+  ok("ranked second matched on ranked event", !!last(second, "ranked_match_matched"));
+  ok("ranked queue does not emit casual matched event", !last(first, "find_match_matched") && !last(second, "find_match_matched"));
+}
+
 async function testCancelClearsQueue() {
   const first = new FakeSocket("s-cancel");
   const second = new FakeSocket("s-after-cancel");
@@ -202,6 +264,8 @@ async function main() {
   await testFirstPlayerWaitsAndDuplicateIsIdempotent();
   await testSecondPlayerMatches();
   await testAccountIdentityCarriesThroughMatchCallback();
+  await testRankedQueueRequiresAccountIdentity();
+  await testRankedQueueUsesRankedEvents();
   await testCancelClearsQueue();
   await testDisconnectClearsQueue();
   await testTimeoutClearsQueue();
