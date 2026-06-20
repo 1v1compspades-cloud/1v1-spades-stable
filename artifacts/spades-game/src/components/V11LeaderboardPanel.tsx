@@ -61,7 +61,7 @@ export function V11LeaderboardPanel() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-widest text-primary">
-            Leaderboard
+            Ranked Leaderboard
           </h2>
           <p className="text-[11px] text-muted-foreground">
             Season: {state.kind === "loading" || state.kind === "error" ? "v1_1_beta" : state.seasonKey}
