@@ -858,7 +858,9 @@ export default function Lobby() {
                     </Button>
                     {accountId && (
                       <div className="rounded-md border border-emerald-500/25 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-100">
-                        Ranked profile ready: {accountUsername || "username not claimed"}
+                        {accountUsername
+                          ? `Ranked profile ready: ${accountUsername}`
+                          : "Account created. Claim a username to play ranked."}
                       </div>
                     )}
                     {accountStatus && (
