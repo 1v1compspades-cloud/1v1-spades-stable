@@ -34,6 +34,7 @@ import { useTabGuard } from "@/hooks/useTabGuard";
 
 const READY_START_COUNTDOWN_SECONDS = 5;
 const ROUND_OVER_NEXT_COUNTDOWN_SECONDS = 10;
+const COIN_TOSS_REVEAL_DELAY_MS = 2850;
 
 /**
  * Live active-turn AFK countdown. Warnings appear after 60s and 90s of
@@ -148,6 +149,20 @@ export default function Room() {
   // round re-shows the teaching deal unless the player skips it again. Pure
   // client visual state — has no effect on game/socket/server logic.
   const [dealSkipped, setDealSkipped] = useState(false);
+  const [coinTossRevealed, setCoinTossRevealed] = useState(false);
+
+  useEffect(() => {
+    if (gameState?.phase !== "coin_toss" || gameState.coinFlipWinner === null) {
+      setCoinTossRevealed(false);
+      return;
+    }
+
+    setCoinTossRevealed(false);
+    const timeout = window.setTimeout(() => {
+      setCoinTossRevealed(true);
+    }, COIN_TOSS_REVEAL_DELAY_MS);
+    return () => window.clearTimeout(timeout);
+  }, [gameState?.phase, gameState?.coinFlipWinner]);
   useEffect(() => {
     if (gameState?.phase === "shuffling") setDealSkipped(false);
   }, [gameState?.phase]);
@@ -1689,7 +1704,7 @@ export default function Room() {
       : "You";
 
     return (
-      <div className="spades-game-board spades-table-surface flex min-h-[18rem] flex-none flex-col items-center justify-center relative overflow-hidden px-2 py-3 sm:min-h-0 sm:flex-1 sm:py-0">
+      <div className="spades-game-board spades-table-surface flex min-h-[14rem] min-w-0 flex-1 flex-col items-center justify-center relative overflow-hidden px-2 py-2 sm:min-h-0 sm:py-0">
         {/* Top seat hidden hand (always hidden — even players don't see opponent's cards) */}
         <div className="absolute top-3 sm:top-4 flex justify-center w-full pointer-events-none">
           <div className="flex items-center gap-2">
@@ -1798,18 +1813,43 @@ export default function Room() {
                   <span className="font-semibold text-foreground">Tails = Seat 2</span>.
                 </p>
                 <div className="space-y-1 border-y border-border py-3">
-                  <p className="text-xs text-muted-foreground uppercase tracking-widest">
-                    Result: <span className="text-primary">{resultLabel}</span>
-                  </p>
-                  <p data-testid="coin-toss-winner" className="text-2xl font-serif font-bold text-primary">
-                    {winnerName}{youWon ? " (you)" : ""}
-                  </p>
+                  {coinTossRevealed ? (
+                    <>
+                      <p className="text-xs text-muted-foreground uppercase tracking-widest">
+                        Result: <span className="text-primary">{resultLabel}</span>
+                      </p>
+                      <p data-testid="coin-toss-winner" className="text-2xl font-serif font-bold text-primary">
+                        {spectator
+                          ? `${winnerName} won the flip`
+                          : youWon
+                            ? "You won the flip"
+                            : "Opponent won the flip"}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs text-muted-foreground uppercase tracking-widest">
+                        Result
+                      </p>
+                      <p data-testid="coin-toss-winner" className="text-2xl font-serif font-bold text-primary">
+                        Flipping…
+                      </p>
+                    </>
+                  )}
                 </div>
-                <p className="text-sm">
-                  <span className="font-semibold text-foreground" data-testid="coin-toss-first-bidder">{loserName}</span>{" "}
-                  bids first in Round 1. Bidding order alternates each round after.
+                {coinTossRevealed ? (
+                  <p className="text-sm">
+                    <span className="font-semibold text-foreground" data-testid="coin-toss-first-bidder">{loserName}</span>{" "}
+                    bids first in Round 1. Bidding order alternates each round after.
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground" data-testid="coin-toss-first-bidder">
+                    Flipping…
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground italic">
+                  {coinTossRevealed ? "Dealing cards…" : "Coin in motion…"}
                 </p>
-                <p className="text-xs text-muted-foreground italic">Dealing cards…</p>
               </div>
             </div>
           );
@@ -2770,7 +2810,14 @@ export default function Room() {
   }
 
   return (
-    <div className="spades-screen spades-gameplay-screen min-h-[100dvh] sm:h-[100dvh] flex flex-col bg-background overflow-y-auto overflow-x-hidden sm:overflow-hidden relative">
+    <div
+      className={cn(
+        "spades-screen spades-gameplay-screen flex flex-col bg-background overflow-x-hidden relative",
+        gameState.phase === "waiting"
+          ? "min-h-[100dvh] sm:h-[100dvh] overflow-y-auto sm:overflow-hidden"
+          : "h-[100dvh] min-h-[100dvh] overflow-hidden"
+      )}
+    >
       {renderStatusPill()}
       {renderOpponentOffline()}
       {!spectator && gameState.phase === "waiting" ? (

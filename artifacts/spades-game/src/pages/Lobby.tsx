@@ -789,22 +789,25 @@ export default function Lobby() {
               data-testid="v11-account-panel"
             >
               <summary className="cursor-pointer text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                Staging Tools
+                Ranked Profile
               </summary>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Create a username to play ranked matches.
+              </p>
               {accountPanelOpen && <div className="mt-3 space-y-4">
                 {v11WebFlags.usernames && (
                   <div className="space-y-2">
-                    <Label htmlFor="profile-username">Profile Username</Label>
+                    <Label htmlFor="profile-username">Ranked Username</Label>
                     <Input
                       id="profile-username"
-                      placeholder="Persistent username"
+                      placeholder="Choose a username"
                       value={profileInput}
                       onChange={(e) => setProfileInput(e.target.value.slice(0, 32))}
                       className="text-lg py-6"
                       data-testid="input-profile-username"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Saved on this device for match history. Guest play still works.
+                      Guest play still works without a ranked username.
                     </p>
                   </div>
                 )}
@@ -855,7 +858,7 @@ export default function Lobby() {
                     </Button>
                     {accountId && (
                       <div className="rounded-md border border-emerald-500/25 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-100">
-                        Account ready: {accountUsername || "username not claimed"}
+                        Ranked profile ready: {accountUsername || "username not claimed"}
                       </div>
                     )}
                     {accountStatus && (
@@ -875,7 +878,7 @@ export default function Lobby() {
                       className="w-full text-xs"
                       data-testid="button-v11-clear-account"
                     >
-                      Clear Account On This Device
+                      Clear Ranked Profile On This Device
                     </Button>
                   </div>
                 )}
