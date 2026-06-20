@@ -643,113 +643,8 @@ export default function Lobby() {
             </p>
           </div>
 
-          {v11WebFlags.usernames && (
-          <div className="space-y-2">
-            <Label htmlFor="profile-username">Profile Username</Label>
-            <Input
-              id="profile-username"
-              placeholder="Persistent username"
-              value={profileInput}
-              onChange={(e) => setProfileInput(e.target.value.slice(0, 32))}
-              className="text-lg py-6"
-              data-testid="input-profile-username"
-            />
-            <p className="text-xs text-muted-foreground">
-              Saved on this device for match history. Guest play still works.
-            </p>
-          </div>
-          )}
-
-          {v11WebFlags.accounts && (
-            <details
-              open={accountPanelOpen}
-              onToggle={(e) => setAccountPanelOpen(e.currentTarget.open)}
-              className="rounded-md border border-border/50 bg-white/[0.03] px-3 py-2 text-left"
-              data-testid="v11-account-panel"
-            >
-              <summary className="cursor-pointer text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                Staging account
-              </summary>
-              {accountPanelOpen && <div className="mt-3 space-y-3">
-                <div className="space-y-2">
-                  <Label htmlFor="account-display-name" className="text-xs">Display name</Label>
-                  <Input
-                    id="account-display-name"
-                    value={accountDisplayNameInput}
-                    onChange={(e) => setAccountDisplayNameInput(e.target.value.slice(0, 32))}
-                    placeholder="Account display name"
-                    disabled={accountBusy}
-                    data-testid="input-v11-account-display-name"
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => void handleCreateAccount()}
-                  disabled={accountBusy || !accountDisplayNameInput.trim()}
-                  className="w-full"
-                  data-testid="button-v11-create-account"
-                >
-                  {accountId ? "Create New Account" : "Create Account"}
-                </Button>
-                <div className="space-y-2">
-                  <Label htmlFor="account-username" className="text-xs">Username</Label>
-                  <Input
-                    id="account-username"
-                    value={accountUsernameInput}
-                    onChange={(e) => setAccountUsernameInput(e.target.value.slice(0, 20))}
-                    placeholder="username"
-                    disabled={accountBusy || !accountId}
-                    data-testid="input-v11-account-username"
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => void handleClaimUsername()}
-                  disabled={accountBusy || !accountId || !accountUsernameInput.trim()}
-                  className="w-full"
-                  data-testid="button-v11-claim-username"
-                >
-                  Claim Username
-                </Button>
-                {accountId && (
-                  <div className="rounded-md border border-emerald-500/25 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-100">
-                    Account ready: {accountUsername || "username not claimed"}
-                  </div>
-                )}
-                {accountStatus && (
-                  <p className="text-xs text-muted-foreground" data-testid="v11-account-status">
-                    {accountStatus}
-                  </p>
-                )}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    clearAccountIdentity();
-                    setAccountUsernameInput("");
-                    setAccountStatus("Account identity cleared from this device.");
-                  }}
-                  disabled={accountBusy || !accountId}
-                  className="w-full text-xs"
-                  data-testid="button-v11-clear-account"
-                >
-                  Clear Account On This Device
-                </Button>
-              </div>}
-            </details>
-          )}
-
           {v11WebFlags.matchmaking && matchMode === "quick" && (
             <div className="space-y-3 pt-1" data-testid="find-match-panel">
-              <div
-                className="flex items-center justify-center gap-4 rounded-md border border-border/60 bg-white/[0.03] px-3 py-2 text-xs font-medium text-muted-foreground"
-                data-testid="online-count-indicator"
-              >
-                <span>Online: {onlineCounts?.onlineCount ?? "—"}</span>
-                <span>Finding match: {onlineCounts?.findingMatchCount ?? "—"}</span>
-              </div>
               {isFindingMatch ? (
                 <div className="rounded-md border border-primary/35 bg-primary/10 px-3 py-3 space-y-3">
                   <div className="flex items-center justify-between gap-3">
@@ -778,41 +673,17 @@ export default function Lobby() {
                     className="spades-gold-button w-full py-5 text-lg font-bold active:scale-[0.98] transition-transform"
                     data-testid="button-find-match"
                   >
-                    Find Match (Casual)
+                    <span className="flex flex-col items-center leading-tight">
+                      <span>Play Now</span>
+                      <span className="mt-1 text-xs font-semibold opacity-80">Quick casual match</span>
+                    </span>
                   </Button>
-                  {v11WebFlags.accounts && (
-                    isFindingRankedMatch ? (
-                      <div className="rounded-md border border-primary/35 bg-primary/10 px-3 py-3 space-y-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold text-primary">Finding ranked opponent...</p>
-                            <p className="text-xs text-muted-foreground">Only account players are matched here.</p>
-                          </div>
-                          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-primary animate-pulse" aria-hidden />
-                        </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={handleCancelRankedMatch}
-                          className="w-full"
-                          data-testid="button-ranked-match-cancel"
-                        >
-                          Cancel Ranked Match
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() => void handleRankedMatch()}
-                        disabled={isCreating || isJoining || isSpectating || isFindingMatch || !connected || !hasGuestName || !hasRankedAccount}
-                        className="w-full py-5 text-lg font-bold active:scale-[0.98] transition-transform"
-                        data-testid="button-ranked-match"
-                      >
-                        {hasRankedAccount ? "Ranked Match" : "Create account to play ranked"}
-                      </Button>
-                    )
-                  )}
+                  <p
+                    className="text-center text-xs font-medium text-muted-foreground"
+                    data-testid="online-count-indicator"
+                  >
+                    Online: {onlineCounts?.onlineCount ?? "—"} · Finding match: {onlineCounts?.findingMatchCount ?? "—"}
+                  </p>
                 </div>
               )}
               {findMatchError && (
@@ -820,16 +691,15 @@ export default function Lobby() {
                   {findMatchError}
                 </p>
               )}
-              {rankedMatchError && (
-                <p className="text-xs text-destructive text-center" data-testid="ranked-match-error">
-                  {rankedMatchError}
-                </p>
-              )}
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 border-t border-border/50">
-            <div className="space-y-4">
+          <section className="space-y-3 pt-3 border-t border-border/50" data-testid="private-match-section">
+            <div className="space-y-1">
+              <h2 className="text-sm font-semibold text-foreground">Private Match</h2>
+              <p className="text-xs text-muted-foreground">Create a room or join with a code.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Button
                 onClick={handleCreate}
                 disabled={isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch || !hasGuestName}
@@ -838,10 +708,8 @@ export default function Lobby() {
               >
                 {isCreating ? "Creating..." : matchMode === "custom" ? "Create Event" : "Create Room"}
               </Button>
-            </div>
 
-            <div className="space-y-4">
-              <div className="flex gap-2">
+              <div className="space-y-3">
                 <Input
                   placeholder={matchMode === "custom" ? "Event code" : "Enter room code"}
                   value={joinCodeInput}
@@ -855,18 +723,165 @@ export default function Lobby() {
                   className="text-center uppercase font-mono py-5 placeholder:normal-case placeholder:font-sans placeholder:tracking-normal"
                   maxLength={6}
                 />
+                <Button
+                  onClick={handleJoin}
+                  disabled={isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch || !joinCodeInput || !hasGuestName}
+                  variant="secondary"
+                  className="w-full py-5 text-lg font-bold active:scale-[0.98] transition-transform"
+                  data-testid="button-join"
+                >
+                  {isJoining ? "Joining..." : matchMode === "custom" ? "Join Event" : "Join Match"}
+                </Button>
               </div>
-              <Button
-                onClick={handleJoin}
-                disabled={isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch || !joinCodeInput || !hasGuestName}
-                variant="secondary"
-                className="w-full py-5 text-lg font-bold active:scale-[0.98] transition-transform"
-                data-testid="button-join"
-              >
-                {isJoining ? "Joining..." : matchMode === "custom" ? "Join Event" : "Join Match"}
-              </Button>
             </div>
-          </div>
+          </section>
+
+          {v11WebFlags.matchmaking && v11WebFlags.accounts && matchMode === "quick" && (
+            <section className="space-y-3" data-testid="ranked-match-section">
+              <div className="space-y-1">
+                <h2 className="text-sm font-semibold text-foreground">Ranked Match</h2>
+                <p className="text-xs text-muted-foreground">Account players only. Casual games stay unranked.</p>
+              </div>
+              {isFindingRankedMatch ? (
+                <div className="rounded-md border border-primary/35 bg-primary/10 px-3 py-3 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-primary">Finding ranked opponent...</p>
+                      <p className="text-xs text-muted-foreground">Only account players are matched here.</p>
+                    </div>
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-primary animate-pulse" aria-hidden />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCancelRankedMatch}
+                    className="w-full"
+                    data-testid="button-ranked-match-cancel"
+                  >
+                    Cancel Ranked Match
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => void handleRankedMatch()}
+                  disabled={isCreating || isJoining || isSpectating || isFindingMatch || !connected || !hasGuestName || !hasRankedAccount}
+                  className="w-full py-5 text-lg font-bold active:scale-[0.98] transition-transform"
+                  data-testid="button-ranked-match"
+                >
+                  {hasRankedAccount ? "Ranked Match (requires account)" : "Create account to play ranked"}
+                </Button>
+              )}
+              {rankedMatchError && (
+                <p className="text-xs text-destructive text-center" data-testid="ranked-match-error">
+                  {rankedMatchError}
+                </p>
+              )}
+            </section>
+          )}
+
+          {(v11WebFlags.usernames || v11WebFlags.accounts) && (
+            <details
+              open={accountPanelOpen}
+              onToggle={(e) => setAccountPanelOpen(e.currentTarget.open)}
+              className="rounded-md border border-border/50 bg-white/[0.03] px-3 py-2 text-left"
+              data-testid="v11-account-panel"
+            >
+              <summary className="cursor-pointer text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Staging Tools
+              </summary>
+              {accountPanelOpen && <div className="mt-3 space-y-4">
+                {v11WebFlags.usernames && (
+                  <div className="space-y-2">
+                    <Label htmlFor="profile-username">Profile Username</Label>
+                    <Input
+                      id="profile-username"
+                      placeholder="Persistent username"
+                      value={profileInput}
+                      onChange={(e) => setProfileInput(e.target.value.slice(0, 32))}
+                      className="text-lg py-6"
+                      data-testid="input-profile-username"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Saved on this device for match history. Guest play still works.
+                    </p>
+                  </div>
+                )}
+
+                {v11WebFlags.accounts && (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="account-display-name" className="text-xs">Display name</Label>
+                      <Input
+                        id="account-display-name"
+                        value={accountDisplayNameInput}
+                        onChange={(e) => setAccountDisplayNameInput(e.target.value.slice(0, 32))}
+                        placeholder="Account display name"
+                        disabled={accountBusy}
+                        data-testid="input-v11-account-display-name"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void handleCreateAccount()}
+                      disabled={accountBusy || !accountDisplayNameInput.trim()}
+                      className="w-full"
+                      data-testid="button-v11-create-account"
+                    >
+                      {accountId ? "Create New Account" : "Create Account"}
+                    </Button>
+                    <div className="space-y-2">
+                      <Label htmlFor="account-username" className="text-xs">Username</Label>
+                      <Input
+                        id="account-username"
+                        value={accountUsernameInput}
+                        onChange={(e) => setAccountUsernameInput(e.target.value.slice(0, 20))}
+                        placeholder="username"
+                        disabled={accountBusy || !accountId}
+                        data-testid="input-v11-account-username"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void handleClaimUsername()}
+                      disabled={accountBusy || !accountId || !accountUsernameInput.trim()}
+                      className="w-full"
+                      data-testid="button-v11-claim-username"
+                    >
+                      Claim Username
+                    </Button>
+                    {accountId && (
+                      <div className="rounded-md border border-emerald-500/25 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-100">
+                        Account ready: {accountUsername || "username not claimed"}
+                      </div>
+                    )}
+                    {accountStatus && (
+                      <p className="text-xs text-muted-foreground" data-testid="v11-account-status">
+                        {accountStatus}
+                      </p>
+                    )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => {
+                        clearAccountIdentity();
+                        setAccountUsernameInput("");
+                        setAccountStatus("Account identity cleared from this device.");
+                      }}
+                      disabled={accountBusy || !accountId}
+                      className="w-full text-xs"
+                      data-testid="button-v11-clear-account"
+                    >
+                      Clear Account On This Device
+                    </Button>
+                  </div>
+                )}
+              </div>}
+            </details>
+          )}
 
           <section
             className="rounded-md border border-primary/35 bg-black/20 text-left shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]"
