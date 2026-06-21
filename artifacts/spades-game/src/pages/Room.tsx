@@ -1201,19 +1201,19 @@ export default function Room() {
           // relative + z-[110] keeps the score row above the bidding modal
           // backdrop (z-[100]) so the bottom-player score stays visible while
           // bidding. The modal itself stays centered between the two rows.
-          "spades-seat-bar relative z-[110] flex w-full max-w-full min-w-0 flex-col items-stretch gap-1.5 px-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-2 sm:px-4 py-2 sm:py-3 border-y backdrop-blur-sm transition-shadow overflow-hidden",
+          "spades-seat-bar relative z-[110] flex w-full max-w-full min-w-0 flex-col items-stretch gap-1 px-2 sm:flex-row sm:items-center sm:justify-between sm:gap-2 sm:px-4 py-1.5 sm:py-3 border-y backdrop-blur-sm transition-shadow overflow-hidden",
           isActive
             ? "border-primary/60 shadow-[inset_0_0_0_1px_hsla(35,90%,55%,0.5),0_0_12px_-2px_hsla(35,90%,55%,0.35)]"
             : "border-border",
-          opts?.isTopSeat && "pt-[calc(env(safe-area-inset-top)+1.75rem)]",
+          opts?.isTopSeat && "pt-[calc(env(safe-area-inset-top)+0.5rem)] sm:pt-[calc(env(safe-area-inset-top)+1.75rem)]",
         )}
       >
-        <div className="flex flex-1 items-center gap-2 sm:gap-3 min-w-0">
+        <div className="flex flex-1 items-center gap-1.5 sm:gap-3 min-w-0">
           <div className="flex min-w-0 shrink flex-col leading-tight">
             <span className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">
               {seatLabel}{isMe ? " · You" : ""}
             </span>
-            <span className="font-bold font-serif truncate max-w-[6.5rem] sm:max-w-[10rem]">
+            <span className="text-[1.05rem] font-bold font-serif truncate max-w-[6.25rem] sm:max-w-[10rem] sm:text-base">
               {showCrown && (
                 <span
                   data-testid={`king-crown-seat-${idx + 1}`}
@@ -1227,7 +1227,7 @@ export default function Room() {
               {isActive && <span className="text-primary ml-2 animate-pulse">●</span>}
             </span>
           </div>
-          <div className="flex min-w-0 flex-1 gap-1.5 sm:gap-2 overflow-hidden">
+          <div className="flex min-w-0 flex-1 gap-1 sm:gap-2 overflow-hidden">
             <Badge variant="outline" className="shrink-0 px-1.5 text-[10px] sm:text-xs tabular-nums">{score} pts</Badge>
             <Badge variant="outline" className={`shrink-0 px-1.5 text-[10px] sm:text-xs tabular-nums ${bags >= 8 ? "border-yellow-500 text-yellow-400" : "text-muted-foreground"}`}>
               {bags} bag{bags !== 1 ? "s" : ""}
@@ -1257,14 +1257,14 @@ export default function Room() {
         </div>
 
         {gameState.phase !== "waiting" && (
-          <div className="flex shrink-0 justify-end gap-3 sm:gap-5 text-right">
-            <div className="flex min-w-[3rem] flex-col items-center">
+          <div className="flex shrink-0 justify-end gap-2 sm:gap-5 text-right">
+            <div className="flex min-w-[2.65rem] sm:min-w-[3rem] flex-col items-center">
               <span className="text-muted-foreground text-[9px] sm:text-[10px] uppercase tracking-wider">Bid</span>
-              <span className="text-lg sm:text-xl font-bold font-mono">{bid !== null ? bid : "—"}</span>
+              <span className="text-base sm:text-xl font-bold font-mono">{bid !== null ? bid : "—"}</span>
             </div>
-            <div className="flex min-w-[3rem] flex-col items-center">
+            <div className="flex min-w-[2.65rem] sm:min-w-[3rem] flex-col items-center">
               <span className="text-muted-foreground text-[9px] sm:text-[10px] uppercase tracking-wider">Tricks</span>
-              <span className={`text-lg sm:text-xl font-bold font-mono ${bid !== null && tricks > bid ? "text-yellow-400" : tricks === bid && bid !== null ? "text-green-400" : ""}`}>
+              <span className={`text-base sm:text-xl font-bold font-mono ${bid !== null && tricks > bid ? "text-yellow-400" : tricks === bid && bid !== null ? "text-green-400" : ""}`}>
                 {tricks}
               </span>
             </div>
@@ -1704,7 +1704,7 @@ export default function Room() {
       : "You";
 
     return (
-      <div className="spades-game-board spades-table-surface flex min-h-[14rem] min-w-0 flex-1 flex-col items-center justify-center relative overflow-hidden px-2 py-2 sm:min-h-0 sm:py-0">
+      <div className="spades-game-board spades-table-surface flex min-h-[17rem] min-w-0 flex-1 flex-col items-center justify-center relative overflow-hidden px-1.5 py-1 sm:min-h-0 sm:px-2 sm:py-0">
         {/* Top seat hidden hand (always hidden — even players don't see opponent's cards) */}
         <div className="absolute top-3 sm:top-4 flex justify-center w-full pointer-events-none">
           <div className="flex items-center gap-2">

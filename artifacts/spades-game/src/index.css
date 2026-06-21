@@ -166,8 +166,8 @@
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
   .pb-hand-safe {
-    /* ~96px breathing room + iPhone home indicator */
-    padding-bottom: calc(env(safe-area-inset-bottom) + 0.75rem);
+    /* Extra breathing room for mobile browser toolbars over the hand strip. */
+    padding-bottom: calc(env(safe-area-inset-bottom) + 4.5rem);
   }
 }
 
@@ -458,8 +458,8 @@
   }
 
   .spades-table-pocket {
-    width: min(76vw, 24rem);
-    height: min(76vw, 24rem);
+    width: min(88vw, 24rem);
+    height: min(88vw, 24rem);
     border: 1px solid rgba(245, 197, 24, 0.34);
     background:
       radial-gradient(circle at 50% 48%, rgba(15, 95, 64, 0.86), rgba(5, 44, 33, 0.88) 52%, rgba(6, 5, 4, 0.74) 100%),
@@ -487,6 +487,17 @@
       linear-gradient(180deg, rgba(10, 8, 5, 0.78), rgba(0,0,0,0.94)),
       radial-gradient(ellipse at 50% 0%, rgba(245, 197, 24, 0.12), transparent 70%);
     border-color: rgba(245, 197, 24, 0.28);
+  }
+
+  @media (min-width: 640px) {
+    .pb-hand-safe {
+      padding-bottom: calc(env(safe-area-inset-bottom) + 0.75rem);
+    }
+
+    .spades-table-pocket {
+      width: min(76vw, 24rem);
+      height: min(76vw, 24rem);
+    }
   }
 
   .spades-card-face {
