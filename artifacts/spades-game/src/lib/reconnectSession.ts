@@ -20,3 +20,15 @@ export const shouldClearSavedReconnectBeforeCasualMatch = (input: {
 }): boolean => {
   return input.hasSavedSession && input.availability !== "available";
 };
+
+export const shouldClearSavedReconnectAfterFailure = (message: unknown): boolean => {
+  const text = String(message || "").toLowerCase();
+  return (
+    !text ||
+    text.includes("reconnect") ||
+    text.includes("room not found") ||
+    text.includes("session expired") ||
+    text.includes("seat") ||
+    text.includes("token")
+  );
+};

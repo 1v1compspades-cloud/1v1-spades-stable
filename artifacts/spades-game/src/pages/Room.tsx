@@ -5,6 +5,7 @@ import { useGameStorage } from "@/hooks/useGameStorage";
 import { CardComponent } from "@/components/Card";
 import { ShuffleOverlay } from "@/components/ShuffleOverlay";
 import { isCardPlayable, sortHandBySuit, SUIT_SYMBOLS, SUIT_COLORS } from "@/lib/game";
+import { shouldClearSavedReconnectAfterFailure } from "@/lib/reconnectSession";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -524,6 +525,14 @@ export default function Room() {
           setLocation("/");
           return;
         }
+        if (!tournamentCode && shouldClearSavedReconnectAfterFailure(msg)) {
+          clearPersistedRoomSession(roomCode);
+          clearReconnectRetry();
+          toast({ description: "Saved reconnect cleared. You can start or join a fresh match." });
+          setLocation("/");
+          return;
+        }
+
         toast({ description: err || "Session expired. Please rejoin.", variant: "destructive" });
         // Only a genuine token mismatch is terminal for this browser. Safari
         // can briefly report the old socket as active after a disconnect; keep
