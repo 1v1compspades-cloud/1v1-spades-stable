@@ -423,9 +423,10 @@ export default function Lobby() {
       try {
         const savedSession = getSavedPlayerSession(code);
         if (savedSession && code === savedRoomCode) {
-          saveRoomCode(code);
-          savePlayerIndex(savedSession.seat);
-          setLocation(`/room/${code}?reconnect=1&seat=${savedSession.seat}`);
+          toast({
+            description: "You already have a saved seat in this room. Use Reconnect to keep that seat, or leave the old match before joining with a new name.",
+            variant: "destructive",
+          });
           return;
         }
         if (blockIfActiveGame()) return;
