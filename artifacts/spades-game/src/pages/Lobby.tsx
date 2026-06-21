@@ -54,6 +54,7 @@ export default function Lobby() {
     getTournamentToken,
     savePlayerToken,
     getPlayerToken,
+    clearPersistedRoomSession,
   } = useGameStorage();
   const { toast } = useToast();
 
@@ -517,6 +518,11 @@ export default function Lobby() {
     setLocation(`/room/${savedRoomCode}?reconnect=1&seat=${savedPlayerSession.seat}`);
   };
 
+  const handleStartFresh = (): void => {
+    clearPersistedRoomSession(savedRoomCode);
+    toast({ description: "Saved reconnect cleared. You can start or join a fresh casual match." });
+  };
+
   const handleCreateAccount = async (): Promise<void> => {
     if (!v11WebFlags.accounts) return;
     const displayName = (accountDisplayNameInput || nameInput).trim();
@@ -738,15 +744,26 @@ export default function Lobby() {
             </div>
           )}
           {canReconnectToCurrentGame && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleReconnectToCurrentGame}
-              className="w-full h-12 border-emerald-500/50 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/15 hover:text-emerald-100"
-              data-testid="button-reconnect-current-game"
-            >
-              Reconnect to Current Game
-            </Button>
+            <div className="grid grid-cols-1 gap-2" data-testid="saved-reconnect-actions">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleReconnectToCurrentGame}
+                className="w-full h-12 border-emerald-500/50 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/15 hover:text-emerald-100"
+                data-testid="button-reconnect-current-game"
+              >
+                Reconnect to Current Game
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={handleStartFresh}
+                className="w-full h-10 text-xs text-muted-foreground hover:text-foreground"
+                data-testid="button-clear-saved-reconnect"
+              >
+                Start fresh instead
+              </Button>
+            </div>
           )}
           <div
             className="space-y-2 rounded-md border border-primary/30 bg-primary/10 p-3"

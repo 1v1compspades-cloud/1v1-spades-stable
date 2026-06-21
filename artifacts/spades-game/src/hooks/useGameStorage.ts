@@ -173,6 +173,9 @@ export function useGameStorage() {
     }
 
     if (!code || savedCode.toUpperCase().trim() === normalized) {
+      setRoomCode("");
+      setPlayerIndex(null);
+      setIsSpectator(false);
       localStorage.removeItem("spades_roomCode");
       localStorage.removeItem("spades_playerIndex");
       localStorage.removeItem("spades_isSpectator");
