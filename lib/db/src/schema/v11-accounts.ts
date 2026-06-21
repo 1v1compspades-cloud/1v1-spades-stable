@@ -1,5 +1,6 @@
 import {
   index,
+  integer,
   jsonb,
   pgTable,
   text,
@@ -19,6 +20,10 @@ export const v11AccountsTable = pgTable(
   {
     id: text("id").primaryKey(),
     emailHash: text("email_hash"),
+    emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
+    recoveryEmailAttachedAt: timestamp("recovery_email_attached_at", {
+      withTimezone: true,
+    }),
     displayName: text("display_name").notNull(),
     status: text("status").notNull().default("active"),
     deletionRequestedAt: timestamp("deletion_requested_at", {
@@ -37,6 +42,28 @@ export const v11AccountsTable = pgTable(
     uniqueIndex("v11_accounts_email_hash_unique").on(t.emailHash),
     index("v11_accounts_status_idx").on(t.status),
     index("v11_accounts_deletion_requested_idx").on(t.deletionRequestedAt),
+  ],
+);
+
+export const v12AccountRecoveryCodesTable = pgTable(
+  "v12_account_recovery_codes",
+  {
+    id: text("id").primaryKey(),
+    emailHash: text("email_hash").notNull(),
+    accountId: text("account_id"),
+    codeHash: text("code_hash").notNull(),
+    purpose: text("purpose").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("v12_recovery_codes_email_idx").on(t.emailHash),
+    index("v12_recovery_codes_expires_idx").on(t.expiresAt),
+    index("v12_recovery_codes_purpose_idx").on(t.purpose),
   ],
 );
 
@@ -67,3 +94,7 @@ export type V11AccountRow = typeof v11AccountsTable.$inferSelect;
 export type InsertV11Account = typeof v11AccountsTable.$inferInsert;
 export type V11UsernameRow = typeof v11UsernamesTable.$inferSelect;
 export type InsertV11Username = typeof v11UsernamesTable.$inferInsert;
+export type V12AccountRecoveryCodeRow =
+  typeof v12AccountRecoveryCodesTable.$inferSelect;
+export type InsertV12AccountRecoveryCode =
+  typeof v12AccountRecoveryCodesTable.$inferInsert;

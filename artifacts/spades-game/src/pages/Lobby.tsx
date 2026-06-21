@@ -72,6 +72,8 @@ export default function Lobby() {
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountStatus, setAccountStatus] = useState<string | null>(null);
   const [accountPanelOpen, setAccountPanelOpen] = useState(false);
+  const [recoveryEmailInput, setRecoveryEmailInput] = useState("");
+  const [recoveryCodeInput, setRecoveryCodeInput] = useState("");
   const [joinCodeInput, setJoinCodeInput] = useState(initialParams.code);
   const [matchTarget, setMatchTarget] = useState<250 | 500>(250);
   const [tournamentSize, setTournamentSize] = useState<4 | 8 | 16 | 32>(4);
@@ -577,6 +579,121 @@ export default function Lobby() {
     }
   };
 
+  const saveRecoveredProfile = (profile: { accountId?: unknown; accountUsername?: unknown }): void => {
+    const recoveredAccountId = typeof profile.accountId === "string" ? profile.accountId.trim() : "";
+    const recoveredUsername =
+      typeof profile.accountUsername === "string" ? profile.accountUsername.trim() : "";
+    if (!recoveredAccountId) {
+      throw new Error("Recovery did not return an account.");
+    }
+    saveAccountIdentity(recoveredAccountId, recoveredUsername);
+    if (recoveredUsername) {
+      saveProfileUsername(recoveredUsername);
+      setProfileInput(recoveredUsername);
+      setAccountUsernameInput(recoveredUsername);
+      setAccountStatus(`Recovered ranked profile ${recoveredUsername}.`);
+    } else {
+      setAccountUsernameInput("");
+      setAccountStatus("Recovered account. Claim a username to play ranked.");
+    }
+  };
+
+  const handleStartRecovery = async (purpose: "attach_email" | "recover_profile"): Promise<void> => {
+    if (!v11WebFlags.accounts || !v11WebFlags.accountRecovery) return;
+    const email = recoveryEmailInput.trim();
+    if (!email) {
+      toast({ description: "Enter your recovery email.", variant: "destructive" });
+      return;
+    }
+    if (purpose === "attach_email" && !accountId.trim()) {
+      toast({ description: "Create a ranked profile first.", variant: "destructive" });
+      return;
+    }
+
+    setAccountBusy(true);
+    setAccountStatus(null);
+    try {
+      const res = await fetch(
+        purpose === "attach_email"
+          ? "/api/v1.1/accounts/recovery/attach-email"
+          : "/api/v1.1/accounts/recovery/start",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(
+            purpose === "attach_email"
+              ? { email, accountId: accountId.trim() }
+              : { email },
+          ),
+        },
+      );
+      const body = await res.json().catch(() => null);
+      if (!res.ok || !body?.ok) {
+        throw new Error(body?.message || "Could not send recovery code.");
+      }
+      setRecoveryCodeInput("");
+      setAccountStatus("Recovery code sent. Check the staging/dev logs, then enter it here.");
+    } catch (err) {
+      toast({
+        description: err instanceof Error ? err.message : "Could not send recovery code.",
+        variant: "destructive",
+      });
+    } finally {
+      setAccountBusy(false);
+    }
+  };
+
+  const handleConfirmRecovery = async (purpose: "attach_email" | "recover_profile"): Promise<void> => {
+    if (!v11WebFlags.accounts || !v11WebFlags.accountRecovery) return;
+    const email = recoveryEmailInput.trim();
+    const code = recoveryCodeInput.trim();
+    if (!email || !code) {
+      toast({ description: "Enter your email and 6 digit code.", variant: "destructive" });
+      return;
+    }
+    if (purpose === "attach_email" && !accountId.trim()) {
+      toast({ description: "Create a ranked profile first.", variant: "destructive" });
+      return;
+    }
+
+    setAccountBusy(true);
+    setAccountStatus(null);
+    try {
+      const res = await fetch(
+        purpose === "attach_email"
+          ? "/api/v1.1/accounts/recovery/confirm-attach"
+          : "/api/v1.1/accounts/recovery/verify",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(
+            purpose === "attach_email"
+              ? { email, code, accountId: accountId.trim() }
+              : { email, code },
+          ),
+        },
+      );
+      const body = await res.json().catch(() => null);
+      if (!res.ok || !body?.profile?.accountId) {
+        throw new Error(body?.message || "Could not verify recovery code.");
+      }
+      saveRecoveredProfile(body.profile);
+      setRecoveryCodeInput("");
+      setAccountStatus(
+        purpose === "attach_email"
+          ? "Recovery email verified for this ranked profile."
+          : "Ranked profile recovered on this device.",
+      );
+    } catch (err) {
+      toast({
+        description: err instanceof Error ? err.message : "Could not verify recovery code.",
+        variant: "destructive",
+      });
+    } finally {
+      setAccountBusy(false);
+    }
+  };
+
   return (
     <div className="spades-screen min-h-[100dvh] flex items-center justify-center p-3 sm:p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
       <ConnectionPill />
@@ -868,6 +985,75 @@ export default function Lobby() {
                       <p className="text-xs text-muted-foreground" data-testid="v11-account-status">
                         {accountStatus}
                       </p>
+                    )}
+                    {v11WebFlags.accountRecovery && (
+                      <div className="space-y-2 rounded-md border border-border/40 bg-black/20 p-2.5">
+                        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                          Recovery Email
+                        </p>
+                        <Input
+                          type="email"
+                          value={recoveryEmailInput}
+                          onChange={(e) => setRecoveryEmailInput(e.target.value.slice(0, 254))}
+                          placeholder="email@example.com"
+                          disabled={accountBusy}
+                          data-testid="input-v12-recovery-email"
+                        />
+                        <Input
+                          inputMode="numeric"
+                          value={recoveryCodeInput}
+                          onChange={(e) => setRecoveryCodeInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                          placeholder="6 digit code"
+                          disabled={accountBusy}
+                          data-testid="input-v12-recovery-code"
+                        />
+                        {accountId ? (
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => void handleStartRecovery("attach_email")}
+                              disabled={accountBusy || !recoveryEmailInput.trim()}
+                              data-testid="button-v12-start-attach-email"
+                            >
+                              Send Code
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => void handleConfirmRecovery("attach_email")}
+                              disabled={accountBusy || !recoveryEmailInput.trim() || recoveryCodeInput.length !== 6}
+                              data-testid="button-v12-confirm-attach-email"
+                            >
+                              Verify Email
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => void handleStartRecovery("recover_profile")}
+                              disabled={accountBusy || !recoveryEmailInput.trim()}
+                              data-testid="button-v12-start-recovery"
+                            >
+                              Recover Profile
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => void handleConfirmRecovery("recover_profile")}
+                              disabled={accountBusy || !recoveryEmailInput.trim() || recoveryCodeInput.length !== 6}
+                              data-testid="button-v12-confirm-recovery"
+                            >
+                              Verify Code
+                            </Button>
+                          </div>
+                        )}
+                        <p className="text-[11px] text-muted-foreground">
+                          Email is private and only used to recover your ranked profile.
+                        </p>
+                      </div>
                     )}
                     <Button
                       type="button"

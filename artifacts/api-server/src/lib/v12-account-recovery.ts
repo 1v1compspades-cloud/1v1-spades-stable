@@ -1,0 +1,375 @@
+import { createHmac, randomInt, randomUUID } from "node:crypto";
+import { and, eq } from "drizzle-orm";
+import {
+  v11AccountsTable,
+  v11UsernamesTable,
+  v12AccountRecoveryCodesTable,
+  type InsertV12AccountRecoveryCode,
+  type V11AccountRow,
+  type V11UsernameRow,
+  type V12AccountRecoveryCodeRow,
+} from "@workspace/db/schema/v11-accounts";
+
+export type V12RecoveryPurpose = "attach_email" | "recover_profile";
+
+export type V12RecoveryErrorCode =
+  | "invalid_email"
+  | "invalid_code"
+  | "account_not_found"
+  | "account_deleted"
+  | "account_exists"
+  | "code_expired"
+  | "code_consumed"
+  | "too_many_attempts"
+  | "recovery_not_found";
+
+export class V12RecoveryError extends Error {
+  readonly code: V12RecoveryErrorCode;
+
+  constructor(code: V12RecoveryErrorCode, message: string) {
+    super(message);
+    this.code = code;
+    this.name = "V12RecoveryError";
+  }
+}
+
+export type V12RecoveryDb = {
+  select: (...args: unknown[]) => any;
+  insert: (...args: unknown[]) => any;
+  update: (...args: unknown[]) => any;
+};
+
+export type RecoveryEmailSender = (message: {
+  email: string;
+  code: string;
+  purpose: V12RecoveryPurpose;
+  accountId: string | null;
+  expiresAt: Date;
+}) => void | Promise<void>;
+
+export type RecoveredRankedProfile = {
+  accountId: string;
+  accountUsername: string | null;
+};
+
+const EMAIL_MAX = 254;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const CODE_PATTERN = /^\d{6}$/;
+const RECOVERY_CODE_TTL_MS = 10 * 60 * 1000;
+const MAX_CODE_ATTEMPTS = 5;
+
+function hmac(secret: string, value: string): string {
+  return createHmac("sha256", secret).update(value).digest("hex");
+}
+
+export function normalizeRecoveryEmail(value: unknown): string {
+  if (typeof value !== "string") {
+    throw new V12RecoveryError("invalid_email", "Email is required.");
+  }
+
+  const email = value.trim().toLowerCase();
+  if (!email || email.length > EMAIL_MAX || !EMAIL_PATTERN.test(email)) {
+    throw new V12RecoveryError("invalid_email", "Enter a valid email address.");
+  }
+  return email;
+}
+
+export function hashRecoveryEmail(email: string, secret: string): string {
+  return hmac(secret, `email:${email}`);
+}
+
+function hashRecoveryCode(
+  emailHash: string,
+  code: string,
+  purpose: V12RecoveryPurpose,
+  accountId: string | null,
+  secret: string,
+): string {
+  return hmac(secret, `code:${purpose}:${emailHash}:${accountId ?? ""}:${code}`);
+}
+
+function generateRecoveryCode(): string {
+  return String(randomInt(0, 1_000_000)).padStart(6, "0");
+}
+
+function assertRecoveryCode(value: unknown): string {
+  if (typeof value !== "string" || !CODE_PATTERN.test(value.trim())) {
+    throw new V12RecoveryError("invalid_code", "Enter the 6 digit recovery code.");
+  }
+  return value.trim();
+}
+
+async function findActiveAccount(
+  db: V12RecoveryDb,
+  accountId: string,
+): Promise<V11AccountRow> {
+  const accounts = await db
+    .select()
+    .from(v11AccountsTable)
+    .where(eq(v11AccountsTable.id, accountId));
+  const account = accounts[0] as V11AccountRow | undefined;
+  if (!account) {
+    throw new V12RecoveryError("account_not_found", "Account not found.");
+  }
+  if (account.status !== "active" || account.deletedAt) {
+    throw new V12RecoveryError("account_deleted", "Account has been deleted.");
+  }
+  return account;
+}
+
+async function activeUsernameForAccount(
+  db: V12RecoveryDb,
+  accountId: string,
+): Promise<string | null> {
+  const usernames = await db
+    .select()
+    .from(v11UsernamesTable)
+    .where(eq(v11UsernamesTable.accountId, accountId));
+  const active = (usernames as V11UsernameRow[]).find(
+    (row) => row.status === "active" && !row.releasedAt,
+  );
+  return active?.displayUsername ?? null;
+}
+
+function isUniqueViolation(error: unknown, constraint?: string): boolean {
+  if (!error || typeof error !== "object") return false;
+  const source =
+    "cause" in error && error.cause && typeof error.cause === "object"
+      ? error.cause
+      : error;
+  const candidate = source as { code?: string; constraint?: string };
+  if (candidate.code !== "23505") return false;
+  return !constraint || candidate.constraint === constraint;
+}
+
+export async function startV12AccountRecovery(
+  db: V12RecoveryDb,
+  input: {
+    email: unknown;
+    purpose: V12RecoveryPurpose;
+    accountId?: unknown;
+  },
+  options: {
+    secret: string;
+    sender: RecoveryEmailSender;
+    now?: Date;
+  },
+): Promise<{ ok: true; expiresAt: Date }> {
+  const email = normalizeRecoveryEmail(input.email);
+  const emailHash = hashRecoveryEmail(email, options.secret);
+  const accountId =
+    typeof input.accountId === "string" && input.accountId.trim()
+      ? input.accountId.trim()
+      : null;
+
+  if (input.purpose === "attach_email") {
+    if (!accountId) {
+      throw new V12RecoveryError("account_not_found", "Account not found.");
+    }
+    await findActiveAccount(db, accountId);
+  }
+
+  const now = options.now ?? new Date();
+  const expiresAt = new Date(now.getTime() + RECOVERY_CODE_TTL_MS);
+  const code = generateRecoveryCode();
+  const row: InsertV12AccountRecoveryCode = {
+    id: randomUUID(),
+    emailHash,
+    accountId,
+    codeHash: hashRecoveryCode(
+      emailHash,
+      code,
+      input.purpose,
+      accountId,
+      options.secret,
+    ),
+    purpose: input.purpose,
+    expiresAt,
+    attemptCount: 0,
+    createdAt: now,
+  };
+
+  await db.insert(v12AccountRecoveryCodesTable).values(row).returning();
+  await options.sender({
+    email,
+    code,
+    purpose: input.purpose,
+    accountId,
+    expiresAt,
+  });
+
+  return { ok: true, expiresAt };
+}
+
+async function verifyRecoveryCode(
+  db: V12RecoveryDb,
+  input: {
+    email: unknown;
+    code: unknown;
+    purpose: V12RecoveryPurpose;
+    accountId?: unknown;
+  },
+  options: { secret: string; now?: Date },
+): Promise<{
+  row: V12AccountRecoveryCodeRow;
+  emailHash: string;
+  now: Date;
+}> {
+  const email = normalizeRecoveryEmail(input.email);
+  const emailHash = hashRecoveryEmail(email, options.secret);
+  const accountId =
+    typeof input.accountId === "string" && input.accountId.trim()
+      ? input.accountId.trim()
+      : null;
+  const code = assertRecoveryCode(input.code);
+  const now = options.now ?? new Date();
+
+  const rows = (await db
+    .select()
+    .from(v12AccountRecoveryCodesTable)
+    .where(
+      and(
+        eq(v12AccountRecoveryCodesTable.emailHash, emailHash),
+        eq(v12AccountRecoveryCodesTable.purpose, input.purpose),
+      ),
+    )) as V12AccountRecoveryCodeRow[];
+
+  const candidates = rows
+    .filter(
+      (row) =>
+        row.emailHash === emailHash &&
+        row.purpose === input.purpose &&
+        (accountId ? row.accountId === accountId : true),
+    )
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  const row = candidates[0];
+  if (!row) {
+    throw new V12RecoveryError("recovery_not_found", "Recovery code not found.");
+  }
+  if (row.consumedAt) {
+    throw new V12RecoveryError("code_consumed", "Recovery code has already been used.");
+  }
+  if (row.expiresAt.getTime() <= now.getTime()) {
+    throw new V12RecoveryError("code_expired", "Recovery code has expired.");
+  }
+
+  const attempts = row.attemptCount;
+  if (attempts >= MAX_CODE_ATTEMPTS) {
+    throw new V12RecoveryError("too_many_attempts", "Too many recovery attempts.");
+  }
+
+  const expected = hashRecoveryCode(
+    emailHash,
+    code,
+    input.purpose,
+    row.accountId,
+    options.secret,
+  );
+  if (expected !== row.codeHash) {
+    await db
+      .update(v12AccountRecoveryCodesTable)
+      .set({ attemptCount: attempts + 1 })
+      .where(eq(v12AccountRecoveryCodesTable.id, row.id))
+      .returning();
+    throw new V12RecoveryError("invalid_code", "Recovery code is invalid.");
+  }
+
+  return { row, emailHash, now };
+}
+
+export async function confirmV12RecoveryEmailAttach(
+  db: V12RecoveryDb,
+  input: {
+    accountId: unknown;
+    email: unknown;
+    code: unknown;
+  },
+  options: { secret: string; now?: Date },
+): Promise<RecoveredRankedProfile> {
+  if (typeof input.accountId !== "string" || !input.accountId.trim()) {
+    throw new V12RecoveryError("account_not_found", "Account not found.");
+  }
+  const accountId = input.accountId.trim();
+  await findActiveAccount(db, accountId);
+  const verified = await verifyRecoveryCode(
+    db,
+    {
+      email: input.email,
+      code: input.code,
+      purpose: "attach_email",
+      accountId,
+    },
+    options,
+  );
+
+  try {
+    await db
+      .update(v11AccountsTable)
+      .set({
+        emailHash: verified.emailHash,
+        emailVerifiedAt: verified.now,
+        recoveryEmailAttachedAt: verified.now,
+        updatedAt: verified.now,
+      })
+      .where(eq(v11AccountsTable.id, accountId))
+      .returning();
+  } catch (error) {
+    if (isUniqueViolation(error, "v11_accounts_email_hash_unique")) {
+      throw new V12RecoveryError(
+        "account_exists",
+        "That email is already attached to a ranked profile.",
+      );
+    }
+    throw error;
+  }
+
+  await db
+    .update(v12AccountRecoveryCodesTable)
+    .set({ consumedAt: verified.now })
+    .where(eq(v12AccountRecoveryCodesTable.id, verified.row.id))
+    .returning();
+
+  return {
+    accountId,
+    accountUsername: await activeUsernameForAccount(db, accountId),
+  };
+}
+
+export async function verifyV12AccountRecovery(
+  db: V12RecoveryDb,
+  input: {
+    email: unknown;
+    code: unknown;
+  },
+  options: { secret: string; now?: Date },
+): Promise<RecoveredRankedProfile> {
+  const verified = await verifyRecoveryCode(
+    db,
+    {
+      email: input.email,
+      code: input.code,
+      purpose: "recover_profile",
+    },
+    options,
+  );
+
+  const accounts = (await db
+    .select()
+    .from(v11AccountsTable)
+    .where(eq(v11AccountsTable.emailHash, verified.emailHash))) as V11AccountRow[];
+  const account = accounts.find((row) => row.status === "active" && !row.deletedAt);
+  if (!account) {
+    throw new V12RecoveryError("account_not_found", "Account not found.");
+  }
+
+  await db
+    .update(v12AccountRecoveryCodesTable)
+    .set({ consumedAt: verified.now })
+    .where(eq(v12AccountRecoveryCodesTable.id, verified.row.id))
+    .returning();
+
+  return {
+    accountId: account.id,
+    accountUsername: await activeUsernameForAccount(db, account.id),
+  };
+}

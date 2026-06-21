@@ -256,6 +256,8 @@ export async function deleteV11Account(
     .update(v11AccountsTable)
     .set({
       emailHash: null,
+      emailVerifiedAt: null,
+      recoveryEmailAttachedAt: null,
       displayName: "Deleted account",
       status: "deleted",
       deletionRequestedAt: account.deletionRequestedAt ?? deletedAt,

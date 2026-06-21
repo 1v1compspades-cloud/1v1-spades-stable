@@ -8,4 +8,5 @@ export const v11WebFlags = {
   leaderboards: isV11WebFlagEnabled(import.meta.env.VITE_V11_LEADERBOARDS_ENABLED),
   matchmaking: isV11WebFlagEnabled(import.meta.env.VITE_V11_MATCHMAKING_ENABLED),
   tournaments: isV11WebFlagEnabled(import.meta.env.VITE_V11_TOURNAMENTS_ENABLED),
+  accountRecovery: isV11WebFlagEnabled(import.meta.env.VITE_V12_ACCOUNT_RECOVERY_ENABLED),
 } as const;
