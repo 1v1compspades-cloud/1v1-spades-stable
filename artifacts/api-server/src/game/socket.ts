@@ -2341,6 +2341,73 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
     });
 
     socket.on(
+      "check_reconnect_availability",
+      async (
+        data: { roomCode: string; playerIndex: 0 | 1; playerName: string; token?: string },
+        callback: (res: { available: boolean; reason?: string }) => void
+      ) => {
+        try {
+          const code = String(data?.roomCode || "").toUpperCase().trim();
+          const playerIndex = data?.playerIndex;
+          if (!code || (playerIndex !== 0 && playerIndex !== 1)) {
+            callback({ available: false, reason: "invalid_request" });
+            return;
+          }
+
+          const existing = getRoom(code);
+          if (!existing) {
+            callback({ available: false, reason: "room_not_found" });
+            return;
+          }
+          if (existing.phase === "game_over") {
+            callback({ available: false, reason: "game_over" });
+            return;
+          }
+
+          const currentSeat = existing.players?.[playerIndex] ?? null;
+          if (!currentSeat) {
+            callback({ available: false, reason: "seat_empty" });
+            return;
+          }
+
+          const currentSocketId = currentSeat.socketId ?? null;
+          const currentSocketConnected =
+            typeof currentSocketId === "string" &&
+            currentSocketId.length > 0 &&
+            io.sockets.sockets.get(currentSocketId)?.connected === true;
+          if (shouldRejectDuplicateReconnect(currentSocketId, socket.id, Boolean(currentSocketConnected))) {
+            callback({ available: false, reason: "seat_active" });
+            return;
+          }
+
+          const seatTokenized = existing.tokenizedSeats?.[playerIndex] === true;
+          if (seatTokenized) {
+            if (!data.token) {
+              callback({ available: false, reason: "token_required" });
+              return;
+            }
+            const v = await validateReconnectToken(code, playerIndex, data.token);
+            callback({
+              available: v.ok,
+              reason: v.ok ? undefined : v.reason,
+            });
+            return;
+          }
+
+          const claimedName = String(data.playerName || "").trim().toLowerCase();
+          const seatName = String(currentSeat.name || "").trim().toLowerCase();
+          callback({
+            available: !!claimedName && claimedName === seatName,
+            reason: claimedName && claimedName === seatName ? undefined : "name_mismatch",
+          });
+        } catch (err: unknown) {
+          logger.warn({ err, roomCode: data?.roomCode, playerIndex: data?.playerIndex }, "Reconnect availability check failed");
+          callback({ available: false, reason: "check_failed" });
+        }
+      }
+    );
+
+    socket.on(
       "reconnect_player",
       async (
         data: { roomCode: string; playerIndex: 0 | 1; playerName: string; token?: string },

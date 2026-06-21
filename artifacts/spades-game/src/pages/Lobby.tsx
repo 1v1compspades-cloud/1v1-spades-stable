@@ -14,6 +14,7 @@ import { LegalFooter, MatchAgreementNotice } from "@/components/LegalFooter";
 import { PreGameChecklist } from "@/components/PreGameChecklist";
 import { V11LeaderboardPanel } from "@/components/V11LeaderboardPanel";
 import { resolveCasualGuestName, resolveRankedDisplayName } from "@/lib/guestIdentity";
+import { shouldClearSavedReconnectBeforeCasualMatch, shouldShowReconnectPanel, type ReconnectAvailabilityState } from "@/lib/reconnectSession";
 import { v11WebFlags } from "@/lib/v11Flags";
 
 type FindMatchMatchedPayload = {
@@ -35,7 +36,7 @@ type OnlineCountUpdate = {
 
 export default function Lobby() {
   const [, setLocation] = useLocation();
-  const { connect, connected, socket, createRoom, joinRoom, joinAsSpectator, createTournament, joinTournament, isAdmin, unlockAdmin } = useSocket();
+  const { connect, connected, socket, createRoom, joinRoom, joinAsSpectator, createTournament, joinTournament, checkReconnectAvailability, isAdmin, unlockAdmin } = useSocket();
   const {
     playerName,
     profileUsername,
@@ -100,6 +101,7 @@ export default function Lobby() {
   const [findMatchError, setFindMatchError] = useState<string | null>(null);
   const [rankedMatchError, setRankedMatchError] = useState<string | null>(null);
   const [onlineCounts, setOnlineCounts] = useState<OnlineCountUpdate | null>(null);
+  const [reconnectAvailability, setReconnectAvailability] = useState<ReconnectAvailabilityState>("idle");
   const findMatchCleanupRef = useRef<(() => void) | null>(null);
   const rankedMatchCleanupRef = useRef<(() => void) | null>(null);
   const [invitedAsSpectator] = useState(initialParams.spectate && !!initialParams.code);
@@ -122,11 +124,51 @@ export default function Lobby() {
     return null;
   };
   const savedPlayerSession = savedRoomCode ? getSavedPlayerSession(savedRoomCode) : null;
-  const canReconnectToCurrentGame = !!savedRoomCode && !!savedPlayerSession;
+  const hasSavedReconnectCandidate = !!savedRoomCode && !!savedPlayerSession;
+  const canReconnectToCurrentGame = shouldShowReconnectPanel({
+    hasSavedSession: hasSavedReconnectCandidate,
+    availability: reconnectAvailability,
+    isFindingMatch,
+    isFindingRankedMatch,
+  });
   const activeGameMessage = "You are already in a game. Reconnect or forfeit first.";
 
-  const blockIfActiveGame = (): boolean => {
-    if (!canReconnectToCurrentGame) return false;
+  const clearSavedReconnectState = (): void => {
+    clearPersistedRoomSession(savedRoomCode);
+    setReconnectAvailability("unavailable");
+  };
+
+  const verifySavedReconnect = async (): Promise<boolean> => {
+    if (!savedRoomCode || !savedPlayerSession || !socket || !connected) {
+      setReconnectAvailability("unavailable");
+      return false;
+    }
+    setReconnectAvailability("checking");
+    try {
+      const res = await checkReconnectAvailability(
+        savedRoomCode,
+        savedPlayerSession.seat,
+        playerName,
+        savedPlayerSession.token,
+      );
+      if (res.available) {
+        setReconnectAvailability("available");
+        return true;
+      }
+      clearSavedReconnectState();
+      return false;
+    } catch {
+      setReconnectAvailability("unavailable");
+      return false;
+    }
+  };
+
+  const blockIfActiveGame = async (): Promise<boolean> => {
+    if (!hasSavedReconnectCandidate) return false;
+    const available = reconnectAvailability === "available"
+      ? true
+      : await verifySavedReconnect();
+    if (!available) return false;
     toast({ description: activeGameMessage, variant: "destructive" });
     return true;
   };
@@ -162,6 +204,49 @@ export default function Lobby() {
   useEffect(() => {
     connect();
   }, [connect]);
+
+  useEffect(() => {
+    if (!hasSavedReconnectCandidate) {
+      setReconnectAvailability("idle");
+      return;
+    }
+    if (!socket || !connected || isFindingMatch || isFindingRankedMatch) {
+      setReconnectAvailability("checking");
+      return;
+    }
+    let cancelled = false;
+    setReconnectAvailability("checking");
+    checkReconnectAvailability(
+      savedRoomCode,
+      savedPlayerSession.seat,
+      playerName,
+      savedPlayerSession.token,
+    ).then((res) => {
+      if (cancelled) return;
+      if (res.available) {
+        setReconnectAvailability("available");
+        return;
+      }
+      clearPersistedRoomSession(savedRoomCode);
+      setReconnectAvailability("unavailable");
+    }).catch(() => {
+      if (cancelled) return;
+      setReconnectAvailability("unavailable");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    hasSavedReconnectCandidate,
+    socket,
+    connected,
+    isFindingMatch,
+    isFindingRankedMatch,
+    savedRoomCode,
+    savedPlayerSession?.seat,
+    savedPlayerSession?.token,
+    playerName,
+  ]);
 
   useEffect(() => {
     if (!v11WebFlags.matchmaking || !socket) return;
@@ -212,7 +297,7 @@ export default function Lobby() {
   };
 
   const handleCreate = async (): Promise<void> => {
-    if (blockIfActiveGame()) return;
+    if (await blockIfActiveGame()) return;
     setIsCreating(true);
     try {
       const displayName = useCasualGuestName();
@@ -258,8 +343,15 @@ export default function Lobby() {
 
   const handleFindMatch = async (): Promise<void> => {
     if (!v11WebFlags.matchmaking) return;
-    if (blockIfActiveGame()) return;
     if (!socket) { toast({ description: "Connecting. Try again in a moment.", variant: "destructive" }); return; }
+    const blockedByActiveGame = await blockIfActiveGame();
+    if (blockedByActiveGame) return;
+    if (shouldClearSavedReconnectBeforeCasualMatch({
+      hasSavedSession: hasSavedReconnectCandidate,
+      availability: reconnectAvailability,
+    })) {
+      clearSavedReconnectState();
+    }
 
     const displayName = useCasualGuestName();
     const profile = optionalProfileUsername();
@@ -328,6 +420,7 @@ export default function Lobby() {
     socket?.emit("find_match_cancel");
     findMatchCleanupRef.current?.();
     setIsFindingMatch(false);
+    if (!hasSavedReconnectCandidate) setReconnectAvailability("idle");
   };
 
   const handleRankedMatch = async (): Promise<void> => {
@@ -336,7 +429,7 @@ export default function Lobby() {
       setRankedMatchError("Create account to play ranked");
       return;
     }
-    if (blockIfActiveGame()) return;
+    if (await blockIfActiveGame()) return;
     if (!socket) { toast({ description: "Connecting. Try again in a moment.", variant: "destructive" }); return; }
 
     const displayName = useRankedName();
@@ -423,7 +516,7 @@ export default function Lobby() {
       saveIsSpectator(false);
       const code = joinCodeInput.toUpperCase();
       if (matchMode === "custom") {
-        if (blockIfActiveGame()) return;
+        if (await blockIfActiveGame()) return;
         // Join the tournament lobby, then navigate to the tournament page.
         // If we already have a token cached for this code (e.g. reconnect from
         // the same browser), pass it so the server treats this as the same
@@ -443,7 +536,7 @@ export default function Lobby() {
           });
           return;
         }
-        if (blockIfActiveGame()) return;
+        if (await blockIfActiveGame()) return;
         const res = await joinRoom(code, displayName, profile, optionalAccountIdentity());
         if (res.playerIndex !== undefined) {
           saveRoomCode(code);
@@ -519,7 +612,7 @@ export default function Lobby() {
   };
 
   const handleStartFresh = (): void => {
-    clearPersistedRoomSession(savedRoomCode);
+    clearSavedReconnectState();
     toast({ description: "Saved reconnect cleared. You can start or join a fresh casual match." });
   };
 
@@ -825,7 +918,7 @@ export default function Lobby() {
                     className="text-center text-xs font-medium text-muted-foreground"
                     data-testid="online-count-indicator"
                   >
-                    Online: {onlineCounts?.onlineCount ?? "—"} · Finding match: {onlineCounts?.findingMatchCount ?? "—"}
+                    Online: {onlineCounts?.onlineCount ?? 0} · Finding match: {onlineCounts?.findingMatchCount ?? 0}
                   </p>
                 </div>
               )}

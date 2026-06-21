@@ -8,6 +8,11 @@ export type AccountIdentityPayload = {
   accountUsername: string;
 };
 
+export type ReconnectAvailability = {
+  available: boolean;
+  reason?: string;
+};
+
 // SECURITY: the admin unlock lives ONLY in sessionStorage (cleared when the tab
 // closes), never localStorage, links, or shared state. It holds an opaque,
 // server-issued resume token — NEVER the secret admin key itself.
@@ -22,6 +27,7 @@ interface SocketContextType {
   connect: () => void;
   createRoom: (name: string, matchTarget?: number, matchLabel?: string, mode?: "quick" | "king", profileUsername?: string, accountIdentity?: AccountIdentityPayload) => Promise<{ roomCode?: string; playerIndex?: number; token?: string }>;
   joinRoom: (code: string, name: string, profileUsername?: string, accountIdentity?: AccountIdentityPayload) => Promise<{ playerIndex?: number; token?: string }>;
+  checkReconnectAvailability: (roomCode: string, playerIndex: 0 | 1, playerName: string, token?: string) => Promise<ReconnectAvailability>;
   reconnect: (roomCode: string, playerIndex: 0 | 1, playerName: string, token?: string) => Promise<{ ok: boolean }>;
   startGame: (code: string) => void;
   placeBid: (code: string, amount: number) => Promise<void>;
@@ -379,6 +385,22 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const checkReconnectAvailability = (roomCode: string, playerIndex: 0 | 1, playerName: string, token?: string) => {
+    return new Promise<ReconnectAvailability>((resolve, reject) => {
+      if (!socket) return reject("No socket");
+      socket.emit(
+        "check_reconnect_availability",
+        { roomCode, playerIndex, playerName, token },
+        (res: ReconnectAvailability) => {
+          resolve({
+            available: !!res?.available,
+            reason: typeof res?.reason === "string" ? res.reason : undefined,
+          });
+        }
+      );
+    });
+  };
+
   const nextRound = (roomCode: string) => {
     socket?.emit("next_round", { roomCode });
   };
@@ -585,6 +607,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       connect,
       createRoom,
       joinRoom,
+      checkReconnectAvailability,
       reconnect,
       startGame,
       placeBid,
