@@ -13,6 +13,7 @@ import { InfoMenu } from "@/components/InfoMenu";
 import { LegalFooter, MatchAgreementNotice } from "@/components/LegalFooter";
 import { PreGameChecklist } from "@/components/PreGameChecklist";
 import { V11LeaderboardPanel } from "@/components/V11LeaderboardPanel";
+import { resolveCasualGuestName, resolveRankedDisplayName } from "@/lib/guestIdentity";
 import { v11WebFlags } from "@/lib/v11Flags";
 
 type FindMatchMatchedPayload = {
@@ -105,7 +106,6 @@ export default function Lobby() {
   const [adminDialogOpen, setAdminDialogOpen] = useState(false);
   const [adminKeyInput, setAdminKeyInput] = useState("");
   const [adminUnlocking, setAdminUnlocking] = useState(false);
-  const hasGuestName = !!nameInput.trim();
   const hasRankedAccount = !!accountId.trim() && !!accountUsername.trim();
   const savedRoomCode = storedRoomCode.toUpperCase().trim();
   const getSavedPlayerSession = (code: string): { seat: 0 | 1; token: string } | null => {
@@ -141,6 +141,21 @@ export default function Lobby() {
     const username = accountUsername.trim();
     if (!id || !username) return undefined;
     return { accountId: id, accountUsername: username };
+  };
+
+  const useCasualGuestName = (): string => {
+    const displayName = resolveCasualGuestName(nameInput, playerName);
+    setNameInput(displayName);
+    savePlayerName(displayName);
+    return displayName;
+  };
+
+  const useRankedName = (): string | null => {
+    const displayName = resolveRankedDisplayName(nameInput, accountUsername);
+    if (!displayName) return null;
+    setNameInput(displayName);
+    savePlayerName(displayName);
+    return displayName;
   };
 
   useEffect(() => {
@@ -196,13 +211,11 @@ export default function Lobby() {
   };
 
   const handleCreate = async (): Promise<void> => {
-    if (!nameInput.trim()) { toast({ description: "Please enter your name", variant: "destructive" }); return; }
     if (blockIfActiveGame()) return;
     setIsCreating(true);
     try {
-      const displayName = nameInput.trim();
+      const displayName = useCasualGuestName();
       const profile = optionalProfileUsername();
-      savePlayerName(displayName);
       saveProfileUsername(profile ?? "");
       saveIsSpectator(false);
       if (matchMode === "custom") {
@@ -244,16 +257,14 @@ export default function Lobby() {
 
   const handleFindMatch = async (): Promise<void> => {
     if (!v11WebFlags.matchmaking) return;
-    if (!nameInput.trim()) { toast({ description: "Please enter your name", variant: "destructive" }); return; }
     if (blockIfActiveGame()) return;
     if (!socket) { toast({ description: "Connecting. Try again in a moment.", variant: "destructive" }); return; }
 
-    const displayName = nameInput.trim();
+    const displayName = useCasualGuestName();
     const profile = optionalProfileUsername();
     setFindMatchError(null);
     setIsFindingMatch(true);
     findMatchCleanupRef.current?.();
-    savePlayerName(displayName);
     saveProfileUsername(profile ?? "");
     saveIsSpectator(false);
 
@@ -320,7 +331,6 @@ export default function Lobby() {
 
   const handleRankedMatch = async (): Promise<void> => {
     if (!v11WebFlags.matchmaking || !v11WebFlags.accounts) return;
-    if (!nameInput.trim()) { toast({ description: "Please enter your name", variant: "destructive" }); return; }
     if (!hasRankedAccount) {
       setRankedMatchError("Create account to play ranked");
       return;
@@ -328,12 +338,15 @@ export default function Lobby() {
     if (blockIfActiveGame()) return;
     if (!socket) { toast({ description: "Connecting. Try again in a moment.", variant: "destructive" }); return; }
 
-    const displayName = nameInput.trim();
+    const displayName = useRankedName();
+    if (!displayName) {
+      setRankedMatchError("Create account to play ranked");
+      return;
+    }
     const profile = accountUsername.trim();
     setRankedMatchError(null);
     setIsFindingRankedMatch(true);
     rankedMatchCleanupRef.current?.();
-    savePlayerName(displayName);
     saveProfileUsername(profile);
     saveIsSpectator(false);
 
@@ -400,13 +413,11 @@ export default function Lobby() {
   };
 
   const handleJoin = async (): Promise<void> => {
-    if (!nameInput.trim()) { toast({ description: "Please enter your name", variant: "destructive" }); return; }
     if (!joinCodeInput.trim()) { toast({ description: "Please enter a code", variant: "destructive" }); return; }
     setIsJoining(true);
     try {
-      const displayName = nameInput.trim();
+      const displayName = useCasualGuestName();
       const profile = optionalProfileUsername();
-      savePlayerName(displayName);
       saveProfileUsername(profile ?? "");
       saveIsSpectator(false);
       const code = joinCodeInput.toUpperCase();
@@ -472,21 +483,18 @@ export default function Lobby() {
   useEffect(() => {
     if (!invitedAsSpectator || autoSpectateTried) return;
     if (!connected) return;
-    if (!nameInput.trim()) return;
     setAutoSpectateTried(true);
     void handleSpectate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invitedAsSpectator, autoSpectateTried, connected, nameInput]);
 
   const handleSpectate = async (): Promise<void> => {
-    if (!nameInput.trim()) { toast({ description: "Please enter your name", variant: "destructive" }); return; }
     if (!joinCodeInput.trim()) { toast({ description: "Please enter a room code", variant: "destructive" }); return; }
     const code = joinCodeInput.toUpperCase();
-    const displayName = nameInput.trim();
+    const displayName = useCasualGuestName();
     const profile = optionalProfileUsername();
     setIsSpectating(true);
     try {
-      savePlayerName(displayName);
       saveProfileUsername(profile ?? "");
       savePlayerIndex(null);
       saveIsSpectator(true);
@@ -724,8 +732,8 @@ export default function Lobby() {
               data-testid="banner-invite"
             >
               {invitedAsSpectator
-                ? <>You've been invited to <span className="font-mono">{initialParams.code}</span> as a spectator. Enter your name to start watching.</>
-                : <>You've been invited to room <span className="font-mono">{initialParams.code}</span>. Enter your name and join.</>
+                ? <>You've been invited to <span className="font-mono">{initialParams.code}</span> as a spectator. Add a name or we'll make a guest name for you.</>
+                : <>You've been invited to room <span className="font-mono">{initialParams.code}</span>. Add a name or join as a guest.</>
               }
             </div>
           )}
@@ -757,7 +765,7 @@ export default function Lobby() {
               data-testid="input-player-name"
             />
             <p className="text-xs text-muted-foreground">
-              Guest display name for this match. No account username required.
+              Optional guest display name for this match. No account username required.
             </p>
           </div>
 
@@ -787,7 +795,7 @@ export default function Lobby() {
                   <Button
                     type="button"
                     onClick={() => void handleFindMatch()}
-                    disabled={isCreating || isJoining || isSpectating || isFindingRankedMatch || !connected || !hasGuestName}
+                    disabled={isCreating || isJoining || isSpectating || isFindingRankedMatch || !connected}
                     className="spades-gold-button w-full py-5 text-lg font-bold active:scale-[0.98] transition-transform"
                     data-testid="button-find-match"
                   >
@@ -820,7 +828,7 @@ export default function Lobby() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Button
                 onClick={handleCreate}
-                disabled={isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch || !hasGuestName}
+                disabled={isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch}
                 className="spades-gold-button w-full py-5 text-lg font-bold active:scale-[0.98] transition-transform"
                 data-testid="button-create"
               >
@@ -843,7 +851,7 @@ export default function Lobby() {
                 />
                 <Button
                   onClick={handleJoin}
-                  disabled={isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch || !joinCodeInput || !hasGuestName}
+                  disabled={isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch || !joinCodeInput}
                   variant="secondary"
                   className="w-full py-5 text-lg font-bold active:scale-[0.98] transition-transform"
                   data-testid="button-join"
@@ -884,7 +892,7 @@ export default function Lobby() {
                   type="button"
                   variant="secondary"
                   onClick={() => void handleRankedMatch()}
-                  disabled={isCreating || isJoining || isSpectating || isFindingMatch || !connected || !hasGuestName || !hasRankedAccount}
+                  disabled={isCreating || isJoining || isSpectating || isFindingMatch || !connected || !hasRankedAccount}
                   className="w-full py-5 text-lg font-bold active:scale-[0.98] transition-transform"
                   data-testid="button-ranked-match"
                 >
@@ -1201,7 +1209,7 @@ export default function Lobby() {
           <div className="pt-4 border-t border-border/50 space-y-2">
             <Button
               onClick={handleSpectate}
-              disabled={isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch || !joinCodeInput || !hasGuestName}
+              disabled={isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch || !joinCodeInput}
               variant="ghost"
               className="w-full h-12 text-sm font-medium border border-dashed border-border hover:border-primary/50"
               data-testid="button-spectate"
