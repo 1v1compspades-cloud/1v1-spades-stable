@@ -29,7 +29,7 @@ export function V11LeaderboardPanel() {
         if (!cancelled) setData(body);
       })
       .catch(() => {
-        if (!cancelled) setError("Leaderboard unavailable.");
+        if (!cancelled) setError("No ranked matches yet.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
