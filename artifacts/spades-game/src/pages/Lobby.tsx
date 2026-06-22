@@ -75,6 +75,9 @@ export default function Lobby() {
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountStatus, setAccountStatus] = useState<string | null>(null);
   const [accountPanelOpen, setAccountPanelOpen] = useState(false);
+  const [recoveryMode, setRecoveryMode] = useState<"attach_email" | "recover_profile">(
+    accountId.trim() ? "attach_email" : "recover_profile",
+  );
   const [recoveryEmailInput, setRecoveryEmailInput] = useState("");
   const [recoveryCodeInput, setRecoveryCodeInput] = useState("");
   const [recoveryEnabledAccountId, setRecoveryEnabledAccountId] = useState(() =>
@@ -118,6 +121,7 @@ export default function Lobby() {
   const hasAccountIdentity = !!accountId.trim();
   const recoveryEnabled =
     hasAccountIdentity && recoveryEnabledAccountId === accountId.trim();
+  const activeRecoveryMode = hasAccountIdentity ? recoveryMode : "recover_profile";
   const savedRoomCode = storedRoomCode.toUpperCase().trim();
   const getSavedPlayerSession = (code: string): { seat: 0 | 1; token: string } | null => {
     const normalized = code.toUpperCase().trim();
@@ -131,6 +135,10 @@ export default function Lobby() {
     }
     return null;
   };
+
+  useEffect(() => {
+    setRecoveryMode(hasAccountIdentity ? "attach_email" : "recover_profile");
+  }, [hasAccountIdentity]);
   const savedPlayerSession = savedRoomCode ? getSavedPlayerSession(savedRoomCode) : null;
   const hasSavedReconnectCandidate = !!savedRoomCode && !!savedPlayerSession;
   const canReconnectToCurrentGame = shouldShowReconnectPanel({
@@ -1139,9 +1147,38 @@ export default function Lobby() {
 
                   {v11WebFlags.accountRecovery && (
                     <div className="space-y-2 rounded-md border border-border/40 bg-black/20 p-3">
-                      <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                        Recovery
-                      </p>
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                          Recovery
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {activeRecoveryMode === "attach_email"
+                            ? "Attach a private email to this ranked profile."
+                            : "Restore a ranked profile that already has recovery enabled."}
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <Button
+                          type="button"
+                          variant={activeRecoveryMode === "attach_email" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setRecoveryMode("attach_email")}
+                          disabled={!hasAccountIdentity || accountBusy}
+                          data-testid="button-v11-recovery-mode-attach"
+                        >
+                          Attach Email
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={activeRecoveryMode === "recover_profile" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setRecoveryMode("recover_profile")}
+                          disabled={accountBusy}
+                          data-testid="button-v11-recovery-mode-recover"
+                        >
+                          Recover Existing Profile
+                        </Button>
+                      </div>
                       <Input
                         type="email"
                         value={recoveryEmailInput}
@@ -1158,7 +1195,7 @@ export default function Lobby() {
                         disabled={accountBusy}
                         data-testid="input-v11-recovery-code"
                       />
-                      {hasAccountIdentity ? (
+                      {activeRecoveryMode === "attach_email" ? (
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                           <Button
                             type="button"
@@ -1188,7 +1225,7 @@ export default function Lobby() {
                             disabled={accountBusy || !recoveryEmailInput.trim()}
                             data-testid="button-v11-start-recovery"
                           >
-                            Recover Profile
+                            Send Recovery Code
                           </Button>
                           <Button
                             type="button"
@@ -1197,7 +1234,7 @@ export default function Lobby() {
                             disabled={accountBusy || !recoveryEmailInput.trim() || recoveryCodeInput.length !== 6}
                             data-testid="button-v11-confirm-recovery"
                           >
-                            Verify Code
+                            Recover Profile
                           </Button>
                         </div>
                       )}
