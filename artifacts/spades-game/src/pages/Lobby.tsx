@@ -82,6 +82,8 @@ export default function Lobby() {
   const [tournamentSize, setTournamentSize] = useState<4 | 8 | 16 | 32>(4);
   const [tournamentName, setTournamentName] = useState<string>("");
   const [gameSettingsOpen, setGameSettingsOpen] = useState(false);
+  const showRankedProfilePanel =
+    v11WebFlags.usernames || v11WebFlags.accounts || v11WebFlags.accountRecovery;
   const ALL_MATCH_MODES = [
     { id: "quick",     label: "Quick Match",          blurb: "Single head-to-head match" },
     { id: "king",      label: "Table Streak",         blurb: "Winner stays, next player joins" },
@@ -1017,7 +1019,7 @@ export default function Lobby() {
             </section>
           )}
 
-          {(v11WebFlags.usernames || v11WebFlags.accounts) && (
+          {showRankedProfilePanel && (
             <details
               open={accountPanelOpen}
               onToggle={(e) => setAccountPanelOpen(e.currentTarget.open)}
@@ -1104,75 +1106,6 @@ export default function Lobby() {
                         {accountStatus}
                       </p>
                     )}
-                    {v11WebFlags.accountRecovery && (
-                      <div className="space-y-2 rounded-md border border-border/40 bg-black/20 p-2.5">
-                        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                          Recovery Email
-                        </p>
-                        <Input
-                          type="email"
-                          value={recoveryEmailInput}
-                          onChange={(e) => setRecoveryEmailInput(e.target.value.slice(0, 254))}
-                          placeholder="email@example.com"
-                          disabled={accountBusy}
-                          data-testid="input-v12-recovery-email"
-                        />
-                        <Input
-                          inputMode="numeric"
-                          value={recoveryCodeInput}
-                          onChange={(e) => setRecoveryCodeInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                          placeholder="6 digit code"
-                          disabled={accountBusy}
-                          data-testid="input-v12-recovery-code"
-                        />
-                        {accountId ? (
-                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => void handleStartRecovery("attach_email")}
-                              disabled={accountBusy || !recoveryEmailInput.trim()}
-                              data-testid="button-v12-start-attach-email"
-                            >
-                              Send Code
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => void handleConfirmRecovery("attach_email")}
-                              disabled={accountBusy || !recoveryEmailInput.trim() || recoveryCodeInput.length !== 6}
-                              data-testid="button-v12-confirm-attach-email"
-                            >
-                              Verify Email
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => void handleStartRecovery("recover_profile")}
-                              disabled={accountBusy || !recoveryEmailInput.trim()}
-                              data-testid="button-v12-start-recovery"
-                            >
-                              Recover Profile
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => void handleConfirmRecovery("recover_profile")}
-                              disabled={accountBusy || !recoveryEmailInput.trim() || recoveryCodeInput.length !== 6}
-                              data-testid="button-v12-confirm-recovery"
-                            >
-                              Verify Code
-                            </Button>
-                          </div>
-                        )}
-                        <p className="text-[11px] text-muted-foreground">
-                          Email is private and only used to recover your ranked profile.
-                        </p>
-                      </div>
-                    )}
                     <Button
                       type="button"
                       variant="ghost"
@@ -1187,6 +1120,75 @@ export default function Lobby() {
                     >
                       Clear Ranked Profile On This Device
                     </Button>
+                  </div>
+                )}
+                {v11WebFlags.accountRecovery && (
+                  <div className="space-y-2 rounded-md border border-border/40 bg-black/20 p-2.5">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                      Recovery Email
+                    </p>
+                    <Input
+                      type="email"
+                      value={recoveryEmailInput}
+                      onChange={(e) => setRecoveryEmailInput(e.target.value.slice(0, 254))}
+                      placeholder="email@example.com"
+                      disabled={accountBusy}
+                      data-testid="input-v11-recovery-email"
+                    />
+                    <Input
+                      inputMode="numeric"
+                      value={recoveryCodeInput}
+                      onChange={(e) => setRecoveryCodeInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      placeholder="6 digit code"
+                      disabled={accountBusy}
+                      data-testid="input-v11-recovery-code"
+                    />
+                    {accountId ? (
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => void handleStartRecovery("attach_email")}
+                          disabled={accountBusy || !recoveryEmailInput.trim()}
+                          data-testid="button-v11-start-attach-email"
+                        >
+                          Send Code
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => void handleConfirmRecovery("attach_email")}
+                          disabled={accountBusy || !recoveryEmailInput.trim() || recoveryCodeInput.length !== 6}
+                          data-testid="button-v11-confirm-attach-email"
+                        >
+                          Verify Email
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => void handleStartRecovery("recover_profile")}
+                          disabled={accountBusy || !recoveryEmailInput.trim()}
+                          data-testid="button-v11-start-recovery"
+                        >
+                          Recover Profile
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => void handleConfirmRecovery("recover_profile")}
+                          disabled={accountBusy || !recoveryEmailInput.trim() || recoveryCodeInput.length !== 6}
+                          data-testid="button-v11-confirm-recovery"
+                        >
+                          Verify Code
+                        </Button>
+                      </div>
+                    )}
+                    <p className="text-[11px] text-muted-foreground">
+                      Email is private and only used to recover your ranked profile.
+                    </p>
                   </div>
                 )}
               </div>}
