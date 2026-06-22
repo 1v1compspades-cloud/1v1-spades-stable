@@ -110,6 +110,14 @@ export interface GameState {
    */
   lastActiveAt: [number, number];
   /**
+   * Per-seat disconnect timestamp. A recent disconnected/tokenized waiting
+   * seat is briefly reserved for reconnect; after the grace window a fresh
+   * player can safely reclaim it.
+   */
+  disconnectedAt?: [number | null, number | null];
+  /** Last disconnected player snapshot, kept only long enough to restore metadata on reconnect. */
+  disconnectedPlayers?: [Player | null, Player | null];
+  /**
    * Per-seat ready flag for the pre-match lobby. Both must be true before
    * the host can press "Start Match" (server enforces). Reset on
    * resetMatch / disconnect so a fresh opponent has to ready up again.
@@ -178,6 +186,7 @@ export interface GameState {
 
 /** Max challengers waiting in the KotT queue. */
 export const KING_QUEUE_MAX = 20;
+export const WAITING_SEAT_RECLAIM_MS = 60_000;
 
 /**
  * House rule: when a player's running total reaches this value or below AFTER
@@ -233,6 +242,8 @@ export function createGame(
     coinFlipWinner: null,
     firstBidderRound1: null,
     lastActiveAt: [Date.now(), Date.now()],
+    disconnectedAt: [null, null],
+    disconnectedPlayers: [null, null],
     ready: [false, false],
     mode,
     challengerQueue: [],
@@ -382,6 +393,8 @@ export function resetMatch(state: GameState): GameState {
     coinFlipWinner: null,
     firstBidderRound1: null,
     lastActiveAt: [Date.now(), Date.now()],
+    disconnectedAt: [null, null],
+    disconnectedPlayers: [null, null],
     ready: [false, false],
     gameOverReason: null,
     winnerSeat: null,
@@ -835,10 +848,30 @@ export function joinRoom(
   const state = rooms.get(roomCode);
   if (!state) throw new Error("Room not found");
   if (state.phase !== "waiting") throw new Error("Game already started");
-  if (state.players[1] !== null) throw new Error("Room is full");
   const normalizedJoinName = normalizePlayerName(playerName);
   if (state.players.some((p) => p && normalizePlayerName(p.name) === normalizedJoinName)) {
     throw new Error("That player is already seated");
+  }
+
+  state.disconnectedAt = state.disconnectedAt ?? [null, null];
+  const now = Date.now();
+  const seatReservedForReconnect = (seat: 0 | 1): boolean => {
+    if (state.players[seat] !== null) return false;
+    if (state.tokenizedSeats?.[seat] !== true) return false;
+    const disconnectedAt = state.disconnectedAt?.[seat] ?? null;
+    if (disconnectedAt === null) return false;
+    return now - disconnectedAt < WAITING_SEAT_RECLAIM_MS;
+  };
+  const preferredSeats: (0 | 1)[] =
+    state.players[0] !== null ? [1, 0] : [0, 1];
+  const playerIndex = preferredSeats.find(
+    (seat) => state.players[seat] === null && !seatReservedForReconnect(seat),
+  );
+  if (playerIndex === undefined) {
+    if ([0, 1].some((seat) => seatReservedForReconnect(seat as 0 | 1))) {
+      throw new Error("Seat reserved for reconnect");
+    }
+    throw new Error("Room is full");
   }
 
   const joiner: Player = {
@@ -848,12 +881,17 @@ export function joinRoom(
     accountId: accountIdentity?.accountId ?? null,
     accountUsername: accountIdentity?.accountUsername ?? null,
     socketId,
-    index: 1,
+    index: playerIndex,
   };
-  state.players[1] = joiner;
-  state.lastActiveAt[1] = Date.now();
+  state.players[playerIndex] = joiner;
+  state.lastActiveAt[playerIndex] = now;
+  state.disconnectedAt[playerIndex] = null;
+  state.disconnectedPlayers = state.disconnectedPlayers ?? [null, null];
+  state.disconnectedPlayers[playerIndex] = null;
+  state.ready[playerIndex] = false;
+  if (state.tokenizedSeats) state.tokenizedSeats[playerIndex] = false;
   rooms.set(roomCode, state);
-  return { state, playerIndex: 1 };
+  return { state, playerIndex };
 }
 
 export function getRoom(roomCode: string): GameState | undefined {
@@ -870,6 +908,14 @@ export function removePlayerFromRoom(socketId: string): GameState | null {
       if (state.players[i]?.socketId === socketId) {
         // Null out the slot but preserve phase — reconnectPlayer will restore the seat.
         // We intentionally do NOT set phase = "game_over" so the room stays recoverable.
+        state.disconnectedAt = state.disconnectedAt ?? [null, null];
+        state.disconnectedPlayers = state.disconnectedPlayers ?? [null, null];
+        state.disconnectedAt[i as 0 | 1] = Date.now();
+        state.disconnectedPlayers[i as 0 | 1] = {
+          ...state.players[i]!,
+          socketId: "",
+          id: "",
+        };
         state.players[i] = null;
         // Clear ready so a fresh opponent (or the same one on reconnect) has
         // to re-ready before the host can start. Only meaningful in waiting phase.
@@ -1242,11 +1288,20 @@ export function reconnectPlayer(
   if (!state) throw new Error("Room not found");
 
   const player = state.players[playerIndex];
+  state.disconnectedAt = state.disconnectedAt ?? [null, null];
+  state.disconnectedPlayers = state.disconnectedPlayers ?? [null, null];
   if (!player) {
     // Slot was cleared (e.g. opponent disconnected us) — restore it
+    const previous = state.disconnectedPlayers[playerIndex];
+    const norm = (s: string) => s.trim().toLowerCase();
+    const restoredMetadata =
+      previous && norm(previous.name) === norm(playerName)
+        ? previous
+        : null;
     state.players[playerIndex] = {
+      ...(restoredMetadata ?? {}),
       id: newSocketId,
-      name: playerName,
+      name: restoredMetadata?.name ?? playerName,
       socketId: newSocketId,
       index: playerIndex,
     };
@@ -1263,6 +1318,8 @@ export function reconnectPlayer(
   }
 
   state.lastActiveAt[playerIndex] = Date.now();
+  state.disconnectedAt[playerIndex] = null;
+  state.disconnectedPlayers[playerIndex] = null;
   rooms.set(roomCode, state);
   return state;
 }

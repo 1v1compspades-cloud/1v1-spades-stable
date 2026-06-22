@@ -13,6 +13,7 @@ import {
   removePlayerFromRoom,
   startRound,
   updateRoom,
+  WAITING_SEAT_RECLAIM_MS,
 } from "../engine.js";
 import {
   sanitizeStateForPlayer,
@@ -130,6 +131,26 @@ console.log("\n— Reconnect + sanitized websocket payloads —");
   ok("mobile refresh does not swap opponent seat", current?.players[1]?.name === "Seat Two");
 }
 
+// Account/profile metadata survives a disconnect/reconnect cycle.
+{
+  const room = createRoom(
+    "Ranked Host",
+    `sock-ranked-host-${Date.now()}-${Math.random()}`,
+    250,
+    undefined,
+    "quick",
+    undefined,
+    "RankedHost",
+    { accountId: "acct-ranked-host", accountUsername: "RankedHost" },
+  );
+  removePlayerFromRoom(room.players[0]!.socketId);
+  const restored = reconnectPlayer(room.roomCode, 0, "sock-ranked-restored", "Ranked Host");
+
+  ok("reconnect preserves account id", restored.players[0]?.accountId === "acct-ranked-host");
+  ok("reconnect preserves account username", restored.players[0]?.accountUsername === "RankedHost");
+  ok("reconnect preserves profile username", restored.players[0]?.profileUsername === "RankedHost");
+}
+
 // Duplicate-tab guard: active socket cannot be silently replaced.
 {
   ok(
@@ -179,6 +200,43 @@ console.log("\n— Reconnect + sanitized websocket payloads —");
   ok("ready-screen leave after opponent disconnect removes remaining player", result.removed === true);
   ok("ready-screen leave after opponent disconnect cleans room", result.cleanedUp === true);
   ok("ready-screen leave after opponent disconnect removes room from memory", getRoom(room.roomCode) === undefined);
+}
+
+// Recently disconnected tokenized waiting seats are reserved briefly so the
+// same browser can reconnect instead of being instantly replaced.
+{
+  const room = createRoom("Reserved Host", `sock-reserve-host-${Date.now()}-${Math.random()}`);
+  joinRoom(room.roomCode, "Reserved Guest", "sock-reserve-guest");
+  room.tokenizedSeats = [true, true];
+  removePlayerFromRoom("sock-reserve-guest");
+
+  let msg = "";
+  try {
+    joinRoom(room.roomCode, "Late Guest", "sock-late-guest");
+  } catch (e) {
+    msg = (e as Error).message;
+  }
+
+  ok("freshly disconnected waiting seat is reserved for reconnect", /reserved/i.test(msg), msg);
+}
+
+// After the reconnect grace window, a stale disconnected host seat can be
+// reclaimed so a ready-screen room does not stay blocked forever.
+{
+  const room = createRoom("Stale Host", `sock-stale-host-${Date.now()}-${Math.random()}`);
+  joinRoom(room.roomCode, "Waiting Guest", "sock-waiting-guest");
+  room.tokenizedSeats = [true, true];
+  removePlayerFromRoom(room.players[0]!.socketId);
+  room.disconnectedAt = [
+    Date.now() - WAITING_SEAT_RECLAIM_MS - 1,
+    null,
+  ];
+
+  const result = joinRoom(room.roomCode, "Fresh Host", "sock-fresh-host");
+
+  ok("stale host seat is reclaimable", result.playerIndex === 0);
+  ok("fresh host occupies reclaimed seat", room.players[0]?.name === "Fresh Host");
+  ok("existing guest remains seated", room.players[1]?.name === "Waiting Guest");
 }
 
 // Leave Room is a ready-screen cleanup only; active gameplay still uses

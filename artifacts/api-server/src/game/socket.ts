@@ -37,6 +37,7 @@ import {
   canKottStepDown,
   getAllRooms,
   cleanupRoom,
+  WAITING_SEAT_RECLAIM_MS,
   type GameState,
   type PlayCardResult,
 } from "./engine.js";
@@ -447,6 +448,47 @@ function seatLifecycleSummary(
       lastActiveAt: state.lastActiveAt?.[seat as 0 | 1] ?? null,
     };
   });
+}
+
+function reclaimStaleWaitingSeats(state: GameState, io: SocketIOServer): boolean {
+  if (state.phase !== "waiting") return false;
+  state.disconnectedAt = state.disconnectedAt ?? [null, null];
+  state.disconnectedPlayers = state.disconnectedPlayers ?? [null, null];
+  let changed = false;
+  const now = Date.now();
+  for (let seat = 0; seat < 2; seat++) {
+    const idx = seat as 0 | 1;
+    const player = state.players[idx];
+    if (!player) continue;
+    const socketId = player.socketId ?? "";
+    const socketConnected =
+      socketId.length > 0 && io.sockets.sockets.get(socketId)?.connected === true;
+    if (socketConnected) continue;
+    const staleSince = state.disconnectedAt[idx] ?? state.lastActiveAt[idx] ?? now;
+    const staleAgeMs = now - staleSince;
+    if (staleAgeMs < WAITING_SEAT_RECLAIM_MS) continue;
+    logger.info(
+      {
+        event: "waiting_seat_reclaimed_for_join",
+        roomCode: state.roomCode,
+        seat: idx,
+        playerId: player.id,
+        playerName: player.name,
+        socketId,
+        staleAgeMs,
+        reconnectGraceMs: WAITING_SEAT_RECLAIM_MS,
+        seats: seatLifecycleSummary(state, io),
+      },
+      "Reclaimed stale waiting seat before join",
+    );
+    state.players[idx] = null;
+    state.ready[idx] = false;
+    if (state.tokenizedSeats) state.tokenizedSeats[idx] = false;
+    state.disconnectedAt[idx] = null;
+    state.disconnectedPlayers[idx] = null;
+    changed = true;
+  }
+  return changed;
 }
 
 export function shouldRejectDuplicateReconnect(
@@ -2133,6 +2175,9 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
                   return;
                 }
               }
+              if (pre && !pre.tournamentRef) {
+                reclaimStaleWaitingSeats(pre, io);
+              }
               const r = joinRoom(
                 code,
                 data.playerName,
@@ -2186,9 +2231,10 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           (socket.data as { playerName?: string }).playerName = data.playerName;
           logger.info({ roomCode: code, playerName: data.playerName, socketId: socket.id }, "Player joined room");
           callback({ ok: true, playerIndex, token });
-          const hostSocket = state.players[0]?.socketId;
-          if (hostSocket) {
-            io.to(hostSocket).emit("opponent_joined", { playerName: data.playerName });
+          const otherSeat = playerIndex === 0 ? 1 : 0;
+          const otherSocket = state.players[otherSeat]?.socketId;
+          if (otherSocket) {
+            io.to(otherSocket).emit("opponent_joined", { playerName: data.playerName });
           }
           broadcastState(io, state);
         } catch (err: unknown) {
