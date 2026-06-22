@@ -47,6 +47,19 @@ export type RecoveryEmailSender = (message: {
   expiresAt: Date;
 }) => void | Promise<void>;
 
+export type RecoveryDiagnosticStep =
+  | "validate_email"
+  | "lookup_account"
+  | "create_code"
+  | "insert_recovery_code"
+  | "success";
+
+export type RecoveryDiagnosticLogger = (details: {
+  step: RecoveryDiagnosticStep;
+  purpose: V11RecoveryPurpose;
+  hasAccountId: boolean;
+}) => void;
+
 export type RecoveredRankedProfile = {
   accountId: string;
   accountUsername: string | null;
@@ -153,8 +166,16 @@ export async function startV11AccountRecovery(
     secret: string;
     sender: RecoveryEmailSender;
     now?: Date;
+    diagnostics?: RecoveryDiagnosticLogger;
   },
 ): Promise<{ ok: true; expiresAt: Date }> {
+  const hasAccountId =
+    typeof input.accountId === "string" && input.accountId.trim().length > 0;
+  options.diagnostics?.({
+    step: "validate_email",
+    purpose: input.purpose,
+    hasAccountId,
+  });
   const email = normalizeRecoveryEmail(input.email);
   const emailHash = hashRecoveryEmail(email, options.secret);
   const accountId =
@@ -163,6 +184,11 @@ export async function startV11AccountRecovery(
       : null;
 
   if (input.purpose === "attach_email") {
+    options.diagnostics?.({
+      step: "lookup_account",
+      purpose: input.purpose,
+      hasAccountId,
+    });
     if (!accountId) {
       throw new V11RecoveryError("account_not_found", "Account not found.");
     }
@@ -171,6 +197,11 @@ export async function startV11AccountRecovery(
 
   const now = options.now ?? new Date();
   const expiresAt = new Date(now.getTime() + RECOVERY_CODE_TTL_MS);
+  options.diagnostics?.({
+    step: "create_code",
+    purpose: input.purpose,
+    hasAccountId,
+  });
   const code = generateRecoveryCode();
   const row: InsertV11AccountRecoveryCode = {
     id: randomUUID(),
@@ -189,6 +220,11 @@ export async function startV11AccountRecovery(
     createdAt: now,
   };
 
+  options.diagnostics?.({
+    step: "insert_recovery_code",
+    purpose: input.purpose,
+    hasAccountId,
+  });
   await db.insert(v11AccountRecoveryCodesTable).values(row).returning();
   await options.sender({
     email,
@@ -198,6 +234,11 @@ export async function startV11AccountRecovery(
     expiresAt,
   });
 
+  options.diagnostics?.({
+    step: "success",
+    purpose: input.purpose,
+    hasAccountId,
+  });
   return { ok: true, expiresAt };
 }
 

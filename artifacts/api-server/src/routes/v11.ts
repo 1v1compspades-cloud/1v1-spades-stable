@@ -13,6 +13,7 @@ import {
   startV11AccountRecovery,
   verifyV11AccountRecovery,
   V11RecoveryError,
+  type RecoveryDiagnosticLogger,
   type RecoveryEmailSender,
 } from "../lib/v11-account-recovery.js";
 import {
@@ -171,6 +172,21 @@ function serializeRecoveryError(error: unknown) {
 
 function hasRequestAccountId(value: unknown): boolean {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function recoveryDiagnostics(routeName: string): RecoveryDiagnosticLogger {
+  return ({ step, purpose, hasAccountId }) => {
+    logger.info(
+      {
+        routeName,
+        step,
+        purpose,
+        hasAccountId,
+        feature: "v1.1_account_recovery",
+      },
+      "v1.1 account recovery diagnostic step",
+    );
+  };
 }
 
 function handleAccountError(res: Response, error: unknown) {
@@ -348,6 +364,7 @@ router.post("/accounts/recovery/start", async (req, res) => {
       {
         secret: recoverySecret(),
         sender: logOnlyRecoverySender,
+        diagnostics: recoveryDiagnostics("accounts/recovery/start"),
       },
     );
     res.status(200).json({ ok: true, expiresAt: result.expiresAt });
@@ -394,6 +411,7 @@ router.post("/accounts/recovery/attach-email", async (req, res) => {
       {
         secret: recoverySecret(),
         sender: logOnlyRecoverySender,
+        diagnostics: recoveryDiagnostics("accounts/recovery/attach-email"),
       },
     );
     res.status(200).json({ ok: true, expiresAt: result.expiresAt });
