@@ -235,6 +235,7 @@ function statusForRecoveryError(error: V11RecoveryError): number {
     case "recovery_not_found":
       return 404;
     case "account_exists":
+    case "username_not_found":
       return 409;
   }
 }

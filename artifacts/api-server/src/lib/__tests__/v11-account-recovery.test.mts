@@ -180,6 +180,17 @@ function captureSender(codes: string[]): RecoveryEmailSender {
   };
 }
 
+function expectedOgSoloUsername() {
+  return {
+    normalizedUsername: "ogsolo",
+    displayUsername: "OgSolo",
+    accountId: "acct-1",
+    status: "active",
+    claimedAt: NOW,
+    releasedAt: null,
+  };
+}
+
 test("v1.1 account recovery attaches private email and restores ranked profile", async () => {
   const db = new FakeRecoveryDb();
   const sentCodes: string[] = [];
@@ -210,6 +221,8 @@ test("v1.1 account recovery attaches private email and restores ranked profile",
   assert.deepEqual(attached, {
     accountId: "acct-1",
     accountUsername: "OgSolo",
+    displayUsername: "OgSolo",
+    username: expectedOgSoloUsername(),
   });
   assert.equal(db.accounts[0].emailHash, hashRecoveryEmail("player@example.com", SECRET));
   assert.ok(db.accounts[0].emailVerifiedAt);
@@ -237,7 +250,36 @@ test("v1.1 account recovery attaches private email and restores ranked profile",
   assert.deepEqual(recovered, {
     accountId: "acct-1",
     accountUsername: "OgSolo",
+    displayUsername: "OgSolo",
+    username: expectedOgSoloUsername(),
   });
+});
+
+test("v1.1 account recovery rejects recovered accounts without claimed username", async () => {
+  const db = new FakeRecoveryDb();
+  db.usernames = [];
+  db.accounts[0].emailHash = hashRecoveryEmail("player@example.com", SECRET);
+  db.accounts[0].emailVerifiedAt = NOW;
+  db.accounts[0].recoveryEmailAttachedAt = NOW;
+  const codes: string[] = [];
+
+  await startV11AccountRecovery(
+    db,
+    {
+      email: "player@example.com",
+      purpose: "recover_profile",
+    },
+    { secret: SECRET, sender: captureSender(codes), now: NOW },
+  );
+
+  await assertRecoveryError(
+    verifyV11AccountRecovery(
+      db,
+      { email: "player@example.com", code: codes[0] },
+      { secret: SECRET, now: new Date(NOW.getTime() + 1_000) },
+    ),
+    "username_not_found",
+  );
 });
 
 test("v1.1 account recovery is single-use and expires", async () => {

@@ -17,6 +17,7 @@ export type V11RecoveryErrorCode =
   | "invalid_code"
   | "account_not_found"
   | "account_deleted"
+  | "username_not_found"
   | "account_exists"
   | "code_expired"
   | "code_consumed"
@@ -47,9 +48,20 @@ export type RecoveryEmailSender = (message: {
   expiresAt: Date;
 }) => void | Promise<void>;
 
+export type RecoveredRankedUsername = {
+  normalizedUsername: string;
+  displayUsername: string;
+  accountId: string;
+  status: string;
+  claimedAt: Date;
+  releasedAt: Date | null;
+};
+
 export type RecoveredRankedProfile = {
   accountId: string;
   accountUsername: string | null;
+  displayUsername: string | null;
+  username: RecoveredRankedUsername | null;
 };
 
 const EMAIL_MAX = 254;
@@ -120,7 +132,7 @@ async function findActiveAccount(
 async function activeUsernameForAccount(
   db: V11RecoveryDb,
   accountId: string,
-): Promise<string | null> {
+): Promise<V11UsernameRow | null> {
   const usernames = await db
     .select()
     .from(v11UsernamesTable)
@@ -128,7 +140,45 @@ async function activeUsernameForAccount(
   const active = (usernames as V11UsernameRow[]).find(
     (row) => row.status === "active" && !row.releasedAt,
   );
-  return active?.displayUsername ?? null;
+  return active ?? null;
+}
+
+function toRecoveredUsername(row: V11UsernameRow): RecoveredRankedUsername {
+  return {
+    normalizedUsername: row.normalizedUsername,
+    displayUsername: row.displayUsername,
+    accountId: row.accountId,
+    status: row.status,
+    claimedAt: row.claimedAt,
+    releasedAt: row.releasedAt,
+  };
+}
+
+function toRecoveredProfile(
+  accountId: string,
+  username: V11UsernameRow | null,
+): RecoveredRankedProfile {
+  const publicUsername = username ? toRecoveredUsername(username) : null;
+  return {
+    accountId,
+    accountUsername: publicUsername?.displayUsername ?? null,
+    displayUsername: publicUsername?.displayUsername ?? null,
+    username: publicUsername,
+  };
+}
+
+async function requireActiveUsernameForAccount(
+  db: V11RecoveryDb,
+  accountId: string,
+): Promise<V11UsernameRow> {
+  const username = await activeUsernameForAccount(db, accountId);
+  if (!username) {
+    throw new V11RecoveryError(
+      "username_not_found",
+      "Recovered account has no claimed username.",
+    );
+  }
+  return username;
 }
 
 function isUniqueViolation(error: unknown, constraint?: string): boolean {
@@ -335,10 +385,7 @@ export async function confirmV11RecoveryEmailAttach(
     .where(eq(v11AccountRecoveryCodesTable.id, verified.row.id))
     .returning();
 
-  return {
-    accountId,
-    accountUsername: await activeUsernameForAccount(db, accountId),
-  };
+  return toRecoveredProfile(accountId, await activeUsernameForAccount(db, accountId));
 }
 
 export async function verifyV11AccountRecovery(
@@ -377,8 +424,8 @@ export async function verifyV11AccountRecovery(
     .where(eq(v11AccountRecoveryCodesTable.id, verified.row.id))
     .returning();
 
-  return {
-    accountId: account.id,
-    accountUsername: await activeUsernameForAccount(db, account.id),
-  };
+  return toRecoveredProfile(
+    account.id,
+    await requireActiveUsernameForAccount(db, account.id),
+  );
 }

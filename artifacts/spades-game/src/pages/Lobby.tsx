@@ -727,7 +727,10 @@ export default function Lobby() {
     options: { requireUsername: boolean },
   ): { accountId: string; accountUsername: string } => {
     const recoveredAccountId = typeof profile.accountId === "string" ? profile.accountId.trim() : "";
-    const recoveredUsername = readRecoveredUsername(profile) || accountUsername.trim() || accountUsernameInput.trim();
+    const recoveredUsernameFromServer = readRecoveredUsername(profile);
+    const recoveredUsername = options.requireUsername
+      ? recoveredUsernameFromServer
+      : recoveredUsernameFromServer || accountUsername.trim() || accountUsernameInput.trim();
     if (!recoveredAccountId) {
       throw new Error("Recovery did not return an account.");
     }
