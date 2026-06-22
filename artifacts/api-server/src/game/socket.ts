@@ -428,6 +428,27 @@ function publicPlayer(p: GameState["players"][number]): { name: string; index: 0
     : null;
 }
 
+function seatLifecycleSummary(
+  state: GameState | null | undefined,
+  io?: SocketIOServer,
+) {
+  if (!state) return null;
+  return state.players.map((player, seat) => {
+    const socketId = player?.socketId ?? null;
+    return {
+      seat,
+      status: player ? "occupied" : "empty",
+      playerId: player?.id ?? null,
+      playerName: player?.name ?? null,
+      socketId,
+      socketConnected: socketId ? io?.sockets.sockets.get(socketId)?.connected === true : false,
+      tokenized: state.tokenizedSeats?.[seat as 0 | 1] === true,
+      ready: state.ready?.[seat as 0 | 1] ?? false,
+      lastActiveAt: state.lastActiveAt?.[seat as 0 | 1] ?? null,
+    };
+  });
+}
+
 export function shouldRejectDuplicateReconnect(
   currentSocketId: string | null | undefined,
   incomingSocketId: string,
@@ -2133,7 +2154,22 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
               joinErr = e as Error;
             }
           });
-          if (joinErr || !result) throw joinErr ?? new Error("Join failed");
+          if (joinErr || !result) {
+            const current = getRoom(code);
+            const joinErrorForLog: unknown = joinErr;
+            logger.warn(
+              {
+                event: "join_room_rejected",
+                roomCode: code,
+                reason: joinErrorForLog instanceof Error ? joinErrorForLog.message : "Join failed",
+                socketId: socket.id,
+                playerName: data?.playerName,
+                seats: seatLifecycleSummary(current, io),
+              },
+              "Join room rejected",
+            );
+            throw joinErr ?? new Error("Join failed");
+          }
           const { state, playerIndex } = result as { state: GameState; playerIndex: number };
           let token: string | undefined;
           try {
@@ -2349,24 +2385,54 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
         try {
           const code = String(data?.roomCode || "").toUpperCase().trim();
           const playerIndex = data?.playerIndex;
+          const finish = (res: { available: boolean; reason?: string }, state?: GameState) => {
+            logger.info(
+              {
+                event: "reconnect_availability_checked",
+                roomCode: code,
+                requestedSeat: playerIndex,
+                socketId: socket.id,
+                playerName: data?.playerName,
+                hasToken: Boolean(data?.token),
+                available: res.available,
+                reason: res.reason,
+                seats: seatLifecycleSummary(state, io),
+              },
+              "Reconnect availability checked",
+            );
+            callback(res);
+          };
           if (!code || (playerIndex !== 0 && playerIndex !== 1)) {
-            callback({ available: false, reason: "invalid_request" });
+            finish({ available: false, reason: "invalid_request" });
             return;
           }
 
           const existing = getRoom(code);
           if (!existing) {
-            callback({ available: false, reason: "room_not_found" });
+            finish({ available: false, reason: "room_not_found" });
             return;
           }
           if (existing.phase === "game_over") {
-            callback({ available: false, reason: "game_over" });
+            finish({ available: false, reason: "game_over" }, existing);
             return;
           }
 
           const currentSeat = existing.players?.[playerIndex] ?? null;
+          const seatTokenized = existing.tokenizedSeats?.[playerIndex] === true;
           if (!currentSeat) {
-            callback({ available: false, reason: "seat_empty" });
+            if (!seatTokenized) {
+              finish({ available: false, reason: "seat_empty" }, existing);
+              return;
+            }
+            if (!data.token) {
+              finish({ available: false, reason: "token_required" }, existing);
+              return;
+            }
+            const v = await validateReconnectToken(code, playerIndex, data.token);
+            finish({
+              available: v.ok,
+              reason: v.ok ? undefined : v.reason,
+            }, existing);
             return;
           }
 
@@ -2376,32 +2442,44 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
             currentSocketId.length > 0 &&
             io.sockets.sockets.get(currentSocketId)?.connected === true;
           if (shouldRejectDuplicateReconnect(currentSocketId, socket.id, Boolean(currentSocketConnected))) {
-            callback({ available: false, reason: "seat_active" });
+            finish({ available: false, reason: "seat_active" }, existing);
             return;
           }
 
-          const seatTokenized = existing.tokenizedSeats?.[playerIndex] === true;
           if (seatTokenized) {
             if (!data.token) {
-              callback({ available: false, reason: "token_required" });
+              finish({ available: false, reason: "token_required" }, existing);
               return;
             }
             const v = await validateReconnectToken(code, playerIndex, data.token);
-            callback({
+            finish({
               available: v.ok,
               reason: v.ok ? undefined : v.reason,
-            });
+            }, existing);
             return;
           }
 
           const claimedName = String(data.playerName || "").trim().toLowerCase();
           const seatName = String(currentSeat.name || "").trim().toLowerCase();
-          callback({
+          finish({
             available: !!claimedName && claimedName === seatName,
             reason: claimedName && claimedName === seatName ? undefined : "name_mismatch",
-          });
+          }, existing);
         } catch (err: unknown) {
-          logger.warn({ err, roomCode: data?.roomCode, playerIndex: data?.playerIndex }, "Reconnect availability check failed");
+          const code =
+            typeof data?.roomCode === "string" ? data.roomCode.toUpperCase().trim() : "";
+          logger.warn(
+            {
+              err,
+              event: "reconnect_availability_check_failed",
+              roomCode: data?.roomCode,
+              playerIndex: data?.playerIndex,
+              socketId: socket.id,
+              hasToken: Boolean(data?.token),
+              seats: seatLifecycleSummary(code ? getRoom(code) : undefined, io),
+            },
+            "Reconnect availability check failed",
+          );
           callback({ available: false, reason: "check_failed" });
         }
       }
@@ -2445,6 +2523,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
               seatTokenized,
               currentSeatSocketId: currentSocketId,
               currentSeatConnected: Boolean(currentSocketConnected),
+              seats: seatLifecycleSummary(existing, io),
             },
             "Reconnect attempt",
           );
@@ -2466,6 +2545,17 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
               throw new Error("Reconnect token required for this seat");
             }
             const v = await validateReconnectToken(code, data.playerIndex, data.token);
+            logger.info(
+              {
+                event: "reconnect_token_validated",
+                roomCode: code,
+                requestedSeat: data.playerIndex,
+                socketId: socket.id,
+                ok: v.ok,
+                reason: v.ok ? undefined : v.reason,
+              },
+              "Reconnect token validated",
+            );
             if (!v.ok) {
               // token_mismatch / not_found → caller is wrong. db_error → we
               // refuse to fail open: caller should retry, not be auto-trusted.
@@ -2528,6 +2618,9 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
           broadcastState(io, s);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
+          const currentCode =
+            typeof data?.roomCode === "string" ? data.roomCode.toUpperCase().trim() : "";
+          const current = currentCode ? getRoom(currentCode) : undefined;
           logger.warn(
             {
               err,
@@ -2536,6 +2629,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
               playerName: data?.playerName,
               socketId: socket.id,
               hasToken: Boolean(data?.token),
+              seats: seatLifecycleSummary(current, io),
             },
             "Reconnect failed",
           );
@@ -3842,6 +3936,19 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
       let tournamentSeat: { roomCode: string; idx: 0 | 1 } | null = null;
       let beforeRoomCode: string | null = null;
       if (before) beforeRoomCode = before.roomCode;
+      if (before) {
+        logger.info(
+          {
+            event: "socket_disconnect_room_snapshot",
+            roomCode: before.roomCode,
+            socketId: socket.id,
+            playerName: playerName ?? null,
+            phase: before.phase,
+            seats: seatLifecycleSummary(before, io),
+          },
+          "Socket disconnect room snapshot",
+        );
+      }
       if (
         before &&
         before.tournamentRef &&
@@ -3862,6 +3969,17 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
       const state = removePlayerFromRoom(socket.id);
       if (state) {
         void withRoomLock(state.roomCode, async () => {
+          logger.info(
+            {
+              event: "socket_disconnect_seat_removed",
+              roomCode: state.roomCode,
+              socketId: socket.id,
+              playerName: playerName ?? null,
+              phase: state.phase,
+              seats: seatLifecycleSummary(state, io),
+            },
+            "Socket disconnect removed seat",
+          );
           await commit(state, {
             action: "disconnect",
             payload: { socketId: socket.id, playerName: playerName ?? null },
