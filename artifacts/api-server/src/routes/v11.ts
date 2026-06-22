@@ -114,6 +114,88 @@ function serializeAccountError(error: unknown) {
   };
 }
 
+function safeDiagnosticText(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.length === 0) return undefined;
+  return value
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[redacted-email]")
+    .replace(/\b\d{6}\b/g, "[redacted-code]")
+    .replace(/postgres(?:ql)?:\/\/\S+/gi, "[redacted-database-url]")
+    .replace(/(token|secret|password)=([^&\s]+)/gi, "$1=[redacted]");
+}
+
+function serializeRecoveryDiagnostic(error: unknown) {
+  const candidate = error as {
+    name?: unknown;
+    message?: unknown;
+    stack?: unknown;
+    cause?: unknown;
+  };
+  const cause =
+    candidate?.cause && typeof candidate.cause === "object"
+      ? (candidate.cause as {
+          name?: unknown;
+          message?: unknown;
+          code?: unknown;
+          table?: unknown;
+          column?: unknown;
+          constraint?: unknown;
+          detail?: unknown;
+        })
+      : {};
+  const stackFirstLine =
+    typeof candidate.stack === "string" ? candidate.stack.split("\n")[0] : undefined;
+
+  return {
+    errorName: safeDiagnosticText(candidate.name),
+    errorMessage: safeDiagnosticText(candidate.message),
+    errorStackFirstLine: safeDiagnosticText(stackFirstLine),
+    causeName: safeDiagnosticText(cause.name),
+    causeMessage: safeDiagnosticText(cause.message),
+    causeCode: safeDiagnosticText(cause.code),
+    causeTable: safeDiagnosticText(cause.table),
+    causeColumn: safeDiagnosticText(cause.column),
+    causeConstraint: safeDiagnosticText(cause.constraint),
+    causeDetail: safeDiagnosticText(cause.detail),
+  };
+}
+
+function handleAttachEmailRecoveryError(
+  res: Response,
+  error: unknown,
+  accountId: unknown,
+) {
+  if (error instanceof V11RecoveryError) {
+    res.status(statusForRecoveryError(error)).json({
+      ok: false,
+      code: error.code,
+      message: error.message,
+    });
+    return;
+  }
+
+  const normalizedAccountId =
+    typeof accountId === "string" ? accountId.trim() : "";
+  logger.error(
+    {
+      feature: "v1.1_account_recovery",
+      code: "account_recovery_error",
+      routeName: "attach_email",
+      hasAccountId: normalizedAccountId.length > 0,
+      accountIdPrefix: normalizedAccountId
+        ? normalizedAccountId.slice(0, 6)
+        : undefined,
+      ...serializeRecoveryDiagnostic(error),
+    },
+    "v1.1 account recovery request failed",
+  );
+
+  res.status(500).json({
+    ok: false,
+    code: "account_recovery_error",
+    message: "Account recovery request failed.",
+  });
+}
+
 function handleAccountError(res: Response, error: unknown) {
   if (error instanceof V11AccountError) {
     res.status(statusForAccountError(error)).json({
@@ -301,7 +383,7 @@ router.post("/accounts/recovery/attach-email", async (req, res) => {
     );
     res.status(200).json({ ok: true, expiresAt: result.expiresAt });
   } catch (error) {
-    handleRecoveryError(res, error);
+    handleAttachEmailRecoveryError(res, error, req.body?.accountId);
   }
 });
 
