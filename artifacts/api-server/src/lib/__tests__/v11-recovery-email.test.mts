@@ -114,3 +114,34 @@ test("v1.1 recovery email keeps log-only fallback without Resend", async () => {
     expiresAt: EXPIRES_AT.toISOString(),
   });
 });
+
+test("v1.1 recovery email never logs raw codes in production without Resend", async () => {
+  const infos: unknown[] = [];
+  const warnings: unknown[] = [];
+  const sender = createV11RecoveryEmailSender({
+    env: {
+      NODE_ENV: "production",
+      RENDER_SERVICE_NAME: "onev1-spades-production",
+    },
+    fetchImpl: async () =>
+      new Response(JSON.stringify({ id: "should-not-send" }), { status: 200 }),
+    logger: {
+      info: (details: unknown) => {
+        infos.push(details);
+      },
+      warn: (details: unknown) => {
+        warnings.push(details);
+      },
+    },
+  });
+
+  await sender(recoveryMessage());
+
+  assert.equal(infos.length, 0);
+  assert.equal(warnings.length, 1);
+  assert.deepEqual(warnings[0], {
+    purpose: "recover_profile",
+    accountAttached: true,
+  });
+  assert.doesNotMatch(JSON.stringify(warnings), /123456/);
+});
