@@ -45,8 +45,8 @@ export const v11AccountsTable = pgTable(
   ],
 );
 
-export const v12AccountRecoveryCodesTable = pgTable(
-  "v12_account_recovery_codes",
+export const v11AccountRecoveryCodesTable = pgTable(
+  "v11_account_recovery_codes",
   {
     id: text("id").primaryKey(),
     emailHash: text("email_hash").notNull(),
@@ -61,9 +61,9 @@ export const v12AccountRecoveryCodesTable = pgTable(
       .defaultNow(),
   },
   (t) => [
-    index("v12_recovery_codes_email_idx").on(t.emailHash),
-    index("v12_recovery_codes_expires_idx").on(t.expiresAt),
-    index("v12_recovery_codes_purpose_idx").on(t.purpose),
+    index("v11_recovery_codes_email_idx").on(t.emailHash),
+    index("v11_recovery_codes_expires_idx").on(t.expiresAt),
+    index("v11_recovery_codes_purpose_idx").on(t.purpose),
   ],
 );
 
@@ -94,7 +94,7 @@ export type V11AccountRow = typeof v11AccountsTable.$inferSelect;
 export type InsertV11Account = typeof v11AccountsTable.$inferInsert;
 export type V11UsernameRow = typeof v11UsernamesTable.$inferSelect;
 export type InsertV11Username = typeof v11UsernamesTable.$inferInsert;
-export type V12AccountRecoveryCodeRow =
-  typeof v12AccountRecoveryCodesTable.$inferSelect;
-export type InsertV12AccountRecoveryCode =
-  typeof v12AccountRecoveryCodesTable.$inferInsert;
+export type V11AccountRecoveryCodeRow =
+  typeof v11AccountRecoveryCodesTable.$inferSelect;
+export type InsertV11AccountRecoveryCode =
+  typeof v11AccountRecoveryCodesTable.$inferInsert;

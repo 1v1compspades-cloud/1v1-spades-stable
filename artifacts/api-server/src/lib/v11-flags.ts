@@ -4,7 +4,7 @@ export type V11FlagName =
   | "V11_LEADERBOARDS_ENABLED"
   | "V11_MATCHMAKING_ENABLED"
   | "V11_TOURNAMENTS_ENABLED"
-  | "V12_ACCOUNT_RECOVERY_ENABLED";
+  | "V11_ACCOUNT_RECOVERY_ENABLED";
 
 export function isV11FlagEnabled(
   name: V11FlagName,
