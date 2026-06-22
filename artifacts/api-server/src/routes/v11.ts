@@ -114,6 +114,65 @@ function serializeAccountError(error: unknown) {
   };
 }
 
+function safeDiagnosticString(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  return value
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[redacted-email]")
+    .replace(/postgres(?:ql)?:\/\/\S+/gi, "[redacted-database-url]")
+    .replace(/\b\d{6}\b/g, "[redacted-code]")
+    .replace(
+      /\b(password|token|secret|code)\s*[:=]\s*["']?[^"',\s}]+/gi,
+      "$1=[redacted]",
+    );
+}
+
+function serializeRecoveryError(error: unknown) {
+  const candidate = error as {
+    cause?: unknown;
+    name?: unknown;
+    message?: unknown;
+    stack?: unknown;
+    code?: unknown;
+    table?: unknown;
+    column?: unknown;
+    constraint?: unknown;
+    detail?: unknown;
+  };
+  const source =
+    candidate?.cause && typeof candidate.cause === "object"
+      ? (candidate.cause as {
+          name?: unknown;
+          message?: unknown;
+          code?: unknown;
+          table?: unknown;
+          column?: unknown;
+          constraint?: unknown;
+          detail?: unknown;
+        })
+      : candidate;
+  const stackFirstLine =
+    typeof candidate.stack === "string"
+      ? candidate.stack.split("\n")[0]
+      : undefined;
+
+  return {
+    errorName: safeDiagnosticString(candidate.name),
+    errorMessage: safeDiagnosticString(candidate.message),
+    errorStackFirstLine: safeDiagnosticString(stackFirstLine),
+    causeName: safeDiagnosticString(source.name),
+    causeMessage: safeDiagnosticString(source.message),
+    causeCode: safeDiagnosticString(source.code),
+    causeConstraint: safeDiagnosticString(source.constraint),
+    causeColumn: safeDiagnosticString(source.column),
+    causeTable: safeDiagnosticString(source.table),
+    causeDetail: safeDiagnosticString(source.detail),
+  };
+}
+
+function hasRequestAccountId(value: unknown): boolean {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
 function handleAccountError(res: Response, error: unknown) {
   if (error instanceof V11AccountError) {
     res.status(statusForAccountError(error)).json({
@@ -157,7 +216,11 @@ function statusForRecoveryError(error: V11RecoveryError): number {
   }
 }
 
-function handleRecoveryError(res: Response, error: unknown) {
+function handleRecoveryError(
+  res: Response,
+  error: unknown,
+  context: { routeName: string; hasAccountId: boolean },
+) {
   if (error instanceof V11RecoveryError) {
     res.status(statusForRecoveryError(error)).json({
       ok: false,
@@ -169,7 +232,9 @@ function handleRecoveryError(res: Response, error: unknown) {
 
   logger.error(
     {
-      err: serializeAccountError(error),
+      ...serializeRecoveryError(error),
+      routeName: context.routeName,
+      hasAccountId: context.hasAccountId,
       feature: "v1.1_account_recovery",
       code: "account_recovery_error",
     },
@@ -287,7 +352,10 @@ router.post("/accounts/recovery/start", async (req, res) => {
     );
     res.status(200).json({ ok: true, expiresAt: result.expiresAt });
   } catch (error) {
-    handleRecoveryError(res, error);
+    handleRecoveryError(res, error, {
+      routeName: "accounts/recovery/start",
+      hasAccountId: false,
+    });
   }
 });
 
@@ -305,7 +373,10 @@ router.post("/accounts/recovery/verify", async (req, res) => {
     );
     res.status(200).json({ ok: true, profile });
   } catch (error) {
-    handleRecoveryError(res, error);
+    handleRecoveryError(res, error, {
+      routeName: "accounts/recovery/verify",
+      hasAccountId: false,
+    });
   }
 });
 
@@ -327,7 +398,10 @@ router.post("/accounts/recovery/attach-email", async (req, res) => {
     );
     res.status(200).json({ ok: true, expiresAt: result.expiresAt });
   } catch (error) {
-    handleRecoveryError(res, error);
+    handleRecoveryError(res, error, {
+      routeName: "accounts/recovery/attach-email",
+      hasAccountId: hasRequestAccountId(req.body?.accountId),
+    });
   }
 });
 
@@ -346,7 +420,10 @@ router.post("/accounts/recovery/confirm-attach", async (req, res) => {
     );
     res.status(200).json({ ok: true, profile });
   } catch (error) {
-    handleRecoveryError(res, error);
+    handleRecoveryError(res, error, {
+      routeName: "accounts/recovery/confirm-attach",
+      hasAccountId: hasRequestAccountId(req.body?.accountId),
+    });
   }
 });
 
