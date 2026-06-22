@@ -47,22 +47,6 @@ export type RecoveryEmailSender = (message: {
   expiresAt: Date;
 }) => void | Promise<void>;
 
-export type RecoveryDiagnosticStep =
-  | "validate_email"
-  | "lookup_account"
-  | "create_code"
-  | "insert_recovery_code"
-  | "verify_lookup"
-  | "verify_code_compare"
-  | "verify_success"
-  | "success";
-
-export type RecoveryDiagnosticLogger = (details: {
-  step: RecoveryDiagnosticStep;
-  purpose: V11RecoveryPurpose;
-  hasAccountId: boolean;
-}) => void;
-
 export type RecoveredRankedProfile = {
   accountId: string;
   accountUsername: string | null;
@@ -169,16 +153,8 @@ export async function startV11AccountRecovery(
     secret: string;
     sender: RecoveryEmailSender;
     now?: Date;
-    diagnostics?: RecoveryDiagnosticLogger;
   },
 ): Promise<{ ok: true; expiresAt: Date }> {
-  const hasAccountId =
-    typeof input.accountId === "string" && input.accountId.trim().length > 0;
-  options.diagnostics?.({
-    step: "validate_email",
-    purpose: input.purpose,
-    hasAccountId,
-  });
   const email = normalizeRecoveryEmail(input.email);
   const emailHash = hashRecoveryEmail(email, options.secret);
   const accountId =
@@ -187,11 +163,6 @@ export async function startV11AccountRecovery(
       : null;
 
   if (input.purpose === "attach_email") {
-    options.diagnostics?.({
-      step: "lookup_account",
-      purpose: input.purpose,
-      hasAccountId,
-    });
     if (!accountId) {
       throw new V11RecoveryError("account_not_found", "Account not found.");
     }
@@ -200,11 +171,6 @@ export async function startV11AccountRecovery(
 
   const now = options.now ?? new Date();
   const expiresAt = new Date(now.getTime() + RECOVERY_CODE_TTL_MS);
-  options.diagnostics?.({
-    step: "create_code",
-    purpose: input.purpose,
-    hasAccountId,
-  });
   const code = generateRecoveryCode();
   const row: InsertV11AccountRecoveryCode = {
     id: randomUUID(),
@@ -223,11 +189,6 @@ export async function startV11AccountRecovery(
     createdAt: now,
   };
 
-  options.diagnostics?.({
-    step: "insert_recovery_code",
-    purpose: input.purpose,
-    hasAccountId,
-  });
   await db.insert(v11AccountRecoveryCodesTable).values(row).returning();
   await options.sender({
     email,
@@ -237,11 +198,6 @@ export async function startV11AccountRecovery(
     expiresAt,
   });
 
-  options.diagnostics?.({
-    step: "success",
-    purpose: input.purpose,
-    hasAccountId,
-  });
   return { ok: true, expiresAt };
 }
 
@@ -256,7 +212,6 @@ async function verifyRecoveryCode(
   options: {
     secret: string;
     now?: Date;
-    diagnostics?: RecoveryDiagnosticLogger;
   },
 ): Promise<{
   row: V11AccountRecoveryCodeRow;
@@ -271,13 +226,7 @@ async function verifyRecoveryCode(
       : null;
   const code = assertRecoveryCode(input.code);
   const now = options.now ?? new Date();
-  const hasAccountId = Boolean(accountId);
 
-  options.diagnostics?.({
-    step: "verify_lookup",
-    purpose: input.purpose,
-    hasAccountId,
-  });
   const rows = (await db
     .select()
     .from(v11AccountRecoveryCodesTable)
@@ -312,11 +261,6 @@ async function verifyRecoveryCode(
     throw new V11RecoveryError("too_many_attempts", "Too many recovery attempts.");
   }
 
-  options.diagnostics?.({
-    step: "verify_code_compare",
-    purpose: input.purpose,
-    hasAccountId,
-  });
   const expected = hashRecoveryCode(
     emailHash,
     code,
@@ -333,11 +277,6 @@ async function verifyRecoveryCode(
     throw new V11RecoveryError("invalid_code", "Recovery code is invalid.");
   }
 
-  options.diagnostics?.({
-    step: "verify_success",
-    purpose: input.purpose,
-    hasAccountId,
-  });
   return { row, emailHash, now };
 }
 
@@ -351,7 +290,6 @@ export async function confirmV11RecoveryEmailAttach(
   options: {
     secret: string;
     now?: Date;
-    diagnostics?: RecoveryDiagnosticLogger;
   },
 ): Promise<RecoveredRankedProfile> {
   if (typeof input.accountId !== "string" || !input.accountId.trim()) {
@@ -412,7 +350,6 @@ export async function verifyV11AccountRecovery(
   options: {
     secret: string;
     now?: Date;
-    diagnostics?: RecoveryDiagnosticLogger;
   },
 ): Promise<RecoveredRankedProfile> {
   const verified = await verifyRecoveryCode(
