@@ -1870,33 +1870,33 @@ export default function Room() {
         {!spectator && gameState.phase === "bidding" && gameState.currentBidder === playerIndex && (
           <>
             <div
-              className="fixed inset-0 z-[90] bg-black/75 pointer-events-none"
+              className="fixed inset-0 z-[90] bg-black/50 pointer-events-none sm:bg-black/75"
               data-testid="bidding-backdrop"
               aria-hidden="true"
             />
             <div
               className="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto pointer-events-none sm:items-center"
               style={{
-                paddingTop: "max(0.5rem, env(safe-area-inset-top))",
-                paddingBottom: "calc(env(safe-area-inset-bottom) + 8.25rem)",
+                paddingTop: "max(0.35rem, env(safe-area-inset-top))",
+                paddingBottom: "calc(env(safe-area-inset-bottom) + 12rem)",
                 paddingLeft: "max(0.5rem, env(safe-area-inset-left))",
                 paddingRight: "max(0.5rem, env(safe-area-inset-right))",
               }}
               data-testid="bidding-overlay"
             >
-              <div className="bg-card/96 border border-border p-3 sm:p-5 rounded-xl shadow-2xl space-y-3 w-full max-w-[min(34rem,calc(100vw-1rem))] text-center max-h-[min(72dvh,34rem)] sm:max-h-[80dvh] overflow-y-auto pointer-events-auto backdrop-blur-md">
-                <h3 className="text-sm sm:text-lg font-serif text-primary">Place your bid</h3>
+              <div className="bg-card/96 border border-border p-2.5 sm:p-5 rounded-xl shadow-2xl space-y-2 sm:space-y-3 w-full max-w-[min(34rem,calc(100vw-1rem))] text-center max-h-[min(44dvh,22rem)] sm:max-h-[80dvh] overflow-y-auto overscroll-contain pointer-events-auto backdrop-blur-md">
+                <h3 className="text-sm leading-none sm:text-lg sm:leading-normal font-serif text-primary">Place your bid</h3>
                 {gameState.bids[0] === null && gameState.bids[1] === null && (
-                  <p className="text-[10px] sm:text-[11px] uppercase tracking-widest text-primary/80">
+                  <p className="text-[9px] sm:text-[11px] uppercase tracking-widest text-primary/80 leading-tight">
                     You bid first this round (Round {gameState.roundNumber})
                   </p>
                 )}
                 {(gameState.bids[0] !== null || gameState.bids[1] !== null) && (
-                  <p className="text-[10px] sm:text-[11px] uppercase tracking-widest text-muted-foreground">
+                  <p className="text-[9px] sm:text-[11px] uppercase tracking-widest text-muted-foreground leading-tight">
                     You bid second this round
                   </p>
                 )}
-                <p className="text-[10px] sm:text-xs text-muted-foreground">
+                <p className="text-[10px] sm:text-xs text-muted-foreground leading-tight">
                   You have {gameState.hand.length} cards. Bid 0 for Nil (+/−100).
                 </p>
                 {(() => {
@@ -1907,13 +1907,13 @@ export default function Room() {
                   return (
                     <div
                       data-testid="bidding-opponent-bid"
-                      className="rounded-lg border border-primary/35 bg-black/50 px-3 py-2 text-left"
+                      className="rounded-lg border border-primary/35 bg-black/50 px-2.5 py-1.5 sm:px-3 sm:py-2 text-left"
                     >
                       <div className="flex items-center justify-between gap-3">
-                        <span className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        <span className="min-w-0 truncate text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                           {oppName} bid this round
                         </span>
-                        <span className="shrink-0 rounded-md border border-primary/40 bg-primary/10 px-3 py-1 font-mono text-sm font-black text-primary whitespace-nowrap">
+                        <span className="shrink-0 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-0.5 sm:px-3 sm:py-1 font-mono text-xs sm:text-sm font-black text-primary whitespace-nowrap">
                           {oppBid === null ? "No bid yet" : oppBid === 0 ? "Nil" : oppBid}
                         </span>
                       </div>
@@ -1922,7 +1922,7 @@ export default function Room() {
                 })()}
                 <div
                   data-testid="bid-buttons"
-                  className="grid grid-cols-7 gap-1.5 w-full sm:gap-2"
+                  className="grid grid-cols-7 gap-1 w-full sm:gap-2"
                 >
                   {Array.from({ length: 14 }).map((_, i) => {
                     const val = i.toString();
@@ -1934,7 +1934,7 @@ export default function Room() {
                         data-testid={`bid-btn-${i}`}
                         onClick={() => setBidAmount(val)}
                         className={cn(
-                          "min-h-[36px] sm:min-h-[44px] rounded-lg border text-xs sm:text-sm font-bold tabular-nums transition-colors",
+                          "min-h-[32px] sm:min-h-[44px] rounded-md sm:rounded-lg border text-[11px] sm:text-sm font-bold tabular-nums transition-colors",
                           selected
                             ? "bg-primary text-primary-foreground border-primary shadow-md"
                             : "bg-white/[0.04] text-foreground border-white/20 hover:bg-white/[0.08] active:bg-white/10"
@@ -1945,11 +1945,11 @@ export default function Room() {
                     );
                   })}
                 </div>
-                <div className="-mx-3 -mb-3 px-3 pt-2 pb-3 sm:-mx-5 sm:-mb-5 sm:px-5 sm:pb-5 bg-card/96">
+                <div className="sticky bottom-0 -mx-2.5 -mb-2.5 px-2.5 pt-1.5 pb-2.5 sm:-mx-5 sm:-mb-5 sm:px-5 sm:pt-2 sm:pb-5 bg-card/96">
                   <Button
                     onClick={handleBid}
                     disabled={!bidAmount || isSubmitting}
-                    className="mx-auto flex h-auto min-h-[44px] w-full max-w-[240px] items-center justify-center px-5 py-2 text-sm sm:text-base"
+                    className="mx-auto flex h-auto min-h-[40px] sm:min-h-[44px] w-full max-w-[240px] items-center justify-center px-5 py-2 text-sm sm:text-base"
                     data-testid="button-confirm-bid"
                   >
                     {bidAmount ? `Bid ${bidAmount === "0" ? "Nil" : bidAmount}` : "Select a bid first"}

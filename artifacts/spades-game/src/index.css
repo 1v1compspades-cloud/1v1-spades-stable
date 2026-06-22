@@ -167,7 +167,7 @@
   }
   .pb-hand-safe {
     /* Extra breathing room for mobile browser toolbars over the hand strip. */
-    padding-bottom: calc(env(safe-area-inset-bottom) + 4.5rem);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 7rem);
   }
 }
 
