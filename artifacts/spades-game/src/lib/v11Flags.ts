@@ -1,5 +1,8 @@
 export function isV11WebFlagEnabled(value: unknown): boolean {
-  return value === "1" || value === "true" || value === "yes";
+  if (value === true) return true;
+  if (typeof value !== "string") return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
 }
 
 export const v11WebFlags = {
@@ -8,5 +11,5 @@ export const v11WebFlags = {
   leaderboards: isV11WebFlagEnabled(import.meta.env.VITE_V11_LEADERBOARDS_ENABLED),
   matchmaking: isV11WebFlagEnabled(import.meta.env.VITE_V11_MATCHMAKING_ENABLED),
   tournaments: isV11WebFlagEnabled(import.meta.env.VITE_V11_TOURNAMENTS_ENABLED),
-  accountRecovery: isV11WebFlagEnabled(import.meta.env.VITE_V12_ACCOUNT_RECOVERY_ENABLED),
+  accountRecovery: isV11WebFlagEnabled(import.meta.env.VITE_V11_ACCOUNT_RECOVERY_ENABLED),
 } as const;
