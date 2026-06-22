@@ -166,6 +166,29 @@ test("v1.1 ranked account identity rejects missing username row", async () => {
   );
 });
 
+test("v1.1 ranked account identity rejects released username row", async () => {
+  const db = new FakeIdentityDb();
+  db.accounts.push(accountRow({ id: "acct-1" }));
+  db.usernames.push(usernameRow({
+    accountId: "acct-1",
+    normalizedUsername: "alpha",
+    displayUsername: "Alpha",
+    status: "released",
+    releasedAt: new Date("2026-01-02T00:00:00.000Z"),
+  }));
+
+  await assert.rejects(
+    validateV11RankedAccountIdentity(
+      db,
+      { accountId: "acct-1", accountUsername: "Alpha" },
+      true,
+    ),
+    (err) =>
+      err instanceof V11AccountIdentityError &&
+      err.code === "username_not_found",
+  );
+});
+
 test("v1.1 ranked account identity rejects missing or deleted account", async () => {
   const db = new FakeIdentityDb();
   db.accounts.push(accountRow({
