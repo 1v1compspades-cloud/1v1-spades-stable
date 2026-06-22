@@ -688,23 +688,55 @@ export default function Lobby() {
     }
   };
 
-  const saveRecoveredProfile = (profile: { accountId?: unknown; accountUsername?: unknown }): void => {
+  const readRecoveredUsername = (profile: {
+    accountUsername?: unknown;
+    username?: unknown;
+    displayUsername?: unknown;
+  }): string => {
+    const candidates = [
+      profile.accountUsername,
+      profile.displayUsername,
+      typeof profile.username === "object" && profile.username !== null
+        ? (profile.username as { displayUsername?: unknown }).displayUsername
+        : profile.username,
+    ];
+    for (const candidate of candidates) {
+      if (typeof candidate !== "string") continue;
+      const username = candidate.trim();
+      if (username) return username;
+    }
+    return "";
+  };
+
+  const saveRecoveredProfile = (
+    profile: {
+      accountId?: unknown;
+      accountUsername?: unknown;
+      username?: unknown;
+      displayUsername?: unknown;
+    },
+    options: { requireUsername: boolean },
+  ): { accountId: string; accountUsername: string } => {
     const recoveredAccountId = typeof profile.accountId === "string" ? profile.accountId.trim() : "";
-    const recoveredUsername =
-      typeof profile.accountUsername === "string" ? profile.accountUsername.trim() : "";
+    const recoveredUsername = readRecoveredUsername(profile) || accountUsername.trim() || accountUsernameInput.trim();
     if (!recoveredAccountId) {
       throw new Error("Recovery did not return an account.");
+    }
+    if (options.requireUsername && !recoveredUsername) {
+      throw new Error("Recovery did not return a ranked username. Please try again.");
     }
     saveAccountIdentity(recoveredAccountId, recoveredUsername);
     if (recoveredUsername) {
       saveProfileUsername(recoveredUsername);
       setProfileInput(recoveredUsername);
       setAccountUsernameInput(recoveredUsername);
+      setAccountPanelOpen(false);
       setAccountStatus(`Recovered ranked profile ${recoveredUsername}.`);
     } else {
       setAccountUsernameInput("");
       setAccountStatus("Recovered account. Claim a username to play ranked.");
     }
+    return { accountId: recoveredAccountId, accountUsername: recoveredUsername };
   };
 
   const handleStartRecovery = async (purpose: "attach_email" | "recover_profile"): Promise<void> => {
@@ -786,7 +818,7 @@ export default function Lobby() {
       if (!res.ok || !body?.profile?.accountId) {
         throw new Error(body?.message || "Could not verify recovery code.");
       }
-      saveRecoveredProfile(body.profile);
+      saveRecoveredProfile(body.profile, { requireUsername: purpose === "recover_profile" });
       setRecoveryCodeInput("");
       setAccountStatus(
         purpose === "attach_email"
@@ -977,7 +1009,7 @@ export default function Lobby() {
                             data-testid="input-v11-account-display-name"
                           />
                         </div>
-                        <div className="grid gap-2 sm:grid-cols-2">
+                        <div className={`grid gap-2 ${hasRankedAccount ? "" : "sm:grid-cols-2"}`}>
                           <Button
                             type="button"
                             variant="outline"
@@ -987,27 +1019,40 @@ export default function Lobby() {
                           >
                             {accountId ? "Create New Account" : "Create Account"}
                           </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => void handleClaimUsername()}
-                            disabled={accountBusy || !accountId || !accountUsernameInput.trim()}
-                            data-testid="button-v11-claim-username"
-                          >
-                            Claim Username
-                          </Button>
+                          {!hasRankedAccount && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => void handleClaimUsername()}
+                              disabled={accountBusy || !accountId || !accountUsernameInput.trim()}
+                              data-testid="button-v11-claim-username"
+                            >
+                              Claim Username
+                            </Button>
+                          )}
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="account-username" className="text-xs">Username</Label>
-                          <Input
-                            id="account-username"
-                            value={accountUsernameInput}
-                            onChange={(e) => setAccountUsernameInput(e.target.value.slice(0, 20))}
-                            placeholder="username"
-                            disabled={accountBusy || !accountId}
-                            data-testid="input-v11-account-username"
-                          />
-                        </div>
+                        {hasRankedAccount ? (
+                          <div className="space-y-1">
+                            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                              Username
+                            </p>
+                            <p className="rounded-md border border-emerald-500/25 bg-emerald-500/10 px-2 py-1.5 text-sm text-emerald-100">
+                              {accountUsername}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <Label htmlFor="account-username" className="text-xs">Username</Label>
+                            <Input
+                              id="account-username"
+                              value={accountUsernameInput}
+                              onChange={(e) => setAccountUsernameInput(e.target.value.slice(0, 20))}
+                              placeholder="username"
+                              disabled={accountBusy || !accountId}
+                              data-testid="input-v11-account-username"
+                            />
+                          </div>
+                        )}
                         {accountId && (
                           <div className="rounded-md border border-emerald-500/25 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-100">
                             {accountUsername
@@ -1097,6 +1142,125 @@ export default function Lobby() {
               )}
             </section>
           )}
+
+          <section
+            className="rounded-md border border-primary/35 bg-black/20 text-left shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]"
+            data-testid="game-settings"
+          >
+            <button
+              type="button"
+              className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left"
+              onClick={() => setGameSettingsOpen((open) => !open)}
+              aria-expanded={gameSettingsOpen}
+              aria-controls="game-settings-panel"
+              data-testid="button-game-settings"
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-primary/45 bg-primary/10 text-sm text-primary" aria-hidden>
+                  ♠
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-foreground">Game Settings</span>
+                  <span className="block truncate text-xs font-normal text-muted-foreground">
+                    {matchMode === "king" ? "Table Streak" : matchMode === "custom" ? "Private Event" : "Quick Match"} · {matchTarget} pts
+                  </span>
+                </span>
+              </span>
+              <span className={`shrink-0 text-primary transition-transform ${gameSettingsOpen ? "rotate-180" : ""}`} aria-hidden>
+                ▾
+              </span>
+            </button>
+            {gameSettingsOpen && <div id="game-settings-panel" className="mt-4 space-y-4 px-3 pb-3">
+              <div className="space-y-2">
+                <Label className="text-sm">Match mode</Label>
+                <div className="grid grid-cols-2 gap-2" data-testid="match-mode-picker">
+                  {MATCH_MODES.map((m) => {
+                    const active = matchMode === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setMatchMode(m.id)}
+                        disabled={isCreating || isJoining || isFindingMatch}
+                        data-testid={`mode-${m.id}`}
+                        className={`flex flex-col items-start text-left rounded-md border px-3 py-2 transition disabled:opacity-50 ${
+                          active
+                            ? "border-primary bg-primary/15 text-primary shadow-[0_0_0_1px_hsla(35,90%,55%,0.5)]"
+                            : "border-border bg-white/5 hover:border-primary/50 hover:bg-primary/5"
+                        }`}
+                      >
+                        <span className="text-sm font-semibold leading-tight">{m.label}</span>
+                        <span className="text-[10px] text-muted-foreground leading-snug mt-0.5">{m.blurb}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {matchMode === "king"
+                    ? "Table Streak: winner stays, and the next player can join the table."
+                    : matchMode === "custom"
+                    ? "Private Event: host-managed invite bracket for organized groups."
+                    : "Quick Match: one head-to-head game, first to the target wins."}
+                </p>
+              </div>
+
+              {matchMode === "custom" && (
+                <div className="space-y-3 pt-2 border-t border-border/50">
+                  <div className="space-y-2">
+                    <Label className="text-sm">Bracket size</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {([4, 8, 16, 32] as const).map((s) => (
+                        <Button
+                          key={s}
+                          type="button"
+                          variant={tournamentSize === s ? "default" : "outline"}
+                          onClick={() => setTournamentSize(s)}
+                          disabled={isCreating || isJoining}
+                          className="h-12 font-mono"
+                          data-testid={`tournament-size-${s}`}
+                        >
+                          {s} players
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="tournament-name" className="text-sm">Tournament name <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                    <Input
+                      id="tournament-name"
+                      placeholder="e.g. Friday Night Spades"
+                      value={tournamentName}
+                      onChange={(e) => setTournamentName(e.target.value.slice(0, 40))}
+                      maxLength={40}
+                      disabled={isCreating || isJoining}
+                      data-testid="input-tournament-name"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2 pt-2 border-t border-border/50">
+                <Label className="text-sm">Match target</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {([250, 500] as const).map((t) => (
+                    <Button
+                      key={t}
+                      type="button"
+                      variant={matchTarget === t ? "default" : "outline"}
+                      onClick={() => setMatchTarget(t)}
+                      disabled={isCreating || isJoining}
+                      className="h-12 font-mono"
+                    >
+                      {t} pts
+                    </Button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  First player to reach the target while leading wins. Ties go to tiebreaker rounds.
+                </p>
+              </div>
+            </div>}
+          </section>
 
           <div
             className="space-y-2 rounded-md border border-primary/20 bg-primary/5 p-3"
@@ -1290,125 +1454,6 @@ export default function Lobby() {
 
             <V11LeaderboardPanel />
           </div>
-
-          <section
-            className="rounded-md border border-primary/35 bg-black/20 text-left shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]"
-            data-testid="game-settings"
-          >
-            <button
-              type="button"
-              className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left"
-              onClick={() => setGameSettingsOpen((open) => !open)}
-              aria-expanded={gameSettingsOpen}
-              aria-controls="game-settings-panel"
-              data-testid="button-game-settings"
-            >
-              <span className="flex min-w-0 items-center gap-2">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-primary/45 bg-primary/10 text-sm text-primary" aria-hidden>
-                  ♠
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-foreground">Game Settings</span>
-                  <span className="block truncate text-xs font-normal text-muted-foreground">
-                    {matchMode === "king" ? "Table Streak" : matchMode === "custom" ? "Private Event" : "Quick Match"} · {matchTarget} pts
-                  </span>
-                </span>
-              </span>
-              <span className={`shrink-0 text-primary transition-transform ${gameSettingsOpen ? "rotate-180" : ""}`} aria-hidden>
-                ▾
-              </span>
-            </button>
-            {gameSettingsOpen && <div id="game-settings-panel" className="mt-4 space-y-4 px-3 pb-3">
-              <div className="space-y-2">
-                <Label className="text-sm">Match mode</Label>
-                <div className="grid grid-cols-2 gap-2" data-testid="match-mode-picker">
-                  {MATCH_MODES.map((m) => {
-                    const active = matchMode === m.id;
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => setMatchMode(m.id)}
-                        disabled={isCreating || isJoining || isFindingMatch}
-                        data-testid={`mode-${m.id}`}
-                        className={`flex flex-col items-start text-left rounded-md border px-3 py-2 transition disabled:opacity-50 ${
-                          active
-                            ? "border-primary bg-primary/15 text-primary shadow-[0_0_0_1px_hsla(35,90%,55%,0.5)]"
-                            : "border-border bg-white/5 hover:border-primary/50 hover:bg-primary/5"
-                        }`}
-                      >
-                        <span className="text-sm font-semibold leading-tight">{m.label}</span>
-                        <span className="text-[10px] text-muted-foreground leading-snug mt-0.5">{m.blurb}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {matchMode === "king"
-                    ? "Table Streak: winner stays, and the next player can join the table."
-                    : matchMode === "custom"
-                    ? "Private Event: host-managed invite bracket for organized groups."
-                    : "Quick Match: one head-to-head game, first to the target wins."}
-                </p>
-              </div>
-
-              {matchMode === "custom" && (
-                <div className="space-y-3 pt-2 border-t border-border/50">
-                  <div className="space-y-2">
-                    <Label className="text-sm">Bracket size</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {([4, 8, 16, 32] as const).map((s) => (
-                        <Button
-                          key={s}
-                          type="button"
-                          variant={tournamentSize === s ? "default" : "outline"}
-                          onClick={() => setTournamentSize(s)}
-                          disabled={isCreating || isJoining}
-                          className="h-12 font-mono"
-                          data-testid={`tournament-size-${s}`}
-                        >
-                          {s} players
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="tournament-name" className="text-sm">Tournament name <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                    <Input
-                      id="tournament-name"
-                      placeholder="e.g. Friday Night Spades"
-                      value={tournamentName}
-                      onChange={(e) => setTournamentName(e.target.value.slice(0, 40))}
-                      maxLength={40}
-                      disabled={isCreating || isJoining}
-                      data-testid="input-tournament-name"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-2 pt-2 border-t border-border/50">
-                <Label className="text-sm">Match target</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {([250, 500] as const).map((t) => (
-                    <Button
-                      key={t}
-                      type="button"
-                      variant={matchTarget === t ? "default" : "outline"}
-                      onClick={() => setMatchTarget(t)}
-                      disabled={isCreating || isJoining}
-                      className="h-12 font-mono"
-                    >
-                      {t} pts
-                    </Button>
-                  ))}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  First player to reach the target while leading wins. Ties go to tiebreaker rounds.
-                </p>
-              </div>
-            </div>}
-          </section>
 
           <MatchAgreementNotice />
 
