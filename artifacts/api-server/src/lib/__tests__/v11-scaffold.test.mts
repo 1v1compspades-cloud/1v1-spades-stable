@@ -9,6 +9,7 @@ const serverFlags = [
   "V11_LEADERBOARDS_ENABLED",
   "V11_MATCHMAKING_ENABLED",
   "V11_TOURNAMENTS_ENABLED",
+  "V11_ACCOUNT_RECOVERY_ENABLED",
 ] as const;
 
 const webFlags = [
@@ -17,6 +18,7 @@ const webFlags = [
   "VITE_V11_LEADERBOARDS_ENABLED",
   "VITE_V11_MATCHMAKING_ENABLED",
   "VITE_V11_TOURNAMENTS_ENABLED",
+  "VITE_V11_ACCOUNT_RECOVERY_ENABLED",
 ] as const;
 
 type V11Feature =
@@ -24,7 +26,8 @@ type V11Feature =
   | "usernames"
   | "leaderboards"
   | "matchmaking"
-  | "tournaments";
+  | "tournaments"
+  | "accountRecovery";
 
 const envByFeature: Record<V11Feature, string> = {
   accounts: "V11_ACCOUNTS_ENABLED",
@@ -32,6 +35,7 @@ const envByFeature: Record<V11Feature, string> = {
   leaderboards: "V11_LEADERBOARDS_ENABLED",
   matchmaking: "V11_MATCHMAKING_ENABLED",
   tournaments: "V11_TOURNAMENTS_ENABLED",
+  accountRecovery: "V11_ACCOUNT_RECOVERY_ENABLED",
 };
 
 function enabled(value: string | undefined): boolean {
@@ -74,6 +78,7 @@ test("v1.1 scaffold keeps all planned feature flags explicit", () => {
     "V11_LEADERBOARDS_ENABLED",
     "V11_MATCHMAKING_ENABLED",
     "V11_TOURNAMENTS_ENABLED",
+    "V11_ACCOUNT_RECOVERY_ENABLED",
   ]);
   assert.deepEqual([...webFlags], [
     "VITE_V11_ACCOUNTS_ENABLED",
@@ -81,6 +86,7 @@ test("v1.1 scaffold keeps all planned feature flags explicit", () => {
     "VITE_V11_LEADERBOARDS_ENABLED",
     "VITE_V11_MATCHMAKING_ENABLED",
     "VITE_V11_TOURNAMENTS_ENABLED",
+    "VITE_V11_ACCOUNT_RECOVERY_ENABLED",
   ]);
 });
 
@@ -156,6 +162,30 @@ test("v1.1 account API contract stays disabled by default", () => {
   assert.match(routeSource, /V11_ACCOUNTS_ENABLED/);
   assert.match(routeSource, /status\(503\)\.json\(disabledPayload/);
   assert.doesNotMatch(routeSource, /status\(501\)\.json/);
+});
+
+test("v1.1 account recovery contract stays explicitly gated", () => {
+  const routeSource = readFileSync(
+    fileURLToPath(new URL("../../routes/v11.ts", import.meta.url)),
+    "utf8",
+  );
+  const flagSource = readFileSync(
+    fileURLToPath(new URL("../v11-flags.ts", import.meta.url)),
+    "utf8",
+  );
+  const webFlagSource = readFileSync(
+    fileURLToPath(new URL("../../../../spades-game/src/lib/v11Flags.ts", import.meta.url)),
+    "utf8",
+  );
+
+  assert.match(flagSource, /V11_ACCOUNT_RECOVERY_ENABLED/);
+  assert.match(webFlagSource, /VITE_V11_ACCOUNT_RECOVERY_ENABLED/);
+  assert.match(routeSource, /\/accounts\/recovery\/start/);
+  assert.match(routeSource, /\/accounts\/recovery\/verify/);
+  assert.match(routeSource, /\/accounts\/recovery\/attach-email/);
+  assert.match(routeSource, /\/accounts\/recovery\/confirm-attach/);
+  assert.match(routeSource, /V11_ACCOUNT_RECOVERY_ENABLED/);
+  assert.match(routeSource, /recoveryDisabledPayload/);
 });
 
 test("v1.1 leaderboard scaffold is account-first and disabled by default", () => {
