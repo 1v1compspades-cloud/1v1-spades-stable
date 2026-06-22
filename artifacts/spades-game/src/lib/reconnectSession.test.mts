@@ -18,6 +18,18 @@ test("Play Now does not show reconnect panel during matchmaking", () => {
   );
 });
 
+test("Ranked Match does not show reconnect panel during matchmaking", () => {
+  assert.equal(
+    shouldShowReconnectPanel({
+      hasSavedSession: true,
+      availability: "available",
+      isFindingMatch: false,
+      isFindingRankedMatch: true,
+    }),
+    false,
+  );
+});
+
 test("stale saved reconnect is cleared before casual matchmaking", () => {
   assert.equal(
     shouldClearSavedReconnectBeforeCasualMatch({
@@ -28,6 +40,20 @@ test("stale saved reconnect is cleared before casual matchmaking", () => {
   );
 });
 
+test("available saved reconnect is preserved before casual matchmaking", () => {
+  assert.equal(
+    shouldClearSavedReconnectBeforeCasualMatch({
+      hasSavedSession: true,
+      availability: "available",
+    }),
+    false,
+  );
+});
+
 test("failed reconnect retry error clears stale saved reconnect", () => {
   assert.equal(shouldClearSavedReconnectAfterFailure("Reconnect temporarily unavailable, please retry"), true);
+});
+
+test("transient non-reconnect failure does not clear saved reconnect", () => {
+  assert.equal(shouldClearSavedReconnectAfterFailure("Network offline"), false);
 });
