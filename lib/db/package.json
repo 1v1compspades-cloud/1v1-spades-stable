@@ -11,7 +11,8 @@
   },
   "scripts": {
     "push": "drizzle-kit push --config ./drizzle.config.ts",
-    "push-force": "drizzle-kit push --force --config ./drizzle.config.ts"
+    "push-force": "drizzle-kit push --force --config ./drizzle.config.ts",
+    "verify:v11-schema:staging": "node ./scripts/verify-v11-schema.mjs"
   },
   "dependencies": {
     "drizzle-orm": "catalog:",
