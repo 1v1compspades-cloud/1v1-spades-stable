@@ -27,6 +27,7 @@ export interface Player {
   profileUsername?: string | null;
   accountId?: string | null;
   accountUsername?: string | null;
+  rankedIdentityValidated?: boolean;
   socketId: string;
   index: 0 | 1;
 }
@@ -812,7 +813,11 @@ export function createRoom(
   mode: "quick" | "king" = "quick",
   tournamentRef?: { code: string; matchId: string },
   hostProfileUsername?: string | null,
-  hostAccountIdentity?: { accountId: string; accountUsername: string } | null,
+  hostAccountIdentity?: {
+    accountId: string;
+    accountUsername: string;
+    validatedRanked?: boolean;
+  } | null,
   options: { matchKind?: "casual" | "ranked"; leaderboardEligible?: boolean } = {},
 ): GameState {
   let code: string;
@@ -830,6 +835,7 @@ export function createRoom(
     profileUsername: hostProfileUsername ?? null,
     accountId: hostAccountIdentity?.accountId ?? null,
     accountUsername: hostAccountIdentity?.accountUsername ?? null,
+    rankedIdentityValidated: hostAccountIdentity?.validatedRanked === true,
     socketId: hostSocketId,
     index: 0,
   };
@@ -843,7 +849,11 @@ export function joinRoom(
   playerName: string,
   socketId: string,
   profileUsername?: string | null,
-  accountIdentity?: { accountId: string; accountUsername: string } | null,
+  accountIdentity?: {
+    accountId: string;
+    accountUsername: string;
+    validatedRanked?: boolean;
+  } | null,
 ): { state: GameState; playerIndex: 0 | 1 } {
   const state = rooms.get(roomCode);
   if (!state) throw new Error("Room not found");
@@ -880,6 +890,7 @@ export function joinRoom(
     profileUsername: profileUsername ?? null,
     accountId: accountIdentity?.accountId ?? null,
     accountUsername: accountIdentity?.accountUsername ?? null,
+    rankedIdentityValidated: accountIdentity?.validatedRanked === true,
     socketId,
     index: playerIndex,
   };

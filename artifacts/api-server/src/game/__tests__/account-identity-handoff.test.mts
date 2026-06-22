@@ -11,6 +11,8 @@ test("guest create and join still work without account identity", () => {
   assert.equal(joined.state.players[1]?.name, "Guest Two");
   assert.equal(joined.state.players[0]?.accountId ?? null, null);
   assert.equal(joined.state.players[1]?.accountId ?? null, null);
+  assert.equal(joined.state.players[0]?.rankedIdentityValidated, false);
+  assert.equal(joined.state.players[1]?.rankedIdentityValidated, false);
   assert.equal(joined.state.matchKind, "casual");
   assert.equal(joined.state.leaderboardEligible, false);
 });
@@ -38,6 +40,8 @@ test("account identity attaches to seated players when provided", () => {
   assert.equal(joined.state.players[0]?.accountUsername, "HostUser");
   assert.equal(joined.state.players[1]?.accountId, "acct-guest");
   assert.equal(joined.state.players[1]?.accountUsername, "GuestUser");
+  assert.equal(joined.state.players[0]?.rankedIdentityValidated, false);
+  assert.equal(joined.state.players[1]?.rankedIdentityValidated, false);
   assert.equal(joined.state.players[0]?.profileUsername, "HostProfile");
   assert.equal(joined.state.players[1]?.profileUsername, "GuestProfile");
 });
@@ -51,7 +55,7 @@ test("ranked metadata is opt-in and does not affect seating", () => {
     "quick",
     undefined,
     "RankedHost",
-    { accountId: "acct-ranked-host", accountUsername: "RankedHost" },
+    { accountId: "acct-ranked-host", accountUsername: "RankedHost", validatedRanked: true },
     { matchKind: "ranked", leaderboardEligible: true },
   );
 
@@ -60,7 +64,7 @@ test("ranked metadata is opt-in and does not affect seating", () => {
     "Ranked Guest",
     "sock-ranked-guest",
     "RankedGuest",
-    { accountId: "acct-ranked-guest", accountUsername: "RankedGuest" },
+    { accountId: "acct-ranked-guest", accountUsername: "RankedGuest", validatedRanked: true },
   );
 
   assert.equal(joined.playerIndex, 1);
@@ -69,4 +73,6 @@ test("ranked metadata is opt-in and does not affect seating", () => {
   assert.equal(joined.state.leaderboardEligible, true);
   assert.equal(joined.state.players[0]?.accountId, "acct-ranked-host");
   assert.equal(joined.state.players[1]?.accountId, "acct-ranked-guest");
+  assert.equal(joined.state.players[0]?.rankedIdentityValidated, true);
+  assert.equal(joined.state.players[1]?.rankedIdentityValidated, true);
 });

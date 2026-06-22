@@ -414,6 +414,8 @@ test("v1.1 completed ranked normal quick match records once", async () => {
       loserAccountId: "acct-loser",
       winnerUsername: "Winner",
       loserUsername: "Loser",
+      winnerIdentityValidated: true,
+      loserIdentityValidated: true,
       finalScores: [251, 180],
       bags: [1, 0],
       roundsPlayed: 7,
@@ -433,6 +435,8 @@ test("v1.1 completed ranked normal quick match records once", async () => {
       loserAccountId: "acct-loser",
       winnerUsername: "Winner",
       loserUsername: "Loser",
+      winnerIdentityValidated: true,
+      loserIdentityValidated: true,
       finalScores: [251, 180],
       bags: [1, 0],
       roundsPlayed: 7,
@@ -451,6 +455,40 @@ test("v1.1 completed ranked normal quick match records once", async () => {
   assert.equal(db.stats.reduce((sum, row) => sum + row.gamesPlayed, 0), 2);
   assert.equal(db.stats.reduce((sum, row) => sum + row.bagsTaken, 0), 1);
   assert.equal(db.stats.reduce((sum, row) => sum + row.bagsGiven, 0), 1);
+});
+
+test("v1.1 completed ranked match rejects unvalidated account identity", async () => {
+  const db = new FakeLeaderboardDb();
+
+  const result = await recordV11CompletedMatchLeaderboardResult(
+    db,
+    {
+      roomCode: "ROOM6U",
+      mode: "quick",
+      phase: "game_over",
+      resultReason: "normal_win",
+      matchKind: "ranked",
+      leaderboardEligible: true,
+      winnerAccountId: "acct-winner",
+      loserAccountId: "acct-loser",
+      winnerUsername: "Winner",
+      loserUsername: "Loser",
+      winnerIdentityValidated: false,
+      loserIdentityValidated: true,
+      finalScores: [251, 180],
+      bags: [1, 0],
+      roundsPlayed: 7,
+    },
+    { enabled: true },
+  );
+
+  assert.deepEqual(result, {
+    recorded: false,
+    skipped: "missing_account_identity",
+    seasonKey: DEFAULT_V11_LEADERBOARD_SEASON,
+  });
+  assert.equal(db.results.length, 0);
+  assert.equal(db.stats.length, 0);
 });
 
 test("v1.1 completed casual account match writes nothing", async () => {

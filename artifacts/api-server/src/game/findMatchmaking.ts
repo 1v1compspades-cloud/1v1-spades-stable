@@ -19,6 +19,7 @@ export type FindMatchPlayer<TSocket extends FindMatchSocketLike = FindMatchSocke
   profileUsername: string | null;
   accountId?: string | null;
   accountUsername?: string | null;
+  rankedIdentityValidated?: boolean;
 };
 
 export type FindMatchMatchedPayload = {
@@ -90,7 +91,11 @@ export class FindMatchQueue<TSocket extends FindMatchSocketLike = FindMatchSocke
 
     if (
       this.requireAccountIdentity &&
-      (!player.accountId?.trim() || !player.accountUsername?.trim())
+      (
+        !player.accountId?.trim() ||
+        !player.accountUsername?.trim() ||
+        player.rankedIdentityValidated !== true
+      )
     ) {
       this.emitError(player.socket, "account_required", "Account is required for ranked matches.");
       return;

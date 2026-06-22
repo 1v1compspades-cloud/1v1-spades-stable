@@ -70,6 +70,8 @@ export type V11CompletedMatchLeaderboardInput = {
   loserAccountId?: unknown;
   winnerUsername?: unknown;
   loserUsername?: unknown;
+  winnerIdentityValidated?: unknown;
+  loserIdentityValidated?: unknown;
   finalScores?: unknown;
   bags?: unknown;
   roundsPlayed?: unknown;
@@ -351,6 +353,13 @@ export async function recordV11CompletedMatchLeaderboardResult(
     input.resultReason !== "normal_win"
   ) {
     return { recorded: false, skipped: "ineligible_match", seasonKey };
+  }
+
+  if (
+    input.winnerIdentityValidated !== true ||
+    input.loserIdentityValidated !== true
+  ) {
+    return { recorded: false, skipped: "missing_account_identity", seasonKey };
   }
 
   const finalScores = readScorePair(input.finalScores);

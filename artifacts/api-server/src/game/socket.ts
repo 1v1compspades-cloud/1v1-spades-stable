@@ -6,6 +6,8 @@ import { logger } from "../lib/logger.js";
 import { isV11FlagEnabled } from "../lib/v11-flags.js";
 import {
   normalizeV11AccountIdentity,
+  validateV11RankedAccountIdentity,
+  V11AccountIdentityError,
   type V11AccountIdentity,
 } from "../lib/v11-account-identity.js";
 import { recordV11CompletedMatchLeaderboardResult } from "../lib/v11-leaderboards.js";
@@ -518,21 +520,24 @@ function winnerSeatForCompletedMatch(state: GameState): 0 | 1 | null {
 function playerAccountIdentity(player: GameState["players"][number]): {
   accountId: string | null;
   username: string | null;
+  validated: boolean;
 } {
-  if (!player) return { accountId: null, username: null };
+  if (!player) return { accountId: null, username: null, validated: false };
   const candidate = player as typeof player & {
     accountId?: unknown;
     accountUsername?: unknown;
+    rankedIdentityValidated?: unknown;
   };
+  const validated = candidate.rankedIdentityValidated === true;
   const accountId =
-    typeof candidate.accountId === "string" && candidate.accountId.trim()
+    validated && typeof candidate.accountId === "string" && candidate.accountId.trim()
       ? candidate.accountId.trim()
       : null;
   const username =
-    typeof candidate.accountUsername === "string" && candidate.accountUsername.trim()
+    validated && typeof candidate.accountUsername === "string" && candidate.accountUsername.trim()
       ? candidate.accountUsername.trim()
-      : player.profileUsername ?? null;
-  return { accountId, username };
+      : null;
+  return { accountId, username, validated };
 }
 
 function recordCompletedMatchForLeaderboard(
@@ -558,6 +563,8 @@ function recordCompletedMatchForLeaderboard(
       loserAccountId: loser.accountId,
       winnerUsername: winner.username,
       loserUsername: loser.username,
+      winnerIdentityValidated: winner.validated,
+      loserIdentityValidated: loser.validated,
       finalScores: [state.scores[winnerSeat], state.scores[loserSeat]],
       bags: [state.bags[winnerSeat], state.bags[loserSeat]],
       roundsPlayed: state.roundHistory.length,
@@ -1710,6 +1717,7 @@ async function createFindMatchRoom(
     profileUsername: string | null;
     accountId?: string | null;
     accountUsername?: string | null;
+    rankedIdentityValidated?: boolean;
   },
   second: {
     socket: Socket;
@@ -1717,11 +1725,25 @@ async function createFindMatchRoom(
     profileUsername: string | null;
     accountId?: string | null;
     accountUsername?: string | null;
+    rankedIdentityValidated?: boolean;
   },
   options: { ranked?: boolean } = {},
 ): Promise<[FindMatchMatchedPayload, FindMatchMatchedPayload]> {
   if (getAllRooms().length >= MAX_TOTAL_ROOMS) {
     throw new Error("Server is at capacity. Please try again later.");
+  }
+  if (
+    options.ranked === true &&
+    (
+      first.rankedIdentityValidated !== true ||
+      second.rankedIdentityValidated !== true ||
+      !first.accountId ||
+      !first.accountUsername ||
+      !second.accountId ||
+      !second.accountUsername
+    )
+  ) {
+    throw new Error("Validated ranked account is required.");
   }
 
   const state = createRoom(
@@ -1733,7 +1755,11 @@ async function createFindMatchRoom(
     undefined,
     first.profileUsername,
     first.accountId && first.accountUsername
-      ? { accountId: first.accountId, accountUsername: first.accountUsername }
+      ? {
+          accountId: first.accountId,
+          accountUsername: first.accountUsername,
+          validatedRanked: options.ranked === true && first.rankedIdentityValidated === true,
+        }
       : null,
     options.ranked
       ? { matchKind: "ranked", leaderboardEligible: true }
@@ -1779,7 +1805,11 @@ async function createFindMatchRoom(
         second.socket.id,
         second.profileUsername,
         second.accountId && second.accountUsername
-          ? { accountId: second.accountId, accountUsername: second.accountUsername }
+          ? {
+              accountId: second.accountId,
+              accountUsername: second.accountUsername,
+              validatedRanked: options.ranked === true && second.rankedIdentityValidated === true,
+            }
           : null,
       );
       joinResult = result;
@@ -1979,7 +2009,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
       findMatchQueue.cancel(socket);
     });
 
-    socket.on("ranked_match_join", (data: {
+    socket.on("ranked_match_join", async (data: {
       playerName?: string;
       profileUsername?: string;
       accountId?: string;
@@ -2002,14 +2032,55 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
 
       const playerName = normalizeFindMatchPlayerName(data.playerName);
       const profileUsername = normalizeProfileUsername(data.profileUsername);
-      const accountIdentity = normalizeAccountIdentity(data);
-      void rankedMatchQueue.join({
-        socket,
-        playerName,
-        profileUsername,
-        accountId: accountIdentity?.accountId ?? null,
-        accountUsername: accountIdentity?.accountUsername ?? null,
-      });
+      if (
+        !isV11FlagEnabled("V11_MATCHMAKING_ENABLED") ||
+        !isV11FlagEnabled("V11_ACCOUNTS_ENABLED") ||
+        !isV11FlagEnabled("V11_LEADERBOARDS_ENABLED")
+      ) {
+        void rankedMatchQueue.join({
+          socket,
+          playerName,
+          profileUsername,
+          accountId: null,
+          accountUsername: null,
+          rankedIdentityValidated: false,
+        });
+        return;
+      }
+
+      try {
+        const accountIdentity = await validateV11RankedAccountIdentity(
+          db,
+          data,
+          true,
+        );
+        void rankedMatchQueue.join({
+          socket,
+          playerName,
+          profileUsername: accountIdentity.accountUsername,
+          accountId: accountIdentity.accountId,
+          accountUsername: accountIdentity.accountUsername,
+          rankedIdentityValidated: true,
+        });
+      } catch (err) {
+        if (!(err instanceof V11AccountIdentityError)) {
+          logger.warn(
+            {
+              err,
+              socketId: socket.id,
+              hasAccountId: typeof data.accountId === "string" && data.accountId.trim().length > 0,
+            },
+            "Ranked account identity validation failed unexpectedly",
+          );
+        }
+        socket.emit("ranked_match_error", {
+          code: err instanceof V11AccountIdentityError ? err.code : "account_required",
+          message:
+            err instanceof V11AccountIdentityError
+              ? err.message
+              : "Could not validate ranked account.",
+        });
+      }
     });
 
     socket.on("ranked_match_cancel", () => {

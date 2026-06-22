@@ -161,6 +161,33 @@ async function testRankedQueueRequiresAccountIdentity() {
   ok("ranked missing account does not wait", queue.getWaitingCount() === 0, queue.getWaitingCount());
 }
 
+async function testRankedQueueRejectsUnvalidatedAccountIdentity() {
+  const socket = new FakeSocket("s-ranked-unvalidated-account");
+  const queue = new FindMatchQueue<FakeSocket>({
+    isEnabled: () => true,
+    requireAccountIdentity: true,
+    events: {
+      waiting: "ranked_match_waiting",
+      matched: "ranked_match_matched",
+      cancelled: "ranked_match_cancelled",
+      error: "ranked_match_error",
+    },
+    timeoutMs: () => 1_000,
+    matchPlayers: async () => [matched("RANKED", 0), matched("RANKED", 1)],
+  });
+
+  await queue.join({
+    socket,
+    playerName: "Ranked One",
+    profileUsername: null,
+    accountId: "acct-r1",
+    accountUsername: "RankOne",
+  });
+  const payload = last(socket, "ranked_match_error") as { code?: string } | undefined;
+  ok("ranked queue rejects unvalidated account identity", payload?.code === "account_required", payload);
+  ok("ranked unvalidated account does not wait", queue.getWaitingCount() === 0, queue.getWaitingCount());
+}
+
 async function testRankedQueueUsesRankedEvents() {
   const first = new FakeSocket("s-ranked-first");
   const second = new FakeSocket("s-ranked-second");
@@ -187,6 +214,7 @@ async function testRankedQueueUsesRankedEvents() {
     profileUsername: null,
     accountId: "acct-r1",
     accountUsername: "RankOne",
+    rankedIdentityValidated: true,
   });
   await queue.join({
     socket: second,
@@ -194,6 +222,7 @@ async function testRankedQueueUsesRankedEvents() {
     profileUsername: null,
     accountId: "acct-r2",
     accountUsername: "RankTwo",
+    rankedIdentityValidated: true,
   });
 
   ok("ranked first waits on ranked event", !!last(first, "ranked_match_waiting"));
@@ -265,6 +294,7 @@ async function main() {
   await testSecondPlayerMatches();
   await testAccountIdentityCarriesThroughMatchCallback();
   await testRankedQueueRequiresAccountIdentity();
+  await testRankedQueueRejectsUnvalidatedAccountIdentity();
   await testRankedQueueUsesRankedEvents();
   await testCancelClearsQueue();
   await testDisconnectClearsQueue();
