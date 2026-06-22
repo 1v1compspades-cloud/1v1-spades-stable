@@ -77,6 +77,9 @@ export default function Lobby() {
   const [accountPanelOpen, setAccountPanelOpen] = useState(false);
   const [recoveryEmailInput, setRecoveryEmailInput] = useState("");
   const [recoveryCodeInput, setRecoveryCodeInput] = useState("");
+  const [recoveryEnabledAccountId, setRecoveryEnabledAccountId] = useState(() =>
+    localStorage.getItem("spades_v11_recovery_enabled_account_id") || "",
+  );
   const [joinCodeInput, setJoinCodeInput] = useState(initialParams.code);
   const [matchTarget, setMatchTarget] = useState<250 | 500>(250);
   const [tournamentSize, setTournamentSize] = useState<4 | 8 | 16 | 32>(4);
@@ -112,6 +115,9 @@ export default function Lobby() {
   const [adminKeyInput, setAdminKeyInput] = useState("");
   const [adminUnlocking, setAdminUnlocking] = useState(false);
   const hasRankedAccount = !!accountId.trim() && !!accountUsername.trim();
+  const hasAccountIdentity = !!accountId.trim();
+  const recoveryEnabled =
+    hasAccountIdentity && recoveryEnabledAccountId === accountId.trim();
   const savedRoomCode = storedRoomCode.toUpperCase().trim();
   const getSavedPlayerSession = (code: string): { seat: 0 | 1; token: string } | null => {
     const normalized = code.toUpperCase().trim();
@@ -638,6 +644,8 @@ export default function Lobby() {
         throw new Error(body?.message || "Could not create account.");
       }
       saveAccountIdentity(body.account.id, "");
+      setRecoveryEnabledAccountId("");
+      localStorage.removeItem("spades_v11_recovery_enabled_account_id");
       setAccountUsernameInput("");
       setAccountStatus("Account created. Claim a username next.");
     } catch (err) {
@@ -677,6 +685,7 @@ export default function Lobby() {
       saveAccountIdentity(id, body.username.displayUsername);
       saveProfileUsername(body.username.displayUsername);
       setProfileInput(body.username.displayUsername);
+      setAccountPanelOpen(false);
       setAccountStatus(`Using account username ${body.username.displayUsername}.`);
     } catch (err) {
       toast({
@@ -737,6 +746,13 @@ export default function Lobby() {
       setAccountStatus("Recovered account. Claim a username to play ranked.");
     }
     return { accountId: recoveredAccountId, accountUsername: recoveredUsername };
+  };
+
+  const markRecoveryEnabled = (recoveredAccountId: string): void => {
+    const id = recoveredAccountId.trim();
+    if (!id) return;
+    setRecoveryEnabledAccountId(id);
+    localStorage.setItem("spades_v11_recovery_enabled_account_id", id);
   };
 
   const handleStartRecovery = async (purpose: "attach_email" | "recover_profile"): Promise<void> => {
@@ -818,7 +834,10 @@ export default function Lobby() {
       if (!res.ok || !body?.profile?.accountId) {
         throw new Error(body?.message || "Could not verify recovery code.");
       }
-      saveRecoveredProfile(body.profile, { requireUsername: purpose === "recover_profile" });
+      const recoveredProfile = saveRecoveredProfile(body.profile, {
+        requireUsername: purpose === "recover_profile",
+      });
+      markRecoveryEnabled(recoveredProfile.accountId);
       setRecoveryCodeInput("");
       setAccountStatus(
         purpose === "attach_email"
@@ -837,6 +856,8 @@ export default function Lobby() {
 
   const handleClearRankedProfileDevice = (): void => {
     clearAccountIdentity();
+    setRecoveryEnabledAccountId("");
+    localStorage.removeItem("spades_v11_recovery_enabled_account_id");
     setAccountUsernameInput("");
     setAccountStatus("Account identity cleared from this device.");
   };
@@ -853,11 +874,15 @@ export default function Lobby() {
   const onlineCountLabel = onlineCounts?.onlineCount ?? 0;
   const findingMatchCountLabel = onlineCounts?.findingMatchCount ?? 0;
   const accountSummary = hasRankedAccount
-    ? `Ranked profile ready: ${accountUsername}`
-    : accountId
-    ? "Account created. Claim a username to play ranked."
-    : "Create a username to play ranked matches.";
-  const accountPanelTitle = hasRankedAccount ? "Account" : "Account setup";
+    ? accountUsername
+    : hasAccountIdentity
+    ? "Account created. Claim a username to unlock ranked matches."
+    : "Guest play is open. Ranked matches require a username.";
+  const accountPanelTitle = hasRankedAccount
+    ? "Ranked Profile Ready"
+    : hasAccountIdentity
+    ? "Finish Ranked Profile"
+    : "Create an account to play ranked";
 
   return (
     <div className="spades-screen min-h-[100dvh] flex items-start justify-center p-3 sm:p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
@@ -928,41 +953,60 @@ export default function Lobby() {
                   <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
                     {accountPanelTitle}
                   </p>
-                  <p className="mt-1 truncate text-sm font-semibold text-foreground">
+                  <p className="mt-1 truncate text-base font-semibold text-foreground">
                     {accountSummary}
                   </p>
+                  {hasRankedAccount && recoveryEnabled && (
+                    <p className="mt-1 text-xs font-semibold text-emerald-200">
+                      Recovery enabled
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setAccountPanelOpen((open) => !open)}
-                    data-testid="button-v11-account-manage"
-                  >
-                    {accountPanelOpen ? "Close" : hasRankedAccount ? "Manage" : "Set Up"}
-                  </Button>
-                  {v11WebFlags.accountRecovery && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setAccountPanelOpen(true)}
-                    >
-                      Recovery
-                    </Button>
-                  )}
-                  {accountId && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleClearRankedProfileDevice}
-                      disabled={accountBusy}
-                      data-testid="button-v11-clear-account"
-                    >
-                      Clear Device
-                    </Button>
+                  {hasRankedAccount || hasAccountIdentity ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setAccountPanelOpen((open) => !open)}
+                        data-testid="button-v11-account-manage"
+                      >
+                        {accountPanelOpen ? "Close" : "Manage Account"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleClearRankedProfileDevice}
+                        disabled={accountBusy}
+                        data-testid="button-v11-clear-account"
+                      >
+                        Clear Device
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setAccountPanelOpen(true)}
+                        data-testid="button-v11-account-manage"
+                      >
+                        Create Account
+                      </Button>
+                      {v11WebFlags.accountRecovery && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setAccountPanelOpen(true)}
+                        >
+                          Recovery
+                        </Button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -975,99 +1019,120 @@ export default function Lobby() {
 
               {accountPanelOpen && (
                 <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1fr]">
-                  <div className="space-y-3 rounded-md border border-border/40 bg-black/20 p-3">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                      Ranked Profile
-                    </p>
-                    {v11WebFlags.usernames && (
-                      <div className="space-y-2">
-                        <Label htmlFor="profile-username">Ranked Username</Label>
-                        <Input
-                          id="profile-username"
-                          placeholder="Choose a username"
-                          value={profileInput}
-                          onChange={(e) => setProfileInput(e.target.value.slice(0, 32))}
-                          className="text-lg py-5"
-                          data-testid="input-profile-username"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Guest play still works without a ranked username.
+                  {!hasRankedAccount && (
+                    <div className="space-y-3 rounded-md border border-border/40 bg-black/20 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                        Ranked Profile
+                      </p>
+                      {v11WebFlags.usernames && !hasAccountIdentity && (
+                        <div className="space-y-2">
+                          <Label htmlFor="profile-username">Ranked Username</Label>
+                          <Input
+                            id="profile-username"
+                            placeholder="Choose a username"
+                            value={profileInput}
+                            onChange={(e) => setProfileInput(e.target.value.slice(0, 32))}
+                            className="text-lg py-5"
+                            data-testid="input-profile-username"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Guest play still works without a ranked username.
+                          </p>
+                        </div>
+                      )}
+
+                      {v11WebFlags.accounts && (
+                        <>
+                          {!hasAccountIdentity && (
+                            <div className="space-y-2">
+                              <Label htmlFor="account-display-name" className="text-xs">Display name</Label>
+                              <Input
+                                id="account-display-name"
+                                value={accountDisplayNameInput}
+                                onChange={(e) => setAccountDisplayNameInput(e.target.value.slice(0, 32))}
+                                placeholder="Account display name"
+                                disabled={accountBusy}
+                                data-testid="input-v11-account-display-name"
+                              />
+                            </div>
+                          )}
+                          {hasAccountIdentity && (
+                            <div className="space-y-2">
+                              <Label htmlFor="account-username" className="text-xs">Username</Label>
+                              <Input
+                                id="account-username"
+                                value={accountUsernameInput}
+                                onChange={(e) => setAccountUsernameInput(e.target.value.slice(0, 20))}
+                                placeholder="username"
+                                disabled={accountBusy}
+                                data-testid="input-v11-account-username"
+                              />
+                            </div>
+                          )}
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            {!hasAccountIdentity && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => void handleCreateAccount()}
+                                disabled={accountBusy || !accountDisplayNameInput.trim()}
+                                data-testid="button-v11-create-account"
+                              >
+                                Create Account
+                              </Button>
+                            )}
+                            {hasAccountIdentity && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => void handleClaimUsername()}
+                                disabled={accountBusy || !accountUsernameInput.trim()}
+                                data-testid="button-v11-claim-username"
+                              >
+                                Claim Username
+                              </Button>
+                            )}
+                          </div>
+                          {hasAccountIdentity && (
+                            <div className="rounded-md border border-primary/25 bg-primary/10 px-2 py-1.5 text-xs text-primary">
+                              Account created. Claim a username to play ranked.
+                            </div>
+                          )}
+                          {accountStatus && (
+                            <p className="text-xs text-muted-foreground" data-testid="v11-account-status">
+                              {accountStatus}
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {hasRankedAccount && (
+                    <div className="space-y-3 rounded-md border border-emerald-500/25 bg-emerald-500/10 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-widest text-emerald-100">
+                        Ranked Profile
+                      </p>
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                          Username
+                        </p>
+                        <p className="text-base font-semibold text-emerald-100">
+                          {accountUsername}
                         </p>
                       </div>
-                    )}
-
-                    {v11WebFlags.accounts && (
-                      <>
-                        <div className="space-y-2">
-                          <Label htmlFor="account-display-name" className="text-xs">Display name</Label>
-                          <Input
-                            id="account-display-name"
-                            value={accountDisplayNameInput}
-                            onChange={(e) => setAccountDisplayNameInput(e.target.value.slice(0, 32))}
-                            placeholder="Account display name"
-                            disabled={accountBusy}
-                            data-testid="input-v11-account-display-name"
-                          />
-                        </div>
-                        <div className={`grid gap-2 ${hasRankedAccount ? "" : "sm:grid-cols-2"}`}>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => void handleCreateAccount()}
-                            disabled={accountBusy || !accountDisplayNameInput.trim()}
-                            data-testid="button-v11-create-account"
-                          >
-                            {accountId ? "Create New Account" : "Create Account"}
-                          </Button>
-                          {!hasRankedAccount && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => void handleClaimUsername()}
-                              disabled={accountBusy || !accountId || !accountUsernameInput.trim()}
-                              data-testid="button-v11-claim-username"
-                            >
-                              Claim Username
-                            </Button>
-                          )}
-                        </div>
-                        {hasRankedAccount ? (
-                          <div className="space-y-1">
-                            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                              Username
-                            </p>
-                            <p className="rounded-md border border-emerald-500/25 bg-emerald-500/10 px-2 py-1.5 text-sm text-emerald-100">
-                              {accountUsername}
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <Label htmlFor="account-username" className="text-xs">Username</Label>
-                            <Input
-                              id="account-username"
-                              value={accountUsernameInput}
-                              onChange={(e) => setAccountUsernameInput(e.target.value.slice(0, 20))}
-                              placeholder="username"
-                              disabled={accountBusy || !accountId}
-                              data-testid="input-v11-account-username"
-                            />
-                          </div>
-                        )}
-                        {accountId && (
-                          <div className="rounded-md border border-emerald-500/25 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-100">
-                            {accountUsername
-                              ? `Ranked profile ready: ${accountUsername}`
-                              : "Account created. Claim a username to play ranked."}
-                          </div>
-                        )}
-                        {accountStatus && (
-                          <p className="text-xs text-muted-foreground" data-testid="v11-account-status">
-                            {accountStatus}
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </div>
+                      {recoveryEnabled && (
+                        <p className="rounded-md border border-emerald-500/25 bg-black/20 px-2 py-1.5 text-xs text-emerald-100">
+                          Recovery enabled
+                        </p>
+                      )}
+                      {accountStatus && (
+                        <p className="text-xs text-emerald-100/80" data-testid="v11-account-status">
+                          {accountStatus}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {v11WebFlags.accountRecovery && (
                     <div className="space-y-2 rounded-md border border-border/40 bg-black/20 p-3">
@@ -1090,7 +1155,7 @@ export default function Lobby() {
                         disabled={accountBusy}
                         data-testid="input-v11-recovery-code"
                       />
-                      {accountId ? (
+                      {hasAccountIdentity ? (
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                           <Button
                             type="button"
