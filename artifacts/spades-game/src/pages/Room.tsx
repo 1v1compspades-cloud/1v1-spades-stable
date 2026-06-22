@@ -1210,7 +1210,7 @@ export default function Room() {
           // relative + z-[110] keeps the score row above the bidding modal
           // backdrop (z-[100]) so the bottom-player score stays visible while
           // bidding. The modal itself stays centered between the two rows.
-          "spades-seat-bar relative z-[110] flex w-full max-w-full min-w-0 flex-col items-stretch gap-1 px-2 sm:flex-row sm:items-center sm:justify-between sm:gap-2 sm:px-4 py-1.5 sm:py-3 border-y backdrop-blur-sm transition-shadow overflow-hidden",
+          "spades-seat-bar relative z-[110] flex w-full max-w-full min-w-0 shrink-0 flex-col items-stretch gap-1 px-2 sm:flex-row sm:items-center sm:justify-between sm:gap-2 sm:px-4 py-1.5 sm:py-3 border-y backdrop-blur-sm transition-shadow overflow-visible",
           isActive
             ? "border-primary/60 shadow-[inset_0_0_0_1px_hsla(35,90%,55%,0.5),0_0_12px_-2px_hsla(35,90%,55%,0.35)]"
             : "border-border",
@@ -1266,14 +1266,14 @@ export default function Room() {
         </div>
 
         {gameState.phase !== "waiting" && (
-          <div className="flex shrink-0 justify-end gap-2 sm:gap-5 text-right">
+          <div className="flex shrink-0 justify-end gap-2 text-right leading-none sm:gap-5">
             <div className="flex min-w-[2.65rem] sm:min-w-[3rem] flex-col items-center">
-              <span className="text-muted-foreground text-[9px] sm:text-[10px] uppercase tracking-wider">Bid</span>
-              <span className="text-base sm:text-xl font-bold font-mono">{bid !== null ? bid : "—"}</span>
+              <span className="text-muted-foreground text-[9px] sm:text-[10px] uppercase tracking-wider leading-none">Bid</span>
+              <span className="text-base sm:text-xl font-bold font-mono leading-none mt-0.5">{bid !== null ? bid : "—"}</span>
             </div>
             <div className="flex min-w-[2.65rem] sm:min-w-[3rem] flex-col items-center">
-              <span className="text-muted-foreground text-[9px] sm:text-[10px] uppercase tracking-wider">Tricks</span>
-              <span className={`text-base sm:text-xl font-bold font-mono ${bid !== null && tricks > bid ? "text-yellow-400" : tricks === bid && bid !== null ? "text-green-400" : ""}`}>
+              <span className="text-muted-foreground text-[9px] sm:text-[10px] uppercase tracking-wider leading-none">Tricks</span>
+              <span className={`text-base sm:text-xl font-bold font-mono leading-none mt-0.5 ${bid !== null && tricks > bid ? "text-yellow-400" : tricks === bid && bid !== null ? "text-green-400" : ""}`}>
                 {tricks}
               </span>
             </div>
