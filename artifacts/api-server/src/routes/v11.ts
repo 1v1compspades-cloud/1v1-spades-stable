@@ -13,8 +13,8 @@ import {
   startV11AccountRecovery,
   verifyV11AccountRecovery,
   V11RecoveryError,
-  type RecoveryEmailSender,
 } from "../lib/v11-account-recovery.js";
+import { createV11RecoveryEmailSender } from "../lib/v11-recovery-email.js";
 import {
   DEFAULT_V11_LEADERBOARD_SEASON,
   listV11Leaderboard,
@@ -191,34 +191,7 @@ function recoverySecret(): string {
   return "local-dev-only-account-recovery-secret";
 }
 
-function canLogRecoveryCode(): boolean {
-  const env = process.env.NODE_ENV;
-  const appEnv = process.env.APP_ENV || process.env.RENDER_SERVICE_NAME || "";
-  return env !== "production" || /staging|dev|preview/i.test(appEnv);
-}
-
-const logOnlyRecoverySender: RecoveryEmailSender = (message) => {
-  if (!canLogRecoveryCode()) {
-    logger.warn(
-      {
-        purpose: message.purpose,
-        accountAttached: Boolean(message.accountId),
-      },
-      "v1.1 account recovery email sender is not configured",
-    );
-    return;
-  }
-
-  logger.info(
-    {
-      purpose: message.purpose,
-      code: message.code,
-      accountAttached: Boolean(message.accountId),
-      expiresAt: message.expiresAt.toISOString(),
-    },
-    "v1.1 account recovery code (staging/dev only)",
-  );
-};
+const recoveryEmailSender = createV11RecoveryEmailSender();
 
 router.get("/accounts/status", (_req, res) => {
   if (!accountFeatureEnabled(res, "accounts")) return;
@@ -281,7 +254,7 @@ router.post("/accounts/recovery/start", async (req, res) => {
       },
       {
         secret: recoverySecret(),
-        sender: logOnlyRecoverySender,
+        sender: recoveryEmailSender,
       },
     );
     res.status(200).json({ ok: true, expiresAt: result.expiresAt });
@@ -323,7 +296,7 @@ router.post("/accounts/recovery/attach-email", async (req, res) => {
       },
       {
         secret: recoverySecret(),
-        sender: logOnlyRecoverySender,
+        sender: recoveryEmailSender,
       },
     );
     res.status(200).json({ ok: true, expiresAt: result.expiresAt });
