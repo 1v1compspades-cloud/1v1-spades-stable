@@ -216,6 +216,18 @@ test("v1.1 leaderboard list returns public account-safe rows", async () => {
     Object.prototype.hasOwnProperty.call(entries[0], "accountId"),
     false,
   );
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(entries[0], "normalizedUsername"),
+    false,
+  );
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(entries[0], "displayUsername"),
+    false,
+  );
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(entries[0], "emailHash"),
+    false,
+  );
 });
 
 test("v1.1 leaderboard list filters season and applies limit", async () => {
