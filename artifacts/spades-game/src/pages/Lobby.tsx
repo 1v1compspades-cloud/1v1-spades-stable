@@ -1032,6 +1032,9 @@ export default function Lobby() {
               <p className="mt-2 text-xs text-muted-foreground">
                 Create a username to play ranked matches.
               </p>
+              <p className="mt-1 text-xs text-muted-foreground" data-testid="v11-recovery-flag-diagnostic">
+                {v11WebFlags.accountRecovery ? "Recovery enabled" : "Recovery disabled"}
+              </p>
               {accountPanelOpen && <div className="mt-3 space-y-4">
                 {v11WebFlags.usernames && (
                   <div className="space-y-2">
