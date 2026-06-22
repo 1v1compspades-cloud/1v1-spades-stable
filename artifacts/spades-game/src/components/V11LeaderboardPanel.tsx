@@ -13,6 +13,7 @@ export function V11LeaderboardPanel() {
   const [data, setData] = useState<V11LeaderboardResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     if (!v11WebFlags.leaderboards) return;
@@ -52,24 +53,38 @@ export function V11LeaderboardPanel() {
   );
 
   if (state.kind === "hidden") return null;
+  const visibleEntries = state.kind === "entries"
+    ? state.entries.slice(0, expanded ? 10 : 3)
+    : [];
 
   return (
     <section
-      className="space-y-2 rounded-md border border-border/50 bg-white/[0.03] p-2.5"
+      className="space-y-2 rounded-md border border-primary/30 bg-white/[0.03] p-3"
       data-testid="v11-leaderboard-panel"
     >
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-widest text-primary">
-            Ranked Leaderboard
+            Top Players
           </h2>
           <p className="text-[11px] text-muted-foreground">
             Season: {state.kind === "loading" || state.kind === "error" ? "v1_1_beta" : state.seasonKey}
           </p>
         </div>
-        <span className="rounded border border-primary/30 px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-primary">
-          Top 10
-        </span>
+        {state.kind === "entries" && state.entries.length > 3 ? (
+          <button
+            type="button"
+            onClick={() => setExpanded((open) => !open)}
+            className="rounded border border-primary/30 px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-primary hover:bg-primary/10"
+            data-testid="button-v11-leaderboard-top10"
+          >
+            {expanded ? "Top 3" : "Top 10"}
+          </button>
+        ) : (
+          <span className="rounded border border-primary/30 px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-primary">
+            Top 3
+          </span>
+        )}
       </div>
 
       {state.kind === "loading" && (
@@ -92,7 +107,7 @@ export function V11LeaderboardPanel() {
 
       {state.kind === "entries" && (
         <ol className="space-y-1.5" data-testid="v11-leaderboard-list">
-          {state.entries.map((entry) => (
+          {visibleEntries.map((entry) => (
             <li
               key={`${entry.rank}-${entry.username}`}
               className="rounded-md border border-border/40 bg-black/20 px-2.5 py-1.5"
