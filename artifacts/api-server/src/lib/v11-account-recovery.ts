@@ -52,6 +52,9 @@ export type RecoveryDiagnosticStep =
   | "lookup_account"
   | "create_code"
   | "insert_recovery_code"
+  | "verify_lookup"
+  | "verify_code_compare"
+  | "verify_success"
   | "success";
 
 export type RecoveryDiagnosticLogger = (details: {
@@ -250,7 +253,11 @@ async function verifyRecoveryCode(
     purpose: V11RecoveryPurpose;
     accountId?: unknown;
   },
-  options: { secret: string; now?: Date },
+  options: {
+    secret: string;
+    now?: Date;
+    diagnostics?: RecoveryDiagnosticLogger;
+  },
 ): Promise<{
   row: V11AccountRecoveryCodeRow;
   emailHash: string;
@@ -264,7 +271,13 @@ async function verifyRecoveryCode(
       : null;
   const code = assertRecoveryCode(input.code);
   const now = options.now ?? new Date();
+  const hasAccountId = Boolean(accountId);
 
+  options.diagnostics?.({
+    step: "verify_lookup",
+    purpose: input.purpose,
+    hasAccountId,
+  });
   const rows = (await db
     .select()
     .from(v11AccountRecoveryCodesTable)
@@ -299,6 +312,11 @@ async function verifyRecoveryCode(
     throw new V11RecoveryError("too_many_attempts", "Too many recovery attempts.");
   }
 
+  options.diagnostics?.({
+    step: "verify_code_compare",
+    purpose: input.purpose,
+    hasAccountId,
+  });
   const expected = hashRecoveryCode(
     emailHash,
     code,
@@ -315,6 +333,11 @@ async function verifyRecoveryCode(
     throw new V11RecoveryError("invalid_code", "Recovery code is invalid.");
   }
 
+  options.diagnostics?.({
+    step: "verify_success",
+    purpose: input.purpose,
+    hasAccountId,
+  });
   return { row, emailHash, now };
 }
 
@@ -325,7 +348,11 @@ export async function confirmV11RecoveryEmailAttach(
     email: unknown;
     code: unknown;
   },
-  options: { secret: string; now?: Date },
+  options: {
+    secret: string;
+    now?: Date;
+    diagnostics?: RecoveryDiagnosticLogger;
+  },
 ): Promise<RecoveredRankedProfile> {
   if (typeof input.accountId !== "string" || !input.accountId.trim()) {
     throw new V11RecoveryError("account_not_found", "Account not found.");
@@ -382,7 +409,11 @@ export async function verifyV11AccountRecovery(
     email: unknown;
     code: unknown;
   },
-  options: { secret: string; now?: Date },
+  options: {
+    secret: string;
+    now?: Date;
+    diagnostics?: RecoveryDiagnosticLogger;
+  },
 ): Promise<RecoveredRankedProfile> {
   const verified = await verifyRecoveryCode(
     db,

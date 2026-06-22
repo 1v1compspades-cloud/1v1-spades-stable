@@ -386,7 +386,10 @@ router.post("/accounts/recovery/verify", async (req, res) => {
         email: req.body?.email,
         code: req.body?.code,
       },
-      { secret: recoverySecret() },
+      {
+        secret: recoverySecret(),
+        diagnostics: recoveryDiagnostics("accounts/recovery/verify"),
+      },
     );
     res.status(200).json({ ok: true, profile });
   } catch (error) {
@@ -434,7 +437,10 @@ router.post("/accounts/recovery/confirm-attach", async (req, res) => {
         email: req.body?.email,
         code: req.body?.code,
       },
-      { secret: recoverySecret() },
+      {
+        secret: recoverySecret(),
+        diagnostics: recoveryDiagnostics("accounts/recovery/confirm-attach"),
+      },
     );
     res.status(200).json({ ok: true, profile });
   } catch (error) {
