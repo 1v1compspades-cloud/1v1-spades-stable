@@ -1,9 +1,14 @@
 import { Router, type IRouter, type Request } from "express";
 import { timingSafeEqual } from "node:crypto";
 import type { Server as SocketIOServer } from "socket.io";
+import { db } from "@workspace/db";
 import { getAllRooms } from "../game/engine.js";
 import { getAllTournaments } from "../game/tournament.js";
 import { getConnectionStats } from "../game/socket.js";
+import {
+  resetV11TestAccounts,
+  V11TestAccountResetError,
+} from "../lib/v11-test-account-reset.js";
 
 const router: IRouter = Router();
 
@@ -94,6 +99,60 @@ router.get("/stats", (req, res) => {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "unknown error";
     res.status(500).json({ error: msg });
+  }
+});
+
+function v11RecoverySecret(): string | null {
+  return (
+    process.env["V11_ACCOUNT_RECOVERY_SECRET"] ||
+    process.env["SESSION_SECRET"] ||
+    null
+  );
+}
+
+router.post("/v1.1/test-account-reset", async (req, res) => {
+  if (!isAuthorized(req)) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+
+  if (req.body?.confirm !== "RESET_STAGING_TEST_ACCOUNTS") {
+    res.status(400).json({
+      ok: false,
+      code: "confirmation_required",
+      message: "Set confirm to RESET_STAGING_TEST_ACCOUNTS.",
+    });
+    return;
+  }
+
+  try {
+    const result = await resetV11TestAccounts(
+      db,
+      {
+        accountId: req.body?.accountId,
+        displayName: req.body?.displayName,
+        email: req.body?.email,
+        keepAccountId: req.body?.keepAccountId ?? req.body?.keeperAccountId,
+      },
+      {
+        recoverySecret: v11RecoverySecret(),
+      },
+    );
+    res.status(200).json(result);
+  } catch (error) {
+    if (error instanceof V11TestAccountResetError) {
+      res.status(error.code === "not_allowed" ? 403 : 400).json({
+        ok: false,
+        code: error.code,
+        message: error.message,
+      });
+      return;
+    }
+    res.status(500).json({
+      ok: false,
+      code: "test_account_reset_error",
+      message: "Test account reset failed.",
+    });
   }
 });
 
