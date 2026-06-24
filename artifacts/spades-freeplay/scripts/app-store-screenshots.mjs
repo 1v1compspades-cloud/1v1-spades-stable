@@ -9,7 +9,7 @@ import { stdin as input, stdout as output } from "node:process";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const appJsonPath = resolve(root, "app.json");
-const defaultOutDir = resolve(root, "app-store-screenshots");
+const defaultOutDir = resolve(root, "screenshots", "app-store");
 
 const targets = [
   {
@@ -50,14 +50,61 @@ const targets = [
   },
 ];
 
-const defaultShots = [
-  "01-home",
-  "02-bidding",
-  "03-playing-trick",
-  "04-learn-deal",
-  "05-rules",
-  "06-fair-play",
+const appStoreShots = [
+  {
+    name: "01-home",
+    label: "Home screen with 1v1 Spades branding",
+    setup: "Open the home/lobby screen. Confirm the visible title says 1v1 Spades.",
+  },
+  {
+    name: "02-ranked-profile",
+    label: "Ranked profile/account ready",
+    setup: "Open the account/profile area or ranked-ready profile state. Use a local/test identity, not production-only data.",
+  },
+  {
+    name: "03-ranked-leaderboard",
+    label: "Ranked leaderboard",
+    setup: "Open the ranked leaderboard. Use local/test seeded standings if available.",
+  },
+  {
+    name: "04-create-match-settings",
+    label: "Create match / game settings",
+    setup: "Open the create match or game settings flow before creating the room.",
+  },
+  {
+    name: "05-private-room-code",
+    label: "Private match / room code flow",
+    setup: "Create or open a private room and show the room code/share flow.",
+  },
+  {
+    name: "06-coin-flip-match-start",
+    label: "Coin flip / match start",
+    setup: "Start a test match and pause on the coin flip or match-start transition.",
+  },
+  {
+    name: "07-bidding",
+    label: "Bidding screen",
+    setup: "Navigate to a bidding turn with the bid controls visible.",
+  },
+  {
+    name: "08-mid-hand-gameplay",
+    label: "Mid-hand gameplay",
+    setup: "Play into the hand until cards, current trick, turn hint, and table state are visible.",
+  },
+  {
+    name: "09-scoreboard",
+    label: "Scoreboard",
+    setup: "Open or reveal the score/round summary area after at least one completed trick or round.",
+  },
+  {
+    name: "10-victory-final-result",
+    label: "Victory/final result screen",
+    setup: "Finish or fast-forward a local/test match to the final result screen.",
+  },
 ];
+
+const defaultShots = appStoreShots.map((shot) => shot.name);
+const shotLookup = new Map(appStoreShots.map((shot) => [shot.name, shot]));
 
 function printHelp() {
   console.log(`Capture App Store screenshots for 1v1 Spades.
@@ -68,19 +115,29 @@ Usage:
 Options:
   --app <path>          Install a built .app before launching.
   --bundle-id <id>     Bundle identifier to launch. Defaults to app.json ios.bundleIdentifier.
-  --out <dir>          Output directory. Defaults to app-store-screenshots.
+  --out <dir>          Output directory. Defaults to screenshots/app-store.
   --targets <list>     Comma-separated display targets: 6.3,6.5. Defaults to both.
-  --shots <list>       Comma-separated shot names. Defaults to the App Store checklist set.
+  --shots <list>       Comma-separated shot names. Defaults to the 10-shot App Store review set.
   --open-url <url>     Open a URL after launch, useful for app schemes or hosted test URLs.
   --delay <ms>         Delay before each capture. Defaults to 1500.
   --no-prompt          Do not pause before each shot. Captures current app state in sequence.
   --skip-launch        Do not launch the app. Useful when you already have the screen ready.
+  --list-shots         Print the default App Store shot plan and exit.
   --help               Show this help.
 
 Examples:
   pnpm run appstore:screenshots -- --app ./build/Build/Products/Debug-iphonesimulator/1v1\\ Spades.app
-  pnpm run appstore:screenshots -- --targets 6.3 --shots home,rules --skip-launch
+  pnpm run appstore:screenshots -- --bundle-id org.name.1v1Spades --skip-launch
+  pnpm run appstore:screenshots -- --targets 6.3 --shots 01-home,07-bidding --skip-launch
 `);
+}
+
+function printShotPlan() {
+  console.log("Default App Store screenshot plan for 1v1 Spades:");
+  for (const shot of appStoreShots) {
+    console.log(`${shot.name}: ${shot.label}`);
+    console.log(`  Setup: ${shot.setup}`);
+  }
 }
 
 function parseArgs(argv) {
@@ -138,6 +195,10 @@ function parseArgs(argv) {
         break;
       case "--skip-launch":
         options.skipLaunch = true;
+        break;
+      case "--list-shots":
+        printShotPlan();
+        process.exit(0);
         break;
       case "--help":
       case "-h":
@@ -317,6 +378,8 @@ async function captureShot(device, target, shotName, options) {
     target: target.key,
     targetLabel: target.label,
     shot: shotName,
+    label: shotLookup.get(shotName)?.label ?? shotName,
+    setup: shotLookup.get(shotName)?.setup ?? null,
     path: filePath,
     width: size.width,
     height: size.height,
@@ -350,8 +413,12 @@ async function main() {
       installAndLaunch(device, options);
 
       for (const shot of options.shots) {
+        const shotInfo = shotLookup.get(shot);
         if (prompt) {
-          await prompt.question(`Navigate ${target.label} to "${shot}", then press Enter to capture...`);
+          const setup = shotInfo?.setup ? `\nSetup: ${shotInfo.setup}` : "";
+          await prompt.question(
+            `Navigate ${target.label} to "${shotInfo?.label ?? shot}" (${shot}).${setup}\nPress Enter to capture...`,
+          );
         }
         await sleep(options.delayMs);
         const result = await captureShot(device, target, shot, options);

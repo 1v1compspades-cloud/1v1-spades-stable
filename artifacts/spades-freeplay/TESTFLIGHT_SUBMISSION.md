@@ -68,15 +68,22 @@ Capture the **6.3"** and **6.5"** portrait sets with:
 pnpm run appstore:screenshots -- --app /path/to/1v1-spades.app
 ```
 
+The script writes to `screenshots/app-store/` by default. Run
+`pnpm run appstore:screenshots -- --list-shots` to print the current shot plan.
+
 Accepted portrait sizes are 1179×2556 or 1206×2622 for 6.3", and 1284×2778 or
 1242×2688 for 6.5". Capture these screens:
 
-1. ⬜ Home — hero card fan + Quick Match / Play a Friend
-2. ⬜ Game — bidding phase
-3. ⬜ Game — playing a trick (hand + trick + scores)
-4. ⬜ How Dealing Works — teaching animation
-5. ⬜ How to Play — rules
-6. ⬜ Fair Play
+1. ⬜ Home screen with 1v1 Spades branding
+2. ⬜ Ranked profile/account ready
+3. ⬜ Ranked leaderboard
+4. ⬜ Create match / game settings
+5. ⬜ Private match / room code flow
+6. ⬜ Coin flip / match start
+7. ⬜ Bidding screen
+8. ⬜ Mid-hand gameplay
+9. ⬜ Scoreboard
+10. ⬜ Victory/final result screen
 
 > iPad shots not needed (`ios.supportsTablet: false`).
 

@@ -74,19 +74,34 @@ Connect display classes below. Use the automation from this package:
 pnpm run appstore:screenshots -- --app /path/to/1v1-spades.app
 ```
 
+Screenshots are written to `screenshots/app-store/` by default. To see the
+current capture plan before launching a simulator, run:
+
+```sh
+pnpm run appstore:screenshots -- --list-shots
+```
+
 The script captures and validates the current Apple-accepted portrait sizes:
 
 - ⬜ 6.3" — 1179×2556 or 1206×2622
 - ⬜ 6.5" — 1284×2778 or 1242×2688
 
-Suggested shots (5–6):
+Before saving final assets, verify each screenshot visibly says `1v1 Spades`
+and does not show `Free` or `Free Play`. The shipped wrapper loads the hosted
+game, so the hosted page or screenshot build must already have the new branding.
 
-1. ⬜ Home screen (hero card fan + Quick Match / Play a Friend)
-2. ⬜ Live game — bidding phase
-3. ⬜ Live game — playing a trick (hand + current trick + scores)
-4. ⬜ "How Dealing Works" teaching animation
-5. ⬜ How to Play (rules) screen
-6. ⬜ Fair Play screen
+Target shots:
+
+1. ⬜ Home screen with 1v1 Spades branding
+2. ⬜ Ranked profile/account ready
+3. ⬜ Ranked leaderboard
+4. ⬜ Create match / game settings
+5. ⬜ Private match / room code flow
+6. ⬜ Coin flip / match start
+7. ⬜ Bidding screen
+8. ⬜ Mid-hand gameplay
+9. ⬜ Scoreboard
+10. ⬜ Victory/final result screen
 
 > iPad screenshots are **not** required — `ios.supportsTablet` is `false`.
 
