@@ -56,7 +56,7 @@ export default function Play() {
     >
       <Text style={[styles.heading, { color: colors.foreground }]}>Quick 1v1</Text>
       <Text style={[styles.body, { color: colors.mutedForeground }]}>
-        Spin up a private table and share the code with anyone for a free
+        Spin up a private table and share the code with anyone for a
         head-to-head game. Just you, an opponent, and a deck.
       </Text>
 

@@ -35,8 +35,8 @@ const STEPS: Step[] = [
   },
   {
     icon: "gift",
-    title: "Free play, always",
-    body: "Every game is free, with nothing on the line but bragging rights. No catches — just you, your opponent, and the cards.",
+    title: "Just for bragging rights",
+    body: "Every game has nothing on the line but bragging rights. No catches — just you, your opponent, and the cards.",
   },
 ];
 

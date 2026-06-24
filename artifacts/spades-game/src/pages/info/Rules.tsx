@@ -5,13 +5,13 @@ export default function Rules() {
   return (
     <>
       <Seo
-        title="Spades Free Play Rules"
-        description="Learn the rules of Spades Free Play, including bidding, nil, bags, spades breaking, scoring, and head-to-head match flow."
+        title="1v1 Spades Rules"
+        description="Learn the rules of 1v1 Spades, including bidding, nil, bags, spades breaking, scoring, and head-to-head match flow."
         path="/rules"
       />
       <InfoPageLayout
-        title="How to Play Spades Free Play"
-        intro="Spades Free Play is head-to-head Spades with no partner. Just two players, hidden hands, and a full bidding-and-tricks match. Here is how a match plays out."
+        title="How to Play 1v1 Spades"
+        intro="1v1 Spades is head-to-head Spades with no partner. Just two players, hidden hands, and a full bidding-and-tricks match. Here is how a match plays out."
       >
         <section>
           <h2>Head-to-head, no partner</h2>

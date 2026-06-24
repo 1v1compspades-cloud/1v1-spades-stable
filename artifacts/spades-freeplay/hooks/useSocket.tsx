@@ -11,11 +11,11 @@ import { io, type Socket } from "socket.io-client";
 import type { Card, GameState } from "@workspace/spades-core";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Free-play socket layer for the mobile app.
+// Mobile socket layer for the app.
 //
 // This is a deliberately SMALL subset of the proven web client hook
 // (artifacts/spades-game/src/hooks/useSocket.tsx). It speaks ONLY the existing,
-// free-play-safe server events — create/join/reconnect a 1v1 room, ready up,
+// casual-play server events — create/join/reconnect a 1v1 room, ready up,
 // start, bid, play, advance rounds/matches. It deliberately omits every
 // tournament / KotT / admin / spectator / queue event. The SERVER is the sole
 // authority for all game rules; nothing here re-implements gameplay logic.
@@ -149,7 +149,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       (resolve, reject) => {
         const s = socketRef.current;
         if (!s) return reject(new Error("Not connected"));
-        // mode "quick" = standard free 1v1 (the only mode this app uses).
+        // mode "quick" = standard 1v1 (the only mode this app uses).
         s.emit(
           "create_room",
           { playerName, mode: "quick" },

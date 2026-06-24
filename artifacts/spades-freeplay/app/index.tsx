@@ -10,7 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { WebView, type WebViewMessageEvent, type WebViewNavigation } from "react-native-webview";
+import WebView, { type WebViewMessageEvent, type WebViewNavigation } from "react-native-webview";
 import * as Haptics from "expo-haptics";
 
 const LIVE_URL = "https://1v1spades.com/";
@@ -30,7 +30,7 @@ const LOADING_HTML = `
       strong { color: #efb72a; }
     </style>
   </head>
-  <body><main><strong>Spades Free Play</strong><p>Loading...</p></main></body>
+  <body><main><strong>1v1 Spades</strong><p>Loading...</p></main></body>
 </html>
 `;
 
@@ -71,8 +71,8 @@ function hostedUrl() {
   return url.toString();
 }
 
-export default function HostedSpadesFreePlay() {
-  const webViewRef = useRef<WebView>(null);
+export default function HostedSpadesApp() {
+  const webViewRef = useRef<any>(null);
   const loadingFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const healthAbortRef = useRef<AbortController | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -160,12 +160,13 @@ export default function HostedSpadesFreePlay() {
   const webViewSource = sourceUrl
     ? { uri: sourceUrl }
     : { html: LOADING_HTML, baseUrl: LIVE_ORIGIN };
+  const TypedWebView = WebView as unknown as React.ComponentType<any>;
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" />
       <View style={styles.container}>
-        <WebView
+        <TypedWebView
           ref={webViewRef}
           source={webViewSource}
           style={styles.webView}
@@ -184,17 +185,17 @@ export default function HostedSpadesFreePlay() {
             setLoadError(null);
             setIsLoading(true);
           }}
-          onLoadProgress={(event) => {
+          onLoadProgress={(event: any) => {
             if (event.nativeEvent.progress > 0.35) {
               stopLoading();
             }
           }}
           onLoadEnd={stopLoading}
-          onError={(event) => {
+          onError={(event: any) => {
             stopLoading();
             setLoadError(event.nativeEvent?.description ?? CONNECTION_ERROR);
           }}
-          onHttpError={(event) => {
+          onHttpError={(event: any) => {
             if (event.nativeEvent?.statusCode >= 500) {
               stopLoading();
               setLoadError(`Server error ${event.nativeEvent.statusCode}`);
@@ -211,7 +212,7 @@ export default function HostedSpadesFreePlay() {
 
         {loadError ? (
           <View style={styles.errorPanel}>
-            <Text style={styles.errorTitle}>Spades Free Play</Text>
+            <Text style={styles.errorTitle}>1v1 Spades</Text>
             <Text style={styles.errorText}>{CONNECTION_ERROR}</Text>
             <Text style={styles.errorDetail}>Last load error: {loadError}</Text>
             <Pressable accessibilityRole="button" onPress={retryConnection} style={styles.retryButton}>

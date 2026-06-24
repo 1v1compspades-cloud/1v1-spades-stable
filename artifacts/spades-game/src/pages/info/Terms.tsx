@@ -7,27 +7,27 @@ export default function Terms() {
   return (
     <>
       <Seo
-        title="Terms of Service | Spades Free Play"
-        description="Terms of Service for the Spades Free Play app. A free, for-entertainment card game with no payment features or redeemable rewards."
+        title="Terms of Service | 1v1 Spades"
+        description="Terms of Service for the 1v1 Spades app. A for-entertainment card game with no payment features or redeemable rewards."
         path="/terms"
       />
       <InfoPageLayout
         title="Terms of Service"
-        intro={`Please read these Terms of Service before using the Spades Free Play app. Effective ${EFFECTIVE_DATE}.`}
+        intro={`Please read these Terms of Service before using the 1v1 Spades app. Effective ${EFFECTIVE_DATE}.`}
       >
         <section>
           <h2>Acceptance of these terms</h2>
           <p>
-            By downloading or using Spades Free Play (the "app"), you agree to
+            By downloading or using 1v1 Spades (the "app"), you agree to
             these Terms of Service. If you do not agree, please do not use the
             app.
           </p>
         </section>
 
         <section>
-          <h2>Free play only</h2>
+          <h2>Casual play only</h2>
           <p>
-            The app is provided solely for entertainment. It is free to play.
+            The app is provided solely for entertainment.
           </p>
           <ul>
             <li>No payment features or paid entry.</li>

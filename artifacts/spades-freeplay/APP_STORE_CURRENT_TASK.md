@@ -1,4 +1,4 @@
-# Spades Free Play - Current App Store Launch Task
+# 1v1 Spades - Current App Store Launch Task
 
 This file is the tracked launch task for the current App Store/TestFlight run
 through release approval. Codex guides the steps, runs checks, and updates
@@ -11,7 +11,7 @@ workspace root, to print the automated dashboard.
 
 | Field | Value |
 | --- | --- |
-| App | Spades Free Play |
+| App | 1v1 Spades |
 | Version | 1.0.0 |
 | iOS build | 24 |
 | Bundle ID | com.oneononespades.freeplay |
@@ -59,14 +59,14 @@ workspace root, to print the automated dashboard.
 
 ## App Review notes draft
 
-Spades Free Play is a free, head-to-head card game. No account, payment,
+1v1 Spades is a casual, head-to-head card game. No account, payment,
 deposit, wagering, prize, or redeemable reward features are included. To test,
 open the app, create a room, and join from another device or browser using the
 room code. Privacy, Terms, and Support pages are available at 1v1spades.com.
 
 ## Guardrails
 
-- Keep the release free play only: no accounts, no payments, no prizes, no
+- Keep the release casual play only: no accounts, no payments, no prizes, no
   gambling.
 - Codex does not submit final App Review or release the app unless explicitly
   asked by the user at that step.

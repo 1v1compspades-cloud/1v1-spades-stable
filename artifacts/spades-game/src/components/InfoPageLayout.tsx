@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "wouter";
-import { FREE_PLAY_DISCLAIMER } from "@/components/LegalFooter";
+import { CASUAL_PLAY_DISCLAIMER } from "@/components/LegalFooter";
 
 const NAV = [
   { href: "/rules", label: "Rules" },
@@ -34,7 +34,7 @@ export function InfoPageLayout({
             data-testid="link-home-brand"
           >
             <span aria-hidden className="mr-2 text-base">♠</span>
-            Spades Free Play
+            1v1 Spades
           </Link>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <nav aria-label="Info pages" className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
@@ -93,7 +93,7 @@ export function InfoPageLayout({
 
       <footer className="border-t border-border/50">
         <div className="mx-auto max-w-3xl px-5 py-6 space-y-4 text-sm text-muted-foreground">
-          <p className="text-xs leading-relaxed">{FREE_PLAY_DISCLAIMER}</p>
+          <p className="text-xs leading-relaxed">{CASUAL_PLAY_DISCLAIMER}</p>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Link href="/" className="hover:text-primary transition-colors">
               ← Back to the homepage

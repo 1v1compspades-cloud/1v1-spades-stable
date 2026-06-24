@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 
-export const FREE_PLAY_DISCLAIMER =
-  "Spades Free Play is provided solely for entertainment and is free to play. No payment features, paid entry, deposits, wagering, prizes, financial accounts, balances, redeemable rewards, or items of monetary value are included.";
+export const CASUAL_PLAY_DISCLAIMER =
+  "1v1 Spades is provided solely for entertainment. No payment features, paid entry, deposits, wagering, prizes, financial accounts, balances, redeemable rewards, or items of monetary value are included.";
 
 const POLICY_LINKS = [
   { href: "/terms", label: "Terms of Service" },
@@ -43,7 +43,7 @@ export function MatchAgreementNotice() {
 export function LegalFooter() {
   return (
     <footer className="space-y-3 text-xs leading-relaxed text-muted-foreground">
-      <p>{FREE_PLAY_DISCLAIMER}</p>
+      <p>{CASUAL_PLAY_DISCLAIMER}</p>
       <nav
         aria-label="Legal and support links"
         className="flex flex-wrap justify-center gap-x-4 gap-y-1"

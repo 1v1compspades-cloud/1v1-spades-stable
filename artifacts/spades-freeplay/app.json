@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Spades Free Play",
+    "name": "1v1 Spades",
     "slug": "spades-freeplay",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,7 +8,7 @@
     "scheme": "spades-freeplay",
     "userInterfaceStyle": "dark",
     "primaryColor": "#d4af37",
-    "description": "Free, head-to-head Spades for two players. Create a room, invite an opponent, and play for fun.",
+    "description": "Head-to-head Spades for two players. Create a room, invite an opponent, and play for fun.",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/icon.png",

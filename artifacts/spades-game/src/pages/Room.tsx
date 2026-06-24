@@ -1437,7 +1437,7 @@ export default function Room() {
                 <span className="text-emerald-500">♣</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-serif font-bold text-primary tracking-wider drop-shadow-[0_2px_8px_rgba(234,179,8,0.25)]">
-                {isKingMode ? "Table Streak" : "Spades Free Play"}
+                {isKingMode ? "Table Streak" : "1v1 Spades"}
               </h1>
               <p className="text-[11px] uppercase tracking-widest text-muted-foreground mt-1">
                 {isKingMode ? (kottLobbyState || "Pre-match lobby") : "Pre-match lobby"}
@@ -1455,7 +1455,7 @@ export default function Room() {
               )}
             >
               <p className="text-[10px] font-bold uppercase tracking-widest text-primary">
-                Free Play Lobby
+                1v1 Spades Lobby
               </p>
               <h2 className="mt-1 font-serif text-3xl leading-tight text-foreground">
                 {presenceTitle}
@@ -1638,7 +1638,7 @@ export default function Room() {
               Spectator
             </Badge>
             <h1 className="text-2xl sm:text-3xl font-serif font-bold text-primary tracking-wider">
-              Spades Free Play
+              1v1 Spades
             </h1>
             <p className="text-[11px] uppercase tracking-widest text-muted-foreground mt-1">
               Watching room
@@ -2285,8 +2285,8 @@ export default function Room() {
                     }
 
                     // Spectator with no challenger queued — the King is waiting.
-                    // Surface the current King clearly and keep a token-free
-                    // challenger link handy so watchers can recruit a challenger.
+                    // Surface the current King clearly and keep challenger links
+                    // without private tokens so watchers can recruit a challenger.
                     return (
                       <div
                         data-testid="kott-waiting-banner"

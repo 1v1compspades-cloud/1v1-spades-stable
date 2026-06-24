@@ -6,20 +6,20 @@ export default function Tournaments() {
     <>
       <Seo
         title="Online Spades Tournaments | 1V1 Competitive Spades"
-        description="Join free-entry private online 1V1 Spades tournaments with champion brackets, live matches, and weekly competitive events."
+        description="Join private online 1V1 Spades tournaments with champion brackets, live matches, and weekly competitive events."
         path="/tournaments"
       />
       <InfoPageLayout
         title="1V1 Competitive Spades Tournaments"
-        intro="Compete in free-entry, private online tournaments built for real competition. Invite-only lobbies, organized check-ins, single-elimination brackets, and a champion screen to crown the winner."
+        intro="Compete in private online tournaments built for real competition. Invite-only lobbies, organized check-ins, single-elimination brackets, and a champion screen to crown the winner."
       >
         <section>
-          <h2>Free entry, invite-only lobbies</h2>
+          <h2>Invite-only lobbies</h2>
           <p>
-            Tournaments are free to enter and run in private, invite-only
+            Tournaments run in private, invite-only
             lobbies. Players join with an invite link or code from the host, so
             every event is a known, controlled field rather than an open public
-            free-for-all.
+            all-play lobby.
           </p>
         </section>
 
@@ -46,9 +46,9 @@ export default function Tournaments() {
         <section>
           <h2>Recognition-only events</h2>
           <p>
-            Events are free to enter and are played for competition, standings,
-            and community recognition only. There are no buy-ins, deposits,
-            wagering, cash payouts, or redeemable rewards.
+            Events are played for competition, standings, and recognition only.
+            There are no buy-ins, deposits, wagering, cash payouts, or redeemable
+            rewards.
           </p>
         </section>
 

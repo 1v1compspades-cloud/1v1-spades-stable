@@ -1,9 +1,9 @@
-# Spades Free Play — Final TestFlight / App Store Submission Checklist
+# 1v1 Spades — Final TestFlight / App Store Submission Checklist
 
 Submission-flow companion to `APP_STORE_CHECKLIST.md` (which holds the full asset
 list). This file is the **go/no-go** checklist for the first TestFlight upload.
 
-App is **free play only**: no tournaments in-app, no KOTT, no admin tools, no
+App is **casual play only**: no tournaments in-app, no KOTT, no admin tools, no
 cash, no paid entries, no deposits, no wallets, no prizes, no gambling.
 
 Legend: ✅ ready · ⬜ action required (you) · 🚫 blocker
@@ -17,11 +17,11 @@ Legend: ✅ ready · ⬜ action required (you) · 🚫 blocker
 - ⬜ **App ID / Bundle ID registered** — `com.oneononespades.freeplay` created in
   the Apple Developer portal (Certificates, Identifiers & Profiles). With EAS this
   can be auto-created during `eas build`, but the membership must exist first.
-- ⬜ **App record created in App Store Connect** — name "Spades Free Play",
+- ⬜ **App record created in App Store Connect** — name "1v1 Spades",
   primary language, bundle ID linked.
 - ⬜ **Distribution certificate + provisioning profile** — EAS manages these
   automatically when you run `eas build -p ios` and sign in with your Apple ID.
-- ⬜ **Agreements, Tax, and Banking** — at minimum the free-app agreement must be
+- ⬜ **Agreements, Tax, and Banking** — the required App Store agreement must be
   active in App Store Connect or builds can't go live (TestFlight internal testing
   works without banking; public/external testing and release need the agreement).
 
@@ -34,7 +34,7 @@ Legend: ✅ ready · ⬜ action required (you) · 🚫 blocker
 
 | Item | Value | Status |
 | --- | --- | --- |
-| App name | Spades Free Play | ✅ |
+| App name | 1v1 Spades | ✅ |
 | Marketing version | 1.0.0 | ✅ |
 | iOS build number | 1 | ✅ |
 | iOS bundle identifier | com.oneononespades.freeplay | ✅ |
@@ -50,10 +50,10 @@ Legend: ✅ ready · ⬜ action required (you) · 🚫 blocker
 
 ## C. App Store text (drafted — confirm/tweak before submit)
 
-- ✅ **App name**: Spades Free Play
-- ✅ **Subtitle** (≤30): Free 1v1 head-to-head Spades
-- ✅ **Description**: drafted in `APP_STORE_CHECKLIST.md` §1 (free-play framing)
-- ✅ **Keywords** (≤100): `spades,card game,1v1,trick taking,multiplayer,classic cards,head to head,free,bidding,nil`
+- ✅ **App name**: 1v1 Spades
+- ✅ **Subtitle** (≤30): 1v1 head-to-head Spades
+- ✅ **Description**: drafted in `APP_STORE_CHECKLIST.md` §1 (casual-play framing)
+- ✅ **Keywords** (≤100): `spades,card game,1v1,trick taking,multiplayer,classic cards,head to head,bidding,nil`
 - ⬜ **Promotional text** (optional, ≤170) — write if desired
 - ✅ **Category**: Games › Card
 - ✅ **Age rating**: 4+ (no gambling, no real-money play)
@@ -62,7 +62,14 @@ Legend: ✅ ready · ⬜ action required (you) · 🚫 blocker
 
 ## D. Screenshots required (by screen) — ⬜ capture on device/simulator
 
-Portrait, **6.7" iPhone (1290×2796)** set is mandatory. Capture these screens:
+Capture the **6.3"** and **6.5"** portrait sets with:
+
+```sh
+pnpm run appstore:screenshots -- --app /path/to/1v1-spades.app
+```
+
+Accepted portrait sizes are 1179×2556 or 1206×2622 for 6.3", and 1284×2778 or
+1242×2688 for 6.5". Capture these screens:
 
 1. ⬜ Home — hero card fan + Quick Match / Play a Friend
 2. ⬜ Game — bidding phase
@@ -103,7 +110,7 @@ Portrait, **6.7" iPhone (1290×2796)** set is mandatory. Capture these screens:
 
 - ✅ No cash / deposit / wallet / prize / gambling / wager / payout / stake /
   buy-in / real-money wording in any user-facing screen (automated scan clean).
-- ✅ In-app experience is free play only; tournaments/KOTT/admin are **not**
+- ✅ In-app experience is casual play only; tournaments/KOTT/admin are **not**
   present in the app. The only competitive reference is an external website link
   that opens in the browser.
 

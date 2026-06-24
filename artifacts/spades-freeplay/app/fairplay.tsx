@@ -17,8 +17,8 @@ type Point = {
 const POINTS: Point[] = [
   {
     icon: "gift",
-    title: "Free play only",
-    body: "This app is just for fun. Every game is free to play, with nothing on the line but bragging rights. You play for the love of the game.",
+    title: "Just for fun",
+    body: "Every game is casual play, with nothing on the line but bragging rights. You play for the love of the game.",
   },
   {
     icon: "server",

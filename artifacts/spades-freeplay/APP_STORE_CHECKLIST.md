@@ -1,6 +1,6 @@
-# Spades Free Play — App Store / TestFlight Readiness Checklist
+# 1v1 Spades — App Store / TestFlight Readiness Checklist
 
-A launch-prep checklist for the **free-play** iOS app. This app is free play only:
+A launch-prep checklist for the casual iOS app. This app is casual play only:
 no tournaments, no cash, no paid entries, no deposits, no wallets, no prizes,
 no gambling. Competitive tournaments live on the external website and open in
 the device browser.
@@ -11,8 +11,8 @@ the device browser.
 
 | Field | Value |
 | --- | --- |
-| **App name** | Spades Free Play |
-| **Subtitle** (≤30 chars) | Free 1v1 head-to-head Spades |
+| **App name** | 1v1 Spades |
+| **Subtitle** (≤30 chars) | 1v1 head-to-head Spades |
 | **Bundle ID** | `com.oneononespades.freeplay` |
 | **Version / Build** | 1.0.0 (build 1) |
 | **Primary category** | Games |
@@ -21,7 +21,7 @@ the device browser.
 
 ### Description (draft)
 
-> Spades Free Play is a fast, head-to-head take on the classic trick-taking
+> 1v1 Spades is a fast, head-to-head take on the classic trick-taking
 > card game. One opponent, one deck, pure skill.
 >
 > • Quick Match — spin up a private table and share the code instantly
@@ -31,12 +31,12 @@ the device browser.
 > • A guided "How Dealing Works" animation for new players
 > • A premium black-and-gold card-room look
 >
-> Free play only — every game is for bragging rights, with nothing on the line.
+> Casual play only — every game is for bragging rights, with nothing on the line.
 > No stakes, no catches, just you and the cards.
 
 ### Keywords (≤100 chars, comma-separated)
 
-> spades,card game,1v1,trick taking,multiplayer,classic cards,head to head,free,bidding,nil
+> spades,card game,1v1,trick taking,multiplayer,classic cards,head to head,bidding,nil
 
 ---
 
@@ -67,12 +67,17 @@ the device browser.
 
 ## 4. Screenshots needed (per App Store Connect)
 
-iPhone screenshots are mandatory. Capture in **portrait** on these display
-classes (App Store accepts the 6.7" set to cover most modern devices):
+iPhone screenshots are mandatory. Capture in **portrait** on the App Store
+Connect display classes below. Use the automation from this package:
 
-- ⬜ 6.7" (iPhone 15/16 Pro Max) — **required**, 1290×2796
-- ⬜ 6.5" (iPhone 11 Pro Max / XS Max) — optional fallback, 1242×2688
-- ⬜ 5.5" (older) — only if supporting older devices
+```sh
+pnpm run appstore:screenshots -- --app /path/to/1v1-spades.app
+```
+
+The script captures and validates the current Apple-accepted portrait sizes:
+
+- ⬜ 6.3" — 1179×2556 or 1206×2622
+- ⬜ 6.5" — 1284×2778 or 1242×2688
 
 Suggested shots (5–6):
 

@@ -12,13 +12,13 @@ export default function FairPlay() {
   return (
     <>
       <Seo
-        title="Fair Play Policy | Spades Free Play"
-        description="Learn how Spades Free Play uses private lobbies, hidden spectator hands, server rules, and fair-play policies to reduce cheating risk."
+        title="Fair Play Policy | 1v1 Spades"
+        description="Learn how 1v1 Spades uses private lobbies, hidden spectator hands, server rules, and fair-play policies to reduce cheating risk."
         path="/fair-play"
       />
       <InfoPageLayout
         title="Fair Play Policy"
-        intro="Fair play is the foundation of Spades Free Play. We combine private rooms, server-enforced rules, and clear session controls to make cheating hard to attempt and easier to detect."
+        intro="Fair play is the foundation of 1v1 Spades. We combine private rooms, server-enforced rules, and clear session controls to make cheating hard to attempt and easier to detect."
       >
         <section>
           <h2>How we protect competitive integrity</h2>

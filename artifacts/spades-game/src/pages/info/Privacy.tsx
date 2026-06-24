@@ -7,19 +7,19 @@ export default function Privacy() {
   return (
     <>
       <Seo
-        title="Privacy Policy | Spades Free Play"
-        description="Privacy Policy for the Spades Free Play app. A free card game with optional local profile names, no payment features, and no sale of personal data."
+        title="Privacy Policy | 1v1 Spades"
+        description="Privacy Policy for the 1v1 Spades app. A casual card game with optional local profile names, no payment features, and no sale of personal data."
         path="/privacy"
       />
       <InfoPageLayout
         title="Privacy Policy"
-        intro={`This Privacy Policy explains how the Spades Free Play app handles information. Effective ${EFFECTIVE_DATE}.`}
+        intro={`This Privacy Policy explains how the 1v1 Spades app handles information. Effective ${EFFECTIVE_DATE}.`}
       >
         <section>
-          <h2>Free play only</h2>
+          <h2>Casual play only</h2>
           <p>
-            Spades Free Play is a free, for-entertainment card game. The app
-            does not include payment features, paid entry, redeemable rewards, or
+            1v1 Spades is a for-entertainment card game. The app does not
+            include payment features, paid entry, redeemable rewards, or
             financial accounts. We do not collect or process payment or financial
             account information through the app.
           </p>

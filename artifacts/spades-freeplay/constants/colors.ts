@@ -1,5 +1,5 @@
 /**
- * Semantic design tokens for the Spades Free Play app.
+ * Semantic design tokens for the 1v1 Spades app.
  *
  * Visual direction: a premium black & gold card-room. The app is dark-first,
  * so both the `light` and `dark` palettes intentionally resolve to the same

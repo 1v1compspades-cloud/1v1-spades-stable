@@ -9,7 +9,7 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 
 const EXPECTED = {
-  name: "Spades Free Play",
+  name: "1v1 Spades",
   version: "1.0.0",
   buildNumber: "24",
   bundleIdentifier: "com.oneononespades.freeplay",
@@ -263,7 +263,7 @@ function chooseNextAction(manualState) {
 }
 
 async function main() {
-  console.log("Spades Free Play App Store Launch Dashboard");
+  console.log("1v1 Spades App Store Launch Dashboard");
   console.log(`Version ${EXPECTED.version} (${EXPECTED.buildNumber})`);
   console.log(`TestFlight: https://appstoreconnect.apple.com/apps/${EXPECTED.ascAppId}/testflight/ios`);
 

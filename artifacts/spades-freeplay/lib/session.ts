@@ -1,4 +1,4 @@
-// Lightweight AsyncStorage persistence for a free-play seat.
+// Lightweight AsyncStorage persistence for a mobile seat.
 //
 // The server issues a per-seat reconnect `token` when you create or join a room
 // (mirrors the web client's localStorage model). We stash it — together with the

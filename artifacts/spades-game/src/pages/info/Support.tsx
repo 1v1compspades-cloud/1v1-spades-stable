@@ -5,13 +5,13 @@ export default function Support() {
   return (
     <>
       <Seo
-        title="Support & Help | Spades Free Play"
-        description="Get help with the Spades Free Play app. Contact support by email for questions, bug reports, and feedback."
+        title="Support & Help | 1v1 Spades"
+        description="Get help with the 1v1 Spades app. Contact support by email for questions, bug reports, and feedback."
         path="/support"
       />
       <InfoPageLayout
         title="Support &amp; Help"
-        intro="Need a hand with Spades Free Play? Here's how to reach us and get answers fast."
+        intro="Need a hand with 1v1 Spades? Here's how to reach us and get answers fast."
       >
         <section>
           <h2>Contact us</h2>
@@ -35,7 +35,7 @@ export default function Support() {
         <section>
           <h2>About the app</h2>
           <p>
-            Spades Free Play is a free, for-entertainment card game. It has no
+            1v1 Spades is a for-entertainment card game. It has no
             payment features, paid entry, financial accounts, or redeemable
             rewards. If you ever have a concern about how the game works, reach
             out and we'll explain.
@@ -57,7 +57,7 @@ export default function Support() {
             </li>
             <li>
               <strong>Does the app include payment features?</strong> No. The app
-              is free play only.
+              does not include payment features, paid entry, or redeemable rewards.
             </li>
             <li>
               <strong>How do I report a bug or a player?</strong> Email us with

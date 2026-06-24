@@ -11,6 +11,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "appstore:status": "node scripts/app-store-status.mjs",
     "appstore:check": "tsc -p tsconfig.json --noEmit && node scripts/app-store-status.mjs",
+    "appstore:screenshots": "node scripts/app-store-screenshots.mjs",
     "appstore:submit-latest": "eas submit --platform ios --profile production --latest --non-interactive"
   },
   "devDependencies": {

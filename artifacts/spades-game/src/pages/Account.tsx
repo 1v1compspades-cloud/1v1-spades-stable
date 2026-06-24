@@ -5,7 +5,7 @@ export default function Account() {
   return (
     <>
       <Seo
-        title="Account | Spades Free Play"
+        title="Account | 1v1 Spades"
         description="Account features are planned for v1.1 and are not enabled yet."
         path="/account"
       />

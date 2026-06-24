@@ -904,14 +904,14 @@ export default function Lobby() {
           <div className="flex items-center justify-center gap-3 text-xl text-primary" aria-hidden>
             <span>♠</span><span className="text-red-500">♥</span><span className="text-blue-500">♦</span><span className="text-emerald-500">♣</span>
           </div>
-          <CardTitle className="text-[2rem] sm:text-5xl leading-tight font-serif text-primary tracking-wider drop-shadow-[0_2px_10px_rgba(234,179,8,0.34)]">
-            SPADES
+          <CardTitle className="text-[2rem] sm:text-4xl leading-tight font-serif text-primary tracking-wider drop-shadow-[0_2px_10px_rgba(234,179,8,0.34)]">
+            1v1 Spades
           </CardTitle>
           <p className="text-sm uppercase tracking-[0.45em] text-foreground/85">
-            Free Play
+            Ranked & Casual
           </p>
           <CardDescription className="text-sm font-medium text-foreground/80">
-            Free head-to-head Spades for two players.
+            Head-to-head Spades for two players.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5 mt-1">
