@@ -1460,7 +1460,7 @@ export default function Lobby() {
                       <p className="text-sm text-muted-foreground">Account required</p>
                     </div>
                     <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                      <span className="rounded border border-primary/20 bg-black/20 px-2 py-2">Season: v1_1_beta</span>
+                      <span className="rounded border border-primary/20 bg-black/20 px-2 py-2">Season 0 Beta</span>
                       <span className="rounded border border-primary/20 bg-black/20 px-2 py-2 text-right">{matchTarget} pts</span>
                     </div>
                     <p

@@ -42,6 +42,11 @@ export function formatBags(value: number | undefined): string {
   return `${Math.max(0, Math.floor(value))}`;
 }
 
+export function formatSeasonLabel(seasonKey: string): string {
+  if (seasonKey === "v1_1_beta") return "Season 0 Beta";
+  return seasonKey;
+}
+
 export function computeLeaderboardPanelState(input: {
   enabled: boolean;
   loading: boolean;

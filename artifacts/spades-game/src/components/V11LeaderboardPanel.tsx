@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   computeLeaderboardPanelState,
   formatBags,
+  formatSeasonLabel,
   formatStreak,
   formatWinRate,
   leaderboardEndpoint,
@@ -65,10 +66,10 @@ export function V11LeaderboardPanel() {
       <div className="space-y-2 text-center">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-widest text-primary">
-            Top Players
+            Ranked Tournament Season 0
           </h2>
           <p className="text-[11px] text-muted-foreground">
-            Season: {state.kind === "loading" || state.kind === "error" ? "v1_1_beta" : state.seasonKey}
+            {formatSeasonLabel(state.kind === "loading" || state.kind === "error" ? "v1_1_beta" : state.seasonKey)}
           </p>
         </div>
         {state.kind === "entries" && state.entries.length > 3 ? (
