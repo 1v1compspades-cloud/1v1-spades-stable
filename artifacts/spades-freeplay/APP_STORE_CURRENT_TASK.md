@@ -15,8 +15,8 @@ workspace root, to print the automated dashboard.
 | Version | 1.0.0 |
 | iOS build | 27 |
 | Bundle ID | com.oneononespades.freeplay |
-| EAS build ID | pending |
-| EAS submission ID | pending |
+| EAS build ID | 1faf2f4d-33bd-4e83-955f-2e19576461e7 |
+| EAS submission ID | f2fbb4d4-94aa-4a10-a884-21e3be379812 |
 | App Store Connect app ID | 6776721716 |
 | TestFlight URL | https://appstoreconnect.apple.com/apps/6776721716/testflight/ios |
 | Release mode default | Manual release after approval |
@@ -39,17 +39,16 @@ workspace root, to print the automated dashboard.
 
 ## Ordered next actions
 
-1. Build and submit iOS build 27.
-2. Wait for Apple processing to finish for build 27.
-3. Add build 27 to internal TestFlight testing.
-4. Smoke test on a real iPhone: launch, create room, join from second device or browser, play bidding/trick flow, background/reopen reconnect, leave/return, and open Privacy/Terms/Support.
-5. Confirm the hosted web mobile layout fix is live on `https://1v1spades.com`.
-6. Upload App Store screenshots.
-7. Complete App Privacy, metadata, and App Review notes.
-8. Mark ready, then submit the App Store version for review.
-9. Track App Review status: Waiting for Review, In Review, Rejected, or Approved.
-10. If approved, manually release by default.
-11. Verify the public App Store listing, install path, live URLs, and first-launch flow.
+1. Wait for Apple processing to finish for build 27.
+2. Add build 27 to internal TestFlight testing.
+3. Smoke test on a real iPhone: launch, create room, join from second device or browser, play bidding/trick flow, background/reopen reconnect, leave/return, and open Privacy/Terms/Support.
+4. Confirm the hosted web mobile layout fix is live on `https://1v1spades.com`.
+5. Upload App Store screenshots.
+6. Complete App Privacy, metadata, and App Review notes.
+7. Mark ready, then submit the App Store version for review.
+8. Track App Review status: Waiting for Review, In Review, Rejected, or Approved.
+9. If approved, manually release by default.
+10. Verify the public App Store listing, install path, live URLs, and first-launch flow.
 
 ## Current blockers
 
