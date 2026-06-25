@@ -1809,9 +1809,15 @@ export default function Room() {
     const bottomLabel = spectator
       ? (bottomPlayer?.name?.split(" ")[0] ?? `Seat ${bottomIndex + 1}`)
       : "You";
+    const showBiddingControls = !spectator && gameState.phase === "bidding" && gameState.currentBidder === playerIndex;
 
     return (
-      <div className="spades-game-board spades-table-surface flex min-h-[17rem] min-w-0 flex-1 flex-col items-center justify-center relative overflow-hidden px-1.5 py-1 sm:min-h-0 sm:px-2 sm:py-0">
+      <div
+        className={cn(
+          "spades-game-board spades-table-surface flex min-h-[17rem] min-w-0 flex-1 flex-col items-center justify-center relative overflow-hidden px-1.5 py-1 sm:min-h-0 sm:px-2 sm:py-0",
+          showBiddingControls && "spades-game-board--bidding"
+        )}
+      >
         {/* Top seat hidden hand (always hidden — even players don't see opponent's cards) */}
         <div className="absolute top-3 sm:top-4 flex justify-center w-full pointer-events-none">
           <div className="flex items-center gap-2">
@@ -1965,19 +1971,19 @@ export default function Room() {
         {/* Bidding overlay (players only).
             Keep controls away from the bottom hand tray so all 13 cards remain
             visible and horizontally scrollable while a bid is being chosen. */}
-        {!spectator && gameState.phase === "bidding" && gameState.currentBidder === playerIndex && (
+        {showBiddingControls && (
           <>
             <div
-              className="fixed inset-0 z-[90] bg-black/50 pointer-events-none sm:bg-black/75"
+              className="spades-bidding-backdrop fixed inset-0 z-[90] bg-black/50 pointer-events-none sm:bg-black/75"
               data-testid="bidding-backdrop"
               aria-hidden="true"
             />
             <div
-              className="fixed inset-0 z-[240] flex items-start justify-center overflow-y-auto pointer-events-none px-2 pt-[calc(env(safe-area-inset-top)+8.5rem)] pb-[calc(env(safe-area-inset-bottom)+18.5rem)] sm:items-start sm:px-4 sm:pt-[calc(env(safe-area-inset-top)+6.25rem)] sm:pb-[calc(env(safe-area-inset-bottom)+13rem)]"
+              className="spades-bidding-overlay fixed inset-0 z-[240] flex items-start justify-center overflow-y-auto pointer-events-none px-2 pt-[calc(env(safe-area-inset-top)+8.5rem)] pb-[calc(env(safe-area-inset-bottom)+18.5rem)] sm:items-start sm:px-4 sm:pt-[calc(env(safe-area-inset-top)+6.25rem)] sm:pb-[calc(env(safe-area-inset-bottom)+13rem)]"
               data-testid="bidding-overlay"
             >
-              <div className="bg-card/96 border border-border p-3 sm:p-4 rounded-xl shadow-2xl w-full max-w-[min(34rem,calc(100vw-1rem))] text-center max-h-[calc(100dvh-27rem)] min-[420px]:max-h-[calc(100dvh-26rem)] sm:max-h-[calc(100dvh-20rem)] overflow-hidden pointer-events-auto backdrop-blur-md flex flex-col">
-                <div className="min-h-0 overflow-y-auto overscroll-contain pr-1 space-y-3">
+              <div className="spades-bidding-card bg-card/96 border border-border p-3 sm:p-4 rounded-xl shadow-2xl w-full max-w-[min(34rem,calc(100vw-1rem))] text-center max-h-[calc(100dvh-27rem)] min-[420px]:max-h-[calc(100dvh-26rem)] sm:max-h-[calc(100dvh-20rem)] overflow-hidden pointer-events-auto backdrop-blur-md flex flex-col">
+                <div className="spades-bidding-scroll min-h-0 overflow-y-auto overscroll-contain pr-1 space-y-3">
                   <h3 className="text-sm sm:text-lg font-serif text-primary">Place your bid</h3>
                   {gameState.bids[0] === null && gameState.bids[1] === null && (
                     <p className="text-[9px] sm:text-[11px] uppercase tracking-widest text-primary/80 leading-tight">
@@ -2037,7 +2043,7 @@ export default function Room() {
                   })()}
                   <div
                     data-testid="bid-buttons"
-                    className="grid grid-cols-7 gap-1 w-full sm:gap-2"
+                    className="spades-bidding-buttons grid grid-cols-7 gap-1 w-full sm:gap-2"
                   >
                     {Array.from({ length: 14 }).map((_, i) => {
                       const val = i.toString();
@@ -2061,7 +2067,7 @@ export default function Room() {
                     })}
                   </div>
                 </div>
-                <div className="sticky bottom-0 z-10 mt-3 border-t border-border/70 bg-card/98 pt-3 shadow-[0_-10px_24px_rgba(0,0,0,0.45)]">
+                <div className="spades-bidding-confirm sticky bottom-0 z-10 mt-3 border-t border-border/70 bg-card/98 pt-3 shadow-[0_-10px_24px_rgba(0,0,0,0.45)]">
                   <Button
                     onClick={handleBid}
                     disabled={!bidAmount || isSubmitting}

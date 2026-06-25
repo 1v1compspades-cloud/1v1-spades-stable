@@ -667,6 +667,53 @@
     -webkit-overflow-scrolling: touch;
   }
 
+  .spades-game-board--bidding {
+    flex: 0 0 auto !important;
+    min-height: auto !important;
+    justify-content: flex-start !important;
+    overflow: visible !important;
+    padding-top: 0.35rem !important;
+    padding-bottom: 0.75rem !important;
+  }
+
+  .spades-game-board--bidding .spades-table-pocket {
+    width: min(82vw, 21.5rem);
+    height: min(82vw, 21.5rem);
+    margin-bottom: 0.5rem;
+  }
+
+  .spades-bidding-backdrop {
+    display: none !important;
+  }
+
+  .spades-bidding-overlay {
+    position: relative !important;
+    inset: auto !important;
+    z-index: 50 !important;
+    display: flex !important;
+    width: 100%;
+    overflow: visible !important;
+    padding: 0 0.25rem !important;
+    pointer-events: auto !important;
+  }
+
+  .spades-bidding-card {
+    max-height: none !important;
+    overflow: visible !important;
+    margin: 0 auto;
+  }
+
+  .spades-bidding-scroll {
+    overflow: visible !important;
+    padding-right: 0 !important;
+  }
+
+  .spades-bidding-confirm {
+    position: static !important;
+    margin-top: 0.75rem;
+    box-shadow: none !important;
+  }
+
   .spades-hand-tray--bidding {
     min-height: calc(5.65rem + env(safe-area-inset-bottom) + 6.25rem);
     padding-bottom: calc(env(safe-area-inset-bottom) + 8.5rem) !important;
@@ -681,6 +728,51 @@
     .spades-gameplay-screen--bidding {
       height: 100dvh !important;
       overflow: hidden !important;
+    }
+
+    .spades-game-board--bidding {
+      flex: 1 1 0 !important;
+      min-height: 0 !important;
+      justify-content: center !important;
+      overflow: hidden !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+    }
+
+    .spades-game-board--bidding .spades-table-pocket {
+      width: min(76vw, 24rem);
+      height: min(76vw, 24rem);
+      margin-bottom: 0;
+    }
+
+    .spades-bidding-backdrop {
+      display: block !important;
+    }
+
+    .spades-bidding-overlay {
+      position: fixed !important;
+      inset: 0 !important;
+      z-index: 240 !important;
+      overflow-y: auto !important;
+      padding: calc(env(safe-area-inset-top) + 6.25rem) 1rem calc(env(safe-area-inset-bottom) + 13rem) !important;
+      pointer-events: none !important;
+    }
+
+    .spades-bidding-card {
+      max-height: calc(100dvh - 20rem) !important;
+      overflow: hidden !important;
+    }
+
+    .spades-bidding-scroll {
+      min-height: 0;
+      overflow-y: auto !important;
+      padding-right: 0.25rem !important;
+    }
+
+    .spades-bidding-confirm {
+      position: sticky !important;
+      bottom: 0;
+      box-shadow: 0 -10px 24px rgba(0,0,0,0.45) !important;
     }
 
     .spades-hand-tray--bidding {
