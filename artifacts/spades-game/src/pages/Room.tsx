@@ -2003,7 +2003,6 @@ export default function Room() {
                   const opponentStats = [
                     { label: "Score", value: `${oppScore} / ${gameState.matchTarget}` },
                     { label: "Bags", value: gameState.bags[oppSeat] },
-                    { label: "Tricks", value: gameState.tricks[oppSeat] },
                     { label: "Cards", value: gameState.handSizes?.[oppSeat] ?? 0 },
                   ];
 
@@ -2039,7 +2038,7 @@ export default function Room() {
                         </div>
                       </div>
 
-                      <div className="mt-2 grid grid-cols-4 gap-1.5">
+                      <div className="mt-2 grid grid-cols-3 gap-1.5">
                         {opponentStats.map((stat) => (
                           <div
                             key={stat.label}
