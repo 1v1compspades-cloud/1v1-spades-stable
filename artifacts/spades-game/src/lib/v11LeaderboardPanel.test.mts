@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   computeLeaderboardPanelState,
   formatBags,
+  formatScoreTotal,
   formatSeasonLabel,
   formatStreak,
   formatWinRate,
@@ -38,6 +39,8 @@ test("leaderboard panel renders entries state", () => {
           wins: 3,
           losses: 1,
           gamesPlayed: 4,
+          pointsFor: 1080,
+          pointsAgainst: 820,
           winRate: 0.75,
           currentStreak: 2,
           bagsTaken: 5,
@@ -83,6 +86,9 @@ test("leaderboard panel formats win rate and streak", () => {
   assert.equal(formatStreak(0), "0");
   assert.equal(formatBags(4.9), "4");
   assert.equal(formatBags(undefined), "0");
+  assert.equal(formatScoreTotal(249.8), "249");
+  assert.equal(formatScoreTotal(-12.4), "-12");
+  assert.equal(formatScoreTotal(undefined), "0");
 });
 
 test("leaderboard panel formats the beta season for display", () => {

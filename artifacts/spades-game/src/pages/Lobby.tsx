@@ -1400,8 +1400,8 @@ export default function Lobby() {
                 </h2>
                 <span className="h-px flex-1 bg-border/50" />
               </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <section className="rounded-md border border-emerald-500/35 bg-emerald-950/20 p-4">
+              <div className="grid items-stretch gap-4 md:grid-cols-2">
+                <section className="flex h-full flex-col rounded-md border border-emerald-500/35 bg-emerald-950/20 p-4">
                   <div className="space-y-2 text-center">
                     <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-emerald-400/35 bg-emerald-500/10 text-2xl" aria-hidden>
                       ♠
@@ -1417,39 +1417,41 @@ export default function Lobby() {
                   >
                     Online: {onlineCountLabel} · Finding casual: {findingMatchCountLabel}
                   </p>
-                  {isFindingMatch ? (
-                    <div className="mt-4 space-y-3">
-                      <p className="text-center text-sm font-semibold text-primary">Finding opponent...</p>
+                  <div className="mt-auto pt-4">
+                    {isFindingMatch ? (
+                      <div className="space-y-3">
+                        <p className="text-center text-sm font-semibold text-primary">Finding opponent...</p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleCancelFindMatch}
+                          className="w-full"
+                          data-testid="button-find-match-cancel"
+                        >
+                          Cancel Casual Match
+                        </Button>
+                      </div>
+                    ) : (
                       <Button
                         type="button"
-                        variant="outline"
-                        onClick={handleCancelFindMatch}
-                        className="w-full"
-                        data-testid="button-find-match-cancel"
+                        onClick={() => void handleFindMatch()}
+                        disabled={isCreating || isJoining || isSpectating || isFindingRankedMatch || !connected}
+                        className="spades-gold-button w-full py-5 text-lg font-bold active:scale-[0.98] transition-transform"
+                        data-testid="button-find-match"
                       >
-                        Cancel Casual Match
+                        Find Casual Match
                       </Button>
-                    </div>
-                  ) : (
-                    <Button
-                      type="button"
-                      onClick={() => void handleFindMatch()}
-                      disabled={isCreating || isJoining || isSpectating || isFindingRankedMatch || !connected}
-                      className="spades-gold-button mt-4 w-full py-5 text-lg font-bold active:scale-[0.98] transition-transform"
-                      data-testid="button-find-match"
-                    >
-                      Find Casual Match
-                    </Button>
-                  )}
-                  {findMatchError && (
-                    <p className="mt-2 text-xs text-destructive text-center" data-testid="find-match-error">
-                      {findMatchError}
-                    </p>
-                  )}
+                    )}
+                    {findMatchError && (
+                      <p className="mt-2 text-xs text-destructive text-center" data-testid="find-match-error">
+                        {findMatchError}
+                      </p>
+                    )}
+                  </div>
                 </section>
 
                 {v11WebFlags.accounts && (
-                  <section className="rounded-md border border-primary/35 bg-primary/10 p-4" data-testid="ranked-match-section">
+                  <section className="flex h-full flex-col rounded-md border border-primary/35 bg-primary/10 p-4" data-testid="ranked-match-section">
                     <div className="space-y-2 text-center">
                       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-primary/35 bg-primary/10 text-2xl" aria-hidden>
                         ♛
@@ -1469,36 +1471,38 @@ export default function Lobby() {
                     >
                       Online: {onlineCountLabel} · Finding ranked: {rankedFindingMatchCountLabel}
                     </p>
-                    {isFindingRankedMatch ? (
-                      <div className="mt-4 space-y-3">
-                        <p className="text-center text-sm font-semibold text-primary">Finding ranked opponent...</p>
+                    <div className="mt-auto pt-4">
+                      {isFindingRankedMatch ? (
+                        <div className="space-y-3">
+                          <p className="text-center text-sm font-semibold text-primary">Finding ranked opponent...</p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleCancelRankedMatch}
+                            className="w-full"
+                            data-testid="button-ranked-match-cancel"
+                          >
+                            Cancel Ranked Match
+                          </Button>
+                        </div>
+                      ) : (
                         <Button
                           type="button"
-                          variant="outline"
-                          onClick={handleCancelRankedMatch}
-                          className="w-full"
-                          data-testid="button-ranked-match-cancel"
+                          variant={hasRankedAccount ? "default" : "secondary"}
+                          onClick={handleRankedPrimaryAction}
+                          disabled={isCreating || isJoining || isSpectating || isFindingMatch || !connected}
+                          className="w-full py-5 text-lg font-bold active:scale-[0.98] transition-transform"
+                          data-testid="button-ranked-match"
                         >
-                          Cancel Ranked Match
+                          {hasRankedAccount ? "Find Ranked Match" : "Create account to play ranked"}
                         </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        type="button"
-                        variant={hasRankedAccount ? "default" : "secondary"}
-                        onClick={handleRankedPrimaryAction}
-                        disabled={isCreating || isJoining || isSpectating || isFindingMatch || !connected}
-                        className="mt-4 w-full py-5 text-lg font-bold active:scale-[0.98] transition-transform"
-                        data-testid="button-ranked-match"
-                      >
-                        {hasRankedAccount ? "Find Ranked Match" : "Create account to play ranked"}
-                      </Button>
-                    )}
-                    {rankedMatchError && (
-                      <p className="mt-2 text-xs text-destructive text-center" data-testid="ranked-match-error">
-                        {rankedMatchError}
-                      </p>
-                    )}
+                      )}
+                      {rankedMatchError && (
+                        <p className="mt-2 text-xs text-destructive text-center" data-testid="ranked-match-error">
+                          {rankedMatchError}
+                        </p>
+                      )}
+                    </div>
                   </section>
                 )}
               </div>

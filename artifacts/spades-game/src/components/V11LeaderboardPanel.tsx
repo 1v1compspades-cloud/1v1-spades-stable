@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   computeLeaderboardPanelState,
   formatBags,
+  formatScoreTotal,
   formatSeasonLabel,
   formatStreak,
   formatWinRate,
@@ -66,7 +67,7 @@ export function V11LeaderboardPanel() {
       <div className="space-y-2 text-center">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-widest text-primary">
-            Ranked Tournament Season 0
+            Ranked Leaderboards Season 0
           </h2>
           <p className="text-[11px] text-muted-foreground">
             {formatSeasonLabel(state.kind === "loading" || state.kind === "error" ? "v1_1_beta" : state.seasonKey)}
@@ -107,28 +108,51 @@ export function V11LeaderboardPanel() {
       )}
 
       {state.kind === "entries" && (
-        <ol className="space-y-1.5" data-testid="v11-leaderboard-list">
+        <ol className="space-y-2" data-testid="v11-leaderboard-list">
           {visibleEntries.map((entry) => (
             <li
               key={`${entry.rank}-${entry.username}`}
-              className="rounded-md border border-border/40 bg-black/20 px-2.5 py-1.5"
+              className="rounded-md border border-border/40 bg-black/20 px-3 py-2.5"
             >
-              <div className="flex items-center justify-between gap-3">
+              <div className="grid gap-2 sm:grid-cols-[minmax(0,1.35fr)_repeat(3,minmax(74px,auto))] sm:items-center">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-foreground">
                     <span className="mr-2 font-mono text-primary">#{entry.rank}</span>
                     {entry.username}
                   </p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    {entry.wins}-{entry.losses} · {formatWinRate(entry.winRate)} win · streak {formatStreak(entry.currentStreak)}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    Bags +{formatBags(entry.bagsTaken)} / -{formatBags(entry.bagsGiven)}
-                  </p>
                 </div>
-                <span className="shrink-0 rounded border border-border/50 px-2 py-1 text-[11px] font-mono text-muted-foreground">
-                  {entry.gamesPlayed} GP
-                </span>
+                <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground sm:block sm:text-center">
+                  <span className="uppercase tracking-widest">Record</span>
+                  <span className="font-mono text-foreground sm:mt-0.5 sm:block">{entry.wins}-{entry.losses}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground sm:block sm:text-center">
+                  <span className="uppercase tracking-widest">Win</span>
+                  <span className="font-mono text-foreground sm:mt-0.5 sm:block">{formatWinRate(entry.winRate)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground sm:block sm:text-center">
+                  <span className="uppercase tracking-widest">Streak</span>
+                  <span className="font-mono text-foreground sm:mt-0.5 sm:block">{formatStreak(entry.currentStreak)}</span>
+                </div>
+              </div>
+              <div className="mt-2 grid gap-x-4 gap-y-1 border-t border-border/30 pt-2 text-[11px] text-muted-foreground sm:grid-cols-4">
+                <div className="flex items-center justify-between gap-2">
+                  <span>Games</span>
+                  <span className="font-mono text-foreground">{entry.gamesPlayed}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span>Points</span>
+                  <span className="font-mono text-foreground">
+                    {formatScoreTotal(entry.pointsFor)} / {formatScoreTotal(entry.pointsAgainst)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span>Bags taken</span>
+                  <span className="font-mono text-foreground">+{formatBags(entry.bagsTaken)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span>Bags given</span>
+                  <span className="font-mono text-foreground">-{formatBags(entry.bagsGiven)}</span>
+                </div>
               </div>
             </li>
           ))}

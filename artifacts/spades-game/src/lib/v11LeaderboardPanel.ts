@@ -4,6 +4,8 @@ export type V11LeaderboardEntry = {
   wins: number;
   losses: number;
   gamesPlayed: number;
+  pointsFor?: number;
+  pointsAgainst?: number;
   winRate: number;
   currentStreak: number;
   bagsTaken?: number;
@@ -40,6 +42,11 @@ export function formatStreak(value: number): string {
 export function formatBags(value: number | undefined): string {
   if (typeof value !== "number" || !Number.isFinite(value)) return "0";
   return `${Math.max(0, Math.floor(value))}`;
+}
+
+export function formatScoreTotal(value: number | undefined): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "0";
+  return `${Math.trunc(value)}`;
 }
 
 export function formatSeasonLabel(seasonKey: string): string {
