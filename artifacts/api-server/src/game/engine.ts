@@ -895,6 +895,8 @@ export function joinRoom(
     index: playerIndex,
   };
   state.players[playerIndex] = joiner;
+  state.spectators = state.spectators.filter((s) => s.socketId !== socketId);
+  state.challengerQueue = state.challengerQueue.filter((c) => c.socketId !== socketId);
   state.lastActiveAt[playerIndex] = now;
   state.disconnectedAt[playerIndex] = null;
   state.disconnectedPlayers = state.disconnectedPlayers ?? [null, null];
@@ -1195,6 +1197,9 @@ export function addSpectator(
 ): GameState {
   const state = rooms.get(roomCode);
   if (!state) throw new Error("Room not found");
+  if (state.players.some((p) => p?.socketId === socketId)) {
+    throw new Error("You're already seated at this table");
+  }
   // Prevent the same socket joining twice
   const existing = state.spectators.findIndex((s) => s.socketId === socketId);
   if (existing >= 0) {
@@ -1216,6 +1221,9 @@ export function reconnectSpectator(
 ): GameState {
   const state = rooms.get(roomCode);
   if (!state) throw new Error("Room not found");
+  if (state.players.some((p) => p?.socketId === newSocketId)) {
+    throw new Error("You're already seated at this table");
+  }
   // Deduplicate: if this socket is already registered as a spectator, update
   // in place (same path as addSpectator). If not found by socketId, remove any
   // stale entry with the same name (the previous connection's record) and then
@@ -1329,6 +1337,8 @@ export function reconnectPlayer(
   }
 
   state.lastActiveAt[playerIndex] = Date.now();
+  state.spectators = state.spectators.filter((s) => s.socketId !== newSocketId);
+  state.challengerQueue = state.challengerQueue.filter((c) => c.socketId !== newSocketId);
   state.disconnectedAt[playerIndex] = null;
   state.disconnectedPlayers[playerIndex] = null;
   rooms.set(roomCode, state);

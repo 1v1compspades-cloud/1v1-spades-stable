@@ -119,6 +119,30 @@ console.log("\n— Reconnect + sanitized websocket payloads —");
   ok("spectator payload exposes only hand counts", JSON.stringify(view.handSizes) === JSON.stringify([13, 13]));
 }
 
+// A spectator who takes an open waiting-room seat must not remain in the
+// spectator list, otherwise broadcasts can overwrite their player view.
+{
+  const room = createRoom("Seat One", `sock-open-host-${Date.now()}-${Math.random()}`);
+  addSpectator(room.roomCode, "Guest Two", "sock-switch-role");
+  const joined = joinRoom(room.roomCode, "Guest Two", "sock-switch-role");
+
+  ok("spectator can take open player seat", joined.playerIndex === 1);
+  ok("player socket is removed from spectators after seating", !joined.state.spectators.some((s) => s.socketId === "sock-switch-role"));
+  ok("player socket is seated after spectator switch", joined.state.players[1]?.socketId === "sock-switch-role");
+}
+
+// A seated socket cannot also register as a spectator in the same room.
+{
+  const room = createRoom("Seat One", `sock-seated-host-${Date.now()}-${Math.random()}`);
+  let msg = "";
+  try {
+    addSpectator(room.roomCode, "Seat One", room.players[0]!.socketId);
+  } catch (e) {
+    msg = (e as Error).message;
+  }
+  ok("seated player cannot also join as spectator", /already seated/i.test(msg), msg);
+}
+
 // Mobile Safari style refresh: disconnected old socket can reclaim the same seat.
 {
   const room = createDealtRoom();

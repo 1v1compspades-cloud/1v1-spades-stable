@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { useRoute, useLocation } from "wouter";
-import { useSocket } from "@/hooks/useSocket";
+import { useSocket, type AccountIdentityPayload } from "@/hooks/useSocket";
 import { useGameStorage } from "@/hooks/useGameStorage";
 import { CardComponent } from "@/components/Card";
 import { ConnectionRecoveryActions } from "@/components/ConnectionRecoveryActions";
@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Card as CardType, Suit } from "@/lib/game";
 import { cn } from "@/lib/utils";
+import { v11WebFlags } from "@/lib/v11Flags";
 
 /**
  * Safely format any card-like value (object {rank,suit} or plain string)
@@ -132,6 +133,9 @@ export default function Room() {
   } = useSocket();
   const {
     playerName,
+    profileUsername,
+    accountId,
+    accountUsername,
     roomCode: storedRoomCode,
     playerIndex, isSpectator,
     savePlayerName,
@@ -144,6 +148,7 @@ export default function Room() {
   const [bidAmount, setBidAmount] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [isJoiningAsPlayer, setIsJoiningAsPlayer] = useState(false);
   const [forfeitConfirmOpen, setForfeitConfirmOpen] = useState(false);
   const [spectatorNameInput, setSpectatorNameInput] = useState<string>("");
   // Dev/host Fast Finish test tool: opens a confirm overlay with a winner pick.
@@ -217,6 +222,19 @@ export default function Room() {
   }, []);
 
   const isHost = !isSpectator && playerIndex === 0;
+
+  const optionalProfileUsername = (): string | undefined => {
+    const normalized = profileUsername.trim().replace(/\s+/g, " ").slice(0, 32);
+    return normalized || undefined;
+  };
+
+  const optionalAccountIdentity = (): AccountIdentityPayload | undefined => {
+    if (!v11WebFlags.accounts) return undefined;
+    const id = accountId.trim();
+    const username = accountUsername.trim();
+    if (!id || !username) return undefined;
+    return { accountId: id, accountUsername: username };
+  };
   const spectator = !!gameState?.isSpectator || isSpectator;
 
   const handleHandPointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -596,7 +614,7 @@ export default function Room() {
         setLocation(tournamentCode ? `/tournament/${tournamentCode}` : "/");
       });
     } else {
-      joinRoom(roomCode, playerName).then((res) => {
+      joinRoom(roomCode, playerName, optionalProfileUsername(), optionalAccountIdentity()).then((res) => {
         if (res.playerIndex !== undefined) {
           savePlayerIndex(res.playerIndex as 0 | 1);
           if (res.token) savePlayerToken(roomCode, res.playerIndex as 0 | 1, res.token);
@@ -983,6 +1001,31 @@ export default function Room() {
     clearReconnectRetry();
     saveIsSpectator(false);
     setLocation("/");
+  };
+
+  const handleSpectatorJoinAsPlayer = async () => {
+    if (!roomCode || !playerName.trim()) return;
+    setIsJoiningAsPlayer(true);
+    try {
+      const res = await joinRoom(roomCode, playerName, optionalProfileUsername(), optionalAccountIdentity());
+      if (res.playerIndex !== undefined) {
+        saveRoomCode(roomCode);
+        savePlayerIndex(res.playerIndex as 0 | 1);
+        saveIsSpectator(false);
+        if (res.token) {
+          savePlayerToken(roomCode, res.playerIndex as 0 | 1, res.token);
+        }
+        clearReconnectRetry();
+        toast({ description: "Joined as player. Ready up when you're set." });
+      }
+    } catch (err: any) {
+      toast({
+        description: typeof err === "string" ? err : "Could not join as player.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsJoiningAsPlayer(false);
+    }
   };
 
   const handleLeaveCompletedRoom = (target = "/") => {
@@ -1725,6 +1768,16 @@ export default function Room() {
                 ? "Watching the table — the King defends their seat, challengers rotate in. Hands stay hidden; you'll see bids, tricks, and scores live."
                 : "Waiting for the players to start. Hands stay hidden — you'll see bids, tricks, and scores live."}
             </p>
+            {gameState.phase === "waiting" && gameState.mode === "quick" && gameState.players.some((p) => !p) && !gameState.tournamentRef && (
+              <Button
+                onClick={handleSpectatorJoinAsPlayer}
+                disabled={isJoiningAsPlayer}
+                data-testid="button-spectator-join-as-player"
+                className="w-full min-h-[44px] bg-primary hover:bg-primary/90 font-bold"
+              >
+                {isJoiningAsPlayer ? "Joining..." : "Join as Player"}
+              </Button>
+            )}
             <Button
               variant="ghost"
               onClick={handleLeaveSpectate}

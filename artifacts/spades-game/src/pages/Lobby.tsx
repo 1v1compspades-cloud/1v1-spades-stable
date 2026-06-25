@@ -598,6 +598,9 @@ export default function Lobby() {
           return;
         }
         if (await blockIfActiveGame()) return;
+        clearPersistedRoomSession(code);
+        savePlayerIndex(null);
+        saveIsSpectator(false);
         const res = await joinRoom(code, displayName, profile, optionalAccountIdentity());
         if (res.playerIndex !== undefined) {
           saveRoomCode(code);
@@ -650,6 +653,7 @@ export default function Lobby() {
     const profile = optionalProfileUsername();
     setIsSpectating(true);
     try {
+      clearPersistedRoomSession(code);
       saveProfileUsername(profile ?? "");
       savePlayerIndex(null);
       saveIsSpectator(true);
