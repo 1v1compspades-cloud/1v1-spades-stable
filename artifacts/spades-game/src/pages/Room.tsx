@@ -2524,8 +2524,13 @@ export default function Room() {
     const biddingNow = gameState.phase === "bidding";
     const playingNow = gameState.phase === "playing";
     const isMyPlayTurn = playingNow && gameState.currentTurnIndex === playerIndex;
+    const mySeat = playerIndex as 0 | 1;
+    const myBid = gameState.bids[mySeat];
+    const myTricks = gameState.tricks[mySeat] ?? 0;
+    const showMyHandStats = myBid !== null && (biddingNow || playingNow || gameState.phase === "round_over");
+    const myBidLabel = myBid === null ? "—" : myBid === 0 ? "Nil" : String(myBid);
     const playableCards = gameState.hand.filter((card) =>
-      isCardPlayable(card, gameState, playerIndex as 0 | 1)
+      isCardPlayable(card, gameState, mySeat)
     );
     const handHint = biddingNow
       ? "Review your cards, then choose a bid."
@@ -2552,7 +2557,7 @@ export default function Room() {
         <div
           data-testid="hand-turn-hint"
           className={cn(
-            "sticky left-0 z-10 mx-2 mb-2 flex w-[calc(100vw-1rem)] items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs font-bold uppercase tracking-widest backdrop-blur-sm sm:mx-3 sm:w-[calc(100vw-1.5rem)]",
+            "sticky left-0 z-10 mx-2 mb-2 flex w-[calc(100vw-1rem)] flex-col items-stretch gap-2 rounded-lg border px-3 py-2 text-xs font-bold uppercase tracking-widest backdrop-blur-sm sm:mx-3 sm:w-[calc(100vw-1.5rem)]",
             isMyPlayTurn
               ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200"
               : playingNow
@@ -2560,20 +2565,45 @@ export default function Room() {
                 : "border-primary/35 bg-black/45 text-primary"
           )}
         >
-          <span className="min-w-0 flex-1 text-center leading-snug">{handHint}</span>
-          {canForfeit && (
-            <button
-              type="button"
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
-                event.stopPropagation();
-                setForfeitConfirmOpen(true);
-              }}
-              data-testid="button-forfeit"
-              className="shrink-0 rounded-md border border-red-500/45 bg-red-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-red-200 shadow-sm transition hover:bg-red-500/15 active:scale-95"
+          <div className="flex w-full items-center justify-between gap-2">
+            <span className="min-w-0 flex-1 text-center leading-snug">{handHint}</span>
+            {canForfeit && (
+              <button
+                type="button"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setForfeitConfirmOpen(true);
+                }}
+                data-testid="button-forfeit"
+                className="shrink-0 rounded-md border border-red-500/45 bg-red-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-red-200 shadow-sm transition hover:bg-red-500/15 active:scale-95"
+              >
+                Forfeit
+              </button>
+            )}
+          </div>
+          {showMyHandStats && (
+            <div
+              data-testid="my-hand-bid-tricks"
+              className="grid grid-cols-2 gap-2 sm:hidden"
             >
-              Forfeit
-            </button>
+              <div className="rounded-md border border-white/15 bg-black/35 px-2 py-1.5 text-center">
+                <span className="block text-[8px] leading-none tracking-[0.18em] text-muted-foreground">Bid</span>
+                <span className="mt-1 block font-mono text-sm font-black leading-none text-foreground">{myBidLabel}</span>
+              </div>
+              <div className="rounded-md border border-white/15 bg-black/35 px-2 py-1.5 text-center">
+                <span className="block text-[8px] leading-none tracking-[0.18em] text-muted-foreground">Tricks</span>
+                <span
+                  className={cn(
+                    "mt-1 block font-mono text-sm font-black leading-none text-foreground",
+                    myBid !== null && myTricks > myBid && "text-yellow-300",
+                    myBid !== null && myTricks === myBid && "text-emerald-300"
+                  )}
+                >
+                  {myTricks}
+                </span>
+              </div>
+            </div>
           )}
         </div>
         <div className="flex flex-nowrap items-end gap-1 px-2 sm:gap-2 sm:px-3 sm:justify-center min-w-min">
