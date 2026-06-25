@@ -162,6 +162,27 @@ export default function Room() {
   const [coinTossRevealed, setCoinTossRevealed] = useState(false);
 
   useEffect(() => {
+    const setVisualViewportBottom = () => {
+      const viewport = window.visualViewport;
+      const bottomOffset = viewport
+        ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
+        : 0;
+      document.documentElement.style.setProperty("--spades-visual-bottom", `${Math.ceil(bottomOffset)}px`);
+    };
+
+    setVisualViewportBottom();
+    window.visualViewport?.addEventListener("resize", setVisualViewportBottom);
+    window.visualViewport?.addEventListener("scroll", setVisualViewportBottom);
+    window.addEventListener("resize", setVisualViewportBottom);
+
+    return () => {
+      window.visualViewport?.removeEventListener("resize", setVisualViewportBottom);
+      window.visualViewport?.removeEventListener("scroll", setVisualViewportBottom);
+      window.removeEventListener("resize", setVisualViewportBottom);
+    };
+  }, []);
+
+  useEffect(() => {
     if (gameState?.phase !== "coin_toss" || gameState.coinFlipWinner === null) {
       setCoinTossRevealed(false);
       return;
@@ -2524,6 +2545,7 @@ export default function Room() {
         className={cn(
           "spades-hand-tray relative flex-shrink-0 overflow-x-auto overflow-y-hidden snap-x pt-2 pb-hand-safe border-t shadow-[0_-10px_34px_-24px_hsla(35,90%,55%,0.5)] touch-pan-x",
           biddingNow && "spades-hand-tray--bidding z-[130] ring-1 ring-primary/35 cursor-grab active:cursor-grabbing",
+          playingNow && "spades-hand-tray--playing",
           isMyPlayTurn && "ring-2 ring-emerald-400/50"
         )}
       >

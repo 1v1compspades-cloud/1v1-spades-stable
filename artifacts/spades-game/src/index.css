@@ -699,6 +699,17 @@
     border-color: rgba(245, 197, 24, 0.28);
   }
 
+  @media (max-width: 639px) {
+    .spades-hand-tray--playing {
+      position: fixed !important;
+      left: env(safe-area-inset-left);
+      right: env(safe-area-inset-right);
+      bottom: calc(max(env(safe-area-inset-bottom), var(--spades-visual-bottom, 0px)) + 0.5rem);
+      z-index: 150;
+      padding-bottom: calc(env(safe-area-inset-bottom) + 0.75rem) !important;
+    }
+  }
+
   .spades-gameplay-screen--bidding {
     height: auto !important;
     min-height: 100dvh;
