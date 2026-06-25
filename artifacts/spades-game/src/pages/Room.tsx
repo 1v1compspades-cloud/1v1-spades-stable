@@ -1418,7 +1418,9 @@ export default function Room() {
     const oppReady   = !!gameState.ready?.[opponentIdx];
     const bothPresent = !!me && !!opponent;
     const bothReady   = bothPresent && myReady && oppReady;
-    const canStart    = isHost && bothReady;
+    const isTournamentMatch = !!gameState.tournamentRef;
+    const showStartButton = isTournamentMatch;
+    const canStartTournament = isTournamentMatch && bothReady;
 
     const statusMsg = isKingMode
       ? (!opponent
@@ -1558,17 +1560,6 @@ export default function Room() {
               </div>
             </div>
 
-            {/* Player panels */}
-            <div className="px-5 py-5 space-y-3 border-b border-primary/20">
-              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                Players
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {renderPlayerPanel(0, { selfIndex: playerIndex })}
-                {renderPlayerPanel(1, { selfIndex: playerIndex })}
-              </div>
-            </div>
-
             {/* Readiness actions */}
             <div className="px-5 py-5 space-y-3 border-b border-primary/20">
               <div
@@ -1583,7 +1574,7 @@ export default function Room() {
 
               <PreGameChecklist />
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className={cn("grid grid-cols-1 gap-2", showStartButton && "sm:grid-cols-2")}>
                 <Button
                   onClick={handleToggleReady}
                   data-testid="button-ready-up"
@@ -1596,40 +1587,35 @@ export default function Room() {
                 >
                   {myReady ? "✓ Ready (Tap to Cancel)" : "Ready Up"}
                 </Button>
-                {(() => {
-                  // Pre-June-1 bugfix #6: in tournament match rooms, BOTH
-                  // players see the Start button (server now accepts start_game
-                  // from either seat in a tournament room). Non-tournament
-                  // rooms keep the room-host-only gating.
-                  const isTournamentMatch = !!gameState.tournamentRef;
-                  const canIStart = isTournamentMatch ? bothReady : canStart;
-                  const showStart = isTournamentMatch || isHost;
-                  return showStart ? (
-                    <Button
-                      onClick={handleStartGame}
-                      disabled={!canIStart}
-                      data-testid="button-start-match"
-                      variant="default"
-                      className="min-h-[48px] text-base font-bold tracking-wide bg-amber-500 hover:bg-amber-500/90 text-black disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed active:scale-[0.98] transition-transform"
-                    >
-                      Start Match
-                    </Button>
-                  ) : (
-                    <div
-                      className="min-h-[48px] flex items-center justify-center text-xs text-muted-foreground italic border border-dashed border-border rounded-md"
-                      data-testid="lobby-host-only-hint"
-                    >
-                      Host controls the start
-                    </div>
-                  );
-                })()}
+                {showStartButton && (
+                  <Button
+                    onClick={handleStartGame}
+                    disabled={!canStartTournament}
+                    data-testid="button-start-match"
+                    variant="default"
+                    className="min-h-[48px] text-base font-bold tracking-wide bg-amber-500 hover:bg-amber-500/90 text-black disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed active:scale-[0.98] transition-transform"
+                  >
+                    Start Match
+                  </Button>
+                )}
               </div>
 
-              {isHost && !bothReady && opponent && (
+              {showStartButton && !bothReady && opponent && (
                 <p className="text-[10px] text-muted-foreground text-center px-2">
-                  Start Match unlocks once both players are ready.
+                  Tournament start unlocks once both players are ready.
                 </p>
               )}
+            </div>
+
+            {/* Player panels */}
+            <div className="px-5 py-5 space-y-3 border-b border-primary/20">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                Players
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {renderPlayerPanel(0, { selfIndex: playerIndex })}
+                {renderPlayerPanel(1, { selfIndex: playerIndex })}
+              </div>
             </div>
 
             {/* Match settings */}
