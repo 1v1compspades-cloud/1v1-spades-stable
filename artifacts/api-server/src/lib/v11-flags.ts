@@ -11,5 +11,14 @@ export function isV11FlagEnabled(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
   const value = env[name];
-  return value === "1" || value === "true" || value === "yes";
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "0" || normalized === "false" || normalized === "no") return false;
+    return normalized === "1" || normalized === "true" || normalized === "yes";
+  }
+
+  return (
+    env.NODE_ENV === "production" &&
+    name !== "V11_TOURNAMENTS_ENABLED"
+  );
 }

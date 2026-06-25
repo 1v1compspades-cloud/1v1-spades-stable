@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { isV11FlagEnabled, type V11FlagName } from "../v11-flags.ts";
 
 const serverFlags = [
   "V11_ACCOUNTS_ENABLED",
@@ -29,7 +30,7 @@ type V11Feature =
   | "tournaments"
   | "accountRecovery";
 
-const envByFeature: Record<V11Feature, string> = {
+const envByFeature: Record<V11Feature, V11FlagName> = {
   accounts: "V11_ACCOUNTS_ENABLED",
   usernames: "V11_USERNAMES_ENABLED",
   leaderboards: "V11_LEADERBOARDS_ENABLED",
@@ -37,10 +38,6 @@ const envByFeature: Record<V11Feature, string> = {
   tournaments: "V11_TOURNAMENTS_ENABLED",
   accountRecovery: "V11_ACCOUNT_RECOVERY_ENABLED",
 };
-
-function enabled(value: string | undefined): boolean {
-  return value === "1" || value === "true" || value === "yes";
-}
 
 function normalizeUsername(input: string): string {
   return input.trim().toLowerCase().replace(/\s+/g, "_");
@@ -90,22 +87,23 @@ test("v1.1 scaffold keeps all planned feature flags explicit", () => {
   ]);
 });
 
-test("v1.1 feature flags require explicit opt-in values", () => {
+test("v1.1 feature flags keep local opt-in and production public defaults", () => {
   const key = envByFeature.accounts;
 
-  assert.equal(enabled("1"), true);
-  assert.equal(enabled("true"), true);
-  assert.equal(enabled("yes"), true);
-  assert.equal(enabled("0"), false);
-  assert.equal(enabled(undefined), false);
-
-  const flagSource = readFileSync(
-    fileURLToPath(new URL("../v11-flags.ts", import.meta.url)),
-    "utf8",
+  assert.equal(isV11FlagEnabled(key, { [key]: "1" } as NodeJS.ProcessEnv), true);
+  assert.equal(isV11FlagEnabled(key, { [key]: "true" } as NodeJS.ProcessEnv), true);
+  assert.equal(isV11FlagEnabled(key, { [key]: "yes" } as NodeJS.ProcessEnv), true);
+  assert.equal(isV11FlagEnabled(key, { [key]: "0" } as NodeJS.ProcessEnv), false);
+  assert.equal(isV11FlagEnabled(key, {} as NodeJS.ProcessEnv), false);
+  assert.equal(isV11FlagEnabled(key, { NODE_ENV: "production" } as NodeJS.ProcessEnv), true);
+  assert.equal(
+    isV11FlagEnabled(key, { NODE_ENV: "production", [key]: "false" } as NodeJS.ProcessEnv),
+    false,
   );
-  assert.match(flagSource, /value === "1"/);
-  assert.match(flagSource, /value === "true"/);
-  assert.match(flagSource, /value === "yes"/);
+  assert.equal(
+    isV11FlagEnabled("V11_TOURNAMENTS_ENABLED", { NODE_ENV: "production" } as NodeJS.ProcessEnv),
+    false,
+  );
 });
 
 test("v1.1 username planning uses stable normalization examples", () => {
