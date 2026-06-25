@@ -32,6 +32,7 @@ type FindMatchErrorPayload = {
 type OnlineCountUpdate = {
   onlineCount: number;
   findingMatchCount: number;
+  rankedFindingMatchCount?: number;
 };
 
 export default function Lobby() {
@@ -274,6 +275,7 @@ export default function Lobby() {
       setOnlineCounts({
         onlineCount: Math.max(0, payload.onlineCount),
         findingMatchCount: Math.max(0, payload.findingMatchCount),
+        rankedFindingMatchCount: Math.max(0, payload.rankedFindingMatchCount ?? 0),
       });
     };
     socket.on("online_count_update", onOnlineCountUpdate);
@@ -884,6 +886,7 @@ export default function Lobby() {
 
   const onlineCountLabel = onlineCounts?.onlineCount ?? 0;
   const findingMatchCountLabel = onlineCounts?.findingMatchCount ?? 0;
+  const rankedFindingMatchCountLabel = onlineCounts?.rankedFindingMatchCount ?? 0;
   const accountSummary = hasRankedAccount
     ? accountUsername
     : hasAccountIdentity
@@ -1412,7 +1415,7 @@ export default function Lobby() {
                     className="mt-4 rounded border border-emerald-500/20 bg-black/20 px-3 py-2 text-center text-xs font-medium text-muted-foreground"
                     data-testid="online-count-indicator"
                   >
-                    Online: {onlineCountLabel} · Finding match: {findingMatchCountLabel}
+                    Online: {onlineCountLabel} · Finding casual: {findingMatchCountLabel}
                   </p>
                   {isFindingMatch ? (
                     <div className="mt-4 space-y-3">
@@ -1460,6 +1463,12 @@ export default function Lobby() {
                       <span className="rounded border border-primary/20 bg-black/20 px-2 py-2">Season: v1_1_beta</span>
                       <span className="rounded border border-primary/20 bg-black/20 px-2 py-2 text-right">{matchTarget} pts</span>
                     </div>
+                    <p
+                      className="mt-3 rounded border border-primary/20 bg-black/20 px-3 py-2 text-center text-xs font-medium text-muted-foreground"
+                      data-testid="ranked-online-count-indicator"
+                    >
+                      Online: {onlineCountLabel} · Finding ranked: {rankedFindingMatchCountLabel}
+                    </p>
                     {isFindingRankedMatch ? (
                       <div className="mt-4 space-y-3">
                         <p className="text-center text-sm font-semibold text-primary">Finding ranked opponent...</p>
@@ -1497,11 +1506,9 @@ export default function Lobby() {
           )}
 
           <section className="space-y-3 rounded-md border border-border/40 bg-white/[0.03] p-3" data-testid="private-match-section">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-sm font-semibold uppercase tracking-widest text-primary">Private Match</h2>
-                <p className="text-xs text-muted-foreground">Create a room or join with a code.</p>
-              </div>
+            <div className="text-center">
+              <h2 className="text-sm font-semibold uppercase tracking-widest text-primary">Private Match</h2>
+              <p className="text-xs text-muted-foreground">Create a room or join with a code.</p>
             </div>
             <div className="grid gap-3 md:grid-cols-[1fr_1.2fr]">
               <Button
@@ -1542,52 +1549,38 @@ export default function Lobby() {
 
           <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
             <section className="space-y-3 rounded-md border border-primary/30 bg-white/[0.03] p-3">
-              <div className="space-y-1">
-                <h2 className="text-sm font-semibold uppercase tracking-widest text-primary">Quick Access</h2>
+              <div className="space-y-1 text-center">
+                <h2 className="text-sm font-semibold uppercase tracking-widest text-primary">Spectators Join Here</h2>
                 <p className="text-xs text-muted-foreground">
-                  Watch a room by code, or jump straight into a random table.
+                  Enter a room code to watch scores, bids, and tricks live.
                 </p>
               </div>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+              <div className="grid gap-2 sm:grid-cols-[1fr_auto] lg:grid-cols-1 xl:grid-cols-[1fr_auto]">
+                <Input
+                  placeholder="Room code"
+                  value={joinCodeInput}
+                  onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter") return;
+                    if (isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch || !joinCodeInput.trim()) return;
+                    e.preventDefault();
+                    void handleSpectate();
+                  }}
+                  className="h-12 text-center uppercase font-mono placeholder:normal-case placeholder:font-sans placeholder:tracking-normal"
+                  maxLength={6}
+                  data-testid="input-spectate-code"
+                />
                 <Button
                   onClick={handleSpectate}
                   disabled={isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch || !joinCodeInput}
-                  variant="ghost"
-                  className="h-12 justify-start text-sm font-medium border border-dashed border-border hover:border-primary/50"
+                  variant="secondary"
+                  className="h-12 px-6 text-sm font-semibold"
                   data-testid="button-spectate"
                 >
-                  {isSpectating ? "Joining..." : "Watch by Code"}
+                  {isSpectating ? "Joining..." : "Watch Room"}
                 </Button>
-                {v11WebFlags.matchmaking && (
-                  <Button
-                    type="button"
-                    onClick={() => void handleFindMatch()}
-                    disabled={isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch || !connected}
-                    variant="secondary"
-                    className="h-12 justify-start text-sm font-semibold"
-                    data-testid="button-quick-random-casual"
-                  >
-                    {isFindingMatch ? "Finding..." : "Random Casual"}
-                  </Button>
-                )}
-                {v11WebFlags.matchmaking && v11WebFlags.accounts && (
-                  <Button
-                    type="button"
-                    onClick={handleRankedPrimaryAction}
-                    disabled={isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch || !connected}
-                    variant={hasRankedAccount ? "default" : "secondary"}
-                    className="h-12 justify-start text-sm font-semibold sm:col-span-2 lg:col-span-1 xl:col-span-2"
-                    data-testid="button-quick-random-ranked"
-                  >
-                    {isFindingRankedMatch
-                      ? "Finding ranked..."
-                      : hasRankedAccount
-                        ? "Random Ranked"
-                        : "Create Ranked Profile"}
-                  </Button>
-                )}
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-center text-xs text-muted-foreground">
                 Spectators see scores, bids, and tricks live without hidden hands.
               </p>
             </section>

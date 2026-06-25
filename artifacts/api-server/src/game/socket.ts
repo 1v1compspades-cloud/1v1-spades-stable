@@ -1961,6 +1961,10 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
     },
     timeoutMs: getFindMatchTimeoutMs,
     matchPlayers: (first, second) => createFindMatchRoom(io, first, second, { ranked: true }),
+    onWaitingCountChange: (count) => {
+      onlinePresence.setRankedFindingMatchCount(count);
+      emitOnlineCountUpdate();
+    },
   });
 
   io.on("connection", (socket) => {

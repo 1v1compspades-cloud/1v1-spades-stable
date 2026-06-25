@@ -62,7 +62,7 @@ export function V11LeaderboardPanel() {
       className="space-y-2 rounded-md border border-primary/30 bg-white/[0.03] p-3"
       data-testid="v11-leaderboard-panel"
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="space-y-2 text-center">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-widest text-primary">
             Top Players

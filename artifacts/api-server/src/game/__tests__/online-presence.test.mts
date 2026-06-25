@@ -39,12 +39,19 @@ ok("online count increments on second socket", two.onlineCount === 2, two);
 const finding = tracker.setFindingMatchCount(1);
 ok("finding match count can be set", finding.findingMatchCount === 1, finding);
 
+const rankedFinding = tracker.setRankedFindingMatchCount(1);
+ok("ranked finding match count can be set", rankedFinding.rankedFindingMatchCount === 1, rankedFinding);
+
 const afterOneDisconnect = tracker.disconnect("socket-a");
 ok("online count decrements on disconnect", afterOneDisconnect.onlineCount === 1, afterOneDisconnect);
 ok("finding match count is preserved across ordinary disconnect", afterOneDisconnect.findingMatchCount === 1, afterOneDisconnect);
+ok("ranked finding match count is preserved across ordinary disconnect", afterOneDisconnect.rankedFindingMatchCount === 1, afterOneDisconnect);
 
 const cleared = tracker.setFindingMatchCount(0);
 ok("finding match count clears", cleared.findingMatchCount === 0, cleared);
+
+const rankedCleared = tracker.setRankedFindingMatchCount(0);
+ok("ranked finding match count clears", rankedCleared.rankedFindingMatchCount === 0, rankedCleared);
 
 const afterUnknownDisconnect = tracker.disconnect("missing-socket");
 ok("unknown disconnect is idempotent", afterUnknownDisconnect.onlineCount === 1, afterUnknownDisconnect);
