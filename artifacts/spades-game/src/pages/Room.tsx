@@ -1976,112 +1976,113 @@ export default function Room() {
               className="fixed inset-0 z-[220] flex items-start justify-center overflow-y-auto pointer-events-none px-2 pt-[calc(env(safe-area-inset-top)+10.25rem)] pb-[calc(env(safe-area-inset-bottom)+11rem)] sm:items-center sm:p-4"
               data-testid="bidding-overlay"
             >
-              <div className="bg-card/96 border border-border p-3 sm:p-5 rounded-xl shadow-2xl space-y-3 w-full max-w-[min(34rem,calc(100vw-1rem))] text-center max-h-[calc(100dvh-22rem)] min-[420px]:max-h-[calc(100dvh-20rem)] sm:max-h-[80dvh] overflow-y-auto overscroll-contain pointer-events-auto backdrop-blur-md">
-                <h3 className="text-sm sm:text-lg font-serif text-primary">Place your bid</h3>
-                {gameState.bids[0] === null && gameState.bids[1] === null && (
-                  <p className="text-[9px] sm:text-[11px] uppercase tracking-widest text-primary/80 leading-tight">
-                    You bid first this round (Round {gameState.roundNumber})
+              <div className="bg-card/96 border border-border p-3 sm:p-5 rounded-xl shadow-2xl w-full max-w-[min(34rem,calc(100vw-1rem))] text-center max-h-[calc(100dvh-22rem)] min-[420px]:max-h-[calc(100dvh-20rem)] sm:max-h-[80dvh] overflow-hidden pointer-events-auto backdrop-blur-md flex flex-col">
+                <div className="min-h-0 overflow-y-auto overscroll-contain pr-1 space-y-3">
+                  <h3 className="text-sm sm:text-lg font-serif text-primary">Place your bid</h3>
+                  {gameState.bids[0] === null && gameState.bids[1] === null && (
+                    <p className="text-[9px] sm:text-[11px] uppercase tracking-widest text-primary/80 leading-tight">
+                      You bid first this round (Round {gameState.roundNumber})
+                    </p>
+                  )}
+                  {(gameState.bids[0] !== null || gameState.bids[1] !== null) && (
+                    <p className="text-[9px] sm:text-[11px] uppercase tracking-widest text-muted-foreground leading-tight">
+                      You bid second this round
+                    </p>
+                  )}
+                  <p className="text-[10px] sm:text-xs text-muted-foreground leading-tight">
+                    You have {gameState.hand.length} cards. Bid 0 for Nil (+/−100).
                   </p>
-                )}
-                {(gameState.bids[0] !== null || gameState.bids[1] !== null) && (
-                  <p className="text-[9px] sm:text-[11px] uppercase tracking-widest text-muted-foreground leading-tight">
-                    You bid second this round
-                  </p>
-                )}
-                <p className="text-[10px] sm:text-xs text-muted-foreground leading-tight">
-                  You have {gameState.hand.length} cards. Bid 0 for Nil (+/−100).
-                </p>
-                {(() => {
-                  const mySeat = playerIndex as 0 | 1;
-                  const oppSeat = mySeat === 0 ? 1 : 0;
-                  const oppBid = gameState.bids[oppSeat];
-                  const oppName = gameState.players[oppSeat]?.name ?? `Seat ${oppSeat + 1}`;
-                  const oppBidLabel = oppBid === null ? "No bid yet" : oppBid === 0 ? "Nil" : String(oppBid);
-                  const myName = gameState.players[mySeat]?.name ?? "You";
-                  const myScore = gameState.scores[mySeat] ?? 0;
-                  const oppScore = gameState.scores[oppSeat] ?? 0;
-                  const opponentStats = [
-                    { label: "Score", value: `${oppScore} / ${gameState.matchTarget}` },
-                    { label: "Bags", value: gameState.bags[oppSeat] },
-                    { label: "Cards", value: gameState.handSizes?.[oppSeat] ?? 0 },
-                  ];
+                  {(() => {
+                    const mySeat = playerIndex as 0 | 1;
+                    const oppSeat = mySeat === 0 ? 1 : 0;
+                    const oppBid = gameState.bids[oppSeat];
+                    const oppName = gameState.players[oppSeat]?.name ?? `Seat ${oppSeat + 1}`;
+                    const oppBidLabel = oppBid === null ? "No bid yet" : oppBid === 0 ? "Nil" : String(oppBid);
+                    const myName = gameState.players[mySeat]?.name ?? "You";
+                    const myScore = gameState.scores[mySeat] ?? 0;
+                    const oppScore = gameState.scores[oppSeat] ?? 0;
+                    const opponentStats = [
+                      { label: "Score", value: `${oppScore} / ${gameState.matchTarget}` },
+                      { label: "Bags", value: gameState.bags[oppSeat] },
+                    ];
 
-                  return (
-                    <div className="space-y-2">
-                      <div
-                        data-testid="bidding-score-summary"
-                        className="grid grid-cols-2 gap-2 rounded-lg border border-primary/35 bg-black/55 px-3 py-2 text-left"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-[9px] font-bold uppercase tracking-widest text-muted-foreground">You</p>
-                          <p className="truncate text-sm font-black tabular-nums text-foreground">{myScore} pts</p>
-                          <p className="truncate text-[9px] text-muted-foreground">{myName}</p>
-                        </div>
-                        <div className="min-w-0 text-right">
-                          <p className="truncate text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Opponent</p>
-                          <p className="truncate text-sm font-black tabular-nums text-foreground">{oppScore} pts</p>
-                          <p className="truncate text-[9px] text-muted-foreground">{oppName}</p>
-                        </div>
-                      </div>
-
-                      <div
-                        data-testid="bidding-opponent-bid"
-                        className="rounded-lg border border-primary/35 bg-black/50 px-3 py-2 text-left"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                            {oppName} bid this round
-                          </span>
-                          <span className="shrink-0 rounded-md border border-primary/40 bg-primary/10 px-3 py-1 font-mono text-sm font-black text-primary whitespace-nowrap">
-                            {oppBidLabel}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="mt-2 grid grid-cols-3 gap-1.5">
-                        {opponentStats.map((stat) => (
-                          <div
-                            key={stat.label}
-                            className="rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-1 text-center"
-                          >
-                            <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
-                              {stat.label}
-                            </div>
-                            <div className="mt-0.5 font-mono text-[11px] sm:text-xs font-black text-foreground tabular-nums">
-                              {stat.value}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
-                <div
-                  data-testid="bid-buttons"
-                  className="grid grid-cols-7 gap-1 w-full pb-12 sm:gap-2 sm:pb-14"
-                >
-                  {Array.from({ length: 14 }).map((_, i) => {
-                    const val = i.toString();
-                    const selected = bidAmount === val;
                     return (
-                      <button
-                        key={i}
-                        type="button"
-                        data-testid={`bid-btn-${i}`}
-                        onClick={() => setBidAmount(val)}
-                        className={cn(
-                          "min-h-[32px] sm:min-h-[44px] rounded-md sm:rounded-lg border text-[11px] sm:text-sm font-bold tabular-nums transition-colors",
-                          selected
-                            ? "bg-primary text-primary-foreground border-primary shadow-md"
-                            : "bg-white/[0.04] text-foreground border-white/20 hover:bg-white/[0.08] active:bg-white/10"
-                        )}
-                      >
-                        {i === 0 ? "Nil" : i}
-                      </button>
+                      <div className="space-y-2">
+                        <div
+                          data-testid="bidding-score-summary"
+                          className="grid grid-cols-2 gap-2 rounded-lg border border-primary/35 bg-black/55 px-3 py-2 text-left"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-[9px] font-bold uppercase tracking-widest text-muted-foreground">You</p>
+                            <p className="truncate text-sm font-black tabular-nums text-foreground">{myScore} pts</p>
+                            <p className="truncate text-[9px] text-muted-foreground">{myName}</p>
+                          </div>
+                          <div className="min-w-0 text-right">
+                            <p className="truncate text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Opponent</p>
+                            <p className="truncate text-sm font-black tabular-nums text-foreground">{oppScore} pts</p>
+                            <p className="truncate text-[9px] text-muted-foreground">{oppName}</p>
+                          </div>
+                        </div>
+
+                        <div
+                          data-testid="bidding-opponent-bid"
+                          className="rounded-lg border border-primary/35 bg-black/50 px-3 py-2 text-left"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                              {oppName} bid this round
+                            </span>
+                            <span className="shrink-0 rounded-md border border-primary/40 bg-primary/10 px-3 py-1 font-mono text-sm font-black text-primary whitespace-nowrap">
+                              {oppBidLabel}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="mt-2 grid grid-cols-2 gap-1.5">
+                          {opponentStats.map((stat) => (
+                            <div
+                              key={stat.label}
+                              className="rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-1 text-center"
+                            >
+                              <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
+                                {stat.label}
+                              </div>
+                              <div className="mt-0.5 font-mono text-[11px] sm:text-xs font-black text-foreground tabular-nums">
+                                {stat.value}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     );
-                  })}
+                  })()}
+                  <div
+                    data-testid="bid-buttons"
+                    className="grid grid-cols-7 gap-1 w-full sm:gap-2"
+                  >
+                    {Array.from({ length: 14 }).map((_, i) => {
+                      const val = i.toString();
+                      const selected = bidAmount === val;
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          data-testid={`bid-btn-${i}`}
+                          onClick={() => setBidAmount(val)}
+                          className={cn(
+                            "min-h-[32px] sm:min-h-[44px] rounded-md sm:rounded-lg border text-[11px] sm:text-sm font-bold tabular-nums transition-colors",
+                            selected
+                              ? "bg-primary text-primary-foreground border-primary shadow-md"
+                              : "bg-white/[0.04] text-foreground border-white/20 hover:bg-white/[0.08] active:bg-white/10"
+                          )}
+                        >
+                          {i === 0 ? "Nil" : i}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="sticky bottom-0 -mx-2.5 -mb-2.5 px-2.5 pt-1.5 pb-2.5 sm:-mx-5 sm:-mb-5 sm:px-5 sm:pt-2 sm:pb-5 bg-card/96">
+                <div className="mt-3 border-t border-border/70 bg-card/96 pt-3">
                   <Button
                     onClick={handleBid}
                     disabled={!bidAmount || isSubmitting}
