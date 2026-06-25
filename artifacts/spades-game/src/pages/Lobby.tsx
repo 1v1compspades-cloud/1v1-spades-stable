@@ -967,7 +967,7 @@ export default function Lobby() {
                   <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
                     {accountPanelTitle}
                   </p>
-                  <p className="mt-1 truncate text-base font-semibold text-foreground">
+                  <p className="mt-1 text-sm font-semibold leading-snug text-foreground sm:text-base">
                     {accountSummary}
                   </p>
                   {hasRankedAccount && recoveryEnabled && (
