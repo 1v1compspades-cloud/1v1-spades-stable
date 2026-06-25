@@ -321,10 +321,12 @@
 
 .spades-live-coin__face--heads {
   transform: translateZ(0.04rem);
+  -webkit-transform: translateZ(0.04rem);
 }
 
 .spades-live-coin__face--tails {
   transform: rotateY(180deg) translateZ(0.04rem);
+  -webkit-transform: rotateY(180deg) translateZ(0.04rem);
 }
 
 .spades-live-coin__rim {
@@ -472,16 +474,41 @@
 
 .spades-live-coin__animal-tail {
   position: absolute;
-  right: 0.12rem;
-  bottom: 0.58rem;
+  right: -0.22rem;
+  top: 1.3rem;
+  z-index: 4;
+  display: grid;
+  width: 2.55rem;
+  height: 2.55rem;
+  place-items: center;
   color: var(--diamond-white);
-  font-size: 2.25rem;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2.85rem;
+  font-weight: 900;
   line-height: 1;
-  transform: rotate(31deg);
+  transform: translateZ(0.12rem) rotate(31deg);
+  -webkit-transform: translateZ(0.12rem) rotate(31deg);
+  -webkit-text-stroke: 0.04rem var(--diamond-silver);
   text-shadow:
     -0.04rem -0.04rem 0 var(--diamond-silver),
     0 0.18rem 0.42rem rgba(0, 0, 0, 0.9),
     0 0 0.45rem rgba(248, 251, 255, 0.24);
+}
+
+.spades-live-coin__animal-tail::before {
+  content: "";
+  position: absolute;
+  left: -1.18rem;
+  top: 1.12rem;
+  z-index: -1;
+  width: 1.7rem;
+  height: 0.48rem;
+  border-top: 0.18rem solid var(--diamond-silver);
+  border-radius: 999px;
+  transform: rotate(-16deg);
+  box-shadow:
+    0 -0.05rem 0 rgba(248, 251, 255, 0.42),
+    0 0.14rem 0.34rem rgba(0, 0, 0, 0.72);
 }
 
 @media (max-width: 430px) {
@@ -497,6 +524,19 @@
 
   .spades-live-coin__mark {
     font-size: 2.65rem;
+  }
+
+  .spades-live-coin__animal {
+    width: 5.1rem;
+    height: 4.15rem;
+  }
+
+  .spades-live-coin__animal-tail {
+    right: -0.28rem;
+    top: 1.16rem;
+    width: 2.35rem;
+    height: 2.35rem;
+    font-size: 2.58rem;
   }
 }
 
