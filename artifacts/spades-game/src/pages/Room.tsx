@@ -6,7 +6,10 @@ import { CardComponent } from "@/components/Card";
 import { ConnectionRecoveryActions } from "@/components/ConnectionRecoveryActions";
 import { ShuffleOverlay } from "@/components/ShuffleOverlay";
 import { isCardPlayable, sortHandBySuit, SUIT_SYMBOLS, SUIT_COLORS } from "@/lib/game";
-import { shouldClearSavedReconnectAfterFailure } from "@/lib/reconnectSession";
+import {
+  shouldClearSavedReconnectAfterFailure,
+  shouldRetryReconnectAfterFailure,
+} from "@/lib/reconnectSession";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -193,6 +196,17 @@ export default function Room() {
       reconnectRetryTimeoutRef.current = null;
     }
     reconnectRetryCountRef.current = 0;
+  };
+
+  const scheduleReconnectRetry = (delayMs = 1500): boolean => {
+    if (reconnectRetryCountRef.current >= 20) return false;
+    if (reconnectRetryTimeoutRef.current !== null) return true;
+    reconnectRetryCountRef.current += 1;
+    reconnectRetryTimeoutRef.current = window.setTimeout(() => {
+      reconnectRetryTimeoutRef.current = null;
+      setReconnectRetryTick(tick => tick + 1);
+    }, delayMs);
+    return true;
   };
 
   // Tick every 15s so AFK indicators re-render without depending on socket events.
@@ -527,19 +541,12 @@ export default function Room() {
           typeof window !== "undefined"
             ? window.localStorage.getItem(`spades_room_tournament_${roomCode}`)
             : null;
-        if (/seat already active in another tab/i.test(msg)) {
-          if (reconnectRetryCountRef.current < 20) {
-            if (reconnectRetryTimeoutRef.current === null) {
-              reconnectRetryCountRef.current += 1;
-              reconnectRetryTimeoutRef.current = window.setTimeout(() => {
-                reconnectRetryTimeoutRef.current = null;
-                setReconnectRetryTick(tick => tick + 1);
-              }, 1500);
-            }
-            return;
-          }
+        if (shouldRetryReconnectAfterFailure(msg)) {
+          if (scheduleReconnectRetry(/seat already active in another tab/i.test(msg) ? 1500 : 2500)) return;
           toast({
-            description: "That seat is still active in another tab. Close the old tab, then try Reconnect again.",
+            description: /seat already active in another tab/i.test(msg)
+              ? "That seat is still active in another tab. Close the old tab, then try Reconnect again."
+              : "Still reconnecting. Check your connection or refresh this page.",
             variant: "destructive",
           });
           return;

@@ -57,15 +57,7 @@ export const shouldClearSavedReconnectAfterAvailabilityCheck = (input: {
 
 export const shouldClearSavedReconnectAfterFailure = (message: unknown): boolean => {
   const text = String(message || "").toLowerCase();
-  const retryable =
-    text.includes("temporarily unavailable") ||
-    text.includes("please retry") ||
-    text.includes("try again") ||
-    text.includes("network") ||
-    text.includes("timeout") ||
-    text.includes("offline") ||
-    text.includes("seat already active in another tab");
-  if (retryable) return false;
+  if (shouldRetryReconnectAfterFailure(message)) return false;
   return (
     !text ||
     text.includes("room not found") ||
@@ -75,5 +67,19 @@ export const shouldClearSavedReconnectAfterFailure = (message: unknown): boolean
     text.includes("token required") ||
     text.includes("token invalid") ||
     text.includes("token mismatch")
+  );
+};
+
+export const shouldRetryReconnectAfterFailure = (message: unknown): boolean => {
+  const text = String(message || "").toLowerCase();
+  return (
+    text.includes("temporarily unavailable") ||
+    text.includes("please retry") ||
+    text.includes("try again") ||
+    text.includes("network") ||
+    text.includes("timeout") ||
+    text.includes("offline") ||
+    text.includes("no socket") ||
+    text.includes("seat already active in another tab")
   );
 };

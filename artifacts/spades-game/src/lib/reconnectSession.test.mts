@@ -5,6 +5,7 @@ import {
   shouldClearSavedReconnectAfterFailure,
   shouldClearSavedReconnectBeforeCasualMatch,
   shouldRetryReconnectAvailabilityCheck,
+  shouldRetryReconnectAfterFailure,
   shouldShowReconnectPanel,
 } from "./reconnectSession.js";
 
@@ -128,6 +129,17 @@ test("retryable reconnect error preserves saved reconnect", () => {
 
 test("transient non-reconnect failure does not clear saved reconnect", () => {
   assert.equal(shouldClearSavedReconnectAfterFailure("Network offline"), false);
+});
+
+test("retryable room reconnect failures stay on reconnect flow", () => {
+  assert.equal(shouldRetryReconnectAfterFailure("Reconnect temporarily unavailable, please retry"), true);
+  assert.equal(shouldRetryReconnectAfterFailure("No socket"), true);
+  assert.equal(shouldRetryReconnectAfterFailure("Seat already active in another tab"), true);
+});
+
+test("terminal room reconnect failures do not retry", () => {
+  assert.equal(shouldRetryReconnectAfterFailure("Reconnect token invalid"), false);
+  assert.equal(shouldRetryReconnectAfterFailure("That seat is held by another player"), false);
 });
 
 test("terminal reconnect failures clear saved reconnect", () => {
