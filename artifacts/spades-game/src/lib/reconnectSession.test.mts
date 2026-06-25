@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  shouldClearSavedReconnectAfterAvailabilityCheck,
   shouldClearSavedReconnectAfterFailure,
   shouldClearSavedReconnectBeforeCasualMatch,
   shouldShowReconnectPanel,
@@ -30,6 +31,18 @@ test("Ranked Match does not show reconnect panel during matchmaking", () => {
   );
 });
 
+test("unverified saved reconnect still shows reconnect controls", () => {
+  assert.equal(
+    shouldShowReconnectPanel({
+      hasSavedSession: true,
+      availability: "unverified",
+      isFindingMatch: false,
+      isFindingRankedMatch: false,
+    }),
+    true,
+  );
+});
+
 test("stale saved reconnect is cleared before casual matchmaking", () => {
   assert.equal(
     shouldClearSavedReconnectBeforeCasualMatch({
@@ -48,6 +61,28 @@ test("available saved reconnect is preserved before casual matchmaking", () => {
     }),
     false,
   );
+});
+
+test("unverified saved reconnect is preserved before casual matchmaking", () => {
+  assert.equal(
+    shouldClearSavedReconnectBeforeCasualMatch({
+      hasSavedSession: true,
+      availability: "unverified",
+    }),
+    false,
+  );
+});
+
+test("terminal availability reasons clear saved reconnect", () => {
+  assert.equal(shouldClearSavedReconnectAfterAvailabilityCheck({ available: false, reason: "room_not_found" }), true);
+  assert.equal(shouldClearSavedReconnectAfterAvailabilityCheck({ available: false, reason: "game_over" }), true);
+  assert.equal(shouldClearSavedReconnectAfterAvailabilityCheck({ available: false, reason: "token_mismatch" }), true);
+});
+
+test("retryable availability reasons preserve saved reconnect", () => {
+  assert.equal(shouldClearSavedReconnectAfterAvailabilityCheck({ available: false, reason: "check_failed" }), false);
+  assert.equal(shouldClearSavedReconnectAfterAvailabilityCheck({ available: false, reason: "db_error" }), false);
+  assert.equal(shouldClearSavedReconnectAfterAvailabilityCheck({ available: false, reason: "seat_active" }), false);
 });
 
 test("retryable reconnect error preserves saved reconnect", () => {

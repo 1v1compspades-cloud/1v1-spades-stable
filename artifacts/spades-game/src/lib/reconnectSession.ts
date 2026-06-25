@@ -1,4 +1,4 @@
-export type ReconnectAvailabilityState = "idle" | "checking" | "available" | "unavailable";
+export type ReconnectAvailabilityState = "idle" | "checking" | "available" | "unavailable" | "unverified";
 
 export const shouldShowReconnectPanel = (input: {
   hasSavedSession: boolean;
@@ -8,7 +8,7 @@ export const shouldShowReconnectPanel = (input: {
 }): boolean => {
   return (
     input.hasSavedSession &&
-    input.availability === "available" &&
+    (input.availability === "available" || input.availability === "unverified") &&
     !input.isFindingMatch &&
     !input.isFindingRankedMatch
   );
@@ -18,7 +18,25 @@ export const shouldClearSavedReconnectBeforeCasualMatch = (input: {
   hasSavedSession: boolean;
   availability: ReconnectAvailabilityState;
 }): boolean => {
-  return input.hasSavedSession && input.availability !== "available";
+  return input.hasSavedSession && input.availability === "unavailable";
+};
+
+export const shouldClearSavedReconnectAfterAvailabilityCheck = (input: {
+  available: boolean;
+  reason?: string;
+}): boolean => {
+  if (input.available) return false;
+  const reason = String(input.reason || "").toLowerCase();
+  return (
+    reason === "invalid_request" ||
+    reason === "room_not_found" ||
+    reason === "game_over" ||
+    reason === "seat_empty" ||
+    reason === "token_required" ||
+    reason === "no_record" ||
+    reason === "token_mismatch" ||
+    reason === "name_mismatch"
+  );
 };
 
 export const shouldClearSavedReconnectAfterFailure = (message: unknown): boolean => {

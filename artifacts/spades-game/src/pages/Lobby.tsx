@@ -15,7 +15,12 @@ import { LegalFooter, MatchAgreementNotice } from "@/components/LegalFooter";
 import { PreGameChecklist } from "@/components/PreGameChecklist";
 import { V11LeaderboardPanel } from "@/components/V11LeaderboardPanel";
 import { resolveCasualGuestName, resolveRankedDisplayName } from "@/lib/guestIdentity";
-import { shouldClearSavedReconnectBeforeCasualMatch, shouldShowReconnectPanel, type ReconnectAvailabilityState } from "@/lib/reconnectSession";
+import {
+  shouldClearSavedReconnectAfterAvailabilityCheck,
+  shouldClearSavedReconnectBeforeCasualMatch,
+  shouldShowReconnectPanel,
+  type ReconnectAvailabilityState,
+} from "@/lib/reconnectSession";
 import { v11WebFlags } from "@/lib/v11Flags";
 
 type FindMatchMatchedPayload = {
@@ -150,16 +155,30 @@ export default function Lobby() {
     isFindingRankedMatch,
   });
   const activeGameMessage = "You are already in a game. Reconnect or forfeit first.";
+  const unverifiedGameMessage = "Could not verify your saved game yet. Reconnect or clear it before starting another match.";
 
   const clearSavedReconnectState = (): void => {
     clearPersistedRoomSession(savedRoomCode);
     setReconnectAvailability("unavailable");
   };
 
-  const verifySavedReconnect = async (): Promise<boolean> => {
+  const applyReconnectAvailabilityResult = (res: { available: boolean; reason?: string }): ReconnectAvailabilityState => {
+    if (res.available) {
+      setReconnectAvailability("available");
+      return "available";
+    }
+    if (shouldClearSavedReconnectAfterAvailabilityCheck(res)) {
+      clearSavedReconnectState();
+      return "unavailable";
+    }
+    setReconnectAvailability("unverified");
+    return "unverified";
+  };
+
+  const verifySavedReconnect = async (): Promise<ReconnectAvailabilityState> => {
     if (!savedRoomCode || !savedPlayerSession || !socket || !connected) {
-      setReconnectAvailability("unavailable");
-      return false;
+      setReconnectAvailability(hasSavedReconnectCandidate ? "unverified" : "unavailable");
+      return hasSavedReconnectCandidate ? "unverified" : "unavailable";
     }
     setReconnectAvailability("checking");
     try {
@@ -169,25 +188,23 @@ export default function Lobby() {
         playerName,
         savedPlayerSession.token,
       );
-      if (res.available) {
-        setReconnectAvailability("available");
-        return true;
-      }
-      clearSavedReconnectState();
-      return false;
+      return applyReconnectAvailabilityResult(res);
     } catch {
-      setReconnectAvailability("unavailable");
-      return false;
+      setReconnectAvailability("unverified");
+      return "unverified";
     }
   };
 
   const blockIfActiveGame = async (): Promise<boolean> => {
     if (!hasSavedReconnectCandidate) return false;
-    const available = reconnectAvailability === "available"
-      ? true
+    const availability = reconnectAvailability === "available" || reconnectAvailability === "unverified"
+      ? reconnectAvailability
       : await verifySavedReconnect();
-    if (!available) return false;
-    toast({ description: activeGameMessage, variant: "destructive" });
+    if (availability !== "available" && availability !== "unverified") return false;
+    toast({
+      description: availability === "available" ? activeGameMessage : unverifiedGameMessage,
+      variant: "destructive",
+    });
     return true;
   };
 
@@ -241,15 +258,10 @@ export default function Lobby() {
       savedPlayerSession.token,
     ).then((res) => {
       if (cancelled) return;
-      if (res.available) {
-        setReconnectAvailability("available");
-        return;
-      }
-      clearPersistedRoomSession(savedRoomCode);
-      setReconnectAvailability("unavailable");
+      applyReconnectAvailabilityResult(res);
     }).catch(() => {
       if (cancelled) return;
-      setReconnectAvailability("unavailable");
+      setReconnectAvailability("unverified");
     });
     return () => {
       cancelled = true;
