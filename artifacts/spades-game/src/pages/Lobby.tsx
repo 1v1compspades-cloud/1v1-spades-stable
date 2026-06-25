@@ -18,6 +18,7 @@ import { resolveCasualGuestName, resolveRankedDisplayName } from "@/lib/guestIde
 import {
   shouldClearSavedReconnectAfterAvailabilityCheck,
   shouldClearSavedReconnectBeforeCasualMatch,
+  shouldRetryReconnectAvailabilityCheck,
   shouldShowReconnectPanel,
   type ReconnectAvailabilityState,
 } from "@/lib/reconnectSession";
@@ -156,6 +157,10 @@ export default function Lobby() {
   });
   const activeGameMessage = "You are already in a game. Reconnect or forfeit first.";
   const unverifiedGameMessage = "Could not verify your saved game yet. Reconnect or clear it before starting another match.";
+  const reconnectPanelMessage =
+    reconnectAvailability === "unverified"
+      ? "Saved game found. Connection check is retrying, but you can reconnect now."
+      : "Saved game found. Rejoin before starting something new.";
 
   const clearSavedReconnectState = (): void => {
     clearPersistedRoomSession(savedRoomCode);
@@ -272,6 +277,31 @@ export default function Lobby() {
     connected,
     isFindingMatch,
     isFindingRankedMatch,
+    savedRoomCode,
+    savedPlayerSession?.seat,
+    savedPlayerSession?.token,
+    playerName,
+  ]);
+
+  useEffect(() => {
+    if (!shouldRetryReconnectAvailabilityCheck({
+      hasSavedSession: hasSavedReconnectCandidate,
+      availability: reconnectAvailability,
+      isFindingMatch,
+      isFindingRankedMatch,
+      connected,
+    })) return;
+
+    const retry = window.setTimeout(() => {
+      void verifySavedReconnect();
+    }, 5000);
+    return () => window.clearTimeout(retry);
+  }, [
+    hasSavedReconnectCandidate,
+    reconnectAvailability,
+    isFindingMatch,
+    isFindingRankedMatch,
+    connected,
     savedRoomCode,
     savedPlayerSession?.seat,
     savedPlayerSession?.token,
@@ -949,6 +979,12 @@ export default function Lobby() {
 
           {canReconnectToCurrentGame && (
             <div className="grid grid-cols-1 gap-2" data-testid="saved-reconnect-actions">
+              <p
+                className="text-center text-xs font-medium text-emerald-100/80"
+                data-testid="saved-reconnect-status"
+              >
+                {reconnectPanelMessage}
+              </p>
               <Button
                 type="button"
                 variant="outline"

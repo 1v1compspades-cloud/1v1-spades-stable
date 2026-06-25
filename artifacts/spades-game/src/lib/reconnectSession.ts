@@ -14,6 +14,22 @@ export const shouldShowReconnectPanel = (input: {
   );
 };
 
+export const shouldRetryReconnectAvailabilityCheck = (input: {
+  hasSavedSession: boolean;
+  availability: ReconnectAvailabilityState;
+  isFindingMatch: boolean;
+  isFindingRankedMatch: boolean;
+  connected: boolean;
+}): boolean => {
+  return (
+    input.hasSavedSession &&
+    input.availability === "unverified" &&
+    input.connected &&
+    !input.isFindingMatch &&
+    !input.isFindingRankedMatch
+  );
+};
+
 export const shouldClearSavedReconnectBeforeCasualMatch = (input: {
   hasSavedSession: boolean;
   availability: ReconnectAvailabilityState;

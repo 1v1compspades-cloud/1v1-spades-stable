@@ -4,6 +4,7 @@ import {
   shouldClearSavedReconnectAfterAvailabilityCheck,
   shouldClearSavedReconnectAfterFailure,
   shouldClearSavedReconnectBeforeCasualMatch,
+  shouldRetryReconnectAvailabilityCheck,
   shouldShowReconnectPanel,
 } from "./reconnectSession.js";
 
@@ -40,6 +41,42 @@ test("unverified saved reconnect still shows reconnect controls", () => {
       isFindingRankedMatch: false,
     }),
     true,
+  );
+});
+
+test("unverified saved reconnect retries availability checks", () => {
+  assert.equal(
+    shouldRetryReconnectAvailabilityCheck({
+      hasSavedSession: true,
+      availability: "unverified",
+      isFindingMatch: false,
+      isFindingRankedMatch: false,
+      connected: true,
+    }),
+    true,
+  );
+});
+
+test("availability retry pauses while disconnected or matchmaking", () => {
+  assert.equal(
+    shouldRetryReconnectAvailabilityCheck({
+      hasSavedSession: true,
+      availability: "unverified",
+      isFindingMatch: false,
+      isFindingRankedMatch: false,
+      connected: false,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldRetryReconnectAvailabilityCheck({
+      hasSavedSession: true,
+      availability: "unverified",
+      isFindingMatch: true,
+      isFindingRankedMatch: false,
+      connected: true,
+    }),
+    false,
   );
 });
 
