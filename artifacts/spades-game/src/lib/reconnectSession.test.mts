@@ -50,10 +50,16 @@ test("available saved reconnect is preserved before casual matchmaking", () => {
   );
 });
 
-test("failed reconnect retry error clears stale saved reconnect", () => {
-  assert.equal(shouldClearSavedReconnectAfterFailure("Reconnect temporarily unavailable, please retry"), true);
+test("retryable reconnect error preserves saved reconnect", () => {
+  assert.equal(shouldClearSavedReconnectAfterFailure("Reconnect temporarily unavailable, please retry"), false);
 });
 
 test("transient non-reconnect failure does not clear saved reconnect", () => {
   assert.equal(shouldClearSavedReconnectAfterFailure("Network offline"), false);
+});
+
+test("terminal reconnect failures clear saved reconnect", () => {
+  assert.equal(shouldClearSavedReconnectAfterFailure("Room not found"), true);
+  assert.equal(shouldClearSavedReconnectAfterFailure("Reconnect token invalid"), true);
+  assert.equal(shouldClearSavedReconnectAfterFailure("That seat is held by another player"), true);
 });

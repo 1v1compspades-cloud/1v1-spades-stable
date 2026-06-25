@@ -23,12 +23,23 @@ export const shouldClearSavedReconnectBeforeCasualMatch = (input: {
 
 export const shouldClearSavedReconnectAfterFailure = (message: unknown): boolean => {
   const text = String(message || "").toLowerCase();
+  const retryable =
+    text.includes("temporarily unavailable") ||
+    text.includes("please retry") ||
+    text.includes("try again") ||
+    text.includes("network") ||
+    text.includes("timeout") ||
+    text.includes("offline") ||
+    text.includes("seat already active in another tab");
+  if (retryable) return false;
   return (
     !text ||
-    text.includes("reconnect") ||
     text.includes("room not found") ||
     text.includes("session expired") ||
-    text.includes("seat") ||
-    text.includes("token")
+    text.includes("seat empty") ||
+    text.includes("held by another player") ||
+    text.includes("token required") ||
+    text.includes("token invalid") ||
+    text.includes("token mismatch")
   );
 };
