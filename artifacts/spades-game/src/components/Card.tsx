@@ -12,27 +12,26 @@ interface CardProps {
   dimmed?: boolean;
 }
 
-// Four-color suit palette for clear visual distinction at a glance.
-// Each color is dark enough to read on the white card face.
+// Classic two-color suit palette for table-card readability.
 const SUIT_FACE_COLORS: Record<CardType["suit"], string> = {
   spades:   "text-black",
   hearts:   "text-red-700",
-  clubs:    "text-emerald-800",
-  diamonds: "text-blue-800",
+  clubs:    "text-black",
+  diamonds: "text-red-700",
 };
 
 const SUIT_EDGE_COLORS: Record<CardType["suit"], string> = {
   spades:   "before:bg-black",
   hearts:   "before:bg-red-700",
-  clubs:    "before:bg-emerald-800",
-  diamonds: "before:bg-blue-800",
+  clubs:    "before:bg-black",
+  diamonds: "before:bg-red-700",
 };
 
 const SUIT_BORDER_COLORS: Record<CardType["suit"], string> = {
   spades:   "border-slate-800/70",
   hearts:   "border-red-500/70",
-  clubs:    "border-emerald-600/70",
-  diamonds: "border-blue-600/70",
+  clubs:    "border-slate-800/70",
+  diamonds: "border-red-500/70",
 };
 
 export function CardComponent({ card, hidden, className, onClick, disabled, selected, dimmed }: CardProps) {
@@ -41,7 +40,6 @@ export function CardComponent({ card, hidden, className, onClick, disabled, sele
       <div
         className={cn(
         "spades-card-back relative flex-shrink-0 w-[3.85rem] h-[5.55rem] sm:w-24 sm:h-36 rounded-xl border-2 shadow-md flex items-center justify-center overflow-hidden",
-          "after:absolute after:inset-2 after:rounded-lg after:border after:border-primary/25",
           className
         )}
       />

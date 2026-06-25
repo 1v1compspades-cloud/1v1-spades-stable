@@ -107,7 +107,7 @@ function derivePlayerStatuses(
   });
 }
 
-function buildBracketDiscord(
+function buildBracketShareText(
   snapshot: AdminDashboardSnapshot,
   totalRounds: number,
 ): string {
@@ -503,17 +503,17 @@ export default function HostDashboard() {
               variant="outline"
               size="sm"
               onClick={() =>
-                copyText(buildBracketDiscord(snapshot, totalRounds), "Bracket")
+                copyText(buildBracketShareText(snapshot, totalRounds), "Bracket")
               }
               data-testid="host-copy-bracket"
             >
-              Copy bracket for Discord
+              Copy bracket
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
             Invite link drops new players in the lobby. Host link opens this
             dashboard. Spectator links are public, hands-hidden views — safe to
-            share. Bracket export is a Discord-ready code block.
+            share. Bracket export is a plain text code block.
           </p>
         </Card>
       </section>

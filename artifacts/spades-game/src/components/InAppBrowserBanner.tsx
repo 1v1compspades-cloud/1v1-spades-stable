@@ -5,10 +5,9 @@ const DISMISS_KEY = "spades_inapp_dismissed";
 
 /**
  * Global warning shown when the app is opened inside an in-app browser
- * (Discord/Instagram/TikTok/etc.). These embedded webviews routinely break
- * clipboard, storage persistence and reconnection — the exact failure a player
- * hit when opening a room link from Discord. The banner nudges them to open the
- * link in real Safari/Chrome and offers a copy-link helper.
+ * from a social or messaging app. These embedded webviews routinely break
+ * clipboard, storage persistence and reconnection. The banner nudges players to
+ * open the link in real Safari/Chrome and offers a copy-link helper.
  *
  * Purely advisory UX: no gameplay, auth, or socket behaviour is changed.
  */
@@ -66,7 +65,7 @@ export function InAppBrowserBanner() {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-0.5 text-left">
           <p className="text-sm font-semibold leading-snug">
-            ⚠️ You opened this in {env.name ?? "an in-app"}'s browser.
+            ⚠️ You opened this in {env.name ? `${env.name}'s browser` : "an in-app browser"}.
           </p>
           <p className="text-xs leading-snug text-amber-100/90">
             For best results, open this link in Safari/Chrome. Do not use private

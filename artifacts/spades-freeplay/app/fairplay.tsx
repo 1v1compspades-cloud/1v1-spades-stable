@@ -1,12 +1,9 @@
 import { Feather } from "@expo/vector-icons";
-import * as WebBrowser from "expo-web-browser";
 import React from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { GoldButton } from "@/components/GoldButton";
 import { useColors } from "@/hooks/useColors";
-import { LINKS } from "@/constants/links";
 
 type Point = {
   icon: keyof typeof Feather.glyphMap;
@@ -79,13 +76,6 @@ export default function FairPlay() {
         </View>
       ))}
 
-      <GoldButton
-        label="Questions? Ask in the Discord"
-        icon="message-circle"
-        variant="outline"
-        onPress={() => WebBrowser.openBrowserAsync(LINKS.discord).catch(() => {})}
-        style={{ marginTop: 6 }}
-      />
     </ScrollView>
   );
 }

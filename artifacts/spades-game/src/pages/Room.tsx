@@ -1891,10 +1891,10 @@ export default function Room() {
           const resultLabel = resultSide === "heads" ? "Heads" : "Tails";
           return (
             <div
-              className="fixed inset-0 z-[140] flex items-start justify-center overflow-y-auto bg-black/85 px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(2.75rem,env(safe-area-inset-top))] backdrop-blur-lg sm:absolute sm:inset-0 sm:z-50 sm:items-center sm:overflow-visible sm:p-0"
+              className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/85 p-3 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-lg sm:items-center sm:p-4"
               data-testid="coin-toss-overlay"
             >
-              <div className="bg-card border border-border p-4 sm:p-6 rounded-xl shadow-2xl max-w-sm w-full text-center space-y-3 sm:space-y-5">
+              <div className="my-auto w-full max-w-sm rounded-xl border border-border bg-card p-4 text-center shadow-2xl space-y-4 sm:p-6 sm:space-y-5">
                 <div className="spades-coin-stage" aria-hidden="true">
                   <div
                     className={`spades-live-coin spades-live-coin--${resultSide}`}
@@ -1973,18 +1973,11 @@ export default function Room() {
               aria-hidden="true"
             />
             <div
-              className="fixed inset-x-0 top-0 z-[120] flex items-start justify-center overflow-y-auto pointer-events-none sm:items-center"
-              style={{
-                bottom: "calc(env(safe-area-inset-bottom) + 12rem)",
-                paddingTop: "max(0.35rem, env(safe-area-inset-top))",
-                paddingBottom: "0.75rem",
-                paddingLeft: "max(0.5rem, env(safe-area-inset-left))",
-                paddingRight: "max(0.5rem, env(safe-area-inset-right))",
-              }}
+              className="fixed inset-0 z-[220] flex items-start justify-center overflow-y-auto pointer-events-none px-2 pt-[calc(env(safe-area-inset-top)+10.25rem)] pb-[calc(env(safe-area-inset-bottom)+11rem)] sm:items-center sm:p-4"
               data-testid="bidding-overlay"
             >
-              <div className="bg-card/96 border border-border p-2.5 sm:p-5 rounded-xl shadow-2xl space-y-2 sm:space-y-3 w-full max-w-[min(34rem,calc(100vw-1rem))] text-center max-h-[min(56dvh,26rem)] sm:max-h-[80dvh] overflow-y-auto overscroll-contain pointer-events-auto backdrop-blur-md">
-                <h3 className="text-sm leading-none sm:text-lg sm:leading-normal font-serif text-primary">Place your bid</h3>
+              <div className="bg-card/96 border border-border p-3 sm:p-5 rounded-xl shadow-2xl space-y-3 w-full max-w-[min(34rem,calc(100vw-1rem))] text-center max-h-[calc(100dvh-22rem)] min-[420px]:max-h-[calc(100dvh-20rem)] sm:max-h-[80dvh] overflow-y-auto overscroll-contain pointer-events-auto backdrop-blur-md">
+                <h3 className="text-sm sm:text-lg font-serif text-primary">Place your bid</h3>
                 {gameState.bids[0] === null && gameState.bids[1] === null && (
                   <p className="text-[9px] sm:text-[11px] uppercase tracking-widest text-primary/80 leading-tight">
                     You bid first this round (Round {gameState.roundNumber})
@@ -2004,25 +1997,48 @@ export default function Room() {
                   const oppBid = gameState.bids[oppSeat];
                   const oppName = gameState.players[oppSeat]?.name ?? `Seat ${oppSeat + 1}`;
                   const oppBidLabel = oppBid === null ? "No bid yet" : oppBid === 0 ? "Nil" : String(oppBid);
+                  const myName = gameState.players[mySeat]?.name ?? "You";
+                  const myScore = gameState.scores[mySeat] ?? 0;
+                  const oppScore = gameState.scores[oppSeat] ?? 0;
                   const opponentStats = [
-                    { label: "Score", value: `${gameState.scores[oppSeat]} / ${gameState.matchTarget}` },
+                    { label: "Score", value: `${oppScore} / ${gameState.matchTarget}` },
                     { label: "Bags", value: gameState.bags[oppSeat] },
                     { label: "Tricks", value: gameState.tricks[oppSeat] },
                     { label: "Cards", value: gameState.handSizes?.[oppSeat] ?? 0 },
                   ];
+
                   return (
-                    <div
-                      data-testid="bidding-opponent-bid"
-                      className="rounded-lg border border-primary/35 bg-black/50 px-2.5 py-2 sm:px-3 sm:py-2.5 text-left"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="min-w-0 truncate text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                          {oppName}
-                        </span>
-                        <span className="shrink-0 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-0.5 sm:px-3 sm:py-1 font-mono text-xs sm:text-sm font-black text-primary whitespace-nowrap">
-                          Bid: {oppBidLabel}
-                        </span>
+                    <div className="space-y-2">
+                      <div
+                        data-testid="bidding-score-summary"
+                        className="grid grid-cols-2 gap-2 rounded-lg border border-primary/35 bg-black/55 px-3 py-2 text-left"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-[9px] font-bold uppercase tracking-widest text-muted-foreground">You</p>
+                          <p className="truncate text-sm font-black tabular-nums text-foreground">{myScore} pts</p>
+                          <p className="truncate text-[9px] text-muted-foreground">{myName}</p>
+                        </div>
+                        <div className="min-w-0 text-right">
+                          <p className="truncate text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Opponent</p>
+                          <p className="truncate text-sm font-black tabular-nums text-foreground">{oppScore} pts</p>
+                          <p className="truncate text-[9px] text-muted-foreground">{oppName}</p>
+                        </div>
                       </div>
+
+                      <div
+                        data-testid="bidding-opponent-bid"
+                        className="rounded-lg border border-primary/35 bg-black/50 px-3 py-2 text-left"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                            {oppName} bid this round
+                          </span>
+                          <span className="shrink-0 rounded-md border border-primary/40 bg-primary/10 px-3 py-1 font-mono text-sm font-black text-primary whitespace-nowrap">
+                            {oppBidLabel}
+                          </span>
+                        </div>
+                      </div>
+
                       <div className="mt-2 grid grid-cols-4 gap-1.5">
                         {opponentStats.map((stat) => (
                           <div
@@ -2833,7 +2849,29 @@ export default function Room() {
     </button>
   );
 
-  const renderForfeitControl = () =>
+  const renderMatchActionsPanel = () =>
+    canForfeit ? (
+      <details
+        data-testid="match-actions-panel"
+        className="mx-3 my-2 rounded-lg border border-primary/25 bg-black/45 px-3 py-2 text-xs backdrop-blur-sm"
+      >
+        <summary className="cursor-pointer select-none list-none font-semibold uppercase tracking-widest text-primary [&::-webkit-details-marker]:hidden">
+          Match Actions
+        </summary>
+        <div className="mt-2 border-t border-primary/20 pt-2">
+          <button
+            type="button"
+            onClick={() => setForfeitConfirmOpen(true)}
+            data-testid="button-forfeit"
+            className="w-full rounded-md border border-red-500/45 bg-red-950/30 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-widest text-red-200 transition hover:bg-red-500/10 active:scale-[0.99]"
+          >
+            Forfeit Match
+          </button>
+        </div>
+      </details>
+    ) : null;
+
+  const renderForfeitConfirmDialog = () =>
     canForfeit && forfeitConfirmOpen ? (
       <div
         className="fixed inset-0 z-[140] flex items-center justify-center bg-black/75 p-4"
@@ -2844,9 +2882,9 @@ export default function Room() {
           className="bg-card border border-red-500/35 rounded-xl shadow-2xl p-5 max-w-sm w-full space-y-4 text-center"
           onClick={(event) => event.stopPropagation()}
         >
-          <h3 className="font-serif text-xl text-primary">Forfeit game?</h3>
+          <h3 className="font-serif text-xl text-primary">Forfeit match?</h3>
           <p className="text-sm text-muted-foreground">
-            Are you sure you want to forfeit this game?
+            Forfeit this match? This will count as a loss.
           </p>
           <div className="grid grid-cols-2 gap-2">
             <Button
@@ -2863,7 +2901,7 @@ export default function Room() {
               onClick={handleConfirmForfeit}
               data-testid="button-forfeit-confirm"
             >
-              Forfeit
+              Forfeit Match
             </Button>
           </div>
         </div>
@@ -2983,10 +3021,11 @@ export default function Room() {
           {renderRoomCodeStrip()}
           {renderQueuePanel()}
           {renderStatusBanner()}
+          {renderMatchActionsPanel()}
           {renderTable()}
           {renderPlayerInfo(bottomIndex)}
           {spectator ? renderSpectatorFooter() : renderMyHand()}
-          {renderForfeitControl()}
+          {renderForfeitConfirmDialog()}
           {showHostResetFab && renderHostResetFab()}
           {canFastFinish && renderFastFinishTool()}
         </>

@@ -250,14 +250,21 @@
   display: grid;
   place-items: center;
   perspective: 900px;
+  -webkit-perspective: 900px;
   filter: drop-shadow(0 1.25rem 1.8rem rgba(0, 0, 0, 0.58));
 }
 
 .spades-live-coin {
+  --onyx-bg: #050607;
+  --onyx-panel: #121416;
+  --diamond-white: #f8fbff;
+  --diamond-silver: #b8c0ca;
+  --diamond-border: #e2e8f0;
   position: relative;
   width: 8.8rem;
   height: 8.8rem;
   transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
 }
 
 .spades-live-coin--heads {
@@ -275,9 +282,11 @@
   border-radius: 50%;
   transform: translateZ(-0.42rem);
   background:
-    repeating-conic-gradient(from 0deg, #8a6425 0deg 3deg, #362513 3deg 6deg),
-    linear-gradient(90deg, #2b2115, #d6ac4e 45%, #24190c);
-  box-shadow: 0 0 0.9rem rgba(235, 181, 72, 0.25);
+    repeating-conic-gradient(from 0deg, var(--diamond-white) 0deg 1.4deg, #31363b 1.4deg 3.2deg, #08090a 3.2deg 6.4deg),
+    linear-gradient(90deg, #070809, var(--diamond-silver) 48%, #0d0f11);
+  box-shadow:
+    0 0 1rem rgba(226, 232, 240, 0.22),
+    0.18rem 0.1rem 0.18rem rgba(248, 251, 255, 0.2) inset;
 }
 
 .spades-live-coin__face {
@@ -287,88 +296,190 @@
   place-items: center;
   border-radius: 50%;
   backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
   overflow: hidden;
-  border: 0.42rem solid #d7ae55;
+  border: 0.42rem solid var(--diamond-border);
   background:
-    radial-gradient(circle at 42% 34%, rgba(255, 230, 158, 0.14), transparent 28%),
-    repeating-radial-gradient(circle at 50% 50%, rgba(255, 211, 116, 0.08) 0 0.16rem, transparent 0.16rem 0.42rem),
-    radial-gradient(circle at 50% 52%, #17140f 0 54%, #0b0907 55% 100%);
+    radial-gradient(circle at 32% 27%, rgba(248, 251, 255, 0.88) 0 0.08rem, rgba(184, 192, 202, 0.5) 0.08rem 0.14rem, transparent 0.15rem),
+    radial-gradient(circle at 68% 27%, rgba(248, 251, 255, 0.8) 0 0.08rem, rgba(184, 192, 202, 0.45) 0.08rem 0.14rem, transparent 0.15rem),
+    radial-gradient(circle at 84% 50%, rgba(248, 251, 255, 0.8) 0 0.08rem, rgba(184, 192, 202, 0.45) 0.08rem 0.14rem, transparent 0.15rem),
+    radial-gradient(circle at 68% 73%, rgba(248, 251, 255, 0.8) 0 0.08rem, rgba(184, 192, 202, 0.45) 0.08rem 0.14rem, transparent 0.15rem),
+    radial-gradient(circle at 32% 73%, rgba(248, 251, 255, 0.8) 0 0.08rem, rgba(184, 192, 202, 0.45) 0.08rem 0.14rem, transparent 0.15rem),
+    radial-gradient(circle at 16% 50%, rgba(248, 251, 255, 0.8) 0 0.08rem, rgba(184, 192, 202, 0.45) 0.08rem 0.14rem, transparent 0.15rem),
+    repeating-conic-gradient(from 45deg, transparent 0deg 10deg, rgba(226, 232, 240, 0.2) 10deg 11.4deg, transparent 11.4deg 22deg),
+    radial-gradient(circle at 42% 30%, rgba(248, 251, 255, 0.12), transparent 28%),
+    repeating-radial-gradient(circle at 50% 50%, rgba(226, 232, 240, 0.08) 0 0.1rem, rgba(248, 251, 255, 0.025) 0.1rem 0.15rem, transparent 0.15rem 0.42rem),
+    radial-gradient(circle at 50% 52%, var(--onyx-panel) 0 51%, var(--onyx-bg) 52% 100%);
   box-shadow:
-    inset 0 0 0 0.22rem #4e3719,
-    inset 0 0 0 0.46rem rgba(255, 226, 139, 0.26),
+    inset 0 0 0 0.14rem var(--diamond-white),
+    inset 0 0 0 0.3rem #343a40,
+    inset 0 0 0 0.56rem rgba(226, 232, 240, 0.18),
+    inset 0 0 0 0.82rem rgba(2, 3, 4, 0.82),
     inset 0 -1.2rem 2rem rgba(0, 0, 0, 0.55),
-    0 0 0.7rem rgba(230, 179, 83, 0.25);
+    0 0 0.8rem rgba(226, 232, 240, 0.18);
+}
+
+.spades-live-coin__face--heads {
+  transform: translateZ(0.04rem);
 }
 
 .spades-live-coin__face--tails {
-  transform: rotateY(180deg);
+  transform: translateZ(0.04rem);
 }
 
 .spades-live-coin__rim {
   position: absolute;
   top: 0.72rem;
-  color: #f3d184;
+  color: var(--diamond-white);
   font-family: var(--app-font-mono);
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.18rem;
-  text-transform: uppercase;
-  text-shadow: 0 0.08rem 0 #251607, 0 0 0.45rem rgba(245, 197, 24, 0.34);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.08rem;
+  text-transform: none;
+  text-shadow: 0 0.08rem 0 #000, 0 0 0.42rem rgba(248, 251, 255, 0.34);
 }
 
 .spades-live-coin__spade {
   position: absolute;
-  color: rgba(226, 176, 76, 0.15);
-  font-size: 7.2rem;
+  color: rgba(226, 232, 240, 0.13);
+  font-size: 7.1rem;
   line-height: 1;
   transform: translateY(0.32rem);
-  text-shadow: 0 0 0.12rem rgba(255, 228, 150, 0.25);
+  text-shadow:
+    0 0 0.12rem rgba(248, 251, 255, 0.2),
+    0 0.22rem 0.6rem rgba(0, 0, 0, 0.9);
+}
+
+.spades-live-coin__diamond {
+  position: absolute;
+  z-index: 1;
+  width: 4.55rem;
+  height: 4.55rem;
+  border: 0.12rem solid rgba(248, 251, 255, 0.82);
+  border-radius: 0.34rem;
+  transform: rotate(45deg);
+  background:
+    linear-gradient(135deg, rgba(248, 251, 255, 0.18), rgba(184, 192, 202, 0.04) 38%, rgba(248, 251, 255, 0.12)),
+    var(--onyx-bg);
+  box-shadow:
+    inset 0 0 0 0.12rem rgba(184, 192, 202, 0.28),
+    0 0 0.6rem rgba(248, 251, 255, 0.18);
 }
 
 .spades-live-coin__mark {
   position: relative;
-  z-index: 2;
-  color: #d7a945;
+  z-index: 3;
+  color: var(--diamond-white);
   font-family: var(--app-font-serif);
   font-size: 3.1rem;
   font-weight: 900;
   line-height: 1;
   letter-spacing: 0;
   text-shadow:
-    0 0.08rem 0 #fff0b0,
-    0 0.22rem 0 #7a4d12,
+    -0.04rem -0.04rem 0 var(--diamond-silver),
+    0 0.08rem 0 #7b8794,
+    0 0.22rem 0 #252a30,
+    0 0 0.55rem rgba(248, 251, 255, 0.22),
     0 0.52rem 0.7rem rgba(0, 0, 0, 0.82);
 }
 
 .spades-live-coin__side {
   position: absolute;
   bottom: 0.72rem;
-  color: #f3d184;
+  color: var(--diamond-white);
   font-family: var(--app-font-mono);
   font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.2rem;
-  text-shadow: 0 0.08rem 0 #251607;
+  text-shadow: 0 0.08rem 0 #000, 0 0 0.38rem rgba(248, 251, 255, 0.28);
 }
 
 .spades-live-coin__dragon {
   position: relative;
   z-index: 2;
-  color: #c99a3d;
-  font-size: 3.45rem;
-  line-height: 1;
-  transform: translate(-0.18rem, 0.1rem);
-  text-shadow:
-    0 0.08rem 0 #fff0b0,
-    0 0.3rem 0.7rem rgba(0, 0, 0, 0.8);
+  width: 5.7rem;
+  height: 4.6rem;
+  transform: translateY(0.18rem);
 }
 
-.spades-live-coin__spade--tails {
-  right: 1.1rem;
-  bottom: 2.05rem;
-  font-size: 2.3rem;
-  color: #d7a945;
-  transform: none;
+.spades-live-coin__dragon-body {
+  position: absolute;
+  inset: 0.72rem 0.58rem 0.28rem 0.32rem;
+  border: 0.58rem solid var(--onyx-bg);
+  border-top-color: var(--diamond-silver);
+  border-right-color: #1a1d20;
+  border-bottom-color: #020303;
+  border-radius: 50% 44% 52% 42%;
+  transform: rotate(-17deg);
+  box-shadow:
+    inset 0 0 0 0.08rem rgba(248, 251, 255, 0.32),
+    0 0.05rem 0 var(--diamond-white),
+    0 0.32rem 0.6rem rgba(0, 0, 0, 0.85);
+}
+
+.spades-live-coin__dragon-body::before {
+  content: "";
+  position: absolute;
+  left: 0.9rem;
+  top: -0.82rem;
+  width: 3.2rem;
+  height: 0.52rem;
+  background:
+    repeating-linear-gradient(115deg, var(--diamond-white) 0 0.16rem, #16191c 0.16rem 0.32rem);
+  border-radius: 999px;
+  transform: rotate(16deg);
+  box-shadow: 0 0.08rem 0.22rem rgba(0, 0, 0, 0.62);
+}
+
+.spades-live-coin__dragon-head {
+  position: absolute;
+  left: 0.28rem;
+  top: 1.1rem;
+  width: 2.05rem;
+  height: 1.28rem;
+  background: linear-gradient(135deg, #202428 0 36%, #050607 37% 100%);
+  border: 0.12rem solid var(--diamond-silver);
+  border-radius: 52% 38% 48% 44%;
+  transform: rotate(-23deg);
+  box-shadow:
+    inset 0.18rem 0.12rem 0.24rem rgba(248, 251, 255, 0.16),
+    0 0.1rem 0.35rem rgba(0, 0, 0, 0.78);
+}
+
+.spades-live-coin__dragon-head::before,
+.spades-live-coin__dragon-head::after {
+  content: "";
+  position: absolute;
+  top: -0.38rem;
+  width: 0;
+  height: 0;
+  border-left: 0.24rem solid transparent;
+  border-right: 0.24rem solid transparent;
+  border-bottom: 0.58rem solid var(--diamond-white);
+}
+
+.spades-live-coin__dragon-head::before {
+  left: 0.24rem;
+  transform: rotate(-22deg);
+}
+
+.spades-live-coin__dragon-head::after {
+  left: 0.78rem;
+  transform: rotate(18deg);
+}
+
+.spades-live-coin__dragon-tail {
+  position: absolute;
+  right: 0.12rem;
+  bottom: 0.58rem;
+  color: var(--diamond-white);
+  font-size: 2.25rem;
+  line-height: 1;
+  transform: rotate(31deg);
+  text-shadow:
+    -0.04rem -0.04rem 0 var(--diamond-silver),
+    0 0.18rem 0.42rem rgba(0, 0, 0, 0.9),
+    0 0 0.45rem rgba(248, 251, 255, 0.24);
 }
 
 @media (max-width: 430px) {
@@ -449,25 +560,82 @@
   }
 
   .spades-table-surface {
+    position: relative;
     width: 100%;
     max-width: none;
     box-sizing: border-box;
+    isolation: isolate;
     background:
-      radial-gradient(ellipse at center, rgba(18, 91, 62, 0.56), rgba(6, 47, 35, 0.44) 44%, rgba(8, 7, 5, 0.76) 74%),
-      repeating-linear-gradient(45deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 9px);
+      radial-gradient(ellipse at 50% 42%, rgba(22, 19, 13, 0.68), transparent 46%),
+      radial-gradient(ellipse at center, rgba(8, 8, 7, 0.94), rgba(1, 1, 1, 0.98) 68%, #000 100%),
+      linear-gradient(115deg, transparent 0 16%, rgba(255,255,255,0.07) 17%, transparent 18% 42%, rgba(245,197,24,0.06) 43%, transparent 44% 100%),
+      linear-gradient(28deg, transparent 0 32%, rgba(255,255,255,0.045) 33%, transparent 34% 100%),
+      #020202;
+  }
+
+  .spades-table-surface::before {
+    content: "";
+    position: absolute;
+    inset: 0.35rem;
+    border: 1px solid rgba(245, 197, 24, 0.2);
+    border-radius: 0.7rem;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 18% 20%, rgba(255,255,255,0.08), transparent 18rem),
+      radial-gradient(circle at 86% 74%, rgba(245,197,24,0.07), transparent 16rem);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      inset 0 -1px 0 rgba(0,0,0,0.72);
+    opacity: 0.75;
   }
 
   .spades-table-pocket {
-    width: min(88vw, 24rem);
-    height: min(88vw, 24rem);
-    border: 1px solid rgba(245, 197, 24, 0.34);
+    width: min(80vw, 27rem);
+    height: min(80vw, 27rem);
+    border: 1px solid rgba(219, 177, 82, 0.44);
     background:
-      radial-gradient(circle at 50% 48%, rgba(15, 95, 64, 0.86), rgba(5, 44, 33, 0.88) 52%, rgba(6, 5, 4, 0.74) 100%),
-      repeating-radial-gradient(circle at center, rgba(245, 197, 24, 0.07) 0 1px, transparent 1px 18px);
+      radial-gradient(circle at 50% 50%, rgba(4, 4, 4, 0.98) 0 63%, rgba(31, 20, 6, 0.92) 64%, rgba(158, 112, 31, 0.7) 66%, rgba(10, 7, 3, 0.98) 68%, rgba(206, 165, 78, 0.58) 70%, rgba(0, 0, 0, 0.98) 73%),
+      radial-gradient(circle at 50% 48%, rgba(11, 11, 10, 0.98), rgba(2, 2, 2, 0.99) 68%, rgba(0, 0, 0, 1) 100%),
+      linear-gradient(116deg, transparent 0 31%, rgba(255,255,255,0.045) 32%, transparent 33% 56%, rgba(184,128,36,0.055) 57%, transparent 58%),
+      linear-gradient(36deg, transparent 0 42%, rgba(255,255,255,0.035) 43%, transparent 44%);
     box-shadow:
-      inset 0 0 0 10px rgba(245, 197, 24, 0.055),
-      inset 0 0 70px rgba(0,0,0,0.62),
-      0 30px 90px -55px rgba(245, 197, 24, 0.5);
+      inset 0 0 0 5px rgba(255,255,255,0.035),
+      inset 0 0 0 11px rgba(0,0,0,0.72),
+      inset 0 0 0 17px rgba(181,126,36,0.13),
+      inset 0 0 0 25px rgba(0,0,0,0.66),
+      inset 0 0 84px rgba(0,0,0,0.9),
+      0 0 0 1px rgba(255,255,255,0.06),
+      0 28px 70px -58px rgba(214, 166, 64, 0.72),
+      0 14px 34px -30px rgba(255, 255, 255, 0.28);
+  }
+
+  .spades-table-pocket::before,
+  .spades-table-pocket::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+
+  .spades-table-pocket::before {
+    background:
+      radial-gradient(circle, rgba(255,255,255,0.9) 0 1.35px, rgba(219,177,82,0.58) 1.45px 2.35px, transparent 2.45px) 0 0 / 23px 23px,
+      radial-gradient(circle, rgba(255,255,255,0.52) 0 0.9px, rgba(219,177,82,0.32) 1px 1.75px, transparent 1.85px) 11.5px 11.5px / 23px 23px,
+      radial-gradient(circle at 50% 50%, transparent 0 64%, rgba(214,166,64,0.14) 65%, rgba(255,255,255,0.1) 67%, transparent 71%);
+    mask: radial-gradient(circle, transparent 63%, #000 64.5% 71%, transparent 72.5%);
+    -webkit-mask: radial-gradient(circle, transparent 63%, #000 64.5% 71%, transparent 72.5%);
+    opacity: 0.74;
+    filter: drop-shadow(0 0 3px rgba(255,255,255,0.36)) drop-shadow(0 0 5px rgba(214,166,64,0.26));
+  }
+
+  .spades-table-pocket::after {
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.13), transparent 21%, transparent 72%, rgba(214,166,64,0.1)),
+      radial-gradient(circle at 50% 48%, transparent 0 62%, rgba(255,255,255,0.08) 63%, rgba(214,166,64,0.12) 66%, rgba(0,0,0,0.52) 72%, transparent 73%);
+    mix-blend-mode: screen;
+    opacity: 0.68;
+    filter: drop-shadow(0 0 5px rgba(255,255,255,0.22));
   }
 
   .spades-seat-bar {
@@ -520,15 +688,50 @@
   }
 
   .spades-card-back {
-    border-color: rgba(245, 197, 24, 0.38);
+    border-color: rgba(244, 220, 148, 0.72);
     background:
-      linear-gradient(135deg, rgba(245, 197, 24, 0.18), transparent 22%, rgba(245, 197, 24, 0.11) 52%, transparent),
-      repeating-linear-gradient(45deg, rgba(245, 197, 24, 0.16) 0 2px, rgba(10, 20, 24, 0.95) 2px 8px),
-      #111827;
+      radial-gradient(circle at 50% 50%, rgba(245, 197, 24, 0.14), transparent 38%),
+      linear-gradient(135deg, transparent 0 17%, rgba(255,255,255,0.08) 18%, transparent 19% 54%, rgba(245,197,24,0.12) 55%, transparent 56%),
+      repeating-linear-gradient(45deg, rgba(245, 197, 24, 0.16) 0 1px, transparent 1px 9px),
+      linear-gradient(145deg, #050504, #15120b 48%, #030303);
     box-shadow:
       0 14px 28px -20px rgba(0,0,0,0.95),
-      inset 0 0 0 2px rgba(0,0,0,0.35),
-      inset 0 0 0 5px rgba(245, 197, 24, 0.08);
+      inset 0 0 0 2px rgba(0,0,0,0.5),
+      inset 0 0 0 5px rgba(245, 197, 24, 0.14),
+      inset 0 0 0 8px rgba(0,0,0,0.38),
+      inset 0 0 24px rgba(245, 197, 24, 0.12);
+  }
+
+  .spades-card-back::before {
+    content: "1v1";
+    position: absolute;
+    inset: 1.15rem 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(245, 197, 24, 0.88);
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 1.45rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-shadow:
+      0 1px 0 rgba(255,255,255,0.24),
+      0 0 12px rgba(245,197,24,0.28);
+  }
+
+  .spades-card-back::after {
+    content: "";
+    position: absolute;
+    inset: 0.55rem;
+    border: 1px solid rgba(245, 197, 24, 0.42);
+    border-radius: 0.58rem;
+    pointer-events: none;
+    background:
+      linear-gradient(45deg, transparent 43%, rgba(245,197,24,0.4) 44% 45%, transparent 46%),
+      linear-gradient(-45deg, transparent 43%, rgba(245,197,24,0.28) 44% 45%, transparent 46%);
+    box-shadow:
+      inset 0 0 0 1px rgba(0,0,0,0.6),
+      0 0 12px rgba(245,197,24,0.13);
   }
 
   .spades-gold-button {
@@ -540,8 +743,8 @@
 
   @media (max-width: 640px) {
     .spades-table-pocket {
-      width: min(82vw, 18rem);
-      height: min(82vw, 18rem);
+      width: min(82vw, 20.5rem);
+      height: min(82vw, 20.5rem);
     }
   }
 
