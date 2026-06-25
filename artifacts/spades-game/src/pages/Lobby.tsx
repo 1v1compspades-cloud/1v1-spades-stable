@@ -1542,18 +1542,53 @@ export default function Lobby() {
 
           <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
             <section className="space-y-3 rounded-md border border-primary/30 bg-white/[0.03] p-3">
-              <h2 className="text-sm font-semibold uppercase tracking-widest text-primary">Quick Access</h2>
-              <Button
-                onClick={handleSpectate}
-                disabled={isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch || !joinCodeInput}
-                variant="ghost"
-                className="w-full h-12 justify-start text-sm font-medium border border-dashed border-border hover:border-primary/50"
-                data-testid="button-spectate"
-              >
-                {isSpectating ? "Joining..." : "Watch Match"}
-              </Button>
+              <div className="space-y-1">
+                <h2 className="text-sm font-semibold uppercase tracking-widest text-primary">Quick Access</h2>
+                <p className="text-xs text-muted-foreground">
+                  Watch a room by code, or jump straight into a random table.
+                </p>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                <Button
+                  onClick={handleSpectate}
+                  disabled={isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch || !joinCodeInput}
+                  variant="ghost"
+                  className="h-12 justify-start text-sm font-medium border border-dashed border-border hover:border-primary/50"
+                  data-testid="button-spectate"
+                >
+                  {isSpectating ? "Joining..." : "Watch by Code"}
+                </Button>
+                {v11WebFlags.matchmaking && (
+                  <Button
+                    type="button"
+                    onClick={() => void handleFindMatch()}
+                    disabled={isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch || !connected}
+                    variant="secondary"
+                    className="h-12 justify-start text-sm font-semibold"
+                    data-testid="button-quick-random-casual"
+                  >
+                    {isFindingMatch ? "Finding..." : "Random Casual"}
+                  </Button>
+                )}
+                {v11WebFlags.matchmaking && v11WebFlags.accounts && (
+                  <Button
+                    type="button"
+                    onClick={handleRankedPrimaryAction}
+                    disabled={isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch || !connected}
+                    variant={hasRankedAccount ? "default" : "secondary"}
+                    className="h-12 justify-start text-sm font-semibold sm:col-span-2 lg:col-span-1 xl:col-span-2"
+                    data-testid="button-quick-random-ranked"
+                  >
+                    {isFindingRankedMatch
+                      ? "Finding ranked..."
+                      : hasRankedAccount
+                        ? "Random Ranked"
+                        : "Create Ranked Profile"}
+                  </Button>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
-                Spectators can watch without seeing hidden hands.
+                Spectators see scores, bids, and tricks live without hidden hands.
               </p>
             </section>
 
