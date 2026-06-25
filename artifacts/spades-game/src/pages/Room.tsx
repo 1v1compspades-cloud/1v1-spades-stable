@@ -2565,22 +2565,8 @@ export default function Room() {
                 : "border-primary/35 bg-black/45 text-primary"
           )}
         >
-          <div className="flex w-full items-center justify-between gap-2">
+          <div className="flex w-full items-center justify-center gap-2">
             <span className="min-w-0 flex-1 text-center leading-snug">{handHint}</span>
-            {canForfeit && (
-              <button
-                type="button"
-                onPointerDown={(event) => event.stopPropagation()}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setForfeitConfirmOpen(true);
-                }}
-                data-testid="button-forfeit"
-                className="shrink-0 rounded-md border border-red-500/45 bg-red-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-red-200 shadow-sm transition hover:bg-red-500/15 active:scale-95"
-              >
-                Forfeit
-              </button>
-            )}
           </div>
           {showMyHandStats && (
             <div
