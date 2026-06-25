@@ -42,12 +42,14 @@ export function ConnectionRecoveryActions({
   showImmediately?: boolean;
   showWhenOnline?: boolean;
 }) {
-  const { status, connect } = useSocket();
+  const { status, connect, reportReconnectTelemetry } = useSocket();
   const [showHelp, setShowHelp] = useState(showImmediately);
+  const [reportedHelp, setReportedHelp] = useState(false);
 
   useEffect(() => {
     if (status === "online" && !showWhenOnline) {
       setShowHelp(false);
+      setReportedHelp(false);
       return;
     }
     if (showImmediately) {
@@ -59,10 +61,29 @@ export function ConnectionRecoveryActions({
     return () => window.clearTimeout(timeout);
   }, [showImmediately, showWhenOnline, status]);
 
+  useEffect(() => {
+    if (!showHelp || reportedHelp || status === "online") return;
+    reportReconnectTelemetry("reconnect_help_shown", {
+      source: compact ? "connection_pill" : "room_reconnect_screen",
+    });
+    setReportedHelp(true);
+  }, [compact, reportReconnectTelemetry, reportedHelp, showHelp, status]);
+
   if ((status === "online" && !showWhenOnline) || !showHelp) return null;
 
   const copy = statusCopy(status);
-  const refreshPage = () => window.location.reload();
+  const retryConnection = () => {
+    reportReconnectTelemetry("manual_retry", {
+      source: compact ? "connection_pill" : "room_reconnect_screen",
+    });
+    connect();
+  };
+  const refreshPage = () => {
+    reportReconnectTelemetry("manual_refresh", {
+      source: compact ? "connection_pill" : "room_reconnect_screen",
+    });
+    window.location.reload();
+  };
 
   return (
     <div
@@ -82,7 +103,7 @@ export function ConnectionRecoveryActions({
           type="button"
           variant="outline"
           size="sm"
-          onClick={connect}
+          onClick={retryConnection}
           className="h-9 border-amber-400/40 bg-amber-400/10 text-amber-100 hover:bg-amber-400/15 hover:text-amber-50"
           data-testid="button-retry-connection"
         >

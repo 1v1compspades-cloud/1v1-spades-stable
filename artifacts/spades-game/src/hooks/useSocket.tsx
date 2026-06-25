@@ -13,10 +13,106 @@ export type ReconnectAvailability = {
   reason?: string;
 };
 
+export type ReconnectTelemetryEvent =
+  | "socket_connected"
+  | "socket_disconnected"
+  | "connect_error"
+  | "reconnect_attempt"
+  | "reconnect_success"
+  | "reconnect_error"
+  | "reconnect_failed"
+  | "visibility_resume"
+  | "online_resume"
+  | "manual_retry"
+  | "manual_refresh"
+  | "reconnect_help_shown";
+
+export type ReconnectTelemetryDetails = {
+  reason?: string;
+  durationMs?: number;
+  attempt?: number;
+  source?: string;
+  status?: SocketStatus;
+};
+
 // SECURITY: the admin unlock lives ONLY in sessionStorage (cleared when the tab
 // closes), never localStorage, links, or shared state. It holds an opaque,
 // server-issued resume token — NEVER the secret admin key itself.
 const ADMIN_SESSION_KEY = "spades_admin_session";
+const TELEMETRY_SESSION_KEY = "spades_reconnect_telemetry_session";
+const PENDING_TELEMETRY_KEY = "spades_pending_reconnect_telemetry";
+const MAX_PENDING_TELEMETRY_EVENTS = 20;
+
+type QueuedReconnectTelemetry = ReconnectTelemetryDetails & {
+  event: ReconnectTelemetryEvent;
+  clientTs: number;
+  tabId: string;
+  roomCode: string | null;
+  phase: GameState["phase"] | null;
+  isSpectator: boolean | null;
+  visibility: string | null;
+  online: boolean | null;
+  browser: string;
+  transport: string | null;
+};
+
+function getTelemetrySessionId(): string {
+  if (typeof window === "undefined") return "server";
+  try {
+    const existing = sessionStorage.getItem(TELEMETRY_SESSION_KEY);
+    if (existing) return existing;
+    const next =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    sessionStorage.setItem(TELEMETRY_SESSION_KEY, next);
+    return next;
+  } catch {
+    return "unavailable";
+  }
+}
+
+function detectBrowserFamily(): string {
+  if (typeof navigator === "undefined") return "unknown";
+  const ua = navigator.userAgent;
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  if (isIOS && /CriOS/.test(ua)) return "chrome_ios";
+  if (isIOS && /FxiOS/.test(ua)) return "firefox_ios";
+  if (isIOS && /Safari/.test(ua)) return "mobile_safari";
+  if (/Safari/.test(ua) && !/Chrome|Chromium|Android/.test(ua)) return "safari";
+  if (/Chrome|Chromium/.test(ua)) return "chrome";
+  return "other";
+}
+
+function readPendingTelemetry(): QueuedReconnectTelemetry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = sessionStorage.getItem(PENDING_TELEMETRY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.slice(-MAX_PENDING_TELEMETRY_EVENTS) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePendingTelemetry(events: QueuedReconnectTelemetry[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(PENDING_TELEMETRY_KEY, JSON.stringify(events.slice(-MAX_PENDING_TELEMETRY_EVENTS)));
+  } catch {
+    // Best-effort observability only.
+  }
+}
+
+function clearPendingTelemetry(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(PENDING_TELEMETRY_KEY);
+  } catch {
+    // Best-effort observability only.
+  }
+}
 
 interface SocketContextType {
   socket: Socket | null;
@@ -25,6 +121,7 @@ interface SocketContextType {
   gameState: GameState | null;
   error: string | null;
   connect: () => void;
+  reportReconnectTelemetry: (event: ReconnectTelemetryEvent, details?: ReconnectTelemetryDetails) => void;
   createRoom: (name: string, matchTarget?: number, matchLabel?: string, mode?: "quick" | "king", profileUsername?: string, accountIdentity?: AccountIdentityPayload) => Promise<{ roomCode?: string; playerIndex?: number; token?: string }>;
   joinRoom: (code: string, name: string, profileUsername?: string, accountIdentity?: AccountIdentityPayload) => Promise<{ playerIndex?: number; token?: string }>;
   checkReconnectAvailability: (roomCode: string, playerIndex: 0 | 1, playerName: string, token?: string) => Promise<ReconnectAvailability>;
@@ -116,6 +213,47 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   // during the SF2 → Finals transition. We track the URL room the user is
   // viewing and drop foreign-room game_state events at the boundary.
   const activeRoomRef = useRef<string | null>(null);
+  const latestGameStateRef = useRef<GameState | null>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const statusRef = useRef<SocketStatus>("offline");
+  const reconnectStartedAtRef = useRef<number | null>(null);
+  const reconnectAttemptRef = useRef(0);
+  const telemetrySessionIdRef = useRef(getTelemetrySessionId());
+
+  const reportReconnectTelemetry = useCallback((event: ReconnectTelemetryEvent, details: ReconnectTelemetryDetails = {}) => {
+    const latest = latestGameStateRef.current;
+    const socketInstance = socketRef.current;
+    const payload: QueuedReconnectTelemetry = {
+      ...details,
+      event,
+      clientTs: Date.now(),
+      tabId: telemetrySessionIdRef.current,
+      roomCode: activeRoomRef.current ?? latest?.roomCode ?? null,
+      phase: latest?.phase ?? null,
+      isSpectator: typeof latest?.isSpectator === "boolean" ? latest.isSpectator : null,
+      visibility: typeof document === "undefined" ? null : document.visibilityState,
+      online: typeof navigator === "undefined" ? null : navigator.onLine,
+      browser: detectBrowserFamily(),
+      status: details.status ?? statusRef.current,
+      transport: socketInstance?.io?.engine?.transport?.name ?? null,
+    };
+
+    if (socketInstance?.connected) {
+      socketInstance.emit("client_reconnect_telemetry", payload);
+      return;
+    }
+
+    writePendingTelemetry([...readPendingTelemetry(), payload]);
+  }, []);
+
+  const flushPendingReconnectTelemetry = useCallback((targetSocket: Socket) => {
+    const pending = readPendingTelemetry();
+    if (pending.length === 0) return;
+    clearPendingTelemetry();
+    for (const event of pending) {
+      targetSocket.emit("client_reconnect_telemetry", event);
+    }
+  }, []);
 
   const setActiveRoom = useCallback((roomCode: string | null) => {
     const next = roomCode ? roomCode.toUpperCase() : null;
@@ -133,6 +271,14 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
+
+  useEffect(() => {
+    if (gameState) latestGameStateRef.current = gameState;
+  }, [gameState]);
+
+  useEffect(() => {
     const s = io({
       path: "/socket.io",
       autoConnect: false,
@@ -147,11 +293,25 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       timeout: 10000,
     });
     setSocket(s);
+    socketRef.current = s;
 
     s.on("connect", () => {
       setConnected(true);
       setStatus("online");
+      statusRef.current = "online";
       setError(null);
+      flushPendingReconnectTelemetry(s);
+      if (reconnectStartedAtRef.current !== null) {
+        reportReconnectTelemetry("reconnect_success", {
+          attempt: reconnectAttemptRef.current,
+          durationMs: Date.now() - reconnectStartedAtRef.current,
+          status: "online",
+        });
+      } else {
+        reportReconnectTelemetry("socket_connected", { status: "online" });
+      }
+      reconnectStartedAtRef.current = null;
+      reconnectAttemptRef.current = 0;
       // Re-assert admin status on every (re)connect. A new socket id means a
       // fresh server-side admin binding, so we resume from the opaque session
       // token kept in sessionStorage. The secret key is NEVER stored or resent.
@@ -172,6 +332,9 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     s.on("disconnect", (reason) => {
       setConnected(false);
       setStatus("reconnecting");
+      statusRef.current = "reconnecting";
+      reconnectStartedAtRef.current ??= Date.now();
+      reportReconnectTelemetry("socket_disconnected", { reason, status: "reconnecting" });
       // Drop cached gameState so the Room's auto re-attach effect fires once
       // the socket comes back (server has a fresh socketId for us).
       setGameState(null);
@@ -192,21 +355,55 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     s.on("connect_error", () => {
       setConnected(false);
       setStatus("reconnecting");
+      statusRef.current = "reconnecting";
+      reconnectStartedAtRef.current ??= Date.now();
+      reportReconnectTelemetry("connect_error", { status: "reconnecting" });
     });
-    s.io.on("reconnect_attempt", () => setStatus("reconnecting"));
-    s.io.on("reconnect", () => setStatus("online"));
-    s.io.on("reconnect_error", () => setStatus("reconnecting"));
-    s.io.on("reconnect_failed", () => setStatus("offline"));
+    s.io.on("reconnect_attempt", () => {
+      setStatus("reconnecting");
+      statusRef.current = "reconnecting";
+      reconnectStartedAtRef.current ??= Date.now();
+      reconnectAttemptRef.current += 1;
+      reportReconnectTelemetry("reconnect_attempt", {
+        attempt: reconnectAttemptRef.current,
+        status: "reconnecting",
+      });
+    });
+    s.io.on("reconnect", () => {
+      setStatus("online");
+      statusRef.current = "online";
+    });
+    s.io.on("reconnect_error", (err) => {
+      setStatus("reconnecting");
+      statusRef.current = "reconnecting";
+      reportReconnectTelemetry("reconnect_error", {
+        attempt: reconnectAttemptRef.current,
+        reason: err instanceof Error ? err.message : undefined,
+        status: "reconnecting",
+      });
+    });
+    s.io.on("reconnect_failed", () => {
+      setStatus("offline");
+      statusRef.current = "offline";
+      reportReconnectTelemetry("reconnect_failed", {
+        attempt: reconnectAttemptRef.current,
+        status: "offline",
+      });
+    });
 
-    const resumeConnection = () => {
+    const resumeConnection = (event: ReconnectTelemetryEvent, source: string) => {
       if (s.connected) return;
       setStatus("reconnecting");
+      statusRef.current = "reconnecting";
+      reconnectStartedAtRef.current ??= Date.now();
+      reportReconnectTelemetry(event, { source, status: "reconnecting" });
       s.connect();
     };
     const resumeWhenVisible = () => {
-      if (document.visibilityState === "visible") resumeConnection();
+      if (document.visibilityState === "visible") resumeConnection("visibility_resume", "visibilitychange");
     };
-    window.addEventListener("online", resumeConnection);
+    const resumeWhenOnline = () => resumeConnection("online_resume", "online");
+    window.addEventListener("online", resumeWhenOnline);
     document.addEventListener("visibilitychange", resumeWhenVisible);
 
     s.on("game_state", (state: GameState) => {
@@ -219,6 +416,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       if (active && incoming && incoming !== active) {
         return;
       }
+      latestGameStateRef.current = state;
       setGameState(state);
       setError(null);
     });
@@ -253,15 +451,17 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     });
 
     return () => {
-      window.removeEventListener("online", resumeConnection);
+      window.removeEventListener("online", resumeWhenOnline);
       document.removeEventListener("visibilitychange", resumeWhenVisible);
       s.disconnect();
+      if (socketRef.current === s) socketRef.current = null;
     };
-  }, []);
+  }, [flushPendingReconnectTelemetry, reportReconnectTelemetry]);
 
   const connect = () => {
     if (socket && !socket.connected) {
       setStatus("connecting");
+      statusRef.current = "connecting";
       socket.connect();
     }
   };
@@ -631,6 +831,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       gameState,
       error,
       connect,
+      reportReconnectTelemetry,
       createRoom,
       joinRoom,
       checkReconnectAvailability,

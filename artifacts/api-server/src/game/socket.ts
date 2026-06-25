@@ -220,6 +220,87 @@ function requireFastFinishAuth(socket: Socket): string {
 let totalConnectionsSinceStart = 0;
 const uniqueVisitorIps = new Set<string>();
 let peakConcurrentSockets = 0;
+const reconnectTelemetryByEvent: Record<string, number> = {};
+const reconnectTelemetryRecent: ReconnectTelemetrySummary[] = [];
+const MAX_RECENT_RECONNECT_TELEMETRY = 30;
+
+type ReconnectTelemetrySummary = {
+  ts: string;
+  event: string;
+  roomCode: string | null;
+  phase: string | null;
+  browser: string;
+  durationMs: number | null;
+  attempt: number | null;
+  reason: string | null;
+  source: string | null;
+  status: string | null;
+  visibility: string | null;
+  online: boolean | null;
+  transport: string | null;
+  tabId: string | null;
+};
+
+const ALLOWED_RECONNECT_TELEMETRY_EVENTS = new Set([
+  "socket_connected",
+  "socket_disconnected",
+  "connect_error",
+  "reconnect_attempt",
+  "reconnect_success",
+  "reconnect_error",
+  "reconnect_failed",
+  "visibility_resume",
+  "online_resume",
+  "manual_retry",
+  "manual_refresh",
+  "reconnect_help_shown",
+]);
+
+function safeShortString(value: unknown, max = 80): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().replace(/\s+/g, " ");
+  return normalized ? normalized.slice(0, max) : null;
+}
+
+function safeRoomCode(value: unknown): string | null {
+  const normalized = safeShortString(value, 12)?.toUpperCase() ?? null;
+  return normalized && /^[A-Z0-9_-]+$/.test(normalized) ? normalized : null;
+}
+
+function safeNumber(value: unknown, max: number): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  if (value < 0) return null;
+  return Math.min(Math.floor(value), max);
+}
+
+function sanitizeReconnectTelemetry(payload: unknown): ReconnectTelemetrySummary {
+  const data = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>;
+  const rawEvent = safeShortString(data.event, 40) ?? "unknown";
+  const event = ALLOWED_RECONNECT_TELEMETRY_EVENTS.has(rawEvent) ? rawEvent : "unknown";
+  const rawTabId = safeShortString(data.tabId, 40);
+  return {
+    ts: new Date().toISOString(),
+    event,
+    roomCode: safeRoomCode(data.roomCode),
+    phase: safeShortString(data.phase, 24),
+    browser: safeShortString(data.browser, 32) ?? "unknown",
+    durationMs: safeNumber(data.durationMs, 10 * 60_000),
+    attempt: safeNumber(data.attempt, 1_000),
+    reason: safeShortString(data.reason, 120),
+    source: safeShortString(data.source, 60),
+    status: safeShortString(data.status, 24),
+    visibility: safeShortString(data.visibility, 24),
+    online: typeof data.online === "boolean" ? data.online : null,
+    transport: safeShortString(data.transport, 24),
+    tabId: rawTabId ? rawTabId.slice(0, 12) : null,
+  };
+}
+
+function recordReconnectTelemetry(summary: ReconnectTelemetrySummary): void {
+  reconnectTelemetryByEvent[summary.event] = (reconnectTelemetryByEvent[summary.event] ?? 0) + 1;
+  reconnectTelemetryRecent.unshift(summary);
+  reconnectTelemetryRecent.splice(MAX_RECENT_RECONNECT_TELEMETRY);
+}
 
 function clientIpFromSocket(socket: Socket): string {
   const fwd = socket.handshake.headers["x-forwarded-for"];
@@ -232,11 +313,21 @@ export function getConnectionStats(): {
   totalConnectionsSinceStart: number;
   uniqueVisitors: number;
   peakConcurrentSockets: number;
+  reconnectTelemetry: {
+    total: number;
+    byEvent: Record<string, number>;
+    recent: ReconnectTelemetrySummary[];
+  };
 } {
   return {
     totalConnectionsSinceStart,
     uniqueVisitors: uniqueVisitorIps.size,
     peakConcurrentSockets,
+    reconnectTelemetry: {
+      total: Object.values(reconnectTelemetryByEvent).reduce((sum, count) => sum + count, 0),
+      byEvent: { ...reconnectTelemetryByEvent },
+      recent: [...reconnectTelemetryRecent],
+    },
   };
 }
 
@@ -1975,6 +2066,20 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
     onlinePresence.connect(socket.id);
     emitOnlineCountUpdate();
     logger.info({ socketId: socket.id }, "Socket connected");
+
+    socket.on("client_reconnect_telemetry", (payload: unknown) => {
+      if (!checkRate(socket.id, "client_reconnect_telemetry", 80, 60_000)) return;
+      const summary = sanitizeReconnectTelemetry(payload);
+      recordReconnectTelemetry(summary);
+      logger.info(
+        {
+          socketId: socket.id,
+          connectedTransport: socket.conn.transport.name,
+          ...summary,
+        },
+        "Client reconnect telemetry",
+      );
+    });
 
     socket.on("find_match_join", (data: {
       playerName?: string;

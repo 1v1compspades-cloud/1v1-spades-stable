@@ -73,6 +73,7 @@ router.get("/stats", (req, res) => {
         totalConnections: conn.totalConnectionsSinceStart,
         uniqueVisitors: conn.uniqueVisitors,
         peakConcurrentSockets: conn.peakConcurrentSockets,
+        reconnectTelemetry: conn.reconnectTelemetry,
       },
       live: {
         connectedSockets: io?.engine?.clientsCount ?? 0,
