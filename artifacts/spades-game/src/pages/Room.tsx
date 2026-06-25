@@ -1569,13 +1569,8 @@ export default function Room() {
               </div>
             </div>
 
-            {/* Match settings */}
-            <div className="px-5 py-5 border-b border-primary/20">
-              {renderMatchSettingsCard()}
-            </div>
-
-            {/* Status + actions */}
-            <div className="px-5 pt-4 pb-6 space-y-3">
+            {/* Readiness actions */}
+            <div className="px-5 py-5 space-y-3 border-b border-primary/20">
               <div
                 data-testid="lobby-status-message"
                 className={cn(
@@ -1630,7 +1625,21 @@ export default function Room() {
                 })()}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              {isHost && !bothReady && opponent && (
+                <p className="text-[10px] text-muted-foreground text-center px-2">
+                  Start Match unlocks once both players are ready.
+                </p>
+              )}
+            </div>
+
+            {/* Match settings */}
+            <div className="px-5 py-5 border-b border-primary/20">
+              {renderMatchSettingsCard()}
+            </div>
+
+            {/* Secondary actions */}
+            <div className="px-5 pt-4 pb-6 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {isAdmin && (
                   <Button
                     variant="outline"
@@ -1654,12 +1663,6 @@ export default function Room() {
                   Leave Room
                 </Button>
               </div>
-
-              {isHost && !bothReady && opponent && (
-                <p className="text-[10px] text-muted-foreground text-center px-2">
-                  Start Match unlocks once both players are ready.
-                </p>
-              )}
             </div>
           </div>
         </div>
@@ -1944,18 +1947,40 @@ export default function Room() {
                   const oppSeat = mySeat === 0 ? 1 : 0;
                   const oppBid = gameState.bids[oppSeat];
                   const oppName = gameState.players[oppSeat]?.name ?? `Seat ${oppSeat + 1}`;
+                  const oppBidLabel = oppBid === null ? "No bid yet" : oppBid === 0 ? "Nil" : String(oppBid);
+                  const opponentStats = [
+                    { label: "Score", value: `${gameState.scores[oppSeat]} / ${gameState.matchTarget}` },
+                    { label: "Bags", value: gameState.bags[oppSeat] },
+                    { label: "Tricks", value: gameState.tricks[oppSeat] },
+                    { label: "Cards", value: gameState.handSizes?.[oppSeat] ?? 0 },
+                  ];
                   return (
                     <div
                       data-testid="bidding-opponent-bid"
-                      className="rounded-lg border border-primary/35 bg-black/50 px-2.5 py-1.5 sm:px-3 sm:py-2 text-left"
+                      className="rounded-lg border border-primary/35 bg-black/50 px-2.5 py-2 sm:px-3 sm:py-2.5 text-left"
                     >
                       <div className="flex items-center justify-between gap-3">
                         <span className="min-w-0 truncate text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                          {oppName} bid this round
+                          {oppName}
                         </span>
                         <span className="shrink-0 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-0.5 sm:px-3 sm:py-1 font-mono text-xs sm:text-sm font-black text-primary whitespace-nowrap">
-                          {oppBid === null ? "No bid yet" : oppBid === 0 ? "Nil" : oppBid}
+                          Bid: {oppBidLabel}
                         </span>
+                      </div>
+                      <div className="mt-2 grid grid-cols-4 gap-1.5">
+                        {opponentStats.map((stat) => (
+                          <div
+                            key={stat.label}
+                            className="rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-1 text-center"
+                          >
+                            <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
+                              {stat.label}
+                            </div>
+                            <div className="mt-0.5 font-mono text-[11px] sm:text-xs font-black text-foreground tabular-nums">
+                              {stat.value}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   );
@@ -2007,6 +2032,20 @@ export default function Room() {
               <h3 className="text-xl sm:text-3xl font-serif text-center text-primary border-b border-border pb-3 sm:pb-4">
                 Round {lastRound.round} Summary
               </h3>
+
+              {roundNextCountdown !== null && (
+                <div
+                  data-testid="next-round-countdown-mobile"
+                  className="rounded-lg border border-primary/35 bg-primary/10 px-3 py-2 text-center shadow-[inset_0_0_18px_rgba(234,179,8,0.12)] sm:hidden"
+                >
+                  <div className="text-[9px] font-bold uppercase tracking-[0.28em] text-primary/80">
+                    Next round
+                  </div>
+                  <div className="mt-0.5 font-serif text-xl font-bold text-primary">
+                    Starting in {roundNextCountdown}
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-2 sm:gap-5 text-center">
                 {([0, 1] as (0 | 1)[]).map((idx) => {
@@ -2083,7 +2122,7 @@ export default function Room() {
                 {roundNextCountdown !== null && (
                   <div
                     data-testid="next-round-countdown"
-                    className="rounded-lg border border-primary/35 bg-black/35 px-4 py-2.5 sm:py-3 text-center"
+                    className="hidden rounded-lg border border-primary/35 bg-black/35 px-4 py-2.5 text-center sm:block sm:py-3"
                   >
                     <div className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.28em] text-primary/80">
                       Next round
@@ -2434,7 +2473,7 @@ export default function Room() {
         <div
           data-testid="hand-turn-hint"
           className={cn(
-            "sticky left-0 z-10 mx-2 mb-2 w-[calc(100vw-1rem)] rounded-lg border px-3 py-2 text-center text-xs font-bold uppercase tracking-widest backdrop-blur-sm sm:mx-3 sm:w-[calc(100vw-1.5rem)]",
+            "sticky left-0 z-10 mx-2 mb-2 flex w-[calc(100vw-1rem)] items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs font-bold uppercase tracking-widest backdrop-blur-sm sm:mx-3 sm:w-[calc(100vw-1.5rem)]",
             isMyPlayTurn
               ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200"
               : playingNow
@@ -2442,7 +2481,21 @@ export default function Room() {
                 : "border-primary/35 bg-black/45 text-primary"
           )}
         >
-          {handHint}
+          <span className="min-w-0 flex-1 text-center leading-snug">{handHint}</span>
+          {canForfeit && (
+            <button
+              type="button"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                setForfeitConfirmOpen(true);
+              }}
+              data-testid="button-forfeit"
+              className="shrink-0 rounded-md border border-red-500/45 bg-red-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-red-200 shadow-sm transition hover:bg-red-500/15 active:scale-95"
+            >
+              Forfeit
+            </button>
+          )}
         </div>
         <div className="flex flex-nowrap items-end gap-1 px-2 sm:gap-2 sm:px-3 sm:justify-center min-w-min">
           {groups.map((group, gi) => (
@@ -2725,52 +2778,40 @@ export default function Room() {
   );
 
   const renderForfeitControl = () =>
-    canForfeit ? (
-      <>
-        <button
-          type="button"
-          onClick={() => setForfeitConfirmOpen(true)}
-          data-testid="button-forfeit"
-          className="absolute bottom-[calc(env(safe-area-inset-bottom)+6.5rem)] left-3 z-[55] px-3 py-1.5 rounded-full border border-red-500/45 bg-black/75 text-red-200 text-[10px] font-semibold uppercase tracking-widest backdrop-blur-sm shadow-lg hover:bg-red-500/10 active:scale-95 transition"
+    canForfeit && forfeitConfirmOpen ? (
+      <div
+        className="fixed inset-0 z-[140] flex items-center justify-center bg-black/75 p-4"
+        data-testid="forfeit-confirm-overlay"
+        onClick={() => setForfeitConfirmOpen(false)}
+      >
+        <div
+          className="bg-card border border-red-500/35 rounded-xl shadow-2xl p-5 max-w-sm w-full space-y-4 text-center"
+          onClick={(event) => event.stopPropagation()}
         >
-          Forfeit
-        </button>
-        {forfeitConfirmOpen && (
-          <div
-            className="fixed inset-0 z-[140] flex items-center justify-center bg-black/75 p-4"
-            data-testid="forfeit-confirm-overlay"
-            onClick={() => setForfeitConfirmOpen(false)}
-          >
-            <div
-              className="bg-card border border-red-500/35 rounded-xl shadow-2xl p-5 max-w-sm w-full space-y-4 text-center"
-              onClick={(event) => event.stopPropagation()}
+          <h3 className="font-serif text-xl text-primary">Forfeit game?</h3>
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to forfeit this game?
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setForfeitConfirmOpen(false)}
+              data-testid="button-forfeit-cancel"
             >
-              <h3 className="font-serif text-xl text-primary">Forfeit game?</h3>
-              <p className="text-sm text-muted-foreground">
-                Are you sure you want to forfeit this game?
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setForfeitConfirmOpen(false)}
-                  data-testid="button-forfeit-cancel"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={handleConfirmForfeit}
-                  data-testid="button-forfeit-confirm"
-                >
-                  Forfeit
-                </Button>
-              </div>
-            </div>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleConfirmForfeit}
+              data-testid="button-forfeit-confirm"
+            >
+              Forfeit
+            </Button>
           </div>
-        )}
-      </>
+        </div>
+      </div>
     ) : null;
 
   // Host Fast Finish / End Game test tool. ADMIN-ONLY: shown ONLY to a socket
