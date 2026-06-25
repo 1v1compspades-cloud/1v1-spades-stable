@@ -1220,6 +1220,7 @@ export default function Room() {
             ? fbR1
             : (fbR1 === 0 ? 1 : 0);
       const firstBidderSeat = roundFirstBidder !== null ? roundFirstBidder + 1 : null;
+      const isMyBiddingTurn = !spectator && currentBidder === playerIndex;
       if (!spectator && currentBidder === playerIndex) {
         message = "Your turn to bid";
         colorClass = "bg-primary/20 text-primary font-semibold";
@@ -1235,18 +1236,25 @@ export default function Room() {
       // Always show "Round N · Seat X bids first this round" during bidding
       if (firstBidderSeat !== null) {
         return (
-          <div>
+          <div className="spades-status-stack">
             {gameState.matchLabel && renderMatchLabelBar()}
             <div
               data-testid="first-bidder-hint"
-              className="text-center py-1 px-4 text-[11px] tracking-wider uppercase bg-white/5 text-muted-foreground"
+              className="spades-round-chip"
             >
               <span className="text-foreground font-semibold">Round {gameState.roundNumber}</span>
               <span className="mx-2 opacity-50">·</span>
               <span className="text-primary font-semibold">Seat {firstBidderSeat}</span> bids first this round
             </div>
-            <div className={`text-center py-2 px-4 text-sm tracking-wide transition-colors ${colorClass}`}>
-              {message}
+            <div
+              data-testid="game-status-banner"
+              className={cn(
+                "spades-status-banner",
+                isMyBiddingTurn ? "spades-status-banner--active" : "spades-status-banner--waiting"
+              )}
+            >
+              <span className="spades-status-pulse" aria-hidden="true" />
+              <span>{message}</span>
             </div>
           </div>
         );
@@ -1831,6 +1839,9 @@ export default function Room() {
       ? (bottomPlayer?.name?.split(" ")[0] ?? `Seat ${bottomIndex + 1}`)
       : "You";
     const showBiddingControls = !spectator && gameState.phase === "bidding" && gameState.currentBidder === playerIndex;
+    const biddingWaitingSeat = gameState.phase === "bidding" && gameState.currentBidder !== null && !showBiddingControls
+      ? gameState.currentBidder
+      : null;
 
     return (
       <div
@@ -1901,6 +1912,18 @@ export default function Room() {
             </div>
             {renderLastTrickMini()}
           </div>
+          {biddingWaitingSeat !== null && (
+            <div className="spades-table-waiting-state" data-testid="table-bidding-waiting">
+              <div className="spades-table-waiting-cards" aria-hidden="true">
+                <span className="spades-table-waiting-card" />
+                <span className="spades-table-waiting-card" />
+                <span className="spades-table-waiting-card" />
+              </div>
+              <div className="spades-table-waiting-copy">
+                Waiting on Seat {biddingWaitingSeat + 1}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Shuffle / deal animation — shown to all roles within the server's ~3.1s shuffling window before each round */}
@@ -2553,7 +2576,10 @@ export default function Room() {
         <div
           data-testid="hand-turn-hint"
           className={cn(
-            "sticky left-0 z-10 mx-2 mb-2 flex w-[calc(100vw-1rem)] items-center justify-center rounded-lg border px-3 py-2 text-xs font-bold uppercase tracking-widest backdrop-blur-sm sm:mx-3 sm:w-[calc(100vw-1.5rem)]",
+            "spades-hand-hint sticky left-0 z-10 mb-2 flex items-center justify-center border text-xs font-bold uppercase tracking-widest backdrop-blur-sm",
+            biddingNow
+              ? "spades-hand-hint--bidding mx-auto w-fit max-w-[calc(100vw-2rem)] rounded-full px-4 py-2"
+              : "mx-2 w-[calc(100vw-1rem)] rounded-lg px-3 py-2 sm:mx-3 sm:w-[calc(100vw-1.5rem)]",
             isMyPlayTurn
               ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200"
               : playingNow
@@ -2847,9 +2873,9 @@ export default function Room() {
     canForfeit ? (
       <details
         data-testid="match-actions-panel"
-        className="mx-3 my-2 rounded-lg border border-primary/25 bg-black/45 px-3 py-2 text-xs backdrop-blur-sm"
+        className="spades-match-actions-panel mx-3 my-1 rounded-lg border border-primary/25 bg-black/45 px-3 py-1.5 text-xs backdrop-blur-sm"
       >
-        <summary className="cursor-pointer select-none list-none font-semibold uppercase tracking-widest text-primary [&::-webkit-details-marker]:hidden">
+        <summary className="cursor-pointer select-none list-none text-[10px] font-semibold uppercase tracking-widest text-primary [&::-webkit-details-marker]:hidden">
           Match Actions
         </summary>
         <div className="mt-2 border-t border-primary/20 pt-2">
