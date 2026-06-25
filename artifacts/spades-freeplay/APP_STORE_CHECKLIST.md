@@ -114,7 +114,7 @@ Target shots:
 | `userInterfaceStyle` dark (matches card-room theme) | ✅ Set |
 | Splash background matches theme (`#0b0b0d`) | ✅ Set |
 | `ios.bundleIdentifier` set | ✅ `com.oneononespades.freeplay` |
-| `ios.buildNumber` set | ✅ `1` |
+| `ios.buildNumber` set | ✅ `26` |
 | Encryption declaration (`usesNonExemptEncryption: false`) | ✅ Set (skips export-compliance prompt) |
 | Apple Developer account + App ID created | ⬜ Do in Apple Developer portal |
 | App record created in App Store Connect | ⬜ |
