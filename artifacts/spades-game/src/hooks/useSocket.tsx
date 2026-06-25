@@ -142,6 +142,8 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       reconnectionAttempts: Infinity,
       reconnectionDelay: 800,
       reconnectionDelayMax: 4000,
+      transports: ["websocket", "polling"],
+      tryAllTransports: true,
       timeout: 10000,
     });
     setSocket(s);
@@ -167,7 +169,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         setAdminChecked(true);
       }
     });
-    s.on("disconnect", () => {
+    s.on("disconnect", (reason) => {
       setConnected(false);
       setStatus("reconnecting");
       // Drop cached gameState so the Room's auto re-attach effect fires once
@@ -179,11 +181,33 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       // re-grants admin once the server re-validates the opaque session token.
       setIsAdmin(false);
       setAdminChecked(false);
+      // Socket.IO does not auto-reconnect after a server-initiated disconnect.
+      // Kick it back on so deploy/restart hiccups recover like network drops.
+      if (reason === "io server disconnect") {
+        window.setTimeout(() => {
+          if (!s.connected) s.connect();
+        }, 500);
+      }
+    });
+    s.on("connect_error", () => {
+      setConnected(false);
+      setStatus("reconnecting");
     });
     s.io.on("reconnect_attempt", () => setStatus("reconnecting"));
     s.io.on("reconnect", () => setStatus("online"));
     s.io.on("reconnect_error", () => setStatus("reconnecting"));
     s.io.on("reconnect_failed", () => setStatus("offline"));
+
+    const resumeConnection = () => {
+      if (s.connected) return;
+      setStatus("reconnecting");
+      s.connect();
+    };
+    const resumeWhenVisible = () => {
+      if (document.visibilityState === "visible") resumeConnection();
+    };
+    window.addEventListener("online", resumeConnection);
+    document.addEventListener("visibilitychange", resumeWhenVisible);
 
     s.on("game_state", (state: GameState) => {
       const active = activeRoomRef.current;
@@ -229,6 +253,8 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     });
 
     return () => {
+      window.removeEventListener("online", resumeConnection);
+      document.removeEventListener("visibilitychange", resumeWhenVisible);
       s.disconnect();
     };
   }, []);

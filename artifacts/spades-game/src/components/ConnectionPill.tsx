@@ -1,4 +1,5 @@
 import { useSocket } from "@/hooks/useSocket";
+import { ConnectionRecoveryActions } from "@/components/ConnectionRecoveryActions";
 
 /**
  * Tiny fixed-position connection-status pill. Shows nothing when online
@@ -17,13 +18,18 @@ export function ConnectionPill() {
   const v = map[status];
   return (
     <div
-      className={`fixed top-2 right-2 z-50 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-wider shadow-sm ${v.cls}`}
+      className="fixed right-2 top-2 z-50 flex max-w-[calc(100vw-1rem)] flex-col items-end gap-2"
       data-testid="connection-pill"
-      role="status"
-      aria-live="polite"
     >
-      <span className={`inline-block w-1.5 h-1.5 rounded-full ${v.dot}`} />
-      {v.label}
+      <div
+        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-wider shadow-sm ${v.cls}`}
+        role="status"
+        aria-live="polite"
+      >
+        <span className={`inline-block w-1.5 h-1.5 rounded-full ${v.dot}`} />
+        {v.label}
+      </div>
+      <ConnectionRecoveryActions compact />
     </div>
   );
 }

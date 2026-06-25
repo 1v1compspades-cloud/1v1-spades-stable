@@ -3,6 +3,7 @@ import { useRoute, useLocation } from "wouter";
 import { useSocket } from "@/hooks/useSocket";
 import { useGameStorage } from "@/hooks/useGameStorage";
 import { CardComponent } from "@/components/Card";
+import { ConnectionRecoveryActions } from "@/components/ConnectionRecoveryActions";
 import { ShuffleOverlay } from "@/components/ShuffleOverlay";
 import { isCardPlayable, sortHandBySuit, SUIT_SYMBOLS, SUIT_COLORS } from "@/lib/game";
 import { shouldClearSavedReconnectAfterFailure } from "@/lib/reconnectSession";
@@ -663,7 +664,10 @@ export default function Room() {
         <div className="absolute top-2 right-2">
           {renderStatusPill()}
         </div>
-        <div className="animate-pulse">{label}</div>
+        <div className="space-y-3">
+          <div className="animate-pulse">{label}</div>
+          <ConnectionRecoveryActions showImmediately showWhenOnline />
+        </div>
         <div className="flex flex-wrap items-center justify-center gap-2">
           <Button
             variant="outline"
