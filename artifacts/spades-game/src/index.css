@@ -383,6 +383,19 @@
     0 0.52rem 0.7rem rgba(0, 0, 0, 0.82);
 }
 
+.spades-live-coin__mark--heads {
+  font-size: 4.45rem;
+  letter-spacing: -0.08rem;
+  transform: translateY(0.12rem);
+  text-shadow:
+    -0.05rem -0.05rem 0 #ffffff,
+    0 0.08rem 0 var(--diamond-silver),
+    0 0.22rem 0 #5e6974,
+    0 0.5rem 0 #11161b,
+    0 0 0.72rem rgba(248, 251, 255, 0.36),
+    0 0.7rem 0.85rem rgba(0, 0, 0, 0.88);
+}
+
 .spades-live-coin__side {
   position: absolute;
   bottom: 0.72rem;
