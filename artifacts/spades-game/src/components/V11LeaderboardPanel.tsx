@@ -36,7 +36,7 @@ function podiumClasses(rank: number) {
       row: "border-amber-300/70 bg-gradient-to-r from-amber-500/20 via-black/30 to-black/20 shadow-[0_0_24px_rgba(245,158,11,0.16)]",
       marker: "border-amber-300/80 bg-amber-400/20 text-amber-200",
       badge: "border-amber-300/50 bg-amber-400/15 text-amber-100",
-      label: "Champion",
+      label: "CHAMPION",
     };
   }
   if (rank === 2) {
@@ -44,7 +44,7 @@ function podiumClasses(rank: number) {
       row: "border-slate-200/55 bg-gradient-to-r from-slate-200/14 via-black/25 to-black/20 shadow-[0_0_20px_rgba(226,232,240,0.10)]",
       marker: "border-slate-200/70 bg-slate-200/15 text-slate-100",
       badge: "border-slate-200/45 bg-slate-200/10 text-slate-100",
-      label: "Podium",
+      label: "ELITE",
     };
   }
   if (rank === 3) {
@@ -52,7 +52,7 @@ function podiumClasses(rank: number) {
       row: "border-orange-300/55 bg-gradient-to-r from-orange-500/16 via-black/25 to-black/20 shadow-[0_0_20px_rgba(251,146,60,0.10)]",
       marker: "border-orange-300/70 bg-orange-400/15 text-orange-100",
       badge: "border-orange-300/45 bg-orange-400/10 text-orange-100",
-      label: "Podium",
+      label: "CONTENDER",
     };
   }
   return null;
@@ -132,7 +132,7 @@ function LeaderboardRow({
               {podium && (
                 <span className={cn("inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest", podium.badge)}>
                   <Trophy className="h-3 w-3" aria-hidden />
-                  {podium.label} #{entry.rank}
+                  {podium.label}
                 </span>
               )}
             </div>

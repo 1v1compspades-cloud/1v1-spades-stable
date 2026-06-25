@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useSocket } from "@/hooks/useSocket";
 import { useGameStorage } from "@/hooks/useGameStorage";
@@ -176,6 +176,11 @@ export default function Room() {
   const reconnectRetryCountRef = useRef(0);
   const reconnectRetryTimeoutRef = useRef<number | null>(null);
   const latestGamePhaseRef = useRef<string | null>(null);
+  const handDragRef = useRef<{ pointerId: number | null; startX: number; scrollLeft: number }>({
+    pointerId: null,
+    startX: 0,
+    scrollLeft: 0,
+  });
 
   useEffect(() => {
     latestGamePhaseRef.current = gameState?.phase ?? null;
@@ -198,6 +203,36 @@ export default function Room() {
 
   const isHost = !isSpectator && playerIndex === 0;
   const spectator = !!gameState?.isSpectator || isSpectator;
+
+  const handleHandPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (gameState?.phase !== "bidding") return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    const tray = event.currentTarget;
+    if (tray.scrollWidth <= tray.clientWidth) return;
+
+    handDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      scrollLeft: tray.scrollLeft,
+    };
+    tray.setPointerCapture?.(event.pointerId);
+  };
+
+  const handleHandPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    const drag = handDragRef.current;
+    if (drag.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - drag.startX;
+    if (Math.abs(deltaX) < 1) return;
+    event.currentTarget.scrollLeft = drag.scrollLeft - deltaX;
+    event.preventDefault();
+  };
+
+  const handleHandPointerEnd = (event: PointerEvent<HTMLDivElement>) => {
+    if (handDragRef.current.pointerId !== event.pointerId) return;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    handDragRef.current.pointerId = null;
+  };
 
   useEffect(() => {
     if (!roomCode || !gameState || gameState.mode === "king") return;
@@ -1793,10 +1828,10 @@ export default function Room() {
           const resultLabel = resultSide === "heads" ? "Heads" : "Tails";
           return (
             <div
-              className="absolute inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-lg"
+              className="fixed inset-0 z-[140] flex items-start justify-center overflow-y-auto bg-black/85 px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(2.75rem,env(safe-area-inset-top))] backdrop-blur-lg sm:absolute sm:inset-0 sm:z-50 sm:items-center sm:overflow-visible sm:p-0"
               data-testid="coin-toss-overlay"
             >
-              <div className="bg-card border border-border p-6 rounded-xl shadow-2xl max-w-sm w-full mx-4 text-center space-y-5">
+              <div className="bg-card border border-border p-4 sm:p-6 rounded-xl shadow-2xl max-w-sm w-full text-center space-y-3 sm:space-y-5">
                 <div className="spades-coin-stage" aria-hidden="true">
                   <div
                     className={`spades-live-coin spades-live-coin--${resultSide}`}
@@ -1816,18 +1851,18 @@ export default function Room() {
                     </div>
                   </div>
                 </div>
-                <h3 className="text-2xl font-serif text-primary">Coin Toss</h3>
-                <p className="text-sm text-muted-foreground">
+                <h3 className="text-xl sm:text-2xl font-serif text-primary">Coin Toss</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   Live server toss. <span className="font-semibold text-foreground">Heads = Seat 1</span>,{" "}
                   <span className="font-semibold text-foreground">Tails = Seat 2</span>.
                 </p>
-                <div className="space-y-1 border-y border-border py-3">
+                <div className="space-y-1 border-y border-border py-2.5 sm:py-3">
                   {coinTossRevealed ? (
                     <>
                       <p className="text-xs text-muted-foreground uppercase tracking-widest">
                         Result: <span className="text-primary">{resultLabel}</span>
                       </p>
-                      <p data-testid="coin-toss-winner" className="text-2xl font-serif font-bold text-primary">
+                      <p data-testid="coin-toss-winner" className="text-xl sm:text-2xl font-serif font-bold text-primary">
                         {spectator
                           ? `${winnerName} won the flip`
                           : youWon
@@ -1840,19 +1875,19 @@ export default function Room() {
                       <p className="text-xs text-muted-foreground uppercase tracking-widest">
                         Result
                       </p>
-                      <p data-testid="coin-toss-winner" className="text-2xl font-serif font-bold text-primary">
+                      <p data-testid="coin-toss-winner" className="text-xl sm:text-2xl font-serif font-bold text-primary">
                         Flipping…
                       </p>
                     </>
                   )}
                 </div>
                 {coinTossRevealed ? (
-                  <p className="text-sm">
+                  <p className="text-xs sm:text-sm">
                     <span className="font-semibold text-foreground" data-testid="coin-toss-first-bidder">{loserName}</span>{" "}
                     bids first in Round 1. Bidding order alternates each round after.
                   </p>
                 ) : (
-                  <p className="text-sm text-muted-foreground" data-testid="coin-toss-first-bidder">
+                  <p className="text-xs sm:text-sm text-muted-foreground" data-testid="coin-toss-first-bidder">
                     Flipping…
                   </p>
                 )}
@@ -1875,16 +1910,17 @@ export default function Room() {
               aria-hidden="true"
             />
             <div
-              className="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto pointer-events-none sm:items-center"
+              className="fixed inset-x-0 top-0 z-[120] flex items-start justify-center overflow-y-auto pointer-events-none sm:items-center"
               style={{
+                bottom: "calc(env(safe-area-inset-bottom) + 12rem)",
                 paddingTop: "max(0.35rem, env(safe-area-inset-top))",
-                paddingBottom: "calc(env(safe-area-inset-bottom) + 12rem)",
+                paddingBottom: "0.75rem",
                 paddingLeft: "max(0.5rem, env(safe-area-inset-left))",
                 paddingRight: "max(0.5rem, env(safe-area-inset-right))",
               }}
               data-testid="bidding-overlay"
             >
-              <div className="bg-card/96 border border-border p-2.5 sm:p-5 rounded-xl shadow-2xl space-y-2 sm:space-y-3 w-full max-w-[min(34rem,calc(100vw-1rem))] text-center max-h-[min(44dvh,22rem)] sm:max-h-[80dvh] overflow-y-auto overscroll-contain pointer-events-auto backdrop-blur-md">
+              <div className="bg-card/96 border border-border p-2.5 sm:p-5 rounded-xl shadow-2xl space-y-2 sm:space-y-3 w-full max-w-[min(34rem,calc(100vw-1rem))] text-center max-h-[min(56dvh,26rem)] sm:max-h-[80dvh] overflow-y-auto overscroll-contain pointer-events-auto backdrop-blur-md">
                 <h3 className="text-sm leading-none sm:text-lg sm:leading-normal font-serif text-primary">Place your bid</h3>
                 {gameState.bids[0] === null && gameState.bids[1] === null && (
                   <p className="text-[9px] sm:text-[11px] uppercase tracking-widest text-primary/80 leading-tight">
@@ -1922,7 +1958,7 @@ export default function Room() {
                 })()}
                 <div
                   data-testid="bid-buttons"
-                  className="grid grid-cols-7 gap-1 w-full sm:gap-2"
+                  className="grid grid-cols-7 gap-1 w-full pb-12 sm:gap-2 sm:pb-14"
                 >
                   {Array.from({ length: 14 }).map((_, i) => {
                     const val = i.toString();
@@ -2380,9 +2416,14 @@ export default function Room() {
     return (
       <div
         data-testid="my-hand"
+        onPointerDown={biddingNow ? handleHandPointerDown : undefined}
+        onPointerMove={biddingNow ? handleHandPointerMove : undefined}
+        onPointerUp={biddingNow ? handleHandPointerEnd : undefined}
+        onPointerCancel={biddingNow ? handleHandPointerEnd : undefined}
+        onLostPointerCapture={biddingNow ? handleHandPointerEnd : undefined}
         className={cn(
           "spades-hand-tray relative flex-shrink-0 overflow-x-auto overflow-y-hidden snap-x pt-2 pb-hand-safe border-t shadow-[0_-10px_34px_-24px_hsla(35,90%,55%,0.5)] touch-pan-x",
-          biddingNow && "z-[130] ring-1 ring-primary/35",
+          biddingNow && "z-[130] ring-1 ring-primary/35 cursor-grab active:cursor-grabbing",
           isMyPlayTurn && "ring-2 ring-emerald-400/50"
         )}
       >
@@ -2423,6 +2464,7 @@ export default function Room() {
                     dimmed={isMyPlayTurn && !playable}
                     className={cn(
                       "snap-center",
+                      biddingNow && "pointer-events-none",
                       playable && "ring-4 ring-emerald-400 ring-offset-2 ring-offset-background -translate-y-1 shadow-[0_0_22px_rgba(52,211,153,0.45)]"
                     )}
                   />

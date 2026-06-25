@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useSocket } from "@/hooks/useSocket";
 import type { AccountIdentityPayload } from "@/hooks/useSocket";
 import { useGameStorage } from "@/hooks/useGameStorage";
+import { Eye, LogIn, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1512,19 +1513,20 @@ export default function Lobby() {
           <section className="space-y-3 rounded-md border border-border/40 bg-white/[0.03] p-3" data-testid="private-match-section">
             <div className="text-center">
               <h2 className="text-sm font-semibold uppercase tracking-widest text-primary">Private Match</h2>
-              <p className="text-xs text-muted-foreground">Create a room or join with a code.</p>
+              <p className="text-xs text-muted-foreground">Create, join, or watch with a room code.</p>
             </div>
-            <div className="grid gap-3 md:grid-cols-[1fr_1.2fr]">
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.65fr)]">
               <Button
                 onClick={handleCreate}
                 disabled={isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch}
-                className="spades-gold-button w-full py-4 text-base font-bold active:scale-[0.98] transition-transform"
+                className="spades-gold-button flex min-h-14 w-full items-center justify-center gap-2 text-base font-bold active:scale-[0.98] transition-transform"
                 data-testid="button-create"
               >
+                <Plus className="h-4 w-4" aria-hidden />
                 {isCreating ? "Creating..." : matchMode === "custom" ? "Create Event" : "Create Room"}
               </Button>
 
-              <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
                 <Input
                   placeholder={matchMode === "custom" ? "Event code" : "Enter room code"}
                   value={joinCodeInput}
@@ -1535,62 +1537,38 @@ export default function Lobby() {
                     e.preventDefault();
                     void handleJoin();
                   }}
-                  className="text-center uppercase font-mono py-4 placeholder:normal-case placeholder:font-sans placeholder:tracking-normal"
+                  className="h-14 text-center uppercase font-mono placeholder:normal-case placeholder:font-sans placeholder:tracking-normal"
                   maxLength={6}
+                  data-testid="input-spectate-code"
                 />
                 <Button
                   onClick={handleJoin}
                   disabled={isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch || !joinCodeInput}
                   variant="secondary"
-                  className="py-4 px-6 text-base font-bold active:scale-[0.98] transition-transform"
+                  className="flex h-14 items-center justify-center gap-2 px-5 text-base font-bold active:scale-[0.98] transition-transform"
                   data-testid="button-join"
                 >
+                  <LogIn className="h-4 w-4" aria-hidden />
                   {isJoining ? "Joining..." : matchMode === "custom" ? "Join Event" : "Join Match"}
                 </Button>
-              </div>
-            </div>
-          </section>
-
-          <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
-            <section className="space-y-3 rounded-md border border-primary/30 bg-white/[0.03] p-3">
-              <div className="space-y-1 text-center">
-                <h2 className="text-sm font-semibold uppercase tracking-widest text-primary">Spectators Join Here</h2>
-                <p className="text-xs text-muted-foreground">
-                  Enter a room code to watch scores, bids, and tricks live.
-                </p>
-              </div>
-              <div className="grid gap-2 sm:grid-cols-[1fr_auto] lg:grid-cols-1 xl:grid-cols-[1fr_auto]">
-                <Input
-                  placeholder="Room code"
-                  value={joinCodeInput}
-                  onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
-                  onKeyDown={(e) => {
-                    if (e.key !== "Enter") return;
-                    if (isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch || !joinCodeInput.trim()) return;
-                    e.preventDefault();
-                    void handleSpectate();
-                  }}
-                  className="h-12 text-center uppercase font-mono placeholder:normal-case placeholder:font-sans placeholder:tracking-normal"
-                  maxLength={6}
-                  data-testid="input-spectate-code"
-                />
                 <Button
                   onClick={handleSpectate}
                   disabled={isCreating || isJoining || isSpectating || isFindingMatch || isFindingRankedMatch || !joinCodeInput}
-                  variant="secondary"
-                  className="h-12 px-6 text-sm font-semibold"
+                  variant="outline"
+                  className="flex h-14 items-center justify-center gap-2 border-primary/35 bg-primary/5 px-5 text-base font-bold text-primary active:scale-[0.98] transition-transform hover:bg-primary/10"
                   data-testid="button-spectate"
                 >
+                  <Eye className="h-4 w-4" aria-hidden />
                   {isSpectating ? "Joining..." : "Watch Room"}
                 </Button>
               </div>
-              <p className="text-center text-xs text-muted-foreground">
-                Spectators see scores, bids, and tricks live without hidden hands.
-              </p>
-            </section>
+            </div>
+            <p className="text-center text-xs text-muted-foreground">
+              Spectators watch scores, bids, and tricks live without hidden hands.
+            </p>
+          </section>
 
-            <V11LeaderboardPanel />
-          </div>
+          <V11LeaderboardPanel />
 
           <MatchAgreementNotice />
 
