@@ -13,8 +13,14 @@ import {
 import WebView, { type WebViewMessageEvent, type WebViewNavigation } from "react-native-webview";
 import * as Haptics from "expo-haptics";
 
-const LIVE_URL = "https://1v1spades.com/";
-const LIVE_ORIGIN = "https://1v1spades.com";
+function liveOrigin() {
+  const domain = process.env.EXPO_PUBLIC_DOMAIN || "1v1spades.com";
+  const host = domain.replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  return `https://${host}`;
+}
+
+const LIVE_ORIGIN = liveOrigin();
+const LIVE_URL = `${LIVE_ORIGIN}/`;
 const CONNECTION_ERROR = "Connection unavailable. Check internet or try again.";
 const SERVER_UNAVAILABLE_ERROR = "Server unavailable. Tap Retry in a moment.";
 const LOAD_TIMEOUT_MS = 10000;

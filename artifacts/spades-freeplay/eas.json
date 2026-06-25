@@ -19,6 +19,12 @@
       "env": {
         "EXPO_PUBLIC_DOMAIN": "1v1spades.com"
       }
+    },
+    "staging": {
+      "autoIncrement": false,
+      "env": {
+        "EXPO_PUBLIC_DOMAIN": "onev1-spades-staging.onrender.com"
+      }
     }
   },
   "submit": {
