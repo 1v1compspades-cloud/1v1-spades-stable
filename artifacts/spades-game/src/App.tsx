@@ -10,6 +10,7 @@ import Room from "@/pages/Room";
 import Tournament from "@/pages/Tournament";
 import HostDashboard from "@/pages/HostDashboard";
 import Account from "@/pages/Account";
+import Leaderboard from "@/pages/Leaderboard";
 import Rules from "@/pages/info/Rules";
 import FairPlay from "@/pages/info/FairPlay";
 import Privacy from "@/pages/info/Privacy";
@@ -29,6 +30,7 @@ function Router() {
       <Route path="/terms" component={Terms} />
       <Route path="/support" component={Support} />
       {v11WebFlags.accounts && <Route path="/account" component={Account} />}
+      {v11WebFlags.leaderboards && <Route path="/leaderboard" component={Leaderboard} />}
       <Route path="/room/:roomCode" component={Room} />
       <Route path="/tournament/:code/host" component={HostDashboard} />
       <Route path="/tournament/:code" component={Tournament} />

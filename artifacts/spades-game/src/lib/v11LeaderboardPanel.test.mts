@@ -7,6 +7,7 @@ import {
   formatSeasonLabel,
   formatStreak,
   formatWinRate,
+  latestLeaderboardUpdatedAt,
   leaderboardEndpoint,
 } from "./v11LeaderboardPanel.js";
 
@@ -45,6 +46,7 @@ test("leaderboard panel renders entries state", () => {
           currentStreak: 2,
           bagsTaken: 5,
           bagsGiven: 3,
+          updatedAt: "2026-06-24T12:00:00.000Z",
         },
       ],
     },
@@ -94,4 +96,32 @@ test("leaderboard panel formats win rate and streak", () => {
 test("leaderboard panel formats the beta season for display", () => {
   assert.equal(formatSeasonLabel("v1_1_beta"), "Season 0 Beta");
   assert.equal(formatSeasonLabel("season_1"), "season_1");
+});
+
+test("leaderboard panel finds the latest update timestamp", () => {
+  const label = latestLeaderboardUpdatedAt([
+    {
+      rank: 1,
+      username: "Alpha",
+      wins: 3,
+      losses: 1,
+      gamesPlayed: 4,
+      winRate: 0.75,
+      currentStreak: 2,
+      updatedAt: "2026-06-24T12:00:00.000Z",
+    },
+    {
+      rank: 2,
+      username: "Beta",
+      wins: 2,
+      losses: 2,
+      gamesPlayed: 4,
+      winRate: 0.5,
+      currentStreak: -1,
+      updatedAt: "2026-06-25T13:30:00.000Z",
+    },
+  ]);
+
+  assert.ok(label?.includes("Jun"));
+  assert.ok(label?.includes("25"));
 });

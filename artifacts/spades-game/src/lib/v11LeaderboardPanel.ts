@@ -10,6 +10,7 @@ export type V11LeaderboardEntry = {
   currentStreak: number;
   bagsTaken?: number;
   bagsGiven?: number;
+  updatedAt?: string | Date;
 };
 
 export type V11LeaderboardResponse = {
@@ -52,6 +53,30 @@ export function formatScoreTotal(value: number | undefined): string {
 export function formatSeasonLabel(seasonKey: string): string {
   if (seasonKey === "v1_1_beta") return "Season 0 Beta";
   return seasonKey;
+}
+
+export function formatLastUpdated(value: string | Date | undefined): string | null {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) return null;
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
+export function latestLeaderboardUpdatedAt(entries: V11LeaderboardEntry[]): string | null {
+  const latest = entries.reduce<number | null>((max, entry) => {
+    if (!entry.updatedAt) return max;
+    const date = entry.updatedAt instanceof Date ? entry.updatedAt : new Date(entry.updatedAt);
+    const time = date.getTime();
+    if (!Number.isFinite(time)) return max;
+    return max === null ? time : Math.max(max, time);
+  }, null);
+
+  return latest === null ? null : formatLastUpdated(new Date(latest));
 }
 
 export function computeLeaderboardPanelState(input: {
