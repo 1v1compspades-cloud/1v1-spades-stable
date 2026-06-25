@@ -1972,10 +1972,10 @@ export default function Room() {
               aria-hidden="true"
             />
             <div
-              className="fixed inset-0 z-[220] flex items-start justify-center overflow-y-auto pointer-events-none px-2 pt-[calc(env(safe-area-inset-top)+10.25rem)] pb-[calc(env(safe-area-inset-bottom)+11rem)] sm:items-center sm:p-4"
+              className="fixed inset-0 z-[240] flex items-start justify-center overflow-y-auto pointer-events-none px-2 pt-[calc(env(safe-area-inset-top)+8.5rem)] pb-[calc(env(safe-area-inset-bottom)+18.5rem)] sm:items-start sm:px-4 sm:pt-[calc(env(safe-area-inset-top)+6.25rem)] sm:pb-[calc(env(safe-area-inset-bottom)+13rem)]"
               data-testid="bidding-overlay"
             >
-              <div className="bg-card/96 border border-border p-3 sm:p-5 rounded-xl shadow-2xl w-full max-w-[min(34rem,calc(100vw-1rem))] text-center max-h-[calc(100dvh-22rem)] min-[420px]:max-h-[calc(100dvh-20rem)] sm:max-h-[80dvh] overflow-hidden pointer-events-auto backdrop-blur-md flex flex-col">
+              <div className="bg-card/96 border border-border p-3 sm:p-4 rounded-xl shadow-2xl w-full max-w-[min(34rem,calc(100vw-1rem))] text-center max-h-[calc(100dvh-27rem)] min-[420px]:max-h-[calc(100dvh-26rem)] sm:max-h-[calc(100dvh-20rem)] overflow-hidden pointer-events-auto backdrop-blur-md flex flex-col">
                 <div className="min-h-0 overflow-y-auto overscroll-contain pr-1 space-y-3">
                   <h3 className="text-sm sm:text-lg font-serif text-primary">Place your bid</h3>
                   {gameState.bids[0] === null && gameState.bids[1] === null && (
@@ -2000,11 +2000,6 @@ export default function Room() {
                     const myName = gameState.players[mySeat]?.name ?? "You";
                     const myScore = gameState.scores[mySeat] ?? 0;
                     const oppScore = gameState.scores[oppSeat] ?? 0;
-                    const opponentStats = [
-                      { label: "Score", value: `${oppScore} / ${gameState.matchTarget}` },
-                      { label: "Bags", value: gameState.bags[oppSeat] },
-                    ];
-
                     return (
                       <div className="space-y-2">
                         <div
@@ -2036,22 +2031,6 @@ export default function Room() {
                             </span>
                           </div>
                         </div>
-
-                        <div className="mt-2 grid grid-cols-2 gap-1.5">
-                          {opponentStats.map((stat) => (
-                            <div
-                              key={stat.label}
-                              className="rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-1 text-center"
-                            >
-                              <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
-                                {stat.label}
-                              </div>
-                              <div className="mt-0.5 font-mono text-[11px] sm:text-xs font-black text-foreground tabular-nums">
-                                {stat.value}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
                       </div>
                     );
                   })()}
@@ -2081,7 +2060,7 @@ export default function Room() {
                     })}
                   </div>
                 </div>
-                <div className="mt-3 border-t border-border/70 bg-card/96 pt-3">
+                <div className="sticky bottom-0 z-10 mt-3 border-t border-border/70 bg-card/98 pt-3 shadow-[0_-10px_24px_rgba(0,0,0,0.45)]">
                   <Button
                     onClick={handleBid}
                     disabled={!bidAmount || isSubmitting}
@@ -2537,7 +2516,7 @@ export default function Room() {
         onLostPointerCapture={biddingNow ? handleHandPointerEnd : undefined}
         className={cn(
           "spades-hand-tray relative flex-shrink-0 overflow-x-auto overflow-y-hidden snap-x pt-2 pb-hand-safe border-t shadow-[0_-10px_34px_-24px_hsla(35,90%,55%,0.5)] touch-pan-x",
-          biddingNow && "z-[130] ring-1 ring-primary/35 cursor-grab active:cursor-grabbing",
+          biddingNow && "spades-hand-tray--bidding z-[130] ring-1 ring-primary/35 cursor-grab active:cursor-grabbing",
           isMyPlayTurn && "ring-2 ring-emerald-400/50"
         )}
       >
@@ -3004,7 +2983,8 @@ export default function Room() {
         "spades-screen spades-gameplay-screen flex flex-col bg-background overflow-x-hidden relative",
         gameState.phase === "waiting"
           ? "min-h-[100dvh] sm:h-[100dvh] overflow-y-auto sm:overflow-hidden"
-          : "h-[100dvh] min-h-[100dvh] overflow-hidden"
+          : "h-[100dvh] min-h-[100dvh] overflow-hidden",
+        gameState.phase === "bidding" && "spades-gameplay-screen--bidding overflow-y-auto"
       )}
     >
       {renderStatusPill()}

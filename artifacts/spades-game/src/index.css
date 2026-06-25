@@ -324,7 +324,7 @@
 }
 
 .spades-live-coin__face--tails {
-  transform: translateZ(0.04rem);
+  transform: rotateY(180deg) translateZ(0.04rem);
 }
 
 .spades-live-coin__rim {
@@ -670,9 +670,34 @@
     border-color: rgba(245, 197, 24, 0.28);
   }
 
+  .spades-gameplay-screen--bidding {
+    height: auto !important;
+    min-height: 100dvh;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .spades-hand-tray--bidding {
+    min-height: calc(5.65rem + env(safe-area-inset-bottom) + 6.25rem);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 8.5rem) !important;
+    scroll-padding-bottom: calc(env(safe-area-inset-bottom) + 8.5rem);
+  }
+
   @media (min-width: 640px) {
     .pb-hand-safe {
       padding-bottom: calc(env(safe-area-inset-bottom) + 0.75rem);
+    }
+
+    .spades-gameplay-screen--bidding {
+      height: 100dvh !important;
+      overflow: hidden !important;
+    }
+
+    .spades-hand-tray--bidding {
+      min-height: auto;
+      padding-bottom: calc(env(safe-area-inset-bottom) + 0.75rem) !important;
+      scroll-padding-bottom: calc(env(safe-area-inset-bottom) + 0.75rem);
     }
 
     .spades-table-pocket {
