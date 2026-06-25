@@ -339,17 +339,6 @@
   text-shadow: 0 0.08rem 0 #000, 0 0 0.42rem rgba(248, 251, 255, 0.34);
 }
 
-.spades-live-coin__spade {
-  position: absolute;
-  color: rgba(226, 232, 240, 0.13);
-  font-size: 7.1rem;
-  line-height: 1;
-  transform: translateY(0.32rem);
-  text-shadow:
-    0 0 0.12rem rgba(248, 251, 255, 0.2),
-    0 0.22rem 0.6rem rgba(0, 0, 0, 0.9);
-}
-
 .spades-live-coin__diamond {
   position: absolute;
   z-index: 1;
@@ -384,9 +373,9 @@
 }
 
 .spades-live-coin__mark--heads {
-  font-size: 4.45rem;
+  font-size: 5.35rem;
   letter-spacing: -0.08rem;
-  transform: translateY(0.12rem);
+  transform: translateY(-0.02rem);
   text-shadow:
     -0.05rem -0.05rem 0 #ffffff,
     0 0.08rem 0 var(--diamond-silver),
@@ -407,15 +396,15 @@
   text-shadow: 0 0.08rem 0 #000, 0 0 0.38rem rgba(248, 251, 255, 0.28);
 }
 
-.spades-live-coin__dragon {
+.spades-live-coin__animal {
   position: relative;
   z-index: 2;
   width: 5.7rem;
   height: 4.6rem;
-  transform: translateY(0.18rem);
+  transform: translateY(0.04rem);
 }
 
-.spades-live-coin__dragon-body {
+.spades-live-coin__animal-body {
   position: absolute;
   inset: 0.72rem 0.58rem 0.28rem 0.32rem;
   border: 0.58rem solid var(--onyx-bg);
@@ -430,7 +419,7 @@
     0 0.32rem 0.6rem rgba(0, 0, 0, 0.85);
 }
 
-.spades-live-coin__dragon-body::before {
+.spades-live-coin__animal-body::before {
   content: "";
   position: absolute;
   left: 0.9rem;
@@ -444,7 +433,7 @@
   box-shadow: 0 0.08rem 0.22rem rgba(0, 0, 0, 0.62);
 }
 
-.spades-live-coin__dragon-head {
+.spades-live-coin__animal-head {
   position: absolute;
   left: 0.28rem;
   top: 1.1rem;
@@ -459,8 +448,8 @@
     0 0.1rem 0.35rem rgba(0, 0, 0, 0.78);
 }
 
-.spades-live-coin__dragon-head::before,
-.spades-live-coin__dragon-head::after {
+.spades-live-coin__animal-head::before,
+.spades-live-coin__animal-head::after {
   content: "";
   position: absolute;
   top: -0.38rem;
@@ -471,17 +460,17 @@
   border-bottom: 0.58rem solid var(--diamond-white);
 }
 
-.spades-live-coin__dragon-head::before {
+.spades-live-coin__animal-head::before {
   left: 0.24rem;
   transform: rotate(-22deg);
 }
 
-.spades-live-coin__dragon-head::after {
+.spades-live-coin__animal-head::after {
   left: 0.78rem;
   transform: rotate(18deg);
 }
 
-.spades-live-coin__dragon-tail {
+.spades-live-coin__animal-tail {
   position: absolute;
   right: 0.12rem;
   bottom: 0.58rem;

@@ -1901,14 +1901,15 @@ export default function Room() {
                     data-testid="live-coin-toss"
                   >
                     <div className="spades-live-coin__face spades-live-coin__face--heads">
-                      <div className="spades-live-coin__rim">1v1 SPADES</div>
                       <div className="spades-live-coin__mark spades-live-coin__mark--heads">1V1</div>
                       <div className="spades-live-coin__side">HEADS</div>
                     </div>
                     <div className="spades-live-coin__face spades-live-coin__face--tails">
-                      <div className="spades-live-coin__rim">1v1 SPADES</div>
-                      <div className="spades-live-coin__dragon">♞</div>
-                      <div className="spades-live-coin__spade spades-live-coin__spade--tails">♠</div>
+                      <div className="spades-live-coin__animal">
+                        <div className="spades-live-coin__animal-body" />
+                        <div className="spades-live-coin__animal-head" />
+                        <div className="spades-live-coin__animal-tail">♠</div>
+                      </div>
                       <div className="spades-live-coin__side">TAILS</div>
                     </div>
                   </div>
