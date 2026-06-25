@@ -528,8 +528,18 @@ export default function Room() {
         : reconnectAsSpectator(roomCode, playerName);
       spectateCall.catch(err => {
         if (latestGamePhaseRef.current === "game_over") return;
+        const msg = typeof err === "string" ? err : (err?.message ?? "");
+        if (shouldRetryReconnectAfterFailure(msg)) {
+          if (scheduleReconnectRetry(2500)) return;
+          toast({
+            description: "Still connecting as a spectator. Check your connection or refresh this page.",
+            variant: "destructive",
+          });
+          return;
+        }
         toast({ description: err || "Spectator session expired.", variant: "destructive" });
         saveIsSpectator(false);
+        clearReconnectRetry();
         setLocation("/");
       });
     } else if (playerIndex !== null) {

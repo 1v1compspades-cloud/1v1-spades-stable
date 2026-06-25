@@ -135,6 +135,7 @@ test("retryable room reconnect failures stay on reconnect flow", () => {
   assert.equal(shouldRetryReconnectAfterFailure("Reconnect temporarily unavailable, please retry"), true);
   assert.equal(shouldRetryReconnectAfterFailure("No socket"), true);
   assert.equal(shouldRetryReconnectAfterFailure("Seat already active in another tab"), true);
+  assert.equal(shouldRetryReconnectAfterFailure("Network timeout while watching"), true);
 });
 
 test("terminal room reconnect failures do not retry", () => {
