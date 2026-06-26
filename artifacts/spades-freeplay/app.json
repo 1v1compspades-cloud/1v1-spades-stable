@@ -18,7 +18,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.oneononespades.freeplay",
-      "buildNumber": "27",
+      "buildNumber": "28",
       "config": {
         "usesNonExemptEncryption": false
       },
