@@ -13,18 +13,18 @@ workspace root, to print the automated dashboard.
 | --- | --- |
 | App | 1v1 Spades |
 | Version | 1.0.0 |
-| iOS build | 28 |
+| iOS build | 29 |
 | Bundle ID | com.oneononespades.freeplay |
-| EAS build ID | 1e3545ba-1feb-407c-bc6e-664dec1f9960 |
-| EAS submission ID | a5cdde90-f42b-471c-b34d-506b84fa699e |
+| EAS build ID | Pending build 29 |
+| EAS submission ID | Pending build 29 |
 | App Store Connect app ID | 6776721716 |
 | TestFlight URL | https://appstoreconnect.apple.com/apps/6776721716/testflight/ios |
 | Release mode default | Manual release after approval |
 
 ## Manual launch checklist
 
-- [ ] Apple processing complete for build 28
-- [ ] Build 28 added to internal TestFlight testing
+- [ ] Apple processing complete for build 29
+- [ ] Build 29 added to internal TestFlight testing
 - [ ] TestFlight smoke test checklist complete
 - [ ] Hosted web mobile layout fix deployed to 1v1spades.com
 - [ ] App Store screenshots uploaded
@@ -39,8 +39,8 @@ workspace root, to print the automated dashboard.
 
 ## Ordered next actions
 
-1. Wait for Apple processing to finish for build 28.
-2. Add build 28 to internal TestFlight testing.
+1. Wait for Apple processing to finish for build 29.
+2. Add build 29 to internal TestFlight testing.
 3. Smoke test on a real iPhone: launch, create room, join from second device or browser, play bidding/trick flow, background/reopen reconnect, leave/return, and open Privacy/Terms/Support.
 4. Confirm the hosted web mobile layout fix is live on `https://1v1spades.com`.
 5. Upload App Store screenshots.
@@ -52,7 +52,7 @@ workspace root, to print the automated dashboard.
 
 ## Current blockers
 
-- [ ] Smoke test visual layout failure seen on build 21: iPhone bidding/game screen clipped horizontally, score counters overflowed past the right edge, bid modal was too wide/tall for the viewport, bottom hand was partially cut off, and the Report Bug button truncated. Build 28 uses the live fixed `1v1spades.com` deployment; do not mark smoke test complete until build 28 is built, submitted, processed, installed, and verified on device.
+- [ ] Smoke test visual layout failure seen on build 21: iPhone bidding/game screen clipped horizontally, score counters overflowed past the right edge, bid modal was too wide/tall for the viewport, bottom hand was partially cut off, and the Report Bug button truncated. Build 29 uses the live fixed `1v1spades.com` deployment; do not mark smoke test complete until build 29 is built, submitted, processed, installed, and verified on device.
 - [ ] Smoke test visual layout failure seen on hosted build 22 candidate: room code/header was truncated on the iPhone-width layout. The local web fix now shows a dedicated full room-code strip and wrap-safe lobby code; deploy to `1v1spades.com` and verify before App Review.
 - [ ] Smoke test visual clarity failure seen on mobile lobby: opponent join/ready state was not prominent enough. The local web fix now shows a top lobby presence card with "Opponent joined" and both players' ready states; deploy and verify before App Review.
 - [ ] Smoke test play-card blocker seen on mobile website: after bidding, the play-card step was unclear and the user could not reliably tell whether it was their turn or which cards were legal. The local web fix now keeps a persistent hand-area turn hint and strongly highlights legal cards; deploy and verify before App Review.
@@ -70,7 +70,7 @@ room code. Privacy, Terms, and Support pages are available at 1v1spades.com.
   gambling.
 - Codex does not submit final App Review or release the app unless explicitly
   asked by the user at that step.
-- Build 28 remains the release candidate unless smoke testing finds a blocker.
+- Build 29 remains the release candidate unless smoke testing finds a blocker.
 - If Apple rejects the app, record the reason here before changing build or
   metadata.
 - Do not commit Apple credentials or local EAS settings.
