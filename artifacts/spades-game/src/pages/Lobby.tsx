@@ -42,6 +42,43 @@ type OnlineCountUpdate = {
   rankedFindingMatchCount?: number;
 };
 
+type RecoveryErrorBody = {
+  code?: unknown;
+  feature?: unknown;
+  status?: unknown;
+  message?: unknown;
+};
+
+function recoveryErrorMessage(
+  body: RecoveryErrorBody | null,
+  fallback: string,
+): string {
+  const code = typeof body?.code === "string" ? body.code : "";
+  const feature = typeof body?.feature === "string" ? body.feature : "";
+  const status = typeof body?.status === "string" ? body.status : "";
+
+  if (feature === "account_recovery" && status === "disabled") {
+    return "Profile recovery is not enabled yet.";
+  }
+
+  switch (code) {
+    case "invalid_email":
+      return "Enter a valid recovery email address.";
+    case "account_not_found":
+    case "recovery_not_found":
+    case "username_not_found":
+      return "No ranked profile is attached to that recovery email.";
+    case "email_send_failed":
+      return "We could not send the recovery email. Please try again in a few minutes.";
+    case "recovery_not_configured":
+      return "Profile recovery is temporarily unavailable. Please contact support.";
+    default:
+      return typeof body?.message === "string" && body.message.trim()
+        ? body.message
+        : fallback;
+  }
+}
+
 export default function Lobby() {
   const [, setLocation] = useLocation();
   const { connect, connected, socket, createRoom, joinRoom, joinAsSpectator, createTournament, joinTournament, checkReconnectAvailability, isAdmin, unlockAdmin } = useSocket();
@@ -88,6 +125,7 @@ export default function Lobby() {
   );
   const [recoveryEmailInput, setRecoveryEmailInput] = useState("");
   const [recoveryCodeInput, setRecoveryCodeInput] = useState("");
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState("");
   const [recoveryEnabledAccountId, setRecoveryEnabledAccountId] = useState(() =>
     localStorage.getItem("spades_v11_recovery_enabled_account_id") || "",
   );
@@ -846,10 +884,12 @@ export default function Lobby() {
       );
       const body = await res.json().catch(() => null);
       if (!res.ok || !body?.ok) {
-        throw new Error(body?.message || "Could not send recovery code.");
+        throw new Error(
+          recoveryErrorMessage(body, "Could not send recovery code."),
+        );
       }
       setRecoveryCodeInput("");
-      setAccountStatus("Recovery code sent. Check the staging/dev logs, then enter it here.");
+      setAccountStatus("Recovery code sent. Check your email, then enter it here.");
     } catch (err) {
       toast({
         description: err instanceof Error ? err.message : "Could not send recovery code.",
@@ -892,7 +932,9 @@ export default function Lobby() {
       );
       const body = await res.json().catch(() => null);
       if (!res.ok || !body?.profile?.accountId) {
-        throw new Error(body?.message || "Could not verify recovery code.");
+        throw new Error(
+          recoveryErrorMessage(body, "Could not verify recovery code."),
+        );
       }
       const recoveredProfile = saveRecoveredProfile(body.profile, {
         requireUsername: purpose === "recover_profile",
@@ -919,7 +961,57 @@ export default function Lobby() {
     setRecoveryEnabledAccountId("");
     localStorage.removeItem("spades_v11_recovery_enabled_account_id");
     setAccountUsernameInput("");
+    setDeleteConfirmInput("");
     setAccountStatus("Account identity cleared from this device.");
+  };
+
+  const handleDeleteRankedAccount = async (): Promise<void> => {
+    if (!v11WebFlags.accounts) return;
+    const id = accountId.trim();
+    if (!id) {
+      toast({ description: "No ranked account is stored on this device.", variant: "destructive" });
+      return;
+    }
+    if (deleteConfirmInput.trim().toUpperCase() !== "DELETE") {
+      toast({ description: "Type DELETE to confirm account deletion.", variant: "destructive" });
+      return;
+    }
+
+    setAccountBusy(true);
+    setAccountStatus(null);
+    try {
+      const res = await fetch("/api/v1.1/accounts/delete", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ accountId: id }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok || !body?.ok) {
+        throw new Error(
+          typeof body?.message === "string" && body.message.trim()
+            ? body.message
+            : "Could not delete ranked account.",
+        );
+      }
+      clearAccountIdentity();
+      saveProfileUsername("");
+      setProfileInput("");
+      setAccountUsernameInput("");
+      setRecoveryEmailInput("");
+      setRecoveryCodeInput("");
+      setDeleteConfirmInput("");
+      setRecoveryEnabledAccountId("");
+      localStorage.removeItem("spades_v11_recovery_enabled_account_id");
+      setAccountStatus("Ranked account deleted. The username has been released.");
+      toast({ description: "Ranked account deleted." });
+    } catch (err) {
+      toast({
+        description: err instanceof Error ? err.message : "Could not delete ranked account.",
+        variant: "destructive",
+      });
+    } finally {
+      setAccountBusy(false);
+    }
   };
 
   const handleRankedPrimaryAction = (): void => {
@@ -1176,28 +1268,99 @@ export default function Lobby() {
                   )}
 
                   {hasRankedAccount && (
-                    <div className="space-y-3 rounded-md border border-emerald-500/25 bg-emerald-500/10 p-3">
-                      <p className="text-xs font-semibold uppercase tracking-widest text-emerald-100">
-                        Ranked Profile
-                      </p>
-                      <div className="space-y-1">
-                        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                          Username
+                    <div className="space-y-3">
+                      <div className="space-y-3 rounded-md border border-emerald-500/25 bg-emerald-500/10 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-widest text-emerald-100">
+                          Ranked Profile
                         </p>
-                        <p className="text-base font-semibold text-emerald-100">
-                          {accountUsername}
+                        <div className="space-y-1">
+                          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                            Username
+                          </p>
+                          <p className="text-base font-semibold text-emerald-100">
+                            {accountUsername}
+                          </p>
+                        </div>
+                        {recoveryEnabled && (
+                          <p className="rounded-md border border-emerald-500/25 bg-black/20 px-2 py-1.5 text-xs text-emerald-100">
+                            Recovery enabled
+                          </p>
+                        )}
+                        {accountStatus && (
+                          <p className="text-xs text-emerald-100/80" data-testid="v11-account-status">
+                            {accountStatus}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-3 rounded-md border border-destructive/35 bg-destructive/10 p-3">
+                        <div className="space-y-1">
+                          <p className="text-xs font-semibold uppercase tracking-widest text-destructive">
+                            Delete Account
+                          </p>
+                          <p className="text-[11px] leading-relaxed text-muted-foreground">
+                            Permanently closes this ranked account, releases its username,
+                            and removes recovery email access. Guest play will still work.
+                          </p>
+                        </div>
+                        <Label htmlFor="delete-account-confirm" className="text-xs">
+                          Type DELETE to confirm
+                        </Label>
+                        <Input
+                          id="delete-account-confirm"
+                          value={deleteConfirmInput}
+                          onChange={(e) => setDeleteConfirmInput(e.target.value.slice(0, 12))}
+                          placeholder="DELETE"
+                          autoComplete="off"
+                          disabled={accountBusy}
+                          data-testid="input-v11-delete-account-confirm"
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          onClick={() => void handleDeleteRankedAccount()}
+                          disabled={accountBusy || deleteConfirmInput.trim().toUpperCase() !== "DELETE"}
+                          className="w-full"
+                          data-testid="button-v11-delete-account"
+                        >
+                          Delete Account
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {hasAccountIdentity && !hasRankedAccount && (
+                    <div className="space-y-3 rounded-md border border-destructive/35 bg-destructive/10 p-3">
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold uppercase tracking-widest text-destructive">
+                          Delete Account
+                        </p>
+                        <p className="text-[11px] leading-relaxed text-muted-foreground">
+                          Permanently closes this account and clears it from this device.
                         </p>
                       </div>
-                      {recoveryEnabled && (
-                        <p className="rounded-md border border-emerald-500/25 bg-black/20 px-2 py-1.5 text-xs text-emerald-100">
-                          Recovery enabled
-                        </p>
-                      )}
-                      {accountStatus && (
-                        <p className="text-xs text-emerald-100/80" data-testid="v11-account-status">
-                          {accountStatus}
-                        </p>
-                      )}
+                      <Label htmlFor="delete-unranked-account-confirm" className="text-xs">
+                        Type DELETE to confirm
+                      </Label>
+                      <Input
+                        id="delete-unranked-account-confirm"
+                        value={deleteConfirmInput}
+                        onChange={(e) => setDeleteConfirmInput(e.target.value.slice(0, 12))}
+                        placeholder="DELETE"
+                        autoComplete="off"
+                        disabled={accountBusy}
+                        data-testid="input-v11-delete-account-confirm"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        onClick={() => void handleDeleteRankedAccount()}
+                        disabled={accountBusy || deleteConfirmInput.trim().toUpperCase() !== "DELETE"}
+                        className="w-full"
+                        data-testid="button-v11-delete-account"
+                      >
+                        Delete Account
+                      </Button>
                     </div>
                   )}
 

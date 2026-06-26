@@ -165,6 +165,26 @@ function handleAttachEmailRecoveryError(
   accountId: unknown,
 ) {
   if (error instanceof V11RecoveryError) {
+    if (
+      error.code === "email_send_failed" ||
+      error.code === "recovery_not_configured"
+    ) {
+      const normalizedAccountId =
+        typeof accountId === "string" ? accountId.trim() : "";
+      logger.error(
+        {
+          feature: "v1.1_account_recovery",
+          code: error.code,
+          routeName: "attach_email",
+          hasAccountId: normalizedAccountId.length > 0,
+          accountIdPrefix: normalizedAccountId
+            ? normalizedAccountId.slice(0, 6)
+            : undefined,
+          ...serializeRecoveryDiagnostic(error),
+        },
+        "v1.1 account recovery unavailable",
+      );
+    }
     res.status(statusForRecoveryError(error)).json({
       ok: false,
       code: error.code,
@@ -237,11 +257,33 @@ function statusForRecoveryError(error: V11RecoveryError): number {
     case "account_exists":
     case "username_not_found":
       return 409;
+    case "email_send_failed":
+      return 502;
+    case "recovery_not_configured":
+      return 503;
   }
 }
 
-function handleRecoveryError(res: Response, error: unknown) {
+function handleRecoveryError(
+  res: Response,
+  error: unknown,
+  routeName = "recovery",
+) {
   if (error instanceof V11RecoveryError) {
+    if (
+      error.code === "email_send_failed" ||
+      error.code === "recovery_not_configured"
+    ) {
+      logger.error(
+        {
+          feature: "v1.1_account_recovery",
+          code: error.code,
+          routeName,
+          ...serializeRecoveryDiagnostic(error),
+        },
+        "v1.1 account recovery unavailable",
+      );
+    }
     res.status(statusForRecoveryError(error)).json({
       ok: false,
       code: error.code,
@@ -254,6 +296,8 @@ function handleRecoveryError(res: Response, error: unknown) {
     {
       feature: "v1.1_account_recovery",
       code: "account_recovery_error",
+      routeName,
+      ...serializeRecoveryDiagnostic(error),
     },
     "v1.1 account recovery request failed",
   );
@@ -269,7 +313,10 @@ function recoverySecret(): string {
   const secret = process.env.V11_ACCOUNT_RECOVERY_SECRET || process.env.SESSION_SECRET;
   if (secret) return secret;
   if (process.env.NODE_ENV === "production") {
-    throw new Error("V11_ACCOUNT_RECOVERY_SECRET or SESSION_SECRET must be set.");
+    throw new V11RecoveryError(
+      "recovery_not_configured",
+      "Profile recovery is temporarily unavailable. Please contact support.",
+    );
   }
   return "local-dev-only-account-recovery-secret";
 }
@@ -342,7 +389,7 @@ router.post("/accounts/recovery/start", async (req, res) => {
     );
     res.status(200).json({ ok: true, expiresAt: result.expiresAt });
   } catch (error) {
-    handleRecoveryError(res, error);
+    handleRecoveryError(res, error, "recover_profile_start");
   }
 });
 
@@ -362,7 +409,7 @@ router.post("/accounts/recovery/verify", async (req, res) => {
     );
     res.status(200).json({ ok: true, profile });
   } catch (error) {
-    handleRecoveryError(res, error);
+    handleRecoveryError(res, error, "recover_profile_verify");
   }
 });
 
@@ -405,7 +452,7 @@ router.post("/accounts/recovery/confirm-attach", async (req, res) => {
     );
     res.status(200).json({ ok: true, profile });
   } catch (error) {
-    handleRecoveryError(res, error);
+    handleRecoveryError(res, error, "confirm_attach_email");
   }
 });
 

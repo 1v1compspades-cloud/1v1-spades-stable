@@ -282,6 +282,49 @@ test("v1.1 account recovery rejects recovered accounts without claimed username"
   );
 });
 
+test("v1.1 account recovery start reports missing recovery profile", async () => {
+  const db = new FakeRecoveryDb();
+  const sentCodes: string[] = [];
+
+  await assertRecoveryError(
+    startV11AccountRecovery(
+      db,
+      {
+        email: "missing@example.com",
+        purpose: "recover_profile",
+      },
+      { secret: SECRET, sender: captureSender(sentCodes), now: NOW },
+    ),
+    "account_not_found",
+  );
+  assert.equal(sentCodes.length, 0);
+  assert.equal(db.recoveryCodes.length, 0);
+});
+
+test("v1.1 account recovery start reports email delivery failure", async () => {
+  const db = new FakeRecoveryDb();
+  db.accounts[0].emailHash = hashRecoveryEmail("player@example.com", SECRET);
+
+  await assertRecoveryError(
+    startV11AccountRecovery(
+      db,
+      {
+        email: "player@example.com",
+        purpose: "recover_profile",
+      },
+      {
+        secret: SECRET,
+        sender: () => {
+          throw new Error("mailer down");
+        },
+        now: NOW,
+      },
+    ),
+    "email_send_failed",
+  );
+  assert.equal(db.recoveryCodes.length, 1);
+});
+
 test("v1.1 account recovery is single-use and expires", async () => {
   const db = new FakeRecoveryDb();
   const codes: string[] = [];
@@ -310,6 +353,7 @@ test("v1.1 account recovery is single-use and expires", async () => {
   );
 
   const expiredCodes: string[] = [];
+  db.accounts[0].emailHash = hashRecoveryEmail("other@example.com", SECRET);
   await startV11AccountRecovery(
     db,
     {
@@ -330,6 +374,7 @@ test("v1.1 account recovery is single-use and expires", async () => {
 
 test("v1.1 account recovery limits invalid code attempts", async () => {
   const db = new FakeRecoveryDb();
+  db.accounts[0].emailHash = hashRecoveryEmail("player@example.com", SECRET);
   const codes: string[] = [];
   await startV11AccountRecovery(
     db,

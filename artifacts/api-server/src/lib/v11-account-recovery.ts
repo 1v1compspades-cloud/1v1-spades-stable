@@ -22,13 +22,19 @@ export type V11RecoveryErrorCode =
   | "code_expired"
   | "code_consumed"
   | "too_many_attempts"
-  | "recovery_not_found";
+  | "recovery_not_found"
+  | "recovery_not_configured"
+  | "email_send_failed";
 
 export class V11RecoveryError extends Error {
   readonly code: V11RecoveryErrorCode;
 
-  constructor(code: V11RecoveryErrorCode, message: string) {
-    super(message);
+  constructor(
+    code: V11RecoveryErrorCode,
+    message: string,
+    options: { cause?: unknown } = {},
+  ) {
+    super(message, options);
     this.code = code;
     this.name = "V11RecoveryError";
   }
@@ -129,6 +135,24 @@ async function findActiveAccount(
   return account;
 }
 
+async function findActiveAccountByEmailHash(
+  db: V11RecoveryDb,
+  emailHash: string,
+): Promise<V11AccountRow> {
+  const accounts = (await db
+    .select()
+    .from(v11AccountsTable)
+    .where(eq(v11AccountsTable.emailHash, emailHash))) as V11AccountRow[];
+  const account = accounts.find((row) => row.status === "active" && !row.deletedAt);
+  if (!account) {
+    throw new V11RecoveryError(
+      "account_not_found",
+      "No ranked profile is attached to that recovery email.",
+    );
+  }
+  return account;
+}
+
 async function activeUsernameForAccount(
   db: V11RecoveryDb,
   accountId: string,
@@ -217,6 +241,8 @@ export async function startV11AccountRecovery(
       throw new V11RecoveryError("account_not_found", "Account not found.");
     }
     await findActiveAccount(db, accountId);
+  } else {
+    await findActiveAccountByEmailHash(db, emailHash);
   }
 
   const now = options.now ?? new Date();
@@ -240,13 +266,22 @@ export async function startV11AccountRecovery(
   };
 
   await db.insert(v11AccountRecoveryCodesTable).values(row).returning();
-  await options.sender({
-    email,
-    code,
-    purpose: input.purpose,
-    accountId,
-    expiresAt,
-  });
+  try {
+    await options.sender({
+      email,
+      code,
+      purpose: input.purpose,
+      accountId,
+      expiresAt,
+    });
+  } catch (error) {
+    if (error instanceof V11RecoveryError) throw error;
+    throw new V11RecoveryError(
+      "email_send_failed",
+      "We could not send the recovery email. Please try again in a few minutes.",
+      { cause: error },
+    );
+  }
 
   return { ok: true, expiresAt };
 }

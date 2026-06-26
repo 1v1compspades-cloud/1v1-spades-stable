@@ -115,7 +115,7 @@ test("v1.1 recovery email keeps log-only fallback without Resend", async () => {
   });
 });
 
-test("v1.1 recovery email never logs raw codes in production without Resend", async () => {
+test("v1.1 recovery email rejects production sends without Resend", async () => {
   const infos: unknown[] = [];
   const warnings: unknown[] = [];
   const sender = createV11RecoveryEmailSender({
@@ -135,7 +135,12 @@ test("v1.1 recovery email never logs raw codes in production without Resend", as
     },
   });
 
-  await sender(recoveryMessage());
+  await assert.rejects(
+    async () => {
+      await sender(recoveryMessage());
+    },
+    /Recovery email sender is not configured/,
+  );
 
   assert.equal(infos.length, 0);
   assert.equal(warnings.length, 1);

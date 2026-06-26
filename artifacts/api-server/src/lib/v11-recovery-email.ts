@@ -104,7 +104,7 @@ export function createV11RecoveryEmailSender(
   const apiKey = envValue(env, "RESEND_API_KEY");
 
   if (!apiKey) {
-    return (message) => {
+    return async (message) => {
       if (!canLogRecoveryCode(env)) {
         logger.warn(
           {
@@ -113,7 +113,7 @@ export function createV11RecoveryEmailSender(
           },
           "v1.1 account recovery email sender is not configured",
         );
-        return;
+        throw new Error("Recovery email sender is not configured.");
       }
 
       logger.info(

@@ -6,27 +6,28 @@ export default function Account() {
     <>
       <Seo
         title="Account | 1v1 Spades"
-        description="Account features are planned for v1.1 and are not enabled yet."
+        description="Manage ranked profile recovery and deletion for 1v1 Spades."
         path="/account"
       />
       <InfoPageLayout
         title="Account"
-        intro="Account features are planned for v1.1 and are not enabled yet."
+        intro="Ranked profiles can be managed from the account panel on the home screen."
       >
         <section>
           <h2>Guest play remains available</h2>
           <p>
-            You can keep playing as a guest. Account creation, username claims,
-            and account deletion are still being reviewed before they are
-            enabled.
+            You can keep playing casual matches as a guest. Ranked matches use
+            a ranked profile and username so your season record and leaderboard
+            placement stay attached to you.
           </p>
         </section>
 
         <section>
           <h2>Privacy and deletion</h2>
           <p>
-            Before accounts are enabled, an in-app account deletion path and
-            associated data deletion policy must be ready. For questions, email{" "}
+            Open the home screen account panel to attach a recovery email,
+            recover an existing ranked profile, or delete your ranked account
+            from inside the app. For questions, email{" "}
             <a href="mailto:support@1v1spades.com" className="text-primary hover:underline">
               support@1v1spades.com
             </a>
