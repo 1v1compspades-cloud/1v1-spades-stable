@@ -15,8 +15,8 @@ workspace root, to print the automated dashboard.
 | Version | 1.0.0 |
 | iOS build | 28 |
 | Bundle ID | com.oneononespades.freeplay |
-| EAS build ID | Pending build 28 |
-| EAS submission ID | Pending build 28 |
+| EAS build ID | 1e3545ba-1feb-407c-bc6e-664dec1f9960 |
+| EAS submission ID | a5cdde90-f42b-471c-b34d-506b84fa699e |
 | App Store Connect app ID | 6776721716 |
 | TestFlight URL | https://appstoreconnect.apple.com/apps/6776721716/testflight/ios |
 | Release mode default | Manual release after approval |
