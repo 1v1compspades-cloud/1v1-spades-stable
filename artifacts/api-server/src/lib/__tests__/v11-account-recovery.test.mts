@@ -301,9 +301,106 @@ test("v1.1 account recovery start reports missing recovery profile", async () =>
   assert.equal(db.recoveryCodes.length, 0);
 });
 
+test("v1.1 account recovery start reports recovery not enabled", async () => {
+  const db = new FakeRecoveryDb();
+  db.accounts[0].emailHash = hashRecoveryEmail("player@example.com", SECRET);
+  db.accounts[0].emailVerifiedAt = null;
+  db.accounts[0].recoveryEmailAttachedAt = null;
+  const sentCodes: string[] = [];
+
+  await assertRecoveryError(
+    startV11AccountRecovery(
+      db,
+      {
+        email: "player@example.com",
+        purpose: "recover_profile",
+      },
+      { secret: SECRET, sender: captureSender(sentCodes), now: NOW },
+    ),
+    "recovery_not_enabled",
+  );
+  assert.equal(sentCodes.length, 0);
+  assert.equal(db.recoveryCodes.length, 0);
+});
+
+test("v1.1 account recovery attach rejects email attached to another account", async () => {
+  const db = new FakeRecoveryDb();
+  const otherEmailHash = hashRecoveryEmail("taken@example.com", SECRET);
+  db.accounts.push({
+    id: "acct-2",
+    emailHash: otherEmailHash,
+    emailVerifiedAt: NOW,
+    recoveryEmailAttachedAt: NOW,
+    displayName: "Player Two",
+    status: "active",
+    deletionRequestedAt: null,
+    deletedAt: null,
+    metadata: {},
+    createdAt: NOW,
+    updatedAt: NOW,
+  });
+  const sentCodes: string[] = [];
+
+  await assertRecoveryError(
+    startV11AccountRecovery(
+      db,
+      {
+        email: "taken@example.com",
+        accountId: "acct-1",
+        purpose: "attach_email",
+      },
+      { secret: SECRET, sender: captureSender(sentCodes), now: NOW },
+    ),
+    "account_exists",
+  );
+  assert.equal(sentCodes.length, 0);
+  assert.equal(db.recoveryCodes.length, 0);
+});
+
+test("v1.1 account recovery confirm reports email attached to another account", async () => {
+  const db = new FakeRecoveryDb();
+  const emailHash = hashRecoveryEmail("taken@example.com", SECRET);
+  const sentCodes: string[] = [];
+
+  await startV11AccountRecovery(
+    db,
+    {
+      email: "taken@example.com",
+      accountId: "acct-1",
+      purpose: "attach_email",
+    },
+    { secret: SECRET, sender: captureSender(sentCodes), now: NOW },
+  );
+
+  db.accounts.push({
+    id: "acct-2",
+    emailHash,
+    emailVerifiedAt: NOW,
+    recoveryEmailAttachedAt: NOW,
+    displayName: "Player Two",
+    status: "active",
+    deletionRequestedAt: null,
+    deletedAt: null,
+    metadata: {},
+    createdAt: NOW,
+    updatedAt: NOW,
+  });
+
+  await assertRecoveryError(
+    confirmV11RecoveryEmailAttach(
+      db,
+      { email: "taken@example.com", accountId: "acct-1", code: sentCodes[0] },
+      { secret: SECRET, now: new Date(NOW.getTime() + 1_000) },
+    ),
+    "account_exists",
+  );
+});
+
 test("v1.1 account recovery start reports email delivery failure", async () => {
   const db = new FakeRecoveryDb();
   db.accounts[0].emailHash = hashRecoveryEmail("player@example.com", SECRET);
+  db.accounts[0].emailVerifiedAt = NOW;
+  db.accounts[0].recoveryEmailAttachedAt = NOW;
 
   await assertRecoveryError(
     startV11AccountRecovery(
@@ -354,6 +451,8 @@ test("v1.1 account recovery is single-use and expires", async () => {
 
   const expiredCodes: string[] = [];
   db.accounts[0].emailHash = hashRecoveryEmail("other@example.com", SECRET);
+  db.accounts[0].emailVerifiedAt = NOW;
+  db.accounts[0].recoveryEmailAttachedAt = NOW;
   await startV11AccountRecovery(
     db,
     {
@@ -375,6 +474,8 @@ test("v1.1 account recovery is single-use and expires", async () => {
 test("v1.1 account recovery limits invalid code attempts", async () => {
   const db = new FakeRecoveryDb();
   db.accounts[0].emailHash = hashRecoveryEmail("player@example.com", SECRET);
+  db.accounts[0].emailVerifiedAt = NOW;
+  db.accounts[0].recoveryEmailAttachedAt = NOW;
   const codes: string[] = [];
   await startV11AccountRecovery(
     db,

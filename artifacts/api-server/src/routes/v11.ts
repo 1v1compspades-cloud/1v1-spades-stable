@@ -165,12 +165,12 @@ function handleAttachEmailRecoveryError(
   accountId: unknown,
 ) {
   if (error instanceof V11RecoveryError) {
+    const normalizedAccountId =
+      typeof accountId === "string" ? accountId.trim() : "";
     if (
       error.code === "email_send_failed" ||
       error.code === "recovery_not_configured"
     ) {
-      const normalizedAccountId =
-        typeof accountId === "string" ? accountId.trim() : "";
       logger.error(
         {
           feature: "v1.1_account_recovery",
@@ -183,6 +183,19 @@ function handleAttachEmailRecoveryError(
           ...serializeRecoveryDiagnostic(error),
         },
         "v1.1 account recovery unavailable",
+      );
+    } else {
+      logger.warn(
+        {
+          feature: "v1.1_account_recovery",
+          code: error.code,
+          routeName: "attach_email",
+          hasAccountId: normalizedAccountId.length > 0,
+          accountIdPrefix: normalizedAccountId
+            ? normalizedAccountId.slice(0, 6)
+            : undefined,
+        },
+        "v1.1 account recovery rejected",
       );
     }
     res.status(statusForRecoveryError(error)).json({
@@ -211,8 +224,8 @@ function handleAttachEmailRecoveryError(
 
   res.status(500).json({
     ok: false,
-    code: "account_recovery_error",
-    message: "Account recovery request failed.",
+    code: "recovery_service_error",
+    message: "Recovery service is temporarily unavailable. Please try again in a few minutes.",
   });
 }
 
@@ -256,6 +269,7 @@ function statusForRecoveryError(error: V11RecoveryError): number {
       return 404;
     case "account_exists":
     case "username_not_found":
+    case "recovery_not_enabled":
       return 409;
     case "email_send_failed":
       return 502;
@@ -283,6 +297,15 @@ function handleRecoveryError(
         },
         "v1.1 account recovery unavailable",
       );
+    } else {
+      logger.warn(
+        {
+          feature: "v1.1_account_recovery",
+          code: error.code,
+          routeName,
+        },
+        "v1.1 account recovery rejected",
+      );
     }
     res.status(statusForRecoveryError(error)).json({
       ok: false,
@@ -304,8 +327,8 @@ function handleRecoveryError(
 
   res.status(500).json({
     ok: false,
-    code: "account_recovery_error",
-    message: "Account recovery request failed.",
+    code: "recovery_service_error",
+    message: "Recovery service is temporarily unavailable. Please try again in a few minutes.",
   });
 }
 

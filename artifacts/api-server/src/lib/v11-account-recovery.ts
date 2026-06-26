@@ -23,6 +23,7 @@ export type V11RecoveryErrorCode =
   | "code_consumed"
   | "too_many_attempts"
   | "recovery_not_found"
+  | "recovery_not_enabled"
   | "recovery_not_configured"
   | "email_send_failed";
 
@@ -150,7 +151,37 @@ async function findActiveAccountByEmailHash(
       "No ranked profile is attached to that recovery email.",
     );
   }
+  if (!account.recoveryEmailAttachedAt) {
+    throw new V11RecoveryError(
+      "recovery_not_enabled",
+      "Recovery is not enabled for that ranked profile.",
+    );
+  }
   return account;
+}
+
+async function assertEmailNotAttachedToAnotherAccount(
+  db: V11RecoveryDb,
+  emailHash: string,
+  accountId: string,
+): Promise<void> {
+  const accounts = (await db
+    .select()
+    .from(v11AccountsTable)
+    .where(eq(v11AccountsTable.emailHash, emailHash))) as V11AccountRow[];
+  const otherAccount = accounts.find(
+    (row) =>
+      row.id !== accountId &&
+      row.status === "active" &&
+      !row.deletedAt &&
+      row.recoveryEmailAttachedAt,
+  );
+  if (otherAccount) {
+    throw new V11RecoveryError(
+      "account_exists",
+      "That email is already attached to another ranked profile.",
+    );
+  }
 }
 
 async function activeUsernameForAccount(
@@ -241,6 +272,7 @@ export async function startV11AccountRecovery(
       throw new V11RecoveryError("account_not_found", "Account not found.");
     }
     await findActiveAccount(db, accountId);
+    await assertEmailNotAttachedToAnotherAccount(db, emailHash, accountId);
   } else {
     await findActiveAccountByEmailHash(db, emailHash);
   }
@@ -392,6 +424,7 @@ export async function confirmV11RecoveryEmailAttach(
     },
     options,
   );
+  await assertEmailNotAttachedToAnotherAccount(db, verified.emailHash, accountId);
 
   try {
     await db
@@ -451,6 +484,12 @@ export async function verifyV11AccountRecovery(
   const account = accounts.find((row) => row.status === "active" && !row.deletedAt);
   if (!account) {
     throw new V11RecoveryError("account_not_found", "Account not found.");
+  }
+  if (!account.recoveryEmailAttachedAt) {
+    throw new V11RecoveryError(
+      "recovery_not_enabled",
+      "Recovery is not enabled for that ranked profile.",
+    );
   }
 
   await db

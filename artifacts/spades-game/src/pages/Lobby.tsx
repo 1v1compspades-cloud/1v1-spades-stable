@@ -68,10 +68,16 @@ function recoveryErrorMessage(
     case "recovery_not_found":
     case "username_not_found":
       return "No ranked profile is attached to that recovery email.";
+    case "recovery_not_enabled":
+      return "Recovery is not enabled for that ranked profile.";
+    case "account_exists":
+      return "That email is already attached to another ranked profile.";
     case "email_send_failed":
       return "We could not send the recovery email. Please try again in a few minutes.";
     case "recovery_not_configured":
       return "Profile recovery is temporarily unavailable. Please contact support.";
+    case "recovery_service_error":
+      return "Recovery service is temporarily unavailable. Please try again in a few minutes.";
     default:
       return typeof body?.message === "string" && body.message.trim()
         ? body.message
