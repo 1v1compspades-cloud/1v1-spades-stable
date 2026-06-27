@@ -1914,12 +1914,8 @@ export default function Room() {
           </div>
           {biddingWaitingSeat !== null && (
             <div className="spades-table-waiting-state" data-testid="table-bidding-waiting">
-              <div className="spades-table-waiting-cards" aria-hidden="true">
-                <span className="spades-table-waiting-card" />
-                <span className="spades-table-waiting-card" />
-                <span className="spades-table-waiting-card" />
-              </div>
               <div className="spades-table-waiting-copy">
+                <span className="spades-status-pulse" aria-hidden="true" />
                 Waiting on Seat {biddingWaitingSeat + 1}
               </div>
             </div>
@@ -2568,9 +2564,9 @@ export default function Room() {
     const handHint = biddingNow
       ? "Review your cards, then choose a bid."
       : isMyPlayTurn
-        ? `Your turn: play highlighted card${playableCards.length > 1 ? ` (${playableCards.length} legal)` : ""}.`
+        ? `Play highlighted card${playableCards.length > 1 ? ` (${playableCards.length} legal)` : ""}`
         : playingNow
-          ? "Opponent's turn: wait"
+          ? "Opponent's turn"
           : "Your hand";
     const myBid = gameState.bids[mySeat];
     const myBidLabel = myBid === null ? "—" : myBid === 0 ? "Nil" : String(myBid);
