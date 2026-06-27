@@ -11,11 +11,11 @@ const execFileAsync = promisify(execFile);
 const EXPECTED = {
   name: "1v1 Spades",
   version: "1.0.0",
-  buildNumber: "29",
+  buildNumber: "31",
   bundleIdentifier: "com.oneononespades.freeplay",
   easProjectId: "9b64353d-700c-4be9-ac70-3101400335b8",
-  easBuildId: "0985919c-f98b-4a31-b08a-76cbbab052b8",
-  easSubmissionId: "66eb0771-288e-4591-9132-c84524c65e2f",
+  easBuildId: "b27f92d9-353f-4644-91b9-0d0fe55742eb",
+  easSubmissionId: "49459310-b405-4553-9176-47edeb69611e",
   ascAppId: "6776721716",
 };
 
@@ -27,8 +27,8 @@ const URLS = [
 ];
 
 const CHECKBOXES = {
-  appleProcessing: "Apple processing complete for build 29",
-  internalTesting: "Build 29 added to internal TestFlight testing",
+  appleProcessing: "Apple processing complete for build 31",
+  internalTesting: "Build 31 added to internal TestFlight testing",
   smokeTest: "TestFlight smoke test checklist complete",
   hostedLayout: "Hosted web mobile layout fix deployed to 1v1spades.com",
   screenshots: "App Store screenshots uploaded",

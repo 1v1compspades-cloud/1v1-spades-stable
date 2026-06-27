@@ -66,8 +66,9 @@ function recoveryErrorMessage(
       return "Enter a valid recovery email address.";
     case "account_not_found":
     case "recovery_not_found":
-    case "username_not_found":
       return "No ranked profile is attached to that recovery email.";
+    case "username_not_found":
+      return "We found that email, but the profile needs a username repair. Contact support and we can fix it.";
     case "recovery_not_enabled":
       return "Recovery is not enabled for that ranked profile.";
     case "account_exists":
@@ -131,6 +132,7 @@ export default function Lobby() {
   );
   const [recoveryEmailInput, setRecoveryEmailInput] = useState("");
   const [recoveryCodeInput, setRecoveryCodeInput] = useState("");
+  const [recoveryCodeSentFor, setRecoveryCodeSentFor] = useState<"attach_email" | "recover_profile" | null>(null);
   const [deleteConfirmInput, setDeleteConfirmInput] = useState("");
   const [recoveryEnabledAccountId, setRecoveryEnabledAccountId] = useState(() =>
     localStorage.getItem("spades_v11_recovery_enabled_account_id") || "",
@@ -174,6 +176,19 @@ export default function Lobby() {
   const recoveryEnabled =
     hasAccountIdentity && recoveryEnabledAccountId === accountId.trim();
   const activeRecoveryMode = hasAccountIdentity ? recoveryMode : "recover_profile";
+  const recoveryCodeStepActive = recoveryCodeSentFor === activeRecoveryMode;
+  const recoveryEmailReady = !!recoveryEmailInput.trim();
+  const recoveryCodeReady = recoveryCodeInput.length === 6;
+  const recoveryTitle =
+    activeRecoveryMode === "attach_email" ? "Protect this profile" : "Recover profile";
+  const recoveryIntro =
+    activeRecoveryMode === "attach_email"
+      ? "Save an email so this ranked profile can come back on any device."
+      : "Enter the email on the ranked profile you want back.";
+  const recoverySendLabel =
+    activeRecoveryMode === "attach_email" ? "Email Me a Setup Code" : "Email Me a Recovery Code";
+  const recoveryConfirmLabel =
+    activeRecoveryMode === "attach_email" ? "Finish Email Setup" : "Recover My Profile";
   const savedRoomCode = storedRoomCode.toUpperCase().trim();
   const getSavedPlayerSession = (code: string): { seat: 0 | 1; token: string } | null => {
     const normalized = code.toUpperCase().trim();
@@ -191,6 +206,11 @@ export default function Lobby() {
   useEffect(() => {
     setRecoveryMode(hasAccountIdentity ? "attach_email" : "recover_profile");
   }, [hasAccountIdentity]);
+
+  useEffect(() => {
+    setRecoveryCodeInput("");
+    setRecoveryCodeSentFor(null);
+  }, [activeRecoveryMode]);
   const savedPlayerSession = savedRoomCode ? getSavedPlayerSession(savedRoomCode) : null;
   const hasSavedReconnectCandidate = !!savedRoomCode && !!savedPlayerSession;
   const canReconnectToCurrentGame = shouldShowReconnectPanel({
@@ -895,6 +915,7 @@ export default function Lobby() {
         );
       }
       setRecoveryCodeInput("");
+      setRecoveryCodeSentFor(purpose);
       setAccountStatus("Recovery code sent. Check your email, then enter it here.");
     } catch (err) {
       toast({
@@ -947,6 +968,7 @@ export default function Lobby() {
       });
       markRecoveryEnabled(recoveredProfile.accountId);
       setRecoveryCodeInput("");
+      setRecoveryCodeSentFor(null);
       setAccountStatus(
         purpose === "attach_email"
           ? "Recovery email verified for this ranked profile."
@@ -968,7 +990,7 @@ export default function Lobby() {
     localStorage.removeItem("spades_v11_recovery_enabled_account_id");
     setAccountUsernameInput("");
     setDeleteConfirmInput("");
-    setAccountStatus("Account identity cleared from this device.");
+    setAccountStatus("Saved profile cleared from this device. You can recover the correct profile now.");
   };
 
   const handleDeleteRankedAccount = async (): Promise<void> => {
@@ -1147,7 +1169,7 @@ export default function Lobby() {
                         disabled={accountBusy}
                         data-testid="button-v11-clear-account"
                       >
-                        Clear Device
+                        Reset Saved Profile
                       </Button>
                     </>
                   ) : (
@@ -1371,101 +1393,126 @@ export default function Lobby() {
                   )}
 
                   {v11WebFlags.accountRecovery && (
-                    <div className="space-y-2 rounded-md border border-border/40 bg-black/20 p-3">
-                      <div className="space-y-1">
-                        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                          Recovery
-                        </p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {activeRecoveryMode === "attach_email"
-                            ? "Attach a private email to this ranked profile."
-                            : "Restore a ranked profile that already has recovery enabled."}
-                        </p>
+                    <div className="space-y-3 rounded-md border border-primary/35 bg-primary/5 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <p className="text-xs font-semibold uppercase tracking-widest text-primary">
+                            Recovery
+                          </p>
+                          <p className="text-sm font-semibold text-foreground">
+                            {recoveryTitle}
+                          </p>
+                          <p className="text-[11px] leading-relaxed text-muted-foreground">
+                            {recoveryIntro}
+                          </p>
+                        </div>
+                        {recoveryEnabled && (
+                          <span className="shrink-0 rounded-full border border-primary/40 px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-primary">
+                            Saved
+                          </span>
+                        )}
                       </div>
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        <Button
-                          type="button"
-                          variant={activeRecoveryMode === "attach_email" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setRecoveryMode("attach_email")}
-                          disabled={!hasAccountIdentity || accountBusy}
-                          data-testid="button-v11-recovery-mode-attach"
-                        >
-                          Attach Email
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={activeRecoveryMode === "recover_profile" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setRecoveryMode("recover_profile")}
-                          disabled={accountBusy}
-                          data-testid="button-v11-recovery-mode-recover"
-                        >
-                          Recover Existing Profile
-                        </Button>
-                      </div>
-                      <Input
-                        type="email"
-                        value={recoveryEmailInput}
-                        onChange={(e) => setRecoveryEmailInput(e.target.value.slice(0, 254))}
-                        placeholder="email@example.com"
-                        disabled={accountBusy}
-                        data-testid="input-v11-recovery-email"
-                      />
-                      <Input
-                        inputMode="numeric"
-                        value={recoveryCodeInput}
-                        onChange={(e) => setRecoveryCodeInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                        placeholder="6 digit code"
-                        disabled={accountBusy}
-                        data-testid="input-v11-recovery-code"
-                      />
-                      {activeRecoveryMode === "attach_email" ? (
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {hasAccountIdentity ? (
+                        <div className="grid grid-cols-2 gap-2">
                           <Button
                             type="button"
-                            variant="outline"
-                            onClick={() => void handleStartRecovery("attach_email")}
-                            disabled={accountBusy || !recoveryEmailInput.trim()}
-                            data-testid="button-v11-start-attach-email"
+                            variant={activeRecoveryMode === "attach_email" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setRecoveryMode("attach_email")}
+                            disabled={accountBusy}
+                            data-testid="button-v11-recovery-mode-attach"
                           >
-                            Send Code
+                            Protect
                           </Button>
                           <Button
                             type="button"
-                            variant="outline"
-                            onClick={() => void handleConfirmRecovery("attach_email")}
-                            disabled={accountBusy || !recoveryEmailInput.trim() || recoveryCodeInput.length !== 6}
-                            data-testid="button-v11-confirm-attach-email"
+                            variant={activeRecoveryMode === "recover_profile" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setRecoveryMode("recover_profile")}
+                            disabled={accountBusy}
+                            data-testid="button-v11-recovery-mode-recover"
                           >
-                            Verify Email
+                            Recover
                           </Button>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div className="rounded-md border border-border/40 bg-black/20 px-3 py-2 text-[11px] text-muted-foreground">
+                          Recovering replaces the profile saved on this device.
+                        </div>
+                      )}
+                      <Input
+                        type="email"
+                        value={recoveryEmailInput}
+                        onChange={(e) => {
+                          setRecoveryEmailInput(e.target.value.slice(0, 254));
+                          setRecoveryCodeInput("");
+                          setRecoveryCodeSentFor(null);
+                        }}
+                        placeholder="Recovery email"
+                        disabled={accountBusy}
+                        data-testid="input-v11-recovery-email"
+                      />
+                      {recoveryCodeStepActive && (
+                        <Input
+                          inputMode="numeric"
+                          value={recoveryCodeInput}
+                          onChange={(e) => setRecoveryCodeInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                          placeholder="6 digit code"
+                          disabled={accountBusy}
+                          data-testid="input-v11-recovery-code"
+                        />
+                      )}
+                      {!recoveryCodeStepActive ? (
+                        <Button
+                          type="button"
+                          variant="default"
+                          onClick={() => void handleStartRecovery(activeRecoveryMode)}
+                          disabled={accountBusy || !recoveryEmailReady}
+                          className="w-full"
+                          data-testid={
+                            activeRecoveryMode === "attach_email"
+                              ? "button-v11-start-attach-email"
+                              : "button-v11-start-recovery"
+                          }
+                        >
+                          {recoverySendLabel}
+                        </Button>
+                      ) : (
+                        <div className="space-y-2">
                           <Button
                             type="button"
-                            variant="outline"
-                            onClick={() => void handleStartRecovery("recover_profile")}
-                            disabled={accountBusy || !recoveryEmailInput.trim()}
-                            data-testid="button-v11-start-recovery"
+                            variant="default"
+                            onClick={() => void handleConfirmRecovery(activeRecoveryMode)}
+                            disabled={accountBusy || !recoveryEmailReady || !recoveryCodeReady}
+                            className="w-full"
+                            data-testid={
+                              activeRecoveryMode === "attach_email"
+                                ? "button-v11-confirm-attach-email"
+                                : "button-v11-confirm-recovery"
+                            }
                           >
-                            Send Recovery Code
+                            {recoveryConfirmLabel}
                           </Button>
                           <Button
                             type="button"
                             variant="outline"
-                            onClick={() => void handleConfirmRecovery("recover_profile")}
-                            disabled={accountBusy || !recoveryEmailInput.trim() || recoveryCodeInput.length !== 6}
-                            data-testid="button-v11-confirm-recovery"
+                            size="sm"
+                            onClick={() => void handleStartRecovery(activeRecoveryMode)}
+                            disabled={accountBusy || !recoveryEmailReady}
+                            className="w-full"
                           >
-                            Recover Profile
+                            Send New Code
                           </Button>
                         </div>
                       )}
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="text-[11px] leading-relaxed text-muted-foreground">
                         Email is private and only used to recover your ranked profile.
                       </p>
+                      {hasAccountIdentity && (
+                        <p className="text-[11px] leading-relaxed text-muted-foreground">
+                          Wrong profile on this device? Tap Reset Saved Profile above, then recover.
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
