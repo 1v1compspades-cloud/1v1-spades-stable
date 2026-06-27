@@ -1939,6 +1939,22 @@ export default function Room() {
           const youWon = !spectator && playerIndex === gameState.coinFlipWinner;
           const resultSide = gameState.coinFlipWinner === 0 ? "heads" : "tails";
           const resultLabel = resultSide === "heads" ? "Heads" : "Tails";
+          const headsFace = (
+            <>
+              <div className="spades-live-coin__mark spades-live-coin__mark--heads">1V1</div>
+              <div className="spades-live-coin__side">HEADS</div>
+            </>
+          );
+          const tailsFace = (
+            <>
+              <div className="spades-live-coin__animal">
+                <div className="spades-live-coin__animal-body" />
+                <div className="spades-live-coin__animal-head" />
+                <div className="spades-live-coin__animal-tail">♠</div>
+              </div>
+              <div className="spades-live-coin__side">TAILS</div>
+            </>
+          );
           return (
             <div
               className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/85 p-3 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-lg sm:items-center sm:p-4"
@@ -1951,16 +1967,10 @@ export default function Room() {
                     data-testid="live-coin-toss"
                   >
                     <div className="spades-live-coin__face spades-live-coin__face--heads">
-                      <div className="spades-live-coin__mark spades-live-coin__mark--heads">1V1</div>
-                      <div className="spades-live-coin__side">HEADS</div>
+                      {resultSide === "heads" ? headsFace : tailsFace}
                     </div>
                     <div className="spades-live-coin__face spades-live-coin__face--tails">
-                      <div className="spades-live-coin__animal">
-                        <div className="spades-live-coin__animal-body" />
-                        <div className="spades-live-coin__animal-head" />
-                        <div className="spades-live-coin__animal-tail">♠</div>
-                      </div>
-                      <div className="spades-live-coin__side">TAILS</div>
+                      {resultSide === "heads" ? tailsFace : headsFace}
                     </div>
                   </div>
                 </div>
@@ -2249,8 +2259,29 @@ export default function Room() {
 
         {/* Game over overlay (shown to everyone) */}
         {gameState.phase === "game_over" && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-lg overflow-y-auto p-4">
-            <div className="bg-card border border-border p-6 rounded-xl shadow-2xl max-w-sm w-full text-center space-y-5 my-auto">
+          <div className="spades-gameover-overlay absolute inset-0 z-50 flex items-start justify-center bg-black/90 backdrop-blur-lg overflow-y-auto p-2 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:items-center sm:p-4">
+            <div className="spades-gameover-card bg-card border border-border p-4 sm:p-6 rounded-xl shadow-2xl max-w-sm w-full text-center space-y-3 sm:space-y-5 my-0 sm:my-auto">
+              <Button
+                onClick={() =>
+                  gameState.tournamentRef
+                    ? handleLeaveCompletedRoom(`/tournament/${gameState.tournamentRef.code}`)
+                    : spectator
+                      ? handleLeaveSpectate()
+                      : handleLeaveCompletedRoom("/")
+                }
+                variant="outline"
+                size="sm"
+                className="spades-gameover-exit w-full h-10 border-primary/45 bg-black/35 text-primary hover:bg-primary/10"
+                data-testid="button-leave-gameover-top"
+              >
+                {gameState.tournamentRef
+                  ? "Back to Tournament"
+                  : spectator
+                    ? "Leave"
+                    : isKingMode
+                      ? "Leave Table"
+                      : "Return to Lobby"}
+              </Button>
               {gameState.matchLabel && (
                 <div
                   data-testid="match-label"
@@ -2514,23 +2545,6 @@ export default function Room() {
                     Reset Table
                   </Button>
                 )}
-                {gameState.tournamentRef && (
-                  <Button
-                    onClick={() => handleLeaveCompletedRoom(`/tournament/${gameState.tournamentRef!.code}`)}
-                    className="w-full h-11"
-                    data-testid="button-back-to-tournament"
-                  >
-                    Back to Tournament Bracket
-                  </Button>
-                )}
-                <Button
-                  onClick={spectator ? handleLeaveSpectate : () => handleLeaveCompletedRoom("/")}
-                  variant="outline"
-                  className="w-full h-11"
-                  data-testid="button-leave-gameover"
-                >
-                  {spectator ? "Leave" : isKingMode ? "Leave Table" : "Return to Lobby"}
-                </Button>
               </div>
             </div>
           </div>
@@ -2554,10 +2568,13 @@ export default function Room() {
     const handHint = biddingNow
       ? "Review your cards, then choose a bid."
       : isMyPlayTurn
-        ? `Your turn: tap a highlighted card${playableCards.length > 1 ? ` (${playableCards.length} legal)` : ""}.`
+        ? `Your turn: play highlighted card${playableCards.length > 1 ? ` (${playableCards.length} legal)` : ""}.`
         : playingNow
-          ? "Opponent's turn: wait for the other player to play."
+          ? "Opponent's turn: wait"
           : "Your hand";
+    const myBid = gameState.bids[mySeat];
+    const myBidLabel = myBid === null ? "—" : myBid === 0 ? "Nil" : String(myBid);
+    const myTricks = gameState.tricks[mySeat] ?? 0;
     return (
       <div
         data-testid="my-hand"
@@ -2579,7 +2596,7 @@ export default function Room() {
             "spades-hand-hint sticky left-0 z-10 mb-2 flex items-center justify-center border text-xs font-bold uppercase tracking-widest backdrop-blur-sm",
             biddingNow
               ? "spades-hand-hint--bidding mx-auto w-fit max-w-[calc(100vw-2rem)] rounded-full px-4 py-2"
-              : "mx-2 w-[calc(100vw-1rem)] rounded-lg px-3 py-2 sm:mx-3 sm:w-[calc(100vw-1.5rem)]",
+              : "spades-hand-hint--playing mx-2 w-[calc(100vw-1rem)] rounded-lg px-3 py-2 sm:mx-3 sm:w-[calc(100vw-1.5rem)]",
             isMyPlayTurn
               ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200"
               : playingNow
@@ -2587,7 +2604,19 @@ export default function Room() {
                 : "border-primary/35 bg-black/45 text-primary"
           )}
         >
-          <span className="min-w-0 flex-1 text-center leading-snug">{handHint}</span>
+          <span className="spades-hand-hint__copy min-w-0 flex-1 text-center leading-snug">{handHint}</span>
+          {playingNow && (
+            <span className="spades-hand-hint__stats" aria-label={`Your bid ${myBidLabel}, tricks ${myTricks}`}>
+              <span className="spades-hand-hint__stat">
+                <span>Bid</span>
+                <strong>{myBidLabel}</strong>
+              </span>
+              <span className="spades-hand-hint__stat">
+                <span>Tricks</span>
+                <strong>{myTricks}</strong>
+              </span>
+            </span>
+          )}
         </div>
         <div className="flex flex-nowrap items-end gap-1 px-2 sm:gap-2 sm:px-3 sm:justify-center min-w-min">
           {groups.map((group, gi) => (
