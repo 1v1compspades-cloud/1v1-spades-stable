@@ -717,7 +717,11 @@ function clearTurnTimer(roomCode: string): void {
  * No-op when there's no current actor (lobby/loading/reconnecting/pregame/
  * animations/round_over/game_over).
  */
-function armTurnTimer(io: SocketIOServer, state: GameState): void {
+function armTurnTimer(
+  io: SocketIOServer,
+  state: GameState,
+  options: { preserveExistingDeadline?: boolean } = {},
+): void {
   clearTurnTimer(state.roomCode);
   // Host-paused match: do not arm a timer. turnDeadline cleared so clients
   // can render "Paused" without a stale countdown.
@@ -738,9 +742,21 @@ function armTurnTimer(io: SocketIOServer, state: GameState): void {
     state.turnDeadline = null;
     return;
   }
-  state.lastActiveAt[actor] = Date.now();
+  const now = Date.now();
+  const existingDeadline =
+    typeof state.turnDeadline === "number" && Number.isFinite(state.turnDeadline)
+      ? state.turnDeadline
+      : null;
+  const preservingDeadline = options.preserveExistingDeadline && existingDeadline !== null;
+  const deadline =
+    preservingDeadline
+      ? existingDeadline
+      : now + budget;
+
+  if (!preservingDeadline) {
+    state.lastActiveAt[actor] = now;
+  }
   state.turnTimeoutMs = budget;
-  const deadline = Date.now() + budget;
   state.turnDeadline = deadline;
 
   const handle = setTimeout(() => {
@@ -764,7 +780,7 @@ function armTurnTimer(io: SocketIOServer, state: GameState): void {
     } catch (err) {
       logger.error({ err, roomCode: state.roomCode }, "Turn timer auto-action failed");
     }
-  }, budget);
+  }, Math.max(0, deadline - now));
   turnTimers.set(state.roomCode, handle);
 }
 
@@ -2805,7 +2821,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
                 state.phase === "playing" ? state.currentTurnIndex :
                 null;
               if (activeActor === data.playerIndex) {
-                armTurnTimer(io, state);
+                armTurnTimer(io, state, { preserveExistingDeadline: true });
               }
               await commit(state, {
                 action: "reconnect",
