@@ -84,6 +84,7 @@ const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
 const MAX_ROOM_CODE_LENGTH = 16;
 const MAX_REASON_LENGTH = 40;
+const ELIGIBLE_COMPLETED_MATCH_REASONS = new Set(["normal_win", "forfeit", "afk_forfeit"]);
 
 export function sanitizeLeaderboardLimit(value: unknown): number {
   const numeric = Number(value);
@@ -350,7 +351,7 @@ export async function recordV11CompletedMatchLeaderboardResult(
     input.matchKind !== "ranked" ||
     input.leaderboardEligible !== true ||
     input.tournamentRef ||
-    input.resultReason !== "normal_win"
+    !ELIGIBLE_COMPLETED_MATCH_REASONS.has(String(input.resultReason))
   ) {
     return { recorded: false, skipped: "ineligible_match", seasonKey };
   }

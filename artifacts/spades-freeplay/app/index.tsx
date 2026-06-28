@@ -178,7 +178,7 @@ export default function HostedSpadesApp() {
           style={styles.webView}
           containerStyle={styles.webViewContainer}
           originWhitelist={["*"]}
-          allowsBackForwardNavigationGestures
+          allowsBackForwardNavigationGestures={false}
           allowsInlineMediaPlayback
           javaScriptEnabled
           domStorageEnabled

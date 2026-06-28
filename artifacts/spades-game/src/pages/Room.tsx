@@ -1963,10 +1963,10 @@ export default function Room() {
                     data-testid="live-coin-toss"
                   >
                     <div className="spades-live-coin__face spades-live-coin__face--heads">
-                      {resultSide === "heads" ? headsFace : tailsFace}
+                      {headsFace}
                     </div>
                     <div className="spades-live-coin__face spades-live-coin__face--tails">
-                      {resultSide === "heads" ? tailsFace : headsFace}
+                      {tailsFace}
                     </div>
                   </div>
                 </div>

@@ -469,6 +469,73 @@ test("v1.1 completed ranked normal quick match records once", async () => {
   assert.equal(db.stats.reduce((sum, row) => sum + row.bagsGiven, 0), 1);
 });
 
+test("v1.1 completed ranked forfeits record winner and loser", async () => {
+  const db = new FakeLeaderboardDb();
+
+  const manual = await recordV11CompletedMatchLeaderboardResult(
+    db,
+    {
+      roomCode: "ROOM6F",
+      mode: "quick",
+      phase: "game_over",
+      resultReason: "forfeit",
+      matchKind: "ranked",
+      leaderboardEligible: true,
+      winnerAccountId: "acct-winner",
+      loserAccountId: "acct-loser",
+      winnerUsername: "Winner",
+      loserUsername: "Loser",
+      winnerIdentityValidated: true,
+      loserIdentityValidated: true,
+      finalScores: [90, 80],
+      bags: [2, 3],
+      roundsPlayed: 3,
+    },
+    { enabled: true },
+  );
+  const afk = await recordV11CompletedMatchLeaderboardResult(
+    db,
+    {
+      roomCode: "ROOM6A",
+      mode: "quick",
+      phase: "game_over",
+      resultReason: "afk_forfeit",
+      matchKind: "ranked",
+      leaderboardEligible: true,
+      winnerAccountId: "acct-winner",
+      loserAccountId: "acct-loser",
+      winnerUsername: "Winner",
+      loserUsername: "Loser",
+      winnerIdentityValidated: true,
+      loserIdentityValidated: true,
+      finalScores: [110, 95],
+      bags: [1, 4],
+      roundsPlayed: 4,
+    },
+    { enabled: true },
+  );
+
+  assert.equal(manual.recorded, true);
+  assert.equal(afk.recorded, true);
+  assert.equal(db.results.length, 2);
+  assert.equal(db.stats.length, 2);
+
+  const winner = db.stats.find((row) => row.accountId === "acct-winner");
+  const loser = db.stats.find((row) => row.accountId === "acct-loser");
+  assert.ok(winner);
+  assert.ok(loser);
+  assert.equal(winner.wins, 2);
+  assert.equal(winner.gamesPlayed, 2);
+  assert.equal(winner.pointsFor, 200);
+  assert.equal(winner.pointsAgainst, 175);
+  assert.equal(winner.currentStreak, 2);
+  assert.equal(loser.losses, 2);
+  assert.equal(loser.gamesPlayed, 2);
+  assert.equal(loser.pointsFor, 175);
+  assert.equal(loser.pointsAgainst, 200);
+  assert.equal(loser.currentStreak, -2);
+});
+
 test("v1.1 completed ranked match rejects unvalidated account identity", async () => {
   const db = new FakeLeaderboardDb();
 
@@ -535,22 +602,24 @@ test("v1.1 completed casual account match writes nothing", async () => {
   assert.equal(db.stats.length, 0);
 });
 
-test("v1.1 completed match leaderboard skips abandoned or incomplete games", async () => {
+test("v1.1 completed match leaderboard skips admin, tournament, or incomplete games", async () => {
   const db = new FakeLeaderboardDb();
 
-  const forfeit = await recordV11CompletedMatchLeaderboardResult(
+  const autoVictory = await recordV11CompletedMatchLeaderboardResult(
     db,
     {
       roomCode: "ROOM7",
       mode: "quick",
       phase: "game_over",
-      resultReason: "forfeit",
+      resultReason: "auto_victory",
       matchKind: "ranked",
       leaderboardEligible: true,
       winnerAccountId: "acct-winner",
       loserAccountId: "acct-loser",
       winnerUsername: "Winner",
       loserUsername: "Loser",
+      winnerIdentityValidated: true,
+      loserIdentityValidated: true,
       finalScores: [90, 80],
     },
     { enabled: true },
@@ -591,8 +660,8 @@ test("v1.1 completed match leaderboard skips abandoned or incomplete games", asy
     { enabled: true },
   );
 
-  assert.equal(forfeit.recorded, false);
-  assert.equal(forfeit.skipped, "ineligible_match");
+  assert.equal(autoVictory.recorded, false);
+  assert.equal(autoVictory.skipped, "ineligible_match");
   assert.equal(incomplete.recorded, false);
   assert.equal(incomplete.skipped, "ineligible_match");
   assert.equal(tournament.recorded, false);
